@@ -8,6 +8,7 @@ from urllib.request import HTTPSHandler, build_opener
 from urllib.response import addinfourl
 
 import pytest
+
 from matching_engine.rerank_providers import (
     QWEN,
     SYSTEMONE_MODEL,
@@ -152,7 +153,7 @@ def test_endpoint_cannot_be_switched_to_an_unapproved_target(provider, monkeypat
     assert not (provider.directory / "usage.json").exists()
 
 
-def test_generation_still_uses_local_qwen_without_credentials(tmp_path, monkeypatch) -> None:
+def test_legacy_local_generation_remains_replayable_without_credentials(tmp_path, monkeypatch) -> None:
     import matching_engine.rerank_providers as module
 
     traits = {"grade": "junior", "levels": {"python": 2, "react": 1, "sql": 2, "rest_api": 2, "teamwork": 3},
@@ -165,7 +166,7 @@ def test_generation_still_uses_local_qwen_without_credentials(tmp_path, monkeypa
         return io.BytesIO(json.dumps({"choices": [{"message": {"content": json.dumps([traits])}}]}).encode())
 
     monkeypatch.setattr(module, "urlopen", respond)
-    teacher = SystemOneProviders(tmp_path / "cache", key_file=tmp_path / "absent-key.txt")
+    teacher = LocalProviders(tmp_path / "cache")
     assert teacher.generate("backend", "synthetic scenario", count=1) == [traits]
     assert SystemOneProviders.generate is LocalProviders.generate
     assert captured[0].full_url == "http://127.0.0.1:12444/api/v1/chat/completions"

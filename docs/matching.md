@@ -246,6 +246,67 @@ source leakage, family bootstrap для обеих метрик и safety хво
 автоматически. Неизвестные grades исключаются из NDCG с явным числом оценённых
 семейств; pair ничьи/недостаточность не превращаются в бинарные ответы.
 
+### Генерация через Sverk OpenAI API, 06.10.2026
+
+Генераторы `qwen3.8-27b` и `gemma4-vlm` используют
+`https://ai.sverk.tech/v1/chat/completions` и тот же существующий Sverk ключ.
+Свежие семейства запрашивают первый батч через Qwen, второй через Gemma;
+старые валидные батчи переиспользуются вместе с исходной моделью.
+JSON Schema ограничивает пять профилей, диапазоны уровней/зарплаты/длительности
+и допустимые поля. Qwen thinking отключён через `chat_template_kwargs`.
+Пять общих файловых слотов ограничивают HTTP даже между процессами.
+Счётчики резервируются атомарно до вызова; одинаковые запросы выполняются один раз.
+Текущий family обрабатывается полностью до следующего: два generator запроса
+параллельно, затем до пяти pair/grade запросов. Локальный legacy inference
+остаётся последовательным. При ошибке новые задачи не ставятся, начатые завершаются.
+
+Лимиты остаются generation120 / pair3000 / grade600 с учётом прошлых попыток.
+Новые модели не сбрасывают ledger. Контакты и реальные профили не отправляются.
+Исторический невалидный батч можно явно переиспользовать без HTTP:
+
+```sh
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_experiment reuse-batch --family backend-04 --batch 1 --cache-key <sha256>
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_experiment seal-family --family backend-04
+```
+
+`reuse-batch` сохраняет лишь валидные исходные профили, исходный индекс/хеш/причину
+отклонения и неизменный raw response. `seal-family` проверяет raw generation,
+контролируемые варианты фактов и все pair/grade/swapped receipts из кэша;
+сохраняет исходные байты в history и публикует хеш записи. Эти команды не читают
+ключ и не расходуют бюджет. При возобновлении и train неподтверждённая или
+изменённая запись отвергается. Семейства размером 2–10 используют фактический
+размер при ранжировании, построении признаков, pairs и независимых grades.
+
+До добавления Gemma реальный Qwen запуск: 19 запросов / 95 валидных профилей, usage19118tokens;
+18 запросов без thinking заняли 43.59–51.28с, первый с thinking —119.52с.
+Завершены12семейств /119профилей; raw130/valid129 с историческими запросами.
+На frontend-05 согласована1/3перестановок, что ниже обязательных2/3.
+Дальнейшее расширение остановлено; partial dataset не обучается.
+Общий ledger: generation26/pair656/grade119, включая прошлую Laya.
+Проверяемый отчёт — [remote generation](../data/validation/rerank-remote-generation-report.json).
+Эти данные проверяют механику генерации; качество R₀ и реальные предпочтения
+работодателей пока не подтверждены. Backend продолжает явный `main_fallback`.
+
+Дополнительный ограниченный pilot по прямому указанию Mike одновременно
+сгенерировал два батча для frontend-06: Qwen и Gemma, по пять валидных профилей.
+Gemma завершила запрос за 13.87с (actual usage 913 tokens); все исходники сохранены
+для будущего использования. Это проверка нового генератора при остановленной
+разметке; teacher/gates и разбиение не изменены. После pilot общий ledger
+generation28/pair656/grade119, raw140/valid139, завершённые семейства по-прежнему12.
+Отчёт — [mixed generation pilot](../data/validation/rerank-mixed-generation-pilot.json).
+
+Проверки этого прохода: `PYTHONPATH=services/matching-engine/src
+services/matching-engine/.venv/bin/python -m pytest services/matching-engine/tests -q`
+с отдельным `PIPELINE_TEST_DATABASE_URL` — 315 passed, включая PostgreSQL;
+`pnpm --filter @comit/api test` — 10 passed; `pnpm typecheck`, `pnpm build` и
+`WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
+INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` — зелёные (12 smoke проверок).
+Ruff из `services/matching-engine`: `.venv/bin/ruff check src
+tests/test_rerank_generation.py tests/test_rerank_resume.py tests/test_rerank_systemone.py`
+— зелёный. Полный lint tests дополнительно обнаруживает прежние import-order
+ошибки в четырёх нетронутых test-файлах; они не исправлялись в этом проходе.
+Production, удалённый CI, image build и обучение R₀ на полной разметке не проверялись.
+
 Границы активации: golden12/min6 decisive pairs на семью, macro NDCG Δ≥0.02,
 macro accuracy≥0.65/Δ≥0.03 и нижняя95% family-bootstrap граница обоих Δ>0.
 Поддержанные срезы (≥3 семьи) не должны просесть больше0.03.
