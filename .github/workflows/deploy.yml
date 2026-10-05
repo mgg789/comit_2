@@ -1,0 +1,32 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & run prod stack on mgg-server
+    runs-on: [self-hosted, ci]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load server env
+        run: |
+          if [ -f /home/mgg/comit/.env ]; then
+            cp /home/mgg/comit/.env .env
+          else
+            echo "::error::/home/mgg/comit/.env is missing — create it on the server from .env.example"
+            exit 1
+          fi
+      - name: Build and start prod stack
+        run: docker compose -p comit --env-file .env -f infra/docker-compose.prod.yml up -d --build
+      - name: Smoke gate (prod ports)
+        run: ./tests/smoke.sh
+      - name: Prune dangling images
+        if: always()
+        run: docker image prune -f

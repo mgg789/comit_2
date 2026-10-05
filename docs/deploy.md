@@ -1,0 +1,32 @@
+# Deploy — mgg-server
+
+> Решение 2026-10-05: деплой в `/home/mgg/comit` под пользователем `mgg` (без sudo), сам сборщик — deploy-workflow на self-hosted раннере.
+
+## Схема
+
+```
+push main ──► deploy.yml (runner mgg-ci-*, контейнер docker на сервере)
+                ├─ docker compose -f infra/docker-compose.prod.yml build
+                ├─ docker compose up -d
+                └─ ./tests/smoke.sh  (порты по умолчанию: web 8088, api 8080, engines 8101-8103)
+```
+
+- Стек живёт в Docker с `COMPOSE_PROJECT_NAME=comit` (имена `comit-web-1`, `comit-api-1`, ...), checkout раннера — временный, контейнеры от него не зависят.
+- Секреты: `/home/mgg/comit/.env` (создаётся один раз вручную по `.env.example`; `POSTGRES_PASSWORD` и `JWT_SECRET` обязательны — prod compose падает без них намеренно).
+- Порты наружу: только `WEB_PORT` (nginx). Reverse proxy / домен / TLS — отдельная задача, когда появится домен.
+
+## Операции
+
+| Действие | Команда (на mgg-server) |
+|---|---|
+| Статус | `docker compose -f /home/mgg/comit/infra/docker-compose.prod.yml ps` — точнее: `docker ps --filter name=comit-` |
+| Логи | `docker logs -f comit-web-1` / `comit-api-1` / ... |
+| Рестарт сервиса | `docker compose -p comit -f /home/mgg/comit/infra/docker-compose.prod.yml restart api` |
+| Полная пересборка | push в `main` или `gh workflow run deploy.yml` |
+| Откат | `git checkout <prev-tag/commit>` на main + повторный deploy |
+
+## Правила
+
+- Интерактивные операции на сервере — только по явной команде пользователя (AGENTS §13).
+- `down -v` (снос volumes) на prod — запрещён без явной команды: там данные демо.
+- Деплой обязан заканчиваться зелёным smoke — красный деплой откатывается.

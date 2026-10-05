@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: JS typecheck & build
+    runs-on: [self-hosted, ci]
+    container:
+      image: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@9.14.2
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r typecheck
+      - name: Build
+        run: pnpm -r build
+
+  python:
+    name: Python services tests
+    runs-on: [self-hosted, ci]
+    container:
+      image: python:3.12-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install services with dev deps
+        run: |
+          pip install --no-cache-dir \
+            -e "./services/matching-engine[dev]" \
+            -e "./services/testing-engine[dev]" \
+            -e "./services/integration-engine[dev]"
+      - name: Run tests
+        run: >
+          pytest
+          services/matching-engine/tests
+          services/testing-engine/tests
+          services/integration-engine/tests
+          -q
+
+  smoke:
+    name: Compose smoke gate
+    runs-on: [self-hosted, ci]
+    # Host ports are shared: smoke runs must not overlap each other or the deploy.
+    concurrency:
+      group: smoke-host
+      cancel-in-progress: false
+    env:
+      WEB_PORT: 18088
+      API_PORT: 18080
+      MATCHING_PORT: 18101
+      TESTING_PORT: 18102
+      INTEGRATION_PORT: 18103
+      POSTGRES_PORT: 18432
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start dev stack (isolated project and ports)
+        run: docker compose -p comit-ci -f infra/docker-compose.yml up -d --build
+      - name: Run smoke gate
+        run: ./tests/smoke.sh
+      - name: Tear down
+        if: always()
+        run: docker compose -p comit-ci -f infra/docker-compose.yml down -v --remove-orphans
