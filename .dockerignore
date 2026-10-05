@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.mimosa
+.venv
+__pycache__
+*.log
+.env
+context
+docs
