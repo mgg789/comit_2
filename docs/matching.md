@@ -146,3 +146,37 @@ Visited/pending/attractive хранятся отдельно от сменяем
 вернуть в eligible; pending/attractive можно явно освободить. Такое изменение
 инвалидирует старую выдачу и создаёт новый основной отбор. Это серверный контракт
 для следующего этапа, без реализации интерфейса тиндера и feedback learning.
+
+## Проверенный локальный проход 05.10.2026
+
+`tests/combine_acceptance.py` завершился на свежей PostgreSQL БД через Fastify,
+настоящие три worker и pinned Harrier. Вход — 200 кандидатов (20 паттернов × 10)
+и 10 вакансий, независимый oracle допустимости — `data/seed/matching-scenarios.json`.
+
+| Вакансия | Прошло строгий фильтр из 200 |
+|---|---:|
+| Backend onsite Москва | 120 |
+| Backend remote Казань | 150 |
+| Frontend remote | 10 |
+| ML remote | 10 |
+| Backend class-only | 150 |
+| Classless stack-only | 170 |
+| Classless domain-only onsite | 140 |
+| Backend explicit zero | 150 |
+| Backend hybrid Тюмень | 20 |
+| Несовместимые зарплата/город | 0 |
+
+Проверены top10/пустая выдача, числовые вклады и ограничение semantic delta,
+public PDF без контактов (9 образцов), идемпотентность ручного запуска,
+visited/pending, отзыв согласия и перестроение всех run на 199 кандидатах,
+shared backfill 37→38 и закрытие вакансии. Во время backfill все 10 старых
+selections endpoints возвращали 409. Финал: 199 кандидатов, 9 open вакансий,
+630 ACK, pending/queued/retrying/quarantined=0. Полные снимки и отчёт — ignored
+`tests/artifacts/combine/`; скрипт воспроизводит весь проход.
+
+Это проверка контрактов на синтетике, не Precision/MRR качества найма.
+Веса не обучены; реранкер, FSP/freshness и feedback learning не реализованы.
+Структурированного расписания кандидата ещё нет: vacancy daily сохраняется,
+но автоматическое сравнение графиков не выполняется. JWT/ownership работодателя
+нужны перед подключением internal методов к браузерному интерфейсу.
+Prod deployment, remote CI и сборка Docker image в этом проходе не проверялись.

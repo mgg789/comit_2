@@ -47,6 +47,13 @@ services: matching-engine | testing-engine | integration-engine  (Python/FastAPI
 
 Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`.
 
+В цикле 1 реализован серверный поток: подтверждённые/заявленные профили → пул
+с двумя векторами и PDF; вакансии с необязательными группами требований → ready;
+доставка событий → строгие фильтры → основной top-k с объяснениями.
+Город обязателен для обеих сторон. Реранкер и UI тиндера — следующие этапы.
+Запуск трёх worker и настоящая локальная проверка 200 кандидатов/10 вакансий —
+в [runbook](docs/runbook.md); входные сценарии — `data/seed/matching-scenarios.json`.
+
 ## Карта репозитория
 
 | Путь | Содержание |

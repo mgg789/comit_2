@@ -109,6 +109,13 @@ Bio без содержимого не создаёт embedding cache entry. О�
 
 ## Основной отбор: миграция 004
 
+`data/seed/matching-scenarios.json` содержит 20 паттернов × 10 кандидатов и 10
+вакансий с независимым ручным oracle допустимости. `tests/combine_acceptance.py`
+проверяет весь поток через реальные HTTP API/worker/Harrier/PDF; нужна свежая
+отдельная локальная БД. Полные вымышленные входы, снимки карточек, PDF и отчёт
+записываются в ignored `tests/artifacts/combine/`. Этот oracle проверяет контракт
+фильтрации, не реальное качество найма: Precision/MRR без разметки не заявляются.
+
 `matching_pipeline` хранит settings (pool_generation), controls (top_k/ревизия/текущий
 run), runs (неизменяемые snapshots, policy/hash, поколения, lease/retry и статистика),
 selections (карточки с позициями и факторами), selection_states (независимые исключения),
