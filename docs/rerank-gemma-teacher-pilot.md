@@ -148,8 +148,15 @@ format/evidence/prose результаты и hashes; старый отчёт н
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_gemma_format
 ```
 
-Реализация и16новых regression checks:426Python/PGtests passed; из
+До rebase реализация и16новых regression checks:426Python/PGtests passed; из
 matching-engine `.venv/bin/ruff check src tests/test_rerank_gemma_format.py`
 зелёный. `pnpm typecheck`, `pnpm build` и прежняя команда `make smoke` с ports38xxx
-зелёные. Публичные API/shared контракты не менялись; отдельные API/auth tests
-в этом format-проходе не повторялись. Production/remote CI не проверялись.
+зелёные. Публичные API/shared контракты в format-пробе не менялись; отдельные
+API/auth tests до rebase не повторялись. Production/remote CI не проверялись.
+
+После переноса checkpoint на параллельный dev `c742bf3` повторены полные checks:
+436Python/PGtests passed, Ruff/typecheck/build/smoke12 зелёные.
+`pnpm --filter @comit/api test` —27passed/4skipped: отдельные auth/profile HTTP/PG
+tests требуют своих test database переменных и не выполнялись в этом контуре.
+Изменения профилей кандидата и freshness сохранены; matching format-probe
+не использует scores/main-v2 и не меняет исходные frozen synthetic факты.
