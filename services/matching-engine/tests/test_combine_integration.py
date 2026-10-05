@@ -486,3 +486,15 @@ def test_optional_owner_header_hides_foreign_vacancy(store: Store) -> None:
         json={"top_k": 2},
         headers=owned,
     ).status_code == 200
+
+
+def test_rerank_can_validate_current_main_policy_through_shared_guard(store: Store) -> None:
+    """The existing rerank consumer must keep its static freshness-guard contract."""
+    from matching_engine.rerank_models import RerankRequest
+    from matching_engine.rerank_store import RerankStore
+
+    combines, vacancy_id, _ = setup_pool(store)
+    finish(combines)
+    rerank = RerankStore(store.database_url).request(vacancy_id, RerankRequest())
+    assert rerank.main_run_id == combines.status(vacancy_id).run_id
+    assert rerank.state == "queued"

@@ -67,6 +67,8 @@ producer обязан обновить authoritative evidence API и enqueue н�
 grade допускается в пул при выполнении остальных требований, получает badge в
 public PDF, а в policy `main-v2` confidence `0.6` уменьшает только его rating
 contribution. Pending/rejected grade остаются блокирующими.
+Готовая выдача проверяется против текущего policy fingerprint; смена policy
+делает старый run obsolete до нового отбора. Ту же проверку использует реранкер.
 
 ### testing-engine
 

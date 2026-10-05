@@ -143,8 +143,9 @@ class CombineStore:
             JOIN matching_pipeline.runs r ON r.run_id=c.current_run_id WHERE c.vacancy_id=%s""",
             (vacancy_id,)).fetchone()
 
-    def _valid(self, connection: psycopg.Connection, row: dict) -> bool:
-        if row["policy_hash"] != policy_hash(self.policy):
+    @staticmethod
+    def _valid(connection: psycopg.Connection, row: dict, policy: ScoringPolicy | None = None) -> bool:
+        if row["policy_hash"] != policy_hash(policy or ScoringPolicy()):
             return False
         metadata = connection.execute("""
             SELECT 1 FROM matching_pipeline.controls c
@@ -212,7 +213,7 @@ class CombineStore:
                     if old["vacancy_id"] != vacancy_id or old["top_k"] != request.top_k:
                         raise ConflictError("idempotency key was used with a different request")
                     row = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (old["run_id"],)).fetchone()
-                    return self._status(row, obsolete=not self._valid(connection, row))
+                    return self._status(row, obsolete=not self._valid(connection, row, self.policy))
             self._vacancy(connection, vacancy_id)
             connection.execute("INSERT INTO matching_pipeline.controls(vacancy_id) VALUES (%s) ON CONFLICT DO NOTHING", (vacancy_id,))
             connection.execute("""UPDATE matching_pipeline.controls SET top_k=%s,revision=revision+1
@@ -230,7 +231,7 @@ class CombineStore:
             row = self._current(connection, vacancy_id)
             if row is None:
                 raise NotFoundError("combine run not found")
-            return self._status(row, obsolete=not self._valid(connection, row))
+            return self._status(row, obsolete=not self._valid(connection, row, self.policy))
 
     def selections(self, vacancy_id: UUID, limit: int, offset: int) -> SelectionPage:
         """Read one valid ready batch atomically; never serve partial or stale cards."""
@@ -240,7 +241,7 @@ class CombineStore:
             _lock(connection)
             self._vacancy(connection, vacancy_id)
             row = self._current(connection, vacancy_id)
-            if row is None or row["state"] != "ready" or not self._valid(connection, row):
+            if row is None or row["state"] != "ready" or not self._valid(connection, row, self.policy):
                 raise ConflictError("current selection is not ready")
             cards = connection.execute("""SELECT card FROM matching_pipeline.selections WHERE run_id=%s
                 ORDER BY position LIMIT %s OFFSET %s""", (row["run_id"], limit, offset)).fetchall()
@@ -293,7 +294,7 @@ class CombineStore:
                     ORDER BY created_at,run_id FOR UPDATE SKIP LOCKED LIMIT 1""", (max_attempts,)).fetchone()
                 if row is None:
                     return None
-                if not self._valid(connection, row):
+                if not self._valid(connection, row, self.policy):
                     connection.execute("UPDATE matching_pipeline.runs SET state='obsolete',lease_token=NULL,lease_until=NULL WHERE run_id=%s", (row["run_id"],))
                     try:
                         self._queue(connection, row["vacancy_id"])
@@ -323,7 +324,7 @@ class CombineStore:
             row = connection.execute("""SELECT *,lease_until>now() AS lease_live FROM matching_pipeline.runs WHERE run_id=%s""", (job.run_id,)).fetchone()
             if row is None or row["state"] != "processing" or row["lease_token"] != job.lease_token or not row["lease_live"]:
                 return False
-            if not self._valid(connection, row):
+            if not self._valid(connection, row, self.policy):
                 connection.execute("""UPDATE matching_pipeline.runs SET state='obsolete',lease_token=NULL,lease_until=NULL,
                     updated_at=now() WHERE run_id=%s""", (job.run_id,))
                 try:
