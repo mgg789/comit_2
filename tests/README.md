@@ -30,3 +30,11 @@ the separate unit, PostgreSQL, real-model and smoke verification contours.
   for ten sparse vacancy snapshots, explicit-zero masks, query/document space,
   shared schema backfill and status withdrawal/reopen. Requires a separate fresh
   local database; writes `artifacts/vacancy-pool-acceptance.json` (ignored).
+
+- `candidate_profile_acceptance.py` — authenticated source entry to employer
+  main top-k, using the real encrypted OTP mailbox, projection worker, Harrier,
+  PDFs, vacancy publication and event delivery. Checks consent revoke/regrant,
+  ownership and declaration-only claims on a fresh loopback acceptance DB.
+  `profile_auth_mailbox.mjs` is an IPC-only synthetic mailbox, never an SMTP
+  service or public endpoint. See `docs/candidate-profile.md` for setup and
+  environment contracts; reports under `artifacts/` never include credentials.

@@ -101,9 +101,41 @@ pnpm --filter @comit/api profile:worker
 `--once` предназначен для локального прогона одного job; токены и исходные
 исключения не попадают в логи.
 
-## Ограничения проверки
+## Сквозная локальная проверка
 
-Unit/API contract проверки не являются доказательством production deployment,
-живого PostgreSQL контура или acceptance с настоящим Harrier. Эти проверки должны
-выполняться отдельно на свежей изолированной БД с pinned model cache; текущая
-документация не утверждает, что такой runtime acceptance уже пройден.
+`tests/candidate_profile_acceptance.py` проверяет реальный HTTP-контур на свежей
+локальной БД: email-code auth → source profile → durable projection → настоящий
+Harrier 640D и PDF → создание вакансии → main combine → две карточки из пяти.
+Для OTP используется зашифрованный тестовый mailbox через приватный IPC, без
+отправки писем через SMTP. Все аккаунты синтетические `@example.test`.
+
+Прогон 2026-10-06 подтвердил строгие фильтры класса, зарплаты и города; запрет
+поддельных proofs; роль/owner/origin; коэффициент грейда 0,6 и обезличенный PDF.
+Отзыв согласия закрывает выдачу до projection, затем оставляет одного кандидата;
+повторное согласие и пересборка возвращают двух. Доставка событий отдельно
+проверена: 8 ACK, без pending, retry и quarantine.
+
+Для повторения сначала запустить API, matching и agents на одной **свежей** БД
+`comit_profile_acceptance_<суффикс>` на loopback PostgreSQL 25433, с одинаковыми
+синтетическими auth/service credentials и уже скачанным pinned Harrier. Сценарий
+сам применяет явные миграции и запускает реальные workers, но не поднимает
+серверы и не очищает данные:
+
+```bash
+PROFILE_ACCEPTANCE_DATABASE_URL="$DATABASE_URL" \
+PYTHONPATH=services/matching-engine/src:services/agents-service/src \
+  services/matching-engine/.venv/bin/python tests/candidate_profile_acceptance.py
+```
+
+Порты по умолчанию API 39580, matching 39581, agents 39584; переопределяются через
+`PROFILE_ACCEPTANCE_API_URL`, `PROFILE_ACCEPTANCE_MATCHING_URL` и
+`PROFILE_ACCEPTANCE_AGENTS_URL`. `AUTH_ALLOWED_ORIGINS` должен включать
+`PROFILE_ACCEPTANCE_ORIGIN` (по умолчанию `http://127.0.0.1:39580`). Auth API
+требует валидную конфигурацию SMTP, однако mail worker для этой проверки не
+запускается. Результат без секретов сохраняется в игнорируемом
+`tests/artifacts/candidate-profile-acceptance.json`.
+
+Полный backend-путь до main top-k замкнут. Future verification producers и их
+подключение к evidence/outbox остаются отдельным контуром. UI, production deploy,
+реальная доставка email в этом прогоне и качество обученного ML-реранкера здесь
+не проверяются.
