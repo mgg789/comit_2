@@ -1,6 +1,7 @@
 # Архитектура — Comit
 
-> Статус: каркас (S1). Канон-контекст: `context/40-architecture.md`; здесь — актуальное состояние кода.
+> Статус: backend первого цикла; frontend/auth остаются отдельными этапами.
+> Канон-контекст: `context/40-architecture.md`; здесь — актуальное состояние кода.
 
 > Цикл 1: реализован серверный путь от собранного upstream-профиля до готового пула.
 > API-core проверяет сервисный токен и проксирует allowlisted internal методы;
@@ -36,6 +37,15 @@ services/matching-engine     services/testing-engine     services/integration-en
 Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор (context/80, решение Q3).
 
 ## Ключевые потоки
+
+Актуальная серверная реализация: candidate worker → dual-vector pool/PDF;
+vacancy worker → ready; combine worker → main top-k; rerank worker →
+рекомендованный порядок/резерв либо явный fallback. Постановка R₀ атомарна с main
+publication; активная модель хранится в immutable PG registry/settings pointer.
+Обучение выполняет отдельный operator workflow; runtime использует JSON linear
+artifact без sklearn/LLM. Teacher pilot остановлен, активного learned artifact нет.
+Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
+Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 
 1. Регистрация кандидата: email-подтверждение → опрос специализации → заявленный грейд → `testing-engine` формирует вариант → результат → категория → профиль в пуле.
 2. Создание вакансии: строгие параметры + ЗП «от–до» (обязательна) + описание → вектор в `matching-engine` → Active → комбайн → Selection с объяснением → HasCandidates.

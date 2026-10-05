@@ -366,3 +366,13 @@ baseline и новой модели; golden-результаты; корреля
 - [Microsoft: Doubly Robust Policy Evaluation and Optimization](https://www.microsoft.com/en-us/research/publication/doubly-robust-policy-evaluation-and-optimization/) — оценка политик при неполной и смещённой обратной связи.
 
 См. также: [[50-matching-engine]], [[36-mike-ml-workstream]], [[30-domain-model]].
+
+## Состояние реализации, 06.10.2026
+
+Первый проход подготовил typed facts, единый feature builder, portable pairwise
+learner, durable backend R₀ и internal API/fallback. Реальный teacher pilot
+остановлен:20 ответов B из20, согласованность10 перестановок=0%; массовая
+генерация/обучение на этой разметке не выполнялись. Learned artifact не активирован,
+golden/reviews ожидают валидной разметки. Остальные модели этого документа остаются
+следующими этапами. Проверенные контуры и команды — [docs/matching.md](../docs/matching.md)
+и [docs/runbook.md](../docs/runbook.md); этот статус не означает прохождение quality gate.
