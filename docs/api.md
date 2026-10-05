@@ -11,7 +11,7 @@
 | testing-engine | http://localhost:8102/docs |
 | integration-engine | http://localhost:8103/docs |
 
-## Текущие эндпоинты (каркас)
+## Текущие эндпоинты
 
 ### api-core (`apps/api`)
 
@@ -19,6 +19,23 @@
 |---|---|---|
 | GET | `/healthz` | liveness: `{status, service, version}` |
 | GET | `/ready` | readiness (проверка БД подключается с миграциями) |
+
+Аутентификация уже подключена в `apps/api`: пароль не используется. Код на email
+ставится в PostgreSQL outbox, а после успешной проверки создаются собственный HS256
+JWT и отзываемая DB-сессия. Нормализованный email глобально принадлежит ровно одному
+аккаунту и одной неизменяемой роли (`candidate` или `employer`).
+
+| Метод | Путь | Контракт / результат |
+|---|---|---|
+| POST | `/auth/{role}/code` | `{email}` → 202 `{challenge_id,expires_at,resend_after}`; 202 означает постановку отправки |
+| POST | `/auth/{role}/verify` | `{email,challenge_id,code,consent?}` → аккаунт, Bearer JWT, 7-дневный expiry и role cookie |
+| GET | `/auth/{role}/me` | текущий аккаунт из JWT/cookie |
+| POST | `/auth/{role}/logout` | отзыв текущей DB-сессии и очистка cookie |
+| POST | `/auth/{role}/logout-all` | отзыв всех DB-сессий аккаунта |
+
+Первый аккаунт требует versioned consent на обработку аккаунта; consent на публикацию
+профиля в пуле остаётся отдельным условием candidate pipeline. Обязательное согласие
+не превращает регистрацию в публикацию профиля.
 
 ### testing-engine
 
@@ -39,7 +56,9 @@
 - Новые эндпоинты регистрируются в этом файле в том же коммите.
 - Ответы типизируются схемой Fastify (api) / pydantic (engines) — схема = документация.
 - Коды ошибок: 400 (валидация), 401/403 (роли), 404 (нет ресурса), 409 (конфликт статусов), 422 (pydantic).
-- Авторизация: `Authorization: Bearer <JWT>`; структура claims — Keycloak-совместимая (context/80, Q7).
+- Авторизация: `Authorization: Bearer <JWT>` или HttpOnly role cookie; claims JWT
+  Keycloak-совместимы (`sub`, `sid`, `roles`, `email_verified`, `iss`, `aud`, `iat`, `exp`).
+  Сессия дополнительно проверяется по hash `sid` в PostgreSQL и может быть отозвана.
 
 ## Дорожная карта API (S1–S4)
 
@@ -91,20 +110,22 @@ primary_direction, approved grade_result с UUID сессии и времене�
 уровень остаётся в `strict_evidence`. Неподтверждённые навыки не исключаются.
 
 Private owner PDF существует только во внутреннем matching-engine по
-`GET /internal/candidates/{id}/resume.pdf`; API-core его **не проксирует**.
-До появления кандидатской авторизации и проверки владельца этот PDF не подключать к UI.
+`GET /internal/candidates/{id}/resume.pdf`; public API проксирует его только для
+аутентифицированного кандидата и подставляет `account.id`, игнорируя чужой ID.
 Остальные internal mutation-методы предназначены только доверенной серверной интеграции.
 Входная валидация Fastify возвращает 400, Pydantic/неизвестная координата — 422.
 Хранилище или upstream недоступны — 503 без DSN/исходных исключений.
 
-Контракты регистрации/подтверждения email, проведения теста, CRUD исходных claims,
-кандидатского JWT/ownership пока отсутствуют и входят
-в соседние этапы. В рамках этой задачи их результаты поступают через intake.
+Регистрация/подтверждение email и candidate JWT/ownership реализованы. CRUD исходных
+claims, профильная форма, проведение теста и публикация в пул ещё не входят в этот
+контур: pipeline получает уже собранный и проверенный upstream-снимок.
 
 ## Подготовка вакансии к комбайну (цикл 1)
 
-Та же серверная граница `X-Internal-Token`; employer JWT и проверка владельца
-в браузерном API ещё не реализованы. Internal методы доступны доверенному источнику.
+Та же серверная граница `X-Internal-Token` действует для matching-engine. Employer
+JWT и проверка владельца в public gateway реализованы для draft/agent paths, где
+`X-Owner-ID` сервер устанавливается из `account.id`; internal методы по-прежнему
+доступны только доверенному источнику.
 
 | Метод | Путь | Контракт / результат |
 |---|---|---|
@@ -158,9 +179,11 @@ Relocation_ready=true с пустым списком допускает любо
 
 ## Основной отбор и доставка событий
 
-Все маршруты защищены тем же `X-Internal-Token` и опубликованы в OpenAPI
+Все internal-маршруты защищены тем же `X-Internal-Token` и опубликованы в OpenAPI
 FastAPI/Fastify; DTO находятся в `packages/shared/src/matching.ts`. Это server-to-server
-контракт; пользовательский JWT/ownership работодателя и UI тиндера ещё не подключены.
+контракт. Public employer gateway пока не публикует подборку Selection и не даёт
+CRUD опубликованного профиля вакансии; пользовательский JWT используется только в
+реализованных account/draft границах.
 
 | Метод и путь | Назначение |
 |---|---|
@@ -206,9 +229,11 @@ score, rerank_position=null, весь main top-k остаётся рекомен
 `apps/api/src/contracts/agents.openapi.json` и `packages/shared/src/agents.ts`
 командой `PYTHONPATH=services/agents-service/src python tests/generate_agents_contract.py`.
 Fastify использует тот же OpenAPI для allowlist, body/response/UUID schemas.
-Все нижеперечисленные пути требуют `X-Internal-Token=AGENTS_SERVICE_TOKEN` и
-`X-Owner-ID=UUID`. Это доверенный транспорт и учёт владельца, не аккаунты/JWT.
-Реквизиты владельца не принимаются из поля JSON; чужая запись возвращает 404.
+Все нижеперечисленные internal-пути требуют `X-Internal-Token=AGENTS_SERVICE_TOKEN`
+и `X-Owner-ID=UUID`. Public `/employer/*` gateway получает UUID из проверенного JWT/
+cookie и сам передаёт его upstream; клиентский owner header игнорируется. Это не
+заменяет internal token. Реквизиты владельца не принимаются из JSON; чужая запись
+возвращает 404.
 
 | Метод и путь | Тело/результат |
 |---|---|
@@ -244,5 +269,6 @@ multi-select группы объединяет выбранные неперес
 401 — нет доверенного токена; 400/422 — неверный контракт; 404 — нет записи данного
 владельца; 409 — CAS/state/hash/schema конфликт; 503 — недоступная зависимость.
 Технические ошибки inference передаются через job state и безопасный error code.
-UI, JWT/accounts и редактирование опубликованной вакансии не реализованы в этом проходе.
+Auth/JWT/accounts и owner-scoped draft gateway реализованы. UI, public matching
+Selections и CRUD опубликованной вакансии пока не реализованы в этом проходе.
 Подробности: [agents.md](agents.md).

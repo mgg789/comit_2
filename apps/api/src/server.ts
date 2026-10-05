@@ -9,10 +9,12 @@ import swaggerUi from "@fastify/swagger-ui";
 import { healthRoutes } from "./routes/health.js";
 import { candidatePipelineRoutes, candidateValidationOptions } from "./routes/candidate-pipeline.js";
 import { agentsRoutes } from "./routes/agents.js";
+import cookie from "@fastify/cookie";
+import { authDomain } from "./auth/domain.js";
 
 const app = Fastify({
-  logger: true,
-  trustProxy: true,
+  logger: { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-internal-token", "res.headers.set-cookie"] },
+  trustProxy: process.env.TRUST_PROXY?.split(",").filter(Boolean) ?? false,
   ajv: { customOptions: candidateValidationOptions },
 });
 
@@ -26,13 +28,18 @@ await app.register(swagger, {
     tags: [{ name: "health", description: "Liveness and readiness probes" }],
     components: { securitySchemes: {
       internalToken: { type: "apiKey", in: "header", name: "X-Internal-Token" },
+      bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
+      candidateSession: { type: "apiKey", in: "cookie", name: "__Host-comit_candidate_session" },
+      employerSession: { type: "apiKey", in: "cookie", name: "__Host-comit_employer_session" },
     } },
   },
 });
 await app.register(swaggerUi, { routePrefix: "/docs" });
 await app.register(healthRoutes);
+await app.register(cookie);
 await app.register(candidatePipelineRoutes);
 await app.register(agentsRoutes);
+await app.register(authDomain);
 
 const port = Number(process.env.PORT ?? 8080);
 await app.listen({ port, host: "0.0.0.0" });

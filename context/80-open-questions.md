@@ -55,7 +55,8 @@ API не дадут — придумываем сами. Отображение 
 
 ### Q11. NestJS vs Fastify для api-core
 NestJS — структура и Decorator-based OpenAPI, но тяжелее и «магичнее»; Fastify — быстрее и проще, schema-based swagger.
-**Рекомендация:** NestJS, если в команде есть опыт — он самодокументируем для жюри; иначе Fastify + zod/openapi.
+**Решение:** Fastify + TypeScript NodeNext ESM с schema-based OpenAPI. Это фактический
+стек `apps/api`; NestJS/Prisma в проекте не используются.
 
 ### Q12. Эмбеддинг-модель для плотной части
 Локальная ru-friendly модель без GPU: предложения — bge-m3 / multilingual-e5-small / laiy (локально уже есть Harrier/Laya в jev-local). API внешних сервисов (OpenAI и пр.) — против правил (память не отправлять наружу; и вообще демо должно жить офлайн).
@@ -67,7 +68,8 @@ NestJS — структура и Decorator-based OpenAPI, но тяжелее и
 
 ### Q14. Где разворачиваем прототип
 ТЗ: крайне желательна ссылка на развёрнутое решение. У нас есть свой сервер (mgg-server) и опыт публичного стенда Navix.
-**Рекомендация:** docker-compose на сервере + seed-данные + демо-аккаунты (candidate@demo / employer@demo) на слайде первой страницей.
+**План:** docker-compose на сервере + seed-данные + демо-аккаунты. Фактический
+production/server deploy этим документом не подтверждается.
 
 ## Решения (обсуждено с Mike 05.10.2026)
 
@@ -79,6 +81,8 @@ NestJS — структура и Decorator-based OpenAPI, но тяжелее и
 | Q5 | Вектора | **Гибрид**: интерпретируемые фичи — основа скоринга и объяснимости, плотный эмбеддинг — один из сигналов | 05.10 |
 | C  | Тестирование | Блэк-бокс-заглушка **только в рамках первого 24-ч спринта** (сквозной сценарий работает сразу), живая blueprint-механика — в следующих спринтах | 05.10 |
 | Q7 | Keycloak | Свой email+JWT с claims-структурой Keycloak + шов в документации (решение по умолчанию) | 05.10 |
+| Q7a | Auth storage | Passwordless OTP через encrypted PostgreSQL SMTP outbox; один email — один fixed role; custom JWT + revocable DB session. Account consent отделён от profile/pool consent | 06.10 |
+| Q7b | Auth ownership | Public employer drafts/agents и candidate pipeline/PDF получают owner только из JWT/cookie; public matching selections и profile CRUD пока отсутствуют | 06.10 |
 | Q10| SLA-штраф | Мягкая версия в MVP: warn → ограничение новых приглашений; полная — концепцией | 05.10 |
 | Q12| Эмбеддинг-модель | **`microsoft/harrier-oss-v1-270m`, 640D** (решение Mike): базовая в S3, контрастивный дотюн на синтетике в S5 с eval-гейтом base-vs-tuned; MLX-вариант — эксперименты на Mac, прод — CPU на mgg-server | 05.10 |
 | Q12b| LLM для PDF-разбора и объяснений | **Облачная LLM** (решение Mike): Sverk API либо РФ-облако (YandexGPT/GigaChat — 152-ФЗ, данные в РФ); обязателен эвристический fallback для офлайн-контура, один интерфейс клиента, ключи только в env | 05.10 |

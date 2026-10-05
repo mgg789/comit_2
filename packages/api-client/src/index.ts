@@ -3,6 +3,7 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
+import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -23,8 +24,17 @@ export interface ApiClientOptions {
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  /** Queue a role-bound code; the receipt never contains the OTP. */
+  requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
+  /** Verify a code, including account consent only for first registration. */
+  verifyLoginCode(role: AccountRole, body: EmailCodeVerification): Promise<AuthenticatedSession>;
+  /** Resolve the current account from the same-origin cookie or configured Bearer token. */
+  getAccount(role: AccountRole): Promise<AccountView>;
+  /** Revoke this session, or all account sessions when all is true. */
+  logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
 }
 
+/** Create a same-origin API client; optional Bearer credentials override session cookies server-side. */
 export function createApiClient({
   baseUrl = "/api",
   getAuthToken = () => null,
@@ -37,6 +47,7 @@ export function createApiClient({
     const response = await fetch(`${baseUrl}${path}`, {
       method,
       headers,
+      credentials: "same-origin",
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
@@ -48,5 +59,9 @@ export function createApiClient({
   return {
     get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
+    requestLoginCode: (role, email) => request("POST", `/auth/${role}/code`, { email }),
+    verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
+    getAccount: role => request("GET", `/auth/${role}/me`),
+    logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
   };
 }

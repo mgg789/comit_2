@@ -1,5 +1,39 @@
 # Runbook — типовые операции
 
+## Auth API-core: явная миграция и mail worker
+
+Auth не использует пароль и не создаёт аккаунт до успешного OTP. Один
+нормализованный email может иметь только одну роль. Сначала применить миграцию в
+отдельном шаге, затем запускать API и worker:
+
+```bash
+DATABASE_URL='postgres://...' pnpm --filter @comit/api auth:migrate
+DATABASE_URL='postgres://...' AUTH_SECRET='(>=32 bytes)' \
+  pnpm --filter @comit/api auth:mail-worker
+```
+
+`AUTH_SECRET`/`JWT_SECRET`, `AUTH_ALLOWED_ORIGINS`, `ACCOUNT_CONSENT_VERSION` и
+SMTP-параметры передаются через секретное окружение; значения не печатаются и не
+записываются в репозиторий. Worker перед SMTP проверяет lease и актуальность
+challenge. После доставки/истечения/пяти неудачных попыток зашифрованный payload
+удаляется. Повтор письма после crash между SMTP ACK и фиксацией ACK возможен;
+реальную доставку этим локальным запуском не считать проверенной.
+
+Опциональный compose overlay `infra/docker-compose.auth.yml` добавляет только
+auth-migration и mail-worker, использует существующий PostgreSQL и внешний SMTP;
+новый SMTP-сервис не создаётся. Не применять `down -v` для auth-проверки.
+
+Тестовые БД auth должны быть раздельными и одноразовыми:
+
+```bash
+AUTH_TEST_DATABASE_URL='postgres://...' \
+AUTH_ROUTE_TEST_DATABASE_URL='postgres://...' \
+  pnpm --filter @comit/api test
+```
+
+Без этих переменных DB acceptance тесты пропускаются; crypto/unit и transport
+проверки не доказывают работу PostgreSQL или реальную доставку.
+
 ## Candidate pipeline: запуск с собранными данными
 
 Это серверный поток, не регистрация пользователя. Нужны PostgreSQL 16 + pgvector,

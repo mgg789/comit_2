@@ -1,6 +1,7 @@
 # Архитектура — Comit
 
-> Статус: backend первого цикла; frontend/auth остаются отдельными этапами.
+> Статус: backend первого цикла; email auth и owner gateway реализованы, frontend и
+> оставшиеся профильные/подборочные flows подключаются отдельными этапами.
 > Канон-контекст: `context/40-architecture.md`; здесь — актуальное состояние кода.
 
 > Цикл 1: реализован серверный путь от собранного upstream-профиля до готового пула.
@@ -8,9 +9,9 @@
 > matching-engine хранит собственную JSONB-проекцию, версии координат, durable jobs,
 > два вектора, PDF и outbox в одной PostgreSQL. Отдельный worker строит артефакты;
 > отдельный migration job запускается перед serve/worker через local overlay.
-> Это сужение текущей задачи, не перенос будущего auth/profile домена из API-core.
-> Таблица сервисных ответственностей ниже описывает целевую архитектуру: auth,
-> testing sessions, vacancy combine и пользовательские сценарии пока не реализованы.
+> Это сужение текущей задачи, не перенос будущего profile домена из API-core.
+> Auth имеет собственную PostgreSQL migration/outbox/session границу; testing
+> sessions, public matching selections и полная профильная форма пока не реализованы.
 
 ## Контур
 
@@ -28,14 +29,31 @@ services/matching-engine     services/testing-engine     services/integration-en
 
 | Сервис | Стек | Ответственность | Почему отдельный |
 |---|---|---|---|
-| `apps/api` | Fastify, TS (NodeNext ESM) | Auth (email+JWT), профили, вакансии, приглашения/статусы, rating ledger, правила видимости п. 2.2 ТЗ, OpenAPI | Транзакционная логика, целостность |
+| `apps/api` | Fastify, TS (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, owner-scoped account gateway, будущие профили/вакансии/приглашения, OpenAPI | Транзакционная логика, целостность |
 | `services/matching-engine` | FastAPI, pgvector | Комбайн: strict filter → hybrid scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек; объяснимость выдачи | ML-эксперименты на Python, независимые релизы |
 | `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
 | `services/integration-engine` | FastAPI | Верификация внешних данных; мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`) | Внешние источники меняются независимо от ядра |
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
-Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор (context/80, решение Q3).
+Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор
+(`context/80`, решение Q3); account/draft gateway уже даёт owner boundary, но
+public hiring chat и matching selection endpoints ещё не подключены.
+
+## Auth и ownership
+
+Нормализованный email глобально уникален и навсегда связан с одной ролью:
+`candidate` или `employer`. Пароли не используются: email OTP имеет пять попыток,
+single-use expiry и durable PostgreSQL SMTP outbox. После проверки API выдаёт
+HS256 JWT с role-bound claims и случайным sid; PostgreSQL хранит только hash sid,
+поэтому logout/revoke действует до истечения JWT. Account consent на обработку
+данных отделён от согласия candidate profile на публикацию в пуле.
+
+Public employer draft/agent paths и candidate pipeline/PDF paths получают account
+ID из проверенного JWT или HttpOnly role cookie. Клиент не может выбрать owner через
+`X-Owner-ID` или query; internal service-to-service endpoints по-прежнему требуют
+сервисный token. Public matching Selection, published vacancy profile CRUD и
+candidate profile CRUD остаются отсутствующими контрактами.
 
 ## Ключевые потоки
 
@@ -59,7 +77,8 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 - Каждый сервис отвечает `GET /healthz` (контракт smoke-гейта); `/ready` — для зависимостей.
 - Контракты типов — `packages/shared`; OpenAPI — схемы Fastify (api) и pydantic-модели (engines).
 - Веса скоринга и формулы живут только в `matching-engine`.
-- БД: одна PostgreSQL, схемы по сервисам; миграции — с S1/S3 (docs/data.md).
+- БД: одна PostgreSQL, схемы по сервисам; auth миграция применяется явно до serve,
+  matching/agents миграции имеют собственные runners (docs/data.md).
 
 ## Порты (dev)
 

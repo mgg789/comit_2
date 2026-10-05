@@ -16,7 +16,9 @@
 > Публикация атомарна после strict + semantic + public/owner PDF; изменение профиля
 > и отзыв согласия снимают старую публикацию. Новая координата вызывает backfill
 > всех прошлых профилей с fail-closed переходом поколения. Разделы v2 ниже описывают
-> более широкий S2-план; пункты auth/CRUD/testing в этом цикле ещё не реализованы.
+> более широкий S2-план; профильный CRUD, проведение теста и публикационный consent
+> в этом цикле ещё не реализованы. Email auth/account session boundary уже реализованы
+> отдельно в API-core.
 > При добавлении vacancy intake общий справочник расширен самостоятельным `ml`;
 > он не объединяется с `data`. Оба пула мигрируют по одному реестру координат.
 
@@ -39,10 +41,10 @@
 | Поле | Примечание |
 |---|---|
 | name | display-имя, приватность: полное/имя/ник |
-| email | уникальный, подтверждение кодом (dev: код в лог) |
+| email | глобально уникальный, подтверждение одноразовым OTP через durable SMTP outbox; код не пишется в лог |
 | phone | контакт, видимость — только после принятия приглашения (ТЗ 2.2.2) |
-| password_hash | argon2/bcrypt |
-| согласие на обработку (152-ФЗ) | version + ts |
+| role | неизменяемый `candidate` или `employer`, один email — одна роль |
+| account consent | version + server timestamp; это не согласие на публикацию профиля |
 | **согласие на попадание в пул** | version + ts; без него нет входа в пул |
 
 ### B. Профиль (`candidate_profiles`) — Codex
@@ -164,8 +166,8 @@ POST /internal/pool/upsert {candidate_id, categories[], features, dense,
 ## 8. Задача для Codex (acceptance criteria цикла 1)
 
 1. Справочники доменов/стеков/софтскиллов/типов достижений/направлений — в `packages/shared` (+seed), заменить старый SPECIALIZATIONS.
-2. Миграции: users/consents, candidate_profiles, **proficiencies**, achievements, projects, work_experiences, grade_attempts, rating_ledger, candidate_categories.
-3. Auth: register/email-подтверждение (dev: код в лог)/login JWT + согласия (обработка + пул).
+2. Миграции профиля: candidate_profiles, **proficiencies**, achievements, projects, work_experiences, grade_attempts, rating_ledger, candidate_categories.
+3. Auth/account уже реализован отдельной API-core миграцией: register/OTP verify, JWT и revocable DB session; согласие на обработку аккаунта не заменяет pool consent.
 4. Профиль: поля B, приватность, правила видимости (контакты — после accept; анонимная карточка: образ-топ, грейд, очки, ФСП-бейджи, город, зп-ожидания — без ФИО-полного и контактов).
 5. Заполнение профилизаций: self_level + пояснение уровня (рубрикация §3 в UI).
 6. PDF: загрузка → эвристический extraction → экран подтверждения → профилизаций/claims (source=pdf_confirmed).
