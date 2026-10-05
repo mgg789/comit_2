@@ -1,6 +1,7 @@
 # Данные — Comit
 
-> Статус: каркас. Схема появляется с миграциями S1/S3; доменная модель — `context/30-domain-model.md`.
+> Статус: backend первого цикла. Auth-схема API-core уже имеет явную миграцию;
+> остальные доменные таблицы появляются по своим миграциям. Доменная модель — `context/30-domain-model.md`.
 
 ## Хранилище
 
@@ -10,7 +11,8 @@
 
 ## Синопсис домена (детали — context/30)
 
-- `User` (candidate|employer) → `CandidateProfile` (+`FspProfile` nullable), `Company`
+- `accounts` (один нормализованный email → одна неизменяемая роль candidate|employer)
+  → будущие `CandidateProfile`/`Company`; account consent не является согласием на публикацию профиля
 - `VerifiedClaim` + `RatingLedger` → `ratingPoints`
 - `TestBlueprint` / `TestSession` / `GradeAttempt` (cooldown смены грейда)
 - `Vacancy` (строгие параметры + вектор + ЗП от–до обязательна), `VacancyVector`
@@ -24,9 +26,30 @@
 3. Статусы приглашений и откликов видят обе стороны.
 4. Регистрация по email с подтверждением.
 
+## Auth-схема API-core
+
+`apps/api/migrations/001_accounts.sql` применяется только явной командой
+`pnpm --filter @comit/api auth:migrate`. Runner берёт PostgreSQL advisory lock,
+сверяет SHA-256 с таблицей `auth_migrations` и не запускается при старом checksum;
+serve этот шаг не выполняет.
+
+| Таблица | Назначение |
+|---|---|
+| `accounts` | email, фиксированная роль, verified-флаг и серверная версия/время account consent |
+| `auth_challenges` | role-bound OTP HMAC, expiry, attempts и одноразовый статус; raw code не хранится |
+| `auth_mail_outbox` | AES-GCM payload, lease/retry/status; payload очищается после ACK/expiry/exhaustion |
+| `auth_issue_events` / `auth_verify_events` | глобальные email/IP rate limits; IP хранится только HMAC |
+| `sessions` | hash 256-bit sid, role/account ownership, expiry и revoke timestamp |
+
+SMTP worker получает plaintext code только в памяти после расшифровки валидного
+outbox job и проверяет challenge/lease непосредственно перед SMTP. Crash между SMTP
+ACK и записью delivery может повторить письмо; это at-least-once delivery, тогда как
+OTP verify остаётся at-most-once. Фактическая доставка и production состояние этой
+схемой не подтверждаются.
+
 ## Миграции
 
-- api-core: инструмент миграций выбирается с первой схемой (кандидат: Prisma migrate / node-pg-migrate); файлы в `apps/api/migrations/`.
+- api-core: явный Node/pg runner с checksum/advisory lock; файлы в `apps/api/migrations/`.
 - matching-engine: вектора/индексы pgvector — в тех же миграциях или отдельной схемой `matching`.
 
 ## Синтетика
