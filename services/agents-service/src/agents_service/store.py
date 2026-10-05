@@ -634,7 +634,7 @@ class Store:
             connection.execute(
                 """
                 UPDATE agents_service.jobs
-                SET state='failed', error='max_attempts_exceeded', updated_at=now()
+                SET state='failed', error='max_attempts_exceeded', lease_token=NULL, lease_until=NULL, updated_at=now()
                 WHERE attempts >= max_attempts
                   AND ((state IN ('queued','retrying') AND available_at <= now())
                     OR (state='processing' AND lease_until <= now()))
