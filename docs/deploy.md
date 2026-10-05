@@ -13,7 +13,7 @@ push main ──► deploy.yml (runner mgg-ci-*, контейнер docker на 
 
 - Стек живёт в Docker с `COMPOSE_PROJECT_NAME=comit` (имена `comit-web-1`, `comit-api-1`, ...), checkout раннера — временный, контейнеры от него не зависят.
 - Секреты: `/home/mgg/comit/.env` (создаётся один раз вручную по `.env.example`; `POSTGRES_PASSWORD` и `JWT_SECRET` обязательны — prod compose падает без них намеренно).
-- Порты наружу: только `WEB_PORT` (nginx). Reverse proxy / домен / TLS — отдельная задача, когда появится домен.
+- Порты на сервере (из `/home/mgg/comit/.env`, задеваем чужие): web `8088`, api `28080`, matching `28101`, testing `8102`, integration `8103` — 8080/8101 на хосте заняты другими контейнерами (kan-web и пр.). Deploy-workflow подхватывает эти порты в smoke автоматически.
 
 ## Операции
 
