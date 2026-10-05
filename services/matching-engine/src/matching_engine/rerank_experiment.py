@@ -35,7 +35,7 @@ from matching_engine.rerank_features import (
 from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import validate_artifact
 from matching_engine.rerank_protocol import DIRECTIONS, expected_families
-from matching_engine.rerank_providers import LocalProviders
+from matching_engine.rerank_providers import SystemOneProviders, teacher_identity
 from matching_engine.strict import build_strict_vector, initial_schema
 from matching_engine.strict_evidence import build_strict_evidence
 from matching_engine.vacancy_features import build_strict_features
@@ -82,7 +82,7 @@ def label_validation(families: list[dict], pilot: dict) -> dict:
     """Derive label validity from auditable swap outcomes, never a manually assigned flag."""
     audits = [value for family in families for value in family["swap_audits"]]
     consistency = sum(audits) / max(1, len(audits))
-    report = {"pilot_hash": pilot["report_hash"], "families": len(families),
+    report = {"pilot_hash": pilot["report_hash"], "teacher": teacher_identity(), "families": len(families),
               "swap_correct": sum(audits), "swap_total": len(audits), "swap_consistency": consistency,
               "minimum_per_family": min((sum(f["swap_audits"]) for f in families), default=0),
               "insufficient_pairs": sum(p[2] == "insufficient" for f in families for p in f["pairs"]),
@@ -90,6 +90,8 @@ def label_validation(families: list[dict], pilot: dict) -> dict:
               "unknown_grades": sum(g is None for f in families for g in f["grades"]),
               "threshold": .8}
     report["passed"] = (pilot["state"] == "passed" and pilot.get("swap_consistency", 0) >= .8
+                        and pilot.get("teacher") == teacher_identity()
+                        and all(f.get("teacher") == teacher_identity() for f in families)
                         and pilot.get("decisive_pairs", 0) >= 6 and len(families) == 60
                         and len(audits) == 180 and consistency >= .8
                         and report["minimum_per_family"] >= 2)
@@ -108,18 +110,33 @@ def _read(path: Path) -> dict | list:
 
 
 def generate(directory: Path) -> None:
-    """Expand only a successful sealed pilot, caching every provider result and family."""
+    """Expand a sealed pilot; persist a stopped receipt on validation/provider failure."""
+    try:
+        _generate(directory)
+    except Exception as exc:
+        _write(directory / "generation-report.json", {"state": "stopped", "teacher": teacher_identity(),
+            "error_type": type(exc).__name__,
+            "completed_families": len(list((directory / "families").glob("*.json")))})
+        raise
+    _write(directory / "generation-report.json", {"state": "passed", "teacher": teacher_identity(),
+        "completed_families": 60})
+
+
+def _generate(directory: Path) -> None:
+    """Cache every family under the frozen split; never overwrite another teacher's data."""
     pilot = _read(directory / "pilot-report.json")
     if pilot["state"] != "passed":
         raise ValueError("pilot stopped; generation and training remain disabled")
     if pilot["report_hash"] != digest({k: v for k, v in pilot.items() if k != "report_hash"}):
         raise ValueError("pilot integrity failed")
+    if pilot.get("teacher") != teacher_identity():
+        raise ValueError("pilot teacher differs from the active provider")
     manifest = family_manifest()
     manifest_path = directory / "split-manifest.json"
     if manifest_path.exists() and _read(manifest_path) != manifest:
         raise ValueError("sealed split manifest differs; do not overwrite held-out data")
     _write(manifest_path, manifest)
-    providers = LocalProviders(directory / "provider-cache")
+    providers = SystemOneProviders(directory / "provider-cache")
     schema = initial_schema()
     document, query = HarrierEncoder(), HarrierEncoder("vacancy_query")
     semantic_path = directory / "semantic-cache.json"
@@ -141,6 +158,8 @@ def generate(directory: Path) -> None:
             existing = _read(family_path)
             if existing["manifest"] != item:
                 raise ValueError("cached family manifest changed")
+            if existing.get("teacher") != teacher_identity():
+                raise ValueError("cached family belongs to another teacher")
             families.append(existing)
             continue
         first = (_read(directory / "pilot-profiles.json") if item["family_id"] == "backend-01"
@@ -217,7 +236,7 @@ def generate(directory: Path) -> None:
         if sum(audits) < 2:
             raise ValueError(f"teacher consistency failed for {item['family_id']}; stop expansion")
         grades = [providers.grade(teacher_target, trait, item["preference"]) for trait in traits]
-        record = {"manifest": item, "traits": traits, "vacancy": teacher_target, "vectors": features,
+        record = {"manifest": item, "teacher": teacher_identity(), "traits": traits, "vacancy": teacher_target, "vectors": features,
                   "main_scores": [cards[c.candidate_id].explanation.score for c in candidates],
                   "grades": grades, "pairs": pairs, "swap_audits": audits,
                   "profile_order": ranking, "slice_tags": ["class_only" if item["class_only"] else "mixed",
@@ -228,7 +247,7 @@ def generate(directory: Path) -> None:
     _write(directory / "label-manifest.json", provenance)
     validation = label_validation(families, pilot)
     _write(directory / "label-validation.json", validation)
-    dataset = {"families": families, "split_hash": digest(manifest), "label_cache_hash": digest(provenance),
+    dataset = {"families": families, "teacher": teacher_identity(), "split_hash": digest(manifest), "label_cache_hash": digest(provenance),
                "pilot_hash": pilot["report_hash"], "label_validation": validation,
                "label_validation_hash": digest(validation)}
     dataset["dataset_hash"] = digest(dataset)
@@ -236,7 +255,7 @@ def generate(directory: Path) -> None:
 
 
 def train_dataset(directory: Path) -> dict:
-    """Train from immutable cached data only; never calls Qwen, Laya or Harrier."""
+    """Train from immutable cached data only; never calls a generator, teacher or Harrier."""
     from matching_engine.rerank_training import TrainingFamily, train
     dataset = _read(directory / "dataset.json")
     original_hash = dataset.pop("dataset_hash")
@@ -244,6 +263,9 @@ def train_dataset(directory: Path) -> dict:
         raise ValueError("dataset or split integrity failed")
     if [f["manifest"] for f in dataset["families"]] != family_manifest():
         raise ValueError("actual family assignments differ from the sealed manifest")
+    if dataset.get("teacher") != teacher_identity() or any(
+            f.get("teacher") != teacher_identity() for f in dataset["families"]):
+        raise ValueError("dataset contains incompatible teacher labels")
     if digest(dataset["label_validation"]) != dataset["label_validation_hash"]:
         raise ValueError("label validation receipt integrity failed")
     if digest(_read(directory / "label-manifest.json")) != dataset["label_cache_hash"]:

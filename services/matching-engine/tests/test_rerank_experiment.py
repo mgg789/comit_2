@@ -15,7 +15,12 @@ from matching_engine.rerank_experiment import (
     review_package,
     train_dataset,
 )
-from matching_engine.rerank_providers import BudgetExceeded, LocalProviders, digest
+from matching_engine.rerank_providers import (
+    BudgetExceeded,
+    LocalProviders,
+    SystemOneProviders,
+    digest,
+)
 
 
 def test_manifest_covers_all_directions_and_frozen_split_counts() -> None:
@@ -34,6 +39,27 @@ def test_failed_pilot_never_calls_generator(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(LocalProviders, "generate", lambda *_args: pytest.fail("provider called after failed pilot"))
     with pytest.raises(ValueError, match="pilot stopped"):
         generate(tmp_path)
+    assert json.loads((tmp_path / "generation-report.json").read_text())["state"] == "stopped"
+
+
+def test_other_teacher_pilot_never_calls_generator(tmp_path, monkeypatch) -> None:
+    pilot = {"state": "passed", "teacher": {"model": "legacy-laya"}}
+    pilot["report_hash"] = digest(pilot)
+    (tmp_path / "pilot-report.json").write_text(json.dumps(pilot))
+    monkeypatch.setattr(LocalProviders, "generate", lambda *_args: pytest.fail("old teacher expanded"))
+    with pytest.raises(ValueError, match="pilot teacher differs"):
+        generate(tmp_path)
+
+
+def test_label_validation_requires_all_family_and_pilot_teacher_receipts():
+    from matching_engine.rerank_providers import teacher_identity
+    families = [{"teacher": teacher_identity(), "swap_audits": [True] * 3,
+                 "pairs": [(0, 1, "A")], "grades": [2]} for _ in range(60)]
+    pilot = {"state": "passed", "teacher": teacher_identity(), "report_hash": "synthetic-test",
+             "swap_consistency": 1., "decisive_pairs": 10}
+    assert label_validation(families, pilot)["passed"]
+    families[0]["teacher"] = {"model": "legacy-laya"}
+    assert not label_validation(families, pilot)["passed"]
 
 
 def test_cache_replays_exact_responses_and_reserves_budget(tmp_path, monkeypatch) -> None:
@@ -120,8 +146,8 @@ def test_laya_fractional_score_uses_independent_distribution_or_unknown(tmp_path
 def test_passed_pilot_does_not_consume_the_600_profile_grade_budget(tmp_path, monkeypatch):
     profiles = [{"levels": {"python": index}} for index in range(5)]
     monkeypatch.setattr(LocalProviders, "generate", lambda *_args: profiles)
-    monkeypatch.setattr(LocalProviders, "pair", lambda _self, _v, a, b, _p: "A" if a["levels"]["python"] > b["levels"]["python"] else "B")
-    monkeypatch.setattr(LocalProviders, "grade", lambda *_args: pytest.fail("pilot spent full-cohort grade budget"))
+    monkeypatch.setattr(SystemOneProviders, "pair", lambda _self, _v, a, b, _p: "A" if a["levels"]["python"] > b["levels"]["python"] else "B")
+    monkeypatch.setattr(SystemOneProviders, "grade", lambda *_args: pytest.fail("pilot spent full-cohort grade budget"))
     script = Path(__file__).resolve().parents[3] / "tests/rerank_pilot.py"
     namespace = runpy.run_path(str(script))
     namespace["main"].__globals__["__file__"] = str(tmp_path / "rerank_pilot.py")

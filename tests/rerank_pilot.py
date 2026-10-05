@@ -5,16 +5,19 @@ import json
 import time
 from pathlib import Path
 
-from matching_engine.rerank_providers import LocalProviders, digest
+from matching_engine.rerank_providers import (
+    SystemOneProviders,
+    digest,
+    teacher_identity,
+)
 
 
 def main() -> None:
     """Generate five profiles and audit twenty directed comparisons before expansion."""
     root = Path(__file__).parent / "artifacts/reranker"
     root.mkdir(parents=True, exist_ok=True)
-    providers = LocalProviders(root / "provider-cache")
-    report = {"state": "running", "luna_calls": 0,
-              "luna_unavailable_reason": "collaboration agent thread limit reached",
+    providers = SystemOneProviders(root / "provider-cache")
+    report = {"state": "running", "teacher": teacher_identity(),
               "limits": {"families": 60, "profiles": 600, "pair_attempts": 3000, "grade_attempts": 600}}
     start = time.monotonic()
     try:
@@ -46,10 +49,18 @@ def main() -> None:
         report["state"] = "passed"
     except Exception as exc:  # noqa: BLE001 - seal the failed pilot, never advance generation.
         report["state"] = "stopped"
-        report["reason"] = str(exc)[:300]
+        # A provider exception must never copy credentials into the pilot report.
+        report["reason"] = str(exc)[:300] if isinstance(exc, (RuntimeError, ValueError)) else type(exc).__name__
     report["elapsed_seconds"] = time.monotonic() - start
     report["report_hash"] = digest(report)
-    (root / "pilot-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    destination = root / "pilot-report.json"
+    if destination.exists():
+        previous = json.loads(destination.read_text(encoding="utf-8"))
+        history = root / "pilot-history"
+        history.mkdir(exist_ok=True)
+        (history / f"{digest(previous)}.json").write_text(
+            json.dumps(previous, ensure_ascii=False, indent=2), encoding="utf-8")
+    destination.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(report, ensure_ascii=False, indent=2), flush=True)
 
 

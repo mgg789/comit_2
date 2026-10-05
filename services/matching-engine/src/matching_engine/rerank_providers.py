@@ -1,12 +1,14 @@
-"""Bounded, replayable local synthetic generation; never used by live ranking."""
+"""Bounded synthetic providers; secrets and live candidate data never enter caches."""
 
 import fcntl
 import json
 import math
+import os
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from matching_engine.rerank_hash import digest
 
@@ -15,6 +17,15 @@ LAYA = "aac6fef/laya-multilingual-mlx"
 PROMPT_VERSION = "rerank-synthetic-v1"
 LIMITS = {"generation": 120, "pair": 3000, "grade": 600}
 ENDPOINTS = {"generation": "/api/v1/chat/completions", "pair": "/v1/choice", "grade": "/v1/score"}
+SYSTEMONE_URL = "https://ai.sverk.tech/v1/systemone"
+SYSTEMONE_MODEL = "kev-latest"
+SYSTEMONE_PROMPT_VERSION = "rerank-systemone-v1"
+
+
+def teacher_identity() -> dict[str, str]:
+    """Bind pilot and dataset labels to the explicitly authorized teacher contract."""
+    return {"endpoint": SYSTEMONE_URL, "model": SYSTEMONE_MODEL,
+            "prompt_version": SYSTEMONE_PROMPT_VERSION}
 
 
 class BudgetExceeded(RuntimeError):
@@ -42,10 +53,9 @@ class LocalProviders:
         """Reserve one attempt before HTTP; cache successful calls for exact replay."""
         if kind not in LIMITS:
             raise ValueError("unknown provider budget")
-        if path != ENDPOINTS[kind]:
+        if path != self._endpoint(kind):
             raise ValueError("endpoint does not match the reserved provider budget")
-        identity = {"path": path, "payload": payload, "prompt_version": PROMPT_VERSION,
-                    "model": QWEN if kind == "generation" else LAYA}
+        identity = self._identity(path, payload, kind)
         key = digest(identity)
         target = self.directory / f"{key}.json"
         # Lock covers inference too: multiple CLI processes cannot run heavy jobs concurrently.
@@ -65,22 +75,40 @@ class LocalProviders:
             temporary.write_text(json.dumps(ledger), encoding="utf-8")
             temporary.replace(ledger_path)
             start = time.monotonic()
-            request = Request(self.base_url + path, data=json.dumps(payload).encode(),
-                              headers={"Content-Type": "application/json"}, method="POST")
             try:
-                with urlopen(request, timeout=120) as response:
+                request = self._request(path, payload, kind)
+                with self._open(request) as response:
                     result = json.load(response)
+                if not isinstance(result, dict):
+                    raise TypeError("provider returned a non-object response")
             except Exception as exc:
                 error = {"request": identity, "request_hash": key,
                          "error_type": type(exc).__name__, "elapsed_seconds": time.monotonic() - start}
                 (self.directory / f"{key}.failure-{ledger[kind]}.json").write_text(
                     json.dumps(error, ensure_ascii=False, indent=2), encoding="utf-8")
+                # Remote errors may echo headers or request details; never propagate them.
+                if isinstance(self, SystemOneProviders) and kind != "generation":
+                    raise RuntimeError(f"SystemOne request failed ({type(exc).__name__})") from None
                 raise
             record = {"request": identity, "request_hash": key, "response": result,
                       "response_hash": digest(result), "elapsed_seconds": time.monotonic() - start,
                       "usage": result.get("usage"), "usage_estimated": False}
             target.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
             return result
+
+    def _endpoint(self, kind: str) -> str:
+        return ENDPOINTS[kind]
+
+    def _identity(self, path: str, payload: dict, kind: str) -> dict:
+        return {"path": path, "payload": payload, "prompt_version": PROMPT_VERSION,
+                "model": QWEN if kind == "generation" else LAYA}
+
+    def _request(self, path: str, payload: dict, kind: str) -> Request:
+        return Request(self.base_url + path, data=json.dumps(payload).encode(),
+                       headers={"Content-Type": "application/json"}, method="POST")
+
+    def _open(self, request: Request):
+        return urlopen(request, timeout=120)
 
     def generate(self, direction: str, scenario: str, count: int = 5) -> list[dict]:
         """Generate at most five bounded traits; deterministic validators reject malformed facts."""
@@ -143,6 +171,128 @@ class LocalProviders:
         if values.count(maximum) != 1 or response.get("confidence", 0) < .2:
             return None
         return values.index(maximum)
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    """Never forward a bearer credential through an HTTP redirect."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+class SystemOneProviders(LocalProviders):
+    """Local Qwen generation and the authorized SystemOne teacher for synthetic facts.
+
+    The key is read only on a cache miss, never persisted or included in a hash.
+    Legacy Laya receipts remain replayable through LocalProviders, not this adapter.
+    """
+
+    def __init__(self, directory: Path, base_url: str = "http://127.0.0.1:12444",
+                 *, key_file: Path | None = None) -> None:
+        """Reuse the experiment ledger; optionally select an existing credential file."""
+        super().__init__(directory, base_url)
+        self.key_file = key_file or Path(os.environ.get(
+            "RERANK_SYSTEMONE_KEY_FILE", str(Path.home() / "Desktop/qwen_token.txt"))).expanduser()
+
+    def _endpoint(self, kind: str) -> str:
+        return ENDPOINTS[kind] if kind == "generation" else "/v1/systemone"
+
+    def _identity(self, path: str, payload: dict, kind: str) -> dict:
+        if kind == "generation":
+            return super()._identity(path, payload, kind)
+        return {"path": path, "payload": payload, "kind": kind, **teacher_identity()}
+
+    def _request(self, path: str, payload: dict, kind: str) -> Request:
+        if kind == "generation":
+            return super()._request(path, payload, kind)
+        text = self.key_file.read_text(encoding="utf-8").strip()
+        keys = set(re.findall(r"(?<![\w-])sk-[A-Za-z0-9_-]+", text))
+        if re.fullmatch(r"sk-[A-Za-z0-9_-]+", text) is None:
+            # Operator files may contain credentials for several providers. Never
+            # choose by position: require a Sverk-labelled key or following line.
+            selected = set()
+            lines = text.splitlines()
+            for index, line in enumerate(lines):
+                if re.search(r"\bsverk\b", line, flags=re.IGNORECASE):
+                    block = line
+                    for following in lines[index + 1:]:
+                        if not re.fullmatch(r"\s*sk-[A-Za-z0-9_-]+\s*", following):
+                            break
+                        block += "\n" + following
+                    selected.update(re.findall(r"(?<![\w-])sk-[A-Za-z0-9_-]+", block))
+            keys = selected
+        if len(keys) != 1:
+            raise ValueError("credential file must contain one unambiguous API key")
+        return Request(SYSTEMONE_URL, data=json.dumps(payload, ensure_ascii=False).encode(),
+                       headers={"Content-Type": "application/json",
+                                "Authorization": f"Bearer {keys.pop()}"}, method="POST")
+
+    def _open(self, request: Request):
+        if request.full_url == SYSTEMONE_URL:
+            return build_opener(_NoRedirect()).open(request, timeout=120)
+        return super()._open(request)
+
+    def _answer(self, response: dict, question: str, options: tuple[str, ...]) -> dict:
+        if response.get("model") != SYSTEMONE_MODEL or response.get("truncated") is True:
+            raise ValueError("teacher model mismatch or truncated state")
+        answers = response.get("answers")
+        if not isinstance(answers, dict) or set(answers) != {question}:
+            raise ValueError("teacher returned unexpected answer IDs")
+        answer = answers[question]
+        if not isinstance(answer, dict):
+            raise TypeError("teacher returned a non-object answer")
+        probabilities = answer.get("probabilities")
+        if not isinstance(probabilities, dict) or set(probabilities) != set(options):
+            raise ValueError("teacher returned invalid probability keys")
+        values = list(probabilities.values())
+        if any(type(p) not in (int, float) or not math.isfinite(p) or not 0 <= p <= 1 for p in values):
+            raise ValueError("teacher returned invalid probabilities")
+        if abs(sum(values) - 1) > .002:
+            raise ValueError("teacher probabilities do not sum to one")
+        confidence = answer.get("confidence")
+        if type(confidence) not in (int, float) or not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            raise ValueError("teacher returned invalid confidence")
+        return answer
+
+    def pair(self, vacancy: dict, a: dict, b: dict, preferences: str) -> str:
+        """Compare synthetic raw facts; computed matching scores must remain blind."""
+        response = self.request("/v1/systemone", {
+            "state": json.dumps({"vacancy": vacancy, "A": a, "B": b, "preferences": preferences},
+                                ensure_ascii=False, sort_keys=True),
+            "model": SYSTEMONE_MODEL,
+            "questions": {"preference": {"type": "choice",
+                "instructions": "Which candidate better fits these employer preferences? Consider stated facts and uncertainty.",
+                "criteria": {"A": "A preferable to B", "B": "B preferable to A",
+                             "tie": "Comparable overall suitability",
+                             "insufficient": "Insufficient facts to compare"}}},
+        }, "pair")
+        answer = self._answer(response, "preference", ("A", "B", "tie", "insufficient"))
+        label = answer.get("choice")
+        probabilities = answer["probabilities"]
+        if label not in probabilities or probabilities[label] != max(probabilities.values()):
+            raise ValueError("teacher choice contradicts its distribution")
+        if list(probabilities.values()).count(max(probabilities.values())) != 1:
+            return "tie"
+        return label
+
+    def grade(self, vacancy: dict, candidate: dict, preferences: str) -> int | None:
+        """Assess suitability independently; uncertain distributions remain unavailable."""
+        response = self.request("/v1/systemone", {
+            "state": json.dumps({"vacancy": vacancy, "candidate": candidate, "preferences": preferences},
+                                ensure_ascii=False, sort_keys=True),
+            "model": SYSTEMONE_MODEL,
+            "questions": {"suitability": {"type": "score",
+                "instructions": "Assess overall suitability for these employer preferences using available facts.",
+                "criteria": ["Unsuitable", "Weak fit", "Suitable", "Strong fit"]}},
+        }, "grade")
+        answer = self._answer(response, "suitability", ("0", "1", "2", "3"))
+        score = answer.get("score")
+        if type(score) not in (int, float) or not math.isfinite(score) or not 0 <= score <= 3:
+            raise ValueError("teacher returned invalid suitability score")
+        values = [answer["probabilities"][str(i)] for i in range(4)]
+        if values.count(max(values)) != 1 or answer["confidence"] < .2:
+            return None
+        return values.index(max(values))
 
 
 def validate_traits(value: dict) -> None:

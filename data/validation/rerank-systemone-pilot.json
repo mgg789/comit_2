@@ -1,0 +1,92 @@
+{
+  "state": "passed",
+  "teacher": {
+    "endpoint": "https://ai.sverk.tech/v1/systemone",
+    "model": "kev-latest",
+    "prompt_version": "rerank-systemone-v1"
+  },
+  "limits": {
+    "families": 60,
+    "profiles": 600,
+    "pair_attempts": 3000,
+    "grade_attempts": 600
+  },
+  "generation_seconds": 0.0004076249897480011,
+  "comparisons": [
+    {
+      "a": 0,
+      "b": 1,
+      "forward": "B",
+      "backward": "A",
+      "seconds": 4.8965859999880195
+    },
+    {
+      "a": 0,
+      "b": 2,
+      "forward": "B",
+      "backward": "A",
+      "seconds": 0.4579685421194881
+    },
+    {
+      "a": 0,
+      "b": 3,
+      "forward": "A",
+      "backward": "B",
+      "seconds": 0.6524580831173807
+    },
+    {
+      "a": 0,
+      "b": 4,
+      "forward": "A",
+      "backward": "A",
+      "seconds": 0.651370459003374
+    },
+    {
+      "a": 1,
+      "b": 2,
+      "forward": "A",
+      "backward": "A",
+      "seconds": 0.6289531670045108
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "forward": "A",
+      "backward": "B",
+      "seconds": 0.808795333141461
+    },
+    {
+      "a": 1,
+      "b": 4,
+      "forward": "A",
+      "backward": "B",
+      "seconds": 0.44470733287744224
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "forward": "A",
+      "backward": "B",
+      "seconds": 0.42660308303311467
+    },
+    {
+      "a": 2,
+      "b": 4,
+      "forward": "A",
+      "backward": "B",
+      "seconds": 5.424138583941385
+    },
+    {
+      "a": 3,
+      "b": 4,
+      "forward": "B",
+      "backward": "A",
+      "seconds": 0.7710450410377234
+    }
+  ],
+  "swap_consistency": 0.8,
+  "decisive_pairs": 10,
+  "grade_contract_runtime_verified": false,
+  "elapsed_seconds": 15.163564250105992,
+  "report_hash": "4670d4ba58da2b2d17cf7b8d39895097b2d2a706e76ece8eeddfc6577fdd8b21"
+}
