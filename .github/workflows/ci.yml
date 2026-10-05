@@ -55,12 +55,13 @@ jobs:
       group: smoke-host
       cancel-in-progress: false
     env:
-      WEB_PORT: 18088
-      API_PORT: 18080
-      MATCHING_PORT: 18101
-      TESTING_PORT: 18102
-      INTEGRATION_PORT: 18103
-      POSTGRES_PORT: 18432
+      # 38xxx band: verified free on mgg-server (18xxx collides with navix-api)
+      WEB_PORT: 38088
+      API_PORT: 38080
+      MATCHING_PORT: 38101
+      TESTING_PORT: 38102
+      INTEGRATION_PORT: 38103
+      POSTGRES_PORT: 38432
     steps:
       # Container jobs run as root and leave root-owned files in the shared
       # workspace; a root container chowns them back to the runner user.
