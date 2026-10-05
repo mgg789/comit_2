@@ -108,3 +108,48 @@ API: `pnpm --filter @comit/api test` —22passed/2skipped, отдельные au
 Smoke: `WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
 INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` —12проверок зелёные.
 Production, remote CI и реальная learned R₀ acceptance не проверялись.
+
+## Разрешённая проверка простой схемы
+
+После отдельного разрешения Mike выполнены ровно два последовательных запроса
+на первой frozen паре frontend-05 0/1: A/B и B/A. Prompt
+`rerank-gemma-pair-v2-format`, прежняя модель/endpoint/temperature/max_tokens.
+Поле evidence теперь массив строк из enum исходных ссылок, например
+`A.levels.react[int]=3` или `A.duration_months[null]=null`. Тип и значение факта
+входят в точную строку; источник проверяется без coercion. Старый v1 не изменён.
+Одна короткая rationale и максимум четыре ссылки уменьшают объём ответа.
+Схема, инструкция краткости и фактическая последовательность вызовов изменились
+вместе, поэтому отдельно доказать причину прежних обрывов эта проверка не может.
+
+- Оба ответа complete JSON, `finish_reason=stop`, 99/101 output tokens.
+  Все ссылки точно совпадают с источником; прежних обрывов/type errors нет.
+- Оба решающих ответа приводят четыре ссылки только на победителя: direct B,
+  reverse A. Валидатор требует факты обеих сторон и отвергает обе метки.
+  `valid_responses=0` здесь означает ноль **полностью принятых** ответов,
+  а complete JSON responses=2. Raw B/A симметричны, но не становятся разметкой.
+- Frozen blind label этой пары — `insufficient`. Raw выбор не совпал с ней;
+  это не измеренная accuracy учителя на полноценной выборке.
+- В direct rationale выбранный B назван более экономичным: salary_min B=65000,
+  A=50000. Такое сравнительное объяснение исходные факты не поддерживают.
+  Этот разбор сделан ассистентом после просмотра outputs, не является blind
+  review или независимой человеческой оценкой. Фактическое замечание не закрыто.
+- Actual1966input+200output=2166tokens, 7.61с. Ledger28/683/119; всего семь
+  вызовов из первоначального диагностического allowance20, остаётся13.
+  Shared pair budget оставляет2317попыток; generation/grade не изменены.
+
+Результат — **stopped**, quality/training/promotion/activation не разрешены.
+Никаких дальнейших запросов или automatic repairs не отправлено. Исходные
+cache bytes и оба raw ответа сохранены. Проверен повтор без HTTP/key reads,
+изменения ledger; crash запрещает implicit retry, tamper receipts отвергается.
+[Новый отчёт](../data/validation/rerank-gemma-format-probe.json) содержит отдельные
+format/evidence/prose результаты и hashes; старый отчёт не перезаписан.
+
+```sh
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_gemma_format
+```
+
+Реализация и16новых regression checks:426Python/PGtests passed; из
+matching-engine `.venv/bin/ruff check src tests/test_rerank_gemma_format.py`
+зелёный. `pnpm typecheck`, `pnpm build` и прежняя команда `make smoke` с ports38xxx
+зелёные. Публичные API/shared контракты не менялись; отдельные API/auth tests
+в этом format-проходе не повторялись. Production/remote CI не проверялись.

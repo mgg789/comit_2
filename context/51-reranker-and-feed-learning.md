@@ -425,3 +425,13 @@ decisive5<6: stopped. Ledger28/676/119, новоеusage13824input/1515outputtoke
 Новый format probe и пересмотр объёма пока только предложены:
 [Gemma pilot](../docs/rerank-gemma-teacher-pilot.md),
 [hashed report](../data/validation/rerank-gemma-teacher-pilot.json).
+
+По следующему разрешению Mike выполнены2fixeddirect/reverse format probe
+запроса: `rerank-gemma-pair-v2-format`, evidence как homogeneous source strings.
+Оба JSON завершены, все ссылки точные; обе решающие метки отвергнуты за evidence
+только одной стороны. Raw B/A симметричны, но не становятся labels; direct
+зарплатное объяснение не поддерживается сравнением65000против50000.
+Format улучшен лишь на этой паре, quality не пройден. Ledger28/683/119,
+actual1966input+200outputtokens; семьиз20diagnosticcalls,13неиспользованы.
+Дополнительных запросов/обучения/promotion нет. Фактическое замечание не закрыто.
+[Отдельный hashed report](../data/validation/rerank-gemma-format-probe.json).

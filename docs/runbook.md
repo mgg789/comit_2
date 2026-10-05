@@ -362,6 +362,11 @@ receipts, использует общий pair ledger и партии макси
 Первый запуск stopped после пяти ответов с ошибками формата; повтор читает кэш
 без новых запросов. Ledger28/681/119. Новый format probe автоматически не запускается.
 Источник, команды и ограничения — [пилот Gemma](rerank-gemma-teacher-pilot.md).
+Разрешённый format probe: `python -m matching_engine.rerank_gemma_format` с тем
+же PYTHONPATH. Отдельная версия/receipts, максимум2attempts в исходном allowance20.
+Два JSON complete, но labels отвергнуты за evidence лишь одной стороны;
+ledger28/683/119. Повтор читает сохранённый stopped report без HTTP. Новый prompt,
+массовый quality pilot и training автоматически не запускаются.
 
 ### Повтор backend приёмки
 

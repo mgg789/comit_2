@@ -317,6 +317,10 @@ Production, удалённый CI, image build и обучение R₀ на п�
 четыре обрыва и один неверный тип evidence, поэтому качество не оценено.
 Ledger28/681/119; обучение не возобновлено. Подробности —
 [пилот Gemma](rerank-gemma-teacher-pilot.md).
+Разрешённый двухзапросный format probe v2 дал два complete JSON и точные ссылки,
+но обе решающие метки отвергнуты: evidence только победителя, зарплатное
+объяснение direct не подтверждено. Ledger28/683/119; обучение остановлено.
+[Raw responses и разбор](../data/validation/rerank-gemma-format-probe.json).
 
 Границы активации: golden12/min6 decisive pairs на семью, macro NDCG Δ≥0.02,
 macro accuracy≥0.65/Δ≥0.03 и нижняя95% family-bootstrap граница обоих Δ>0.
