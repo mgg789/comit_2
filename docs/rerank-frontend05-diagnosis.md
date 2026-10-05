@@ -115,3 +115,9 @@ calibration. Исправление метаданных записано в н�
 `WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
 INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` —12проверок зелёные.
 Production, remoteCI, image build и полный learned R₀ не проверялись.
+
+После rebase на параллельный auth checkpoint `2b513c0` зависимости восстановлены
+через `pnpm install --frozen-lockfile` без правки lockfile. Повтор API:22passed,
+2skipped — новые HTTP/PG auth integration tests требуют отдельного
+`AUTH_TEST_DATABASE_URL` и не входят в этот проход. Typecheck/build и smoke12
+после интеграции также зелёные; изменения auth сохранены.
