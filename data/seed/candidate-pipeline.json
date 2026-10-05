@@ -1,0 +1,410 @@
+[
+  {
+    "candidate_id": "00000000-0000-4000-8000-000000000001",
+    "profile": {
+      "source_revision": 1,
+      "display_name": "Синтетический Кандидат 1",
+      "email": "synthetic1@example.test",
+      "email_verified": true,
+      "phone": "+7 999 123 45 67",
+      "city": "Москва",
+      "salary": {
+        "from_rub": 100000,
+        "to_rub": 200000
+      },
+      "primary_direction": "backend",
+      "grade_result": {
+        "grade": "junior",
+        "status": "approved",
+        "test_session_id": "10000000-0000-4000-8000-000000000001",
+        "approved_at": "2026-10-05T12:00:00Z"
+      },
+      "consents": {
+        "processing": true,
+        "pool": true,
+        "accepted_at": "2026-10-05T12:00:00Z",
+        "version": "synthetic-v1"
+      },
+      "domains": [
+        {
+          "key": "sql",
+          "level": 3,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-grade-test"
+          ]
+        },
+        {
+          "key": "rest_api",
+          "level": 4,
+          "status": "partial",
+          "provenance": [
+            "synthetic-project"
+          ]
+        }
+      ],
+      "stacks": [
+        {
+          "key": "python",
+          "level": 5,
+          "status": "self_reported",
+          "provenance": [
+            "synthetic-survey"
+          ]
+        }
+      ],
+      "soft_skills": [
+        {
+          "key": "teamwork",
+          "level": 6,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-input"
+          ]
+        }
+      ],
+      "description": "Создаю сервисы для автоматизации. Контакт: synthetic1@example.test",
+      "projects": [
+        {
+          "title": "Каталог услуг",
+          "description": "API поиска по каталогу на Python и PostgreSQL.",
+          "status": "partial",
+          "details": {
+            "my_role": "Разработчик",
+            "stack": [
+              "python",
+              "postgres"
+            ]
+          }
+        }
+      ],
+      "experience": [
+        {
+          "title": "Разработчик",
+          "description": "Два года разрабатывал API и интеграции.",
+          "status": "self_reported",
+          "details": {
+            "duration": "2024-2026"
+          }
+        }
+      ],
+      "achievements": [
+        {
+          "title": "Хакатон",
+          "description": "Командное решение задач автоматизации.",
+          "status": "confirmed"
+        }
+      ],
+      "preferences": [
+        "Удалённая работа",
+        "Проектная команда"
+      ]
+    }
+  },
+  {
+    "candidate_id": "00000000-0000-4000-8000-000000000002",
+    "profile": {
+      "source_revision": 1,
+      "display_name": "Синтетический Кандидат 2",
+      "email": "synthetic2@example.test",
+      "email_verified": true,
+      "phone": "+7 999 123 45 67",
+      "city": "Москва",
+      "salary": {
+        "from_rub": 100000,
+        "to_rub": 200000
+      },
+      "primary_direction": "backend",
+      "grade_result": {
+        "grade": "senior",
+        "status": "approved",
+        "test_session_id": "10000000-0000-4000-8000-000000000002",
+        "approved_at": "2026-10-05T12:00:00Z"
+      },
+      "consents": {
+        "processing": true,
+        "pool": true,
+        "accepted_at": "2026-10-05T12:00:00Z",
+        "version": "synthetic-v1"
+      },
+      "domains": [
+        {
+          "key": "sql",
+          "level": 7,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-grade-test"
+          ]
+        },
+        {
+          "key": "rest_api",
+          "level": 4,
+          "status": "partial",
+          "provenance": [
+            "synthetic-project"
+          ]
+        }
+      ],
+      "stacks": [
+        {
+          "key": "python",
+          "level": 5,
+          "status": "self_reported",
+          "provenance": [
+            "synthetic-survey"
+          ]
+        }
+      ],
+      "soft_skills": [
+        {
+          "key": "teamwork",
+          "level": 6,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-input"
+          ]
+        }
+      ],
+      "description": "Создаю сервисы для автоматизации. Контакт: synthetic2@example.test",
+      "projects": [
+        {
+          "title": "Каталог услуг",
+          "description": "API поиска по каталогу на Python и PostgreSQL.",
+          "status": "partial",
+          "details": {
+            "my_role": "Разработчик",
+            "stack": [
+              "python",
+              "postgres"
+            ]
+          }
+        }
+      ],
+      "experience": [
+        {
+          "title": "Разработчик",
+          "description": "Два года разрабатывал API и интеграции.",
+          "status": "self_reported",
+          "details": {
+            "duration": "2024-2026"
+          }
+        }
+      ],
+      "achievements": [
+        {
+          "title": "Хакатон",
+          "description": "Командное решение задач автоматизации.",
+          "status": "confirmed"
+        }
+      ],
+      "preferences": [
+        "Удалённая работа",
+        "Проектная команда"
+      ]
+    }
+  },
+  {
+    "candidate_id": "00000000-0000-4000-8000-000000000003",
+    "profile": {
+      "source_revision": 1,
+      "display_name": "Синтетический Кандидат 3",
+      "email": "synthetic3@example.test",
+      "email_verified": true,
+      "phone": "+7 999 123 45 67",
+      "city": "Москва",
+      "salary": {
+        "from_rub": 100000,
+        "to_rub": 200000
+      },
+      "primary_direction": "data",
+      "grade_result": {
+        "grade": "middle",
+        "status": "approved",
+        "test_session_id": "10000000-0000-4000-8000-000000000003",
+        "approved_at": "2026-10-05T12:00:00Z"
+      },
+      "consents": {
+        "processing": true,
+        "pool": true,
+        "accepted_at": "2026-10-05T12:00:00Z",
+        "version": "synthetic-v1"
+      },
+      "domains": [
+        {
+          "key": "sql",
+          "level": 4,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-grade-test"
+          ]
+        },
+        {
+          "key": "rest_api",
+          "level": 4,
+          "status": "partial",
+          "provenance": [
+            "synthetic-project"
+          ]
+        }
+      ],
+      "stacks": [
+        {
+          "key": "python",
+          "level": 5,
+          "status": "self_reported",
+          "provenance": [
+            "synthetic-survey"
+          ]
+        }
+      ],
+      "soft_skills": [
+        {
+          "key": "teamwork",
+          "level": 6,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-input"
+          ]
+        }
+      ],
+      "description": "Создаю сервисы для автоматизации. Контакт: synthetic3@example.test",
+      "projects": [
+        {
+          "title": "Каталог услуг",
+          "description": "API поиска по каталогу на Python и PostgreSQL.",
+          "status": "partial",
+          "details": {
+            "my_role": "Разработчик",
+            "stack": [
+              "python",
+              "postgres"
+            ]
+          }
+        }
+      ],
+      "experience": [
+        {
+          "title": "Разработчик",
+          "description": "Два года разрабатывал API и интеграции.",
+          "status": "self_reported",
+          "details": {
+            "duration": "2024-2026"
+          }
+        }
+      ],
+      "achievements": [
+        {
+          "title": "Хакатон",
+          "description": "Командное решение задач автоматизации.",
+          "status": "confirmed"
+        }
+      ],
+      "preferences": [
+        "Удалённая работа",
+        "Проектная команда"
+      ]
+    }
+  },
+  {
+    "candidate_id": "00000000-0000-4000-8000-000000000004",
+    "profile": {
+      "source_revision": 1,
+      "display_name": "Синтетический Кандидат 4",
+      "email": "synthetic4@example.test",
+      "email_verified": true,
+      "phone": "+7 999 123 45 67",
+      "city": "Москва",
+      "salary": {
+        "from_rub": 100000,
+        "to_rub": 200000
+      },
+      "primary_direction": "backend",
+      "grade_result": {
+        "grade": "middle",
+        "status": "approved",
+        "test_session_id": "10000000-0000-4000-8000-000000000004",
+        "approved_at": "2026-10-05T12:00:00Z"
+      },
+      "consents": {
+        "processing": true,
+        "pool": false,
+        "accepted_at": "2026-10-05T12:00:00Z",
+        "version": "synthetic-v1"
+      },
+      "domains": [
+        {
+          "key": "sql",
+          "level": 4,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-grade-test"
+          ]
+        },
+        {
+          "key": "rest_api",
+          "level": 4,
+          "status": "partial",
+          "provenance": [
+            "synthetic-project"
+          ]
+        }
+      ],
+      "stacks": [
+        {
+          "key": "python",
+          "level": 5,
+          "status": "self_reported",
+          "provenance": [
+            "synthetic-survey"
+          ]
+        }
+      ],
+      "soft_skills": [
+        {
+          "key": "teamwork",
+          "level": 6,
+          "status": "confirmed",
+          "provenance": [
+            "synthetic-input"
+          ]
+        }
+      ],
+      "description": "Создаю сервисы для автоматизации. Контакт: synthetic4@example.test",
+      "projects": [
+        {
+          "title": "Каталог услуг",
+          "description": "API поиска по каталогу на Python и PostgreSQL.",
+          "status": "partial",
+          "details": {
+            "my_role": "Разработчик",
+            "stack": [
+              "python",
+              "postgres"
+            ]
+          }
+        }
+      ],
+      "experience": [
+        {
+          "title": "Разработчик",
+          "description": "Два года разрабатывал API и интеграции.",
+          "status": "self_reported",
+          "details": {
+            "duration": "2024-2026"
+          }
+        }
+      ],
+      "achievements": [
+        {
+          "title": "Хакатон",
+          "description": "Командное решение задач автоматизации.",
+          "status": "confirmed"
+        }
+      ],
+      "preferences": [
+        "Удалённая работа",
+        "Проектная команда"
+      ]
+    }
+  }
+]

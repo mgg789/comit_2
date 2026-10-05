@@ -7,12 +7,17 @@ dependencies = [
   "fastapi>=0.115",
   "pydantic>=2.9",
   "uvicorn[standard]>=0.30",
+  "psycopg[binary]>=3.2,<4",
+  "reportlab>=4.2,<5",
 ]
 
 [project.optional-dependencies]
+embeddings = ["sentence-transformers>=5.2,<7"]
 dev = [
   "httpx>=0.27",
   "pytest>=8",
+  "ruff>=0.9",
+  "pypdf>=5,<7",
 ]
 
 [build-system]
@@ -22,5 +27,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+matching_engine = ["migrations/*.sql", "fonts/*.ttf", "fonts/LICENSE.txt"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["integration: isolated PostgreSQL integration tests (PIPELINE_TEST_DATABASE_URL)"]

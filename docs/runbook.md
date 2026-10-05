@@ -1,5 +1,85 @@
 # Runbook — типовые операции
 
+## Candidate pipeline: запуск с собранными данными
+
+Это серверный поток, не регистрация пользователя. Нужны PostgreSQL 16 + pgvector,
+Python 3.12, зависимости сервиса, private `CANDIDATE_PIPELINE_TOKEN`, exact cached
+Harrier revision. Токен не передавать клиентским приложениям и не писать в логи.
+
+```bash
+uv venv --python 3.12 services/matching-engine/.venv
+uv pip install --python services/matching-engine/.venv/bin/python -e 'services/matching-engine[embeddings,dev]'
+pnpm install --frozen-lockfile
+pnpm build
+```
+
+Заранее, в разрешённом сетевом контуре подготовки, скачать публичную модель:
+
+```bash
+services/matching-engine/.venv/bin/python -c 'from huggingface_hub import snapshot_download; snapshot_download("microsoft/harrier-oss-v1-270m", revision="31de22b673913c7d658c0f03f792d77c2dcf8ebd")'
+```
+
+Runtime использует `local_files_only=True`, не требует внешнего API и не скачивает
+модель. `HF_HOME`/`HF_HUB_CACHE` могут задавать каталог кэша. Шрифты DejaVu для
+кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
+
+Опциональный **локальный** compose-overlay включает миграции перед серверами и
+отдельный worker; базовый `make up` сам по себе worker не запускает:
+
+```bash
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml run --rm candidate-worker python -c 'from huggingface_hub import snapshot_download; snapshot_download("microsoft/harrier-oss-v1-270m", revision="31de22b673913c7d658c0f03f792d77c2dcf8ebd")'
+docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml up -d
+```
+
+В overlay используются текущая БД и persistent `harrier_cache`; volume не удалять.
+Build/подготовка модели требуют доступных пакетов/артефактов, обработка работает
+офлайн. Prod compose и сервер в этом цикле не изменялись: подключение runtime
+на сервере — отдельная явная операция с его секретами и путями.
+
+Без Docker, в отдельных терминалах с уже настроенными `DATABASE_URL`,
+`CANDIDATE_PIPELINE_TOKEN`, `MATCHING_ENGINE_URL=http://127.0.0.1:38101`:
+
+```bash
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine migrate
+PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine serve
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
+PORT=38080 pnpm --filter @comit/api start
+```
+
+`/healthz` означает живой процесс; matching `/ready` проверяет token, миграции/БД
+и наличие pinned модели. Не считать healthz доказательством готового пула.
+Статусы queued/processing/retrying/failed видны через candidate status API.
+После устранения ошибки failed/retrying можно повторить через POST retry.
+
+## Проверки candidate pipeline
+
+```bash
+pnpm --filter @comit/api test
+pnpm typecheck
+pnpm build
+cd services/matching-engine
+PYTHONPATH=src .venv/bin/python -m pytest -q tests
+.venv/bin/ruff check src tests
+```
+
+Integration tests **очищают таблицы**. `PIPELINE_TEST_DATABASE_URL` должен указывать
+исключительно на отдельную одноразовую БД, не на локальные пользовательские данные
+и не на рабочий пул. Запуск: `PYTHONPATH=src .venv/bin/python -m pytest -q -m integration tests`.
+Тестовые doubles в этих проверках проверяют транзакции/ошибки; это не доказательство
+инференса модели. Реальная модель проверяется отдельно через acceptance ниже.
+
+```bash
+# Из корня репо; только свежая отдельная БД, реальные API и worker уже запущены.
+CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.venv/bin/python tests/candidate_pool_acceptance.py
+```
+
+Скрипт допускает только loopback URL (`PIPELINE_ACCEPTANCE_URL`, default :38080),
+подаёт четыре синтетических профиля, проверяет настоящий Harrier/PDF/ранг,
+идемпотентность, миграцию 37→38, новую partial координату, отзыв согласия и stale409.
+Сохраняет отчёт и PDF в git-ignored `tests/artifacts/`.
+Нельзя параллельно запускать integration cleanup и acceptance на одной БД.
+
 ## Локально
 
 | Задача | Команда |

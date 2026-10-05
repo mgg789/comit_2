@@ -1,5 +1,13 @@
 # ML-workstream Mike: что именно требуется (S2 → S3 → S5)
 
+> **Обновление 05.10, цикл 1:** Codex реализовал настоящую проекцию candidate→pool,
+> strict+semantic/PDF, durable worker и миграцию координат; моков эмбеддингов
+> в runtime нет. Текущий вход — уже собранный upstream snapshot через PUT profile,
+> заменяющий прежние отдельные vector/upsert контракты ниже в рамках этого цикла.
+> Правила статусов и двух векторов — [[35-candidate-pipeline]] v3;
+> фактические DTO — [[../docs/api.md]]. IRT, обучение и vacancy combine остаются
+> ML-workstream следующего этапа; старые session-контракты — ещё постановка.
+
 > Твоя часть конвейера соискателя ([[35-candidate-pipeline]]) и последующее обучение. Codex работает на **моках** этих эндпоинтов — схемы ниже единый источник истины (дублируют §7 [[35-candidate-pipeline]] с деталями реализации). Всё в существующих сервисах: `services/testing-engine`, `services/matching-engine`.
 
 ## 0. Твои артефакты по спринтам

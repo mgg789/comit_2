@@ -1,0 +1,1377 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Comit Matching Engine",
+    "description": "Revision-safe candidate intake, dual vectors and contact-free ready pool.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Healthz",
+        "description": "Report process liveness, independent of DB, token and model provisioning.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Healthz Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Ready",
+        "description": "Check actual dependencies; unavailable model or migrations means HTTP 503.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Ready Ready Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/candidates/{candidate_id}/profile": {
+      "put": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Intake",
+        "description": "Persist a monotonic upstream snapshot and queue artifacts when its checklist is complete.",
+        "operationId": "intake_internal_candidates__candidate_id__profile_put",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/candidates/{candidate_id}": {
+      "get": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Candidate Status",
+        "description": "Read progress or missing required inputs without returning contacts.",
+        "operationId": "candidate_status_internal_candidates__candidate_id__get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/candidates/{candidate_id}/retry": {
+      "post": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Retry",
+        "description": "Restart bounded failed inference after fixing dependency availability.",
+        "operationId": "retry_internal_candidates__candidate_id__retry_post",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/strict-schema": {
+      "get": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Strict Schema",
+        "description": "Return coordinate indices and compatibility identity for combine consumers.",
+        "operationId": "strict_schema_internal_strict_schema_get",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrictSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/strict-schema/coordinates": {
+      "post": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Extend Schema",
+        "description": "Append an authorized coordinate and durably migrate every previous candidate.",
+        "operationId": "extend_schema_internal_strict_schema_coordinates_post",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CoordinateAddition"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrictSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/pool": {
+      "get": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Pool",
+        "description": "Return contact-free ready snapshots, never drafts or mixed strict generations.",
+        "operationId": "pool_internal_pool_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoolPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/pool/{candidate_id}/resume.pdf": {
+      "get": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Public Resume",
+        "description": "Return the redacted Tinder PDF for a currently visible pool member.",
+        "operationId": "public_resume_internal_pool__candidate_id__resume_pdf_get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/candidates/{candidate_id}/resume.pdf": {
+      "get": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Owner Resume",
+        "description": "Return the private PDF to trusted API, which must enforce candidate ownership.",
+        "operationId": "owner_resume_internal_candidates__candidate_id__resume_pdf_get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CandidateProfile": {
+        "properties": {
+          "source_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Revision"
+          },
+          "display_name": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Display Name",
+            "default": ""
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified",
+            "default": false
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "city": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "City",
+            "default": ""
+          },
+          "salary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "primary_direction": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "backend",
+                  "frontend",
+                  "fullstack",
+                  "mobile",
+                  "devops",
+                  "data",
+                  "qa"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Direction"
+          },
+          "grade_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GradeResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consents": {
+            "$ref": "#/components/schemas/Consent"
+          },
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Domains"
+          },
+          "stacks": {
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Stacks"
+          },
+          "soft_skills": {
+            "items": {
+              "$ref": "#/components/schemas/Skill"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Soft Skills"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Description",
+            "default": ""
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeClaim"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Projects"
+          },
+          "experience": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeClaim"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Experience"
+          },
+          "achievements": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeClaim"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Achievements"
+          },
+          "preferences": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Preferences"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "maxProperties": 100,
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_revision"
+        ],
+        "title": "CandidateProfile",
+        "description": "Complete or draft input; contacts remain private until downstream acceptance."
+      },
+      "CandidateStatus": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "queued",
+              "processing",
+              "retrying",
+              "failed",
+              "ready"
+            ],
+            "title": "State"
+          },
+          "missing_requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Requirements"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Category"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strict_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict Schema Version"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "state",
+          "missing_requirements"
+        ],
+        "title": "CandidateStatus",
+        "description": "Pipeline state for one candidate without private input data or error details."
+      },
+      "Category": {
+        "properties": {
+          "specialization": {
+            "type": "string",
+            "enum": [
+              "backend",
+              "frontend",
+              "fullstack",
+              "mobile",
+              "devops",
+              "data",
+              "qa"
+            ],
+            "title": "Specialization"
+          },
+          "grade": {
+            "type": "string",
+            "enum": [
+              "intern",
+              "junior",
+              "middle",
+              "senior"
+            ],
+            "title": "Grade"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "specialization",
+          "grade"
+        ],
+        "title": "Category",
+        "description": "Deterministic specialization and grade assigned from upstream test results."
+      },
+      "Consent": {
+        "properties": {
+          "processing": {
+            "type": "boolean",
+            "title": "Processing",
+            "default": false
+          },
+          "pool": {
+            "type": "boolean",
+            "title": "Pool",
+            "default": false
+          },
+          "accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Consent",
+        "description": "Explicit, versioned consent snapshot supplied by the trusted API."
+      },
+      "Coordinate": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Index"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "stack",
+              "soft_skill"
+            ],
+            "title": "Group"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "group",
+          "key"
+        ],
+        "title": "Coordinate",
+        "description": "An immutable index in the append-only strict vector registry."
+      },
+      "CoordinateAddition": {
+        "properties": {
+          "group": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "stack",
+              "soft_skill"
+            ],
+            "title": "Group"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "title": "Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "group",
+          "key"
+        ],
+        "title": "CoordinateAddition",
+        "description": "Authorized registry extension; old coordinates cannot be reordered."
+      },
+      "CoordinateEvidence": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "domain",
+              "stack",
+              "soft_skill"
+            ],
+            "title": "Group"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "partial",
+                  "self_reported",
+                  "pending",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "group",
+          "key",
+          "status",
+          "level"
+        ],
+        "title": "CoordinateEvidence",
+        "description": "Status and declared level, without arbitrary private provenance strings."
+      },
+      "GradeResult": {
+        "properties": {
+          "grade": {
+            "type": "string",
+            "enum": [
+              "intern",
+              "junior",
+              "middle",
+              "senior"
+            ],
+            "title": "Grade"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "test_session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Test Session Id"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "grade",
+          "status",
+          "test_session_id"
+        ],
+        "title": "GradeResult",
+        "description": "Upstream grade-test result; only approved results permit pool membership."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JsonValue": {},
+      "NarrativeClaim": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Description",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "maxProperties": 100,
+            "title": "Details"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "NarrativeClaim",
+        "description": "Project, experience or achievement text plus the upstream evidence state."
+      },
+      "PoolEntry": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "strict_vector": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Strict Vector"
+          },
+          "strict_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/CoordinateEvidence"
+            },
+            "type": "array",
+            "title": "Strict Evidence"
+          },
+          "strict_schema_version": {
+            "type": "integer",
+            "title": "Strict Schema Version"
+          },
+          "strict_schema_hash": {
+            "type": "string",
+            "title": "Strict Schema Hash"
+          },
+          "semantic_vector": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Semantic Vector"
+          },
+          "semantic_model_version": {
+            "type": "string",
+            "title": "Semantic Model Version"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "strict_vector",
+          "strict_evidence",
+          "strict_schema_version",
+          "strict_schema_hash",
+          "semantic_vector",
+          "semantic_model_version",
+          "published_at",
+          "resume_url"
+        ],
+        "title": "PoolEntry",
+        "description": "Contact-free combine snapshot; published only with both vectors and a PDF."
+      },
+      "PoolPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PoolEntry"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "PoolPage",
+        "description": "Bounded pool page; ranks are global within each direction."
+      },
+      "SalaryRange": {
+        "properties": {
+          "from_rub": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "From Rub"
+          },
+          "to_rub": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "To Rub"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "from_rub",
+          "to_rub"
+        ],
+        "title": "SalaryRange",
+        "description": "Inclusive salary bounds in RUB; zero is allowed for unpaid internships."
+      },
+      "Skill": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "title": "Key"
+          },
+          "level": {
+            "type": "integer",
+            "maximum": 7.0,
+            "minimum": 0.0,
+            "title": "Level"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "level",
+          "status"
+        ],
+        "title": "Skill",
+        "description": "A registry key and ordinal level, retaining confirmation and provenance."
+      },
+      "StrictSchema": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "schema_hash": {
+            "type": "string",
+            "title": "Schema Hash"
+          },
+          "coordinates": {
+            "items": {
+              "$ref": "#/components/schemas/Coordinate"
+            },
+            "type": "array",
+            "title": "Coordinates"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "schema_hash",
+          "coordinates"
+        ],
+        "title": "StrictSchema",
+        "description": "Version and hash identify both ordering and normalization of coordinates."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

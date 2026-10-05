@@ -4,6 +4,11 @@
  * Salary range is mandatory in vacancies AND invitations (TZ rule 2.2.1).
  */
 
+export type {
+  CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,
+  CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill, StrictCoordinateEvidence,
+} from "./candidate-pipeline.js";
+
 export type Role = "candidate" | "employer";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;

@@ -7,10 +7,12 @@ import Fastify from "fastify";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { healthRoutes } from "./routes/health.js";
+import { candidatePipelineRoutes, candidateValidationOptions } from "./routes/candidate-pipeline.js";
 
 const app = Fastify({
   logger: true,
   trustProxy: true,
+  ajv: { customOptions: candidateValidationOptions },
 });
 
 await app.register(swagger, {
@@ -21,10 +23,14 @@ await app.register(swagger, {
       version: "0.1.0",
     },
     tags: [{ name: "health", description: "Liveness and readiness probes" }],
+    components: { securitySchemes: {
+      internalToken: { type: "apiKey", in: "header", name: "X-Internal-Token" },
+    } },
   },
 });
 await app.register(swaggerUi, { routePrefix: "/docs" });
 await app.register(healthRoutes);
+await app.register(candidatePipelineRoutes);
 
 const port = Number(process.env.PORT ?? 8080);
 await app.listen({ port, host: "0.0.0.0" });

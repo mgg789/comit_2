@@ -14,3 +14,14 @@ Run locally after `make up`:
 ```sh
 ./tests/smoke.sh
 ```
+
+- `candidate_pool_acceptance.py` — real API-core → PostgreSQL → worker → Harrier
+  → dual vectors + PDF. Uses `data/seed/candidate-pipeline.json` and an isolated,
+  fresh local database. Adds a strict coordinate and withdraws one consent.
+  Requires `CANDIDATE_PIPELINE_TOKEN`, real worker, and `PIPELINE_ACCEPTANCE_URL`
+  (defaults to loopback port 38080). Writes ignored reports to `tests/artifacts/`.
+- `generate_candidate_contract.py` — regenerate the gateway OpenAPI source from
+  the FastAPI app, using the matching service environment and PYTHONPATH.
+
+Never run integration cleanup against a live pool; see `docs/runbook.md` for
+the separate unit, PostgreSQL, real-model and smoke verification contours.
