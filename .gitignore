@@ -1,2 +1,25 @@
+# session/tool state
 /.mimosa
+
+# environment & secrets
 .env
+.env.*
+!.env.example
+
+# node / build
+node_modules/
+dist/
+coverage/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# docker / local state
+*.log
+.DS_Store
+.idea/
+.vscode/

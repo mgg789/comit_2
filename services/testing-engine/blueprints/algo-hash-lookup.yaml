@@ -1,0 +1,19 @@
+id: algo-hash-lookup
+specialization: backend
+topic: "Алгоритмы: хеш-таблицы"
+type: code
+difficulty:
+  base: 0.55
+  discriminative: 0.40
+# Variant parameters: bounded ranges keep difficulty comparable between candidates.
+params:
+  input_size:
+    range: [10, 10000]
+  data_type:
+    enum: [ints, strings, pairs]
+  twist:
+    enum: [duplicates, negatives, sorted]
+check: autotests
+statement_ru: >
+  Найдите в массиве пару элементов с заданной суммой за O(n). Вариант задаётся
+  параметрами: размер входа, тип данных, осложняющее условие.
