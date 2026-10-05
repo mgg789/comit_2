@@ -28,6 +28,7 @@ class VacancyInput(Contract):
     zp_min: int | None = Field(default=None, strict=True, ge=0, le=SAFE_JSON_INTEGER)
     zp_max: int | None = Field(default=None, strict=True, ge=0, le=SAFE_JSON_INTEGER)
     daily: str | None = Field(default=None, min_length=1, max_length=500)
+    city: str | None = Field(default=None, min_length=1, max_length=300)
     type: WorkType | None = None
     bio: str = Field(default="", max_length=10000)
     domens: dict[SkillKey, Level] = Field(default_factory=dict, max_length=1000)
@@ -58,12 +59,12 @@ class VacancyInput(Contract):
         return {"back": "backend", "front": "frontend", "ML": "ml"}.get(value, value) \
             if isinstance(value, str) else value
 
-    @field_validator("daily")
+    @field_validator("daily", "city")
     @classmethod
     def nonempty_daily(cls, value: str | None) -> str | None:
         """Whitespace-only schedules are invalid rather than silently accepted."""
         if value is not None and not value.strip():
-            raise ValueError("daily must not be blank")
+            raise ValueError("schedule and city must not be blank")
         return value
 
     @model_validator(mode="after")
@@ -100,6 +101,7 @@ class VacancyReady(VacancyInput):
     zp_min: int
     zp_max: int
     daily: str
+    city: str
     type: WorkType
     build_mode: BuildMode
     strict_vector: list[float]
@@ -128,6 +130,7 @@ def missing_requirements(vacancy: VacancyInput) -> list[str]:
         ("zp_min", vacancy.zp_min is not None),
         ("zp_max", vacancy.zp_max is not None),
         ("daily", vacancy.daily is not None),
+        ("city", vacancy.city is not None),
         ("type", vacancy.type is not None),
         ("class_or_domens_or_stacks", vacancy.class_key is not None or bool(vacancy.domens or vacancy.stacks)),
         ("status_open", vacancy.status == "open"),

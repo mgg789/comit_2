@@ -919,6 +919,47 @@
             "title": "City",
             "default": ""
           },
+          "work_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "remote",
+                    "hybrid"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Types"
+          },
+          "relocation_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relocation Ready"
+          },
+          "relocation_cities": {
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Relocation Cities"
+          },
           "salary": {
             "anyOf": [
               {
@@ -1731,6 +1772,19 @@
             ],
             "title": "Daily"
           },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
           "type": {
             "anyOf": [
               {
@@ -1977,6 +2031,10 @@
             "type": "string",
             "title": "Daily"
           },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
           "type": {
             "type": "string",
             "enum": [
@@ -2164,6 +2222,7 @@
           "zp_min",
           "zp_max",
           "daily",
+          "city",
           "type",
           "vacancy_id",
           "revision",

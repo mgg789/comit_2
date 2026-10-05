@@ -107,7 +107,9 @@ class Store:
                 if profile.source_revision < current["source_revision"]:
                     raise ConflictError("stale source_revision")
                 if profile.source_revision == current["source_revision"]:
-                    if digest != current["profile_hash"]:
+                    if digest != current["profile_hash"] and serialized != CandidateProfile.model_validate(
+                        current["profile"]
+                    ).model_dump(mode="json"):
                         raise ConflictError("source_revision reused with different profile")
                     return self._status(connection, candidate_id)
             revision = current["revision"] + 1 if current else 1

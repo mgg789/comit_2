@@ -12,6 +12,7 @@ export interface VacancyIntake {
   zp_min?: number | null;
   zp_max?: number | null;
   daily?: string | null;
+  city?: string | null;
   type?: VacancyWorkType | "очно" | "дистант" | "гибрид" | null;
   bio?: string | null;
   domens?: Record<string, number>;
@@ -42,6 +43,7 @@ export interface VacancyReady {
   zp_min: number;
   zp_max: number;
   daily: string;
+  city: string;
   type: VacancyWorkType;
   bio: string;
   domens: Record<string, number>;

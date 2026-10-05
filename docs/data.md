@@ -100,3 +100,9 @@ Bio без содержимого не создаёт embedding cache entry. О�
 хранится как NULL вместе с NULL fingerprints, не как нулевая заглушка.
 Реальный synthetic acceptance: `data/seed/vacancy-pipeline.json` (10 случаев) и
 `tests/vacancy_pool_acceptance.py`; только свежая изолированная локальная БД.
+
+Миграция `003_vacancy_city_required.sql` отзывает legacy ready вакансии без city,
+помечает активные jobs obsolete и сохраняет draft с недостающим city; raw_input
+не изменяется. Новый город и предпочтения кандидата хранятся в JSONB snapshots.
+Повтор старого intake с той же source_revision сравнивается после нормализации
+новых дефолтов, сохраняя идемпотентность ранее записанных снимков.

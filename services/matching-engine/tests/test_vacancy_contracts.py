@@ -19,7 +19,7 @@ def eligible_vacancy(**overrides) -> VacancyInput:
     """Build an isolated synthetic upstream snapshot with minimum qualifying class."""
     return VacancyInput.model_validate({
         "source_revision": 1, "owner_id": str(uuid4()), "status": "open",
-        "zp_min": 100000, "zp_max": 200000, "daily": "5/2", "type": "remote",
+        "zp_min": 100000, "zp_max": 200000, "daily": "5/2", "type": "remote", "city": "Москва",
         "class": "backend", **overrides,
     })
 

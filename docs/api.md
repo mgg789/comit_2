@@ -122,7 +122,7 @@ TS DTO: `packages/shared/src/vacancy-pipeline.ts`; OpenAPI генерирует�
 назначения его нельзя менять/удалять. Правила ревизий и идемпотентности как у кандидата.
 Исходные wire значения сохраняются в raw_input, канонические — в profile.
 
-Готовность требует owner_id, zp_min и zp_max (целые рубли ≥0, min≤max),
+Готовность требует owner_id, непустой city (включая remote), zp_min и zp_max (целые рубли ≥0, min≤max),
 непустой daily, type, status=open и хотя бы class **или** непустой domens/stacks.
 Техническое state=ready выдаётся только после успешной сборки артефактов.
 Бизнес-статусы: draft/open/pending/closed/done; переходы задаёт источник.
@@ -145,3 +145,14 @@ nullable semantic_vector/model_version/space_id и semantic_available.
 Изменение любых данных или уход из open немедленно отзывает старый ready.
 Outbox vacancy.ready/withdrawn сохраняется атомарно; его доставка и сам комбайн
 относятся к следующему этапу.
+
+## Структурированные условия кандидата для strict-фильтра
+
+`CandidateProfile` дополнен `work_types` (список onsite/remote/hybrid или null),
+`relocation_ready` (строгий bool или null), `relocation_cities` (список городов).
+Null означает неизвестно, пустой work_types — ни один формат не принят.
+Relocation_ready=true с пустым списком допускает любой город; непустой список
+ограничивает направления переезда. Эти поля не выводятся из preferences/bio.
+Они не меняют eligibility исходного пула, но комбайн исключает неизвестный формат.
+Новая `city` вакансии обязательна для ready любого формата. Legacy ready без
+города отзывается миграцией 003; исходные данные сохраняются как draft.

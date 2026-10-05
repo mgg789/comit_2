@@ -27,6 +27,9 @@ export interface CandidateIntake {
   email_verified?: boolean;
   phone?: string | null;
   city?: string;
+  work_types?: ("onsite" | "remote" | "hybrid")[] | null;
+  relocation_ready?: boolean | null;
+  relocation_cities?: string[];
   salary?: { from_rub: number; to_rub: number } | null;
   primary_direction?: import("./index.js").Specialization | null;
   grade_result?: {

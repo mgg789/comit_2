@@ -29,7 +29,7 @@
 ### Вакансии и подбор
 - `Vacancy` (цикл 1): owner_id, status, zp_min/zp_max, daily, type, bio,
   необязательный class, словари domens/stacks/soft_skills с уровнями 0–7.
-  Для готовности нужны owner_id, обе зарплатные границы, daily, type, status=open
+  Для готовности нужны owner_id, city (для всех форматов), обе зарплатные границы, daily, type, status=open
   и хотя бы class ИЛИ непустой domens/stacks. Soft skills одни не достаточны.
   Неполные снимки сохраняются, но не публикуются для комбайна.
 - Канонические классы intake: backend/frontend/fullstack/mobile/devops/data/qa/ml;

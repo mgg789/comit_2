@@ -15,6 +15,7 @@ from pydantic import (
 
 Grade = Literal["intern", "junior", "middle", "senior"]
 Direction = Literal["backend", "frontend", "fullstack", "mobile", "devops", "data", "qa", "ml"]
+WorkType = Literal["onsite", "remote", "hybrid"]
 ClaimStatus = Literal["confirmed", "partial", "self_reported", "pending", "rejected"]
 CoordinateGroup = Literal["domain", "stack", "soft_skill"]
 GRADE_RANK = {"intern": 0, "junior": 1, "middle": 2, "senior": 3}
@@ -90,6 +91,11 @@ class CandidateProfile(Contract):
     email_verified: bool = False
     phone: str | None = Field(default=None, max_length=100)
     city: str = Field(default="", max_length=300)
+    work_types: list[WorkType] | None = Field(default=None, max_length=3)
+    relocation_ready: bool | None = Field(default=None, strict=True)
+    relocation_cities: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        default_factory=list, max_length=100
+    )
     salary: SalaryRange | None = None
     primary_direction: Direction | None = None
     grade_result: GradeResult | None = None
@@ -113,6 +119,10 @@ class CandidateProfile(Contract):
             keys = [skill.key for skill in skills]
             if len(set(keys)) != len(keys):
                 raise ValueError("duplicate skill key within group")
+        if self.work_types is not None and len(set(self.work_types)) != len(self.work_types):
+            raise ValueError("duplicate work type")
+        if any(not city.strip() for city in self.relocation_cities):
+            raise ValueError("relocation city must not be blank")
         return self
 
 
