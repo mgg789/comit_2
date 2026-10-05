@@ -142,6 +142,8 @@ def test_top_k_has_stable_order_no_hard_tail_cutoff_and_filter_counts() -> None:
     assert [card.candidate_id.int for card in result.items] == [1, 2]
     assert result.scanned_count == 4 and result.passed_count == 3
     assert result.filter_counts == {"location_unknown": 1}
+    assert "salary_overlap" in result.items[0].filter_factors
+    assert "remote_location" in result.items[0].filter_factors
     assert [card.position for card in result.items] == [1, 2]
     assert select_candidates(target, [], ScoringPolicy(), 50).items == []
 

@@ -28,8 +28,14 @@ def store() -> Store:
         pytest.skip("PIPELINE_TEST_DATABASE_URL is not configured (dedicated test database required)")
     migrate(database_url)
     with connect(database_url) as connection:
+        if connection.execute("SELECT to_regclass('matching_pipeline.controls') AS matching").fetchone()["matching"]:
+            # Referencing tables join the same TRUNCATE without touching unrelated schemas.
+            matching_tables = "matching_pipeline.manual_requests,matching_pipeline.selections,matching_pipeline.selection_states,matching_pipeline.controls,matching_pipeline.runs,matching_pipeline.inbox,matching_pipeline.delivery_errors,"
+            connection.execute("UPDATE matching_pipeline.settings SET pool_generation=0")
+        else:
+            matching_tables = ""
         connection.execute("""
-            TRUNCATE vacancy_pipeline.outbox,vacancy_pipeline.jobs,vacancy_pipeline.ready,
+            TRUNCATE """ + matching_tables + """ vacancy_pipeline.outbox,vacancy_pipeline.jobs,vacancy_pipeline.ready,
                      vacancy_pipeline.vacancies,candidate_pipeline.outbox,candidate_pipeline.jobs,candidate_pipeline.pool,
                      candidate_pipeline.candidates,candidate_pipeline.embedding_cache
             RESTART IDENTITY

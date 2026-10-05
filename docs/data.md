@@ -106,3 +106,22 @@ Bio без содержимого не создаёт embedding cache entry. О�
 не изменяется. Новый город и предпочтения кандидата хранятся в JSONB snapshots.
 Повтор старого intake с той же source_revision сравнивается после нормализации
 новых дефолтов, сохраняя идемпотентность ранее записанных снимков.
+
+## Основной отбор: миграция 004
+
+`matching_pipeline` хранит settings (pool_generation), controls (top_k/ревизия/текущий
+run), runs (неизменяемые snapshots, policy/hash, поколения, lease/retry и статистика),
+selections (карточки с позициями и факторами), selection_states (независимые исключения),
+manual_requests (ключ ручной идемпотентности), inbox (дедупликация доставки),
+delivery_errors (bounded retry/quarantine). SQL trigger candidate outbox увеличивает
+generation для всех writers, включая расширение схемы координат.
+
+Run уникален по vacancy revision/schema/pool generation/policy hash/top_k/control revision.
+Новый run делает прежний obsolete; lease предыдущего worker отзывается.
+Публикация проверяет актуальность всех входов, затем сохраняет весь batch одной
+транзакцией. Чтение проверяет те же входы и полный набор candidate ID/revision;
+карточки разных поколений не смешиваются. Private contacts/narratives не входят
+в candidates_snapshot или cards; PDF сохраняется отдельно в candidate pool.
+ACK outbox, inbox и постановка задания атомарны; при storage failure событие
+остаётся недоставленным. При malformed snapshot savepoint изолирует одну запись,
+после ограниченных повторов она остаётся в quarantine до ручного retry.

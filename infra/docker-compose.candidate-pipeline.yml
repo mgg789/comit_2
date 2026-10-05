@@ -1,4 +1,4 @@
-# Opt-in candidate and vacancy materialization runtime, layered over dev compose.
+# Opt-in candidate, vacancy and main-selection runtime, layered over dev compose.
 # Pre-provision the pinned Harrier snapshot in the shared HF cache before real jobs.
 services:
   api:
@@ -56,6 +56,20 @@ services:
       PIPELINE_LEASE_SECONDS: 300
     volumes:
       - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  combine-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "combine-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
     depends_on:
       candidate-migrate:
         condition: service_completed_successfully

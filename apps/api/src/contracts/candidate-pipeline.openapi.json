@@ -867,10 +867,541 @@
           }
         }
       }
+    },
+    "/internal/vacancies/{vacancy_id}/combine": {
+      "post": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Request",
+        "description": "Immediately queue one exact snapshot; repeated caller keys preserve the original run.",
+        "operationId": "request_internal_vacancies__vacancy_id__combine_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CombineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CombineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Status",
+        "description": "Read durable run progress and report obsolete input generations.",
+        "operationId": "status_internal_vacancies__vacancy_id__combine_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CombineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/combine/retry": {
+      "post": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Retry",
+        "description": "Explicitly restart terminal failure with bounded attempts or refresh obsolete inputs.",
+        "operationId": "retry_internal_vacancies__vacancy_id__combine_retry_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CombineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/selections": {
+      "get": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Selections",
+        "description": "Return a page from exactly one valid ready run, with no contact information.",
+        "operationId": "selections_internal_vacancies__vacancy_id__selections_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectionPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/selection-state/{candidate_id}": {
+      "put": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Selection State",
+        "description": "Persist an internal Tinder exclusion handoff and invalidate the former batch.",
+        "operationId": "selection_state_internal_vacancies__vacancy_id__selection_state__candidate_id__put",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectionStateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SelectionState"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/matching/events": {
+      "get": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Events",
+        "description": "Read pending, acknowledged, retrying and quarantined durable delivery totals.",
+        "operationId": "events_internal_matching_events_get",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/matching/events/retry": {
+      "post": {
+        "tags": [
+          "main-selection"
+        ],
+        "summary": "Retry Event",
+        "description": "Release one quarantined/retrying event for bounded durable delivery.",
+        "operationId": "retry_event_internal_matching_events_retry_post",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliveryRetryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CandidateCard": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          },
+          "filter_factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filter Factors"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/ScoreBreakdown"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "position",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "resume_url",
+          "explanation"
+        ],
+        "title": "CandidateCard",
+        "description": "Anonymous main shortlist card; position is provisional until the future reranker."
+      },
       "CandidateProfile": {
         "properties": {
           "source_revision": {
@@ -1200,6 +1731,159 @@
         "title": "Category",
         "description": "Deterministic specialization and grade assigned from upstream test results."
       },
+      "CombineRequest": {
+        "properties": {
+          "top_k": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 50
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CombineRequest",
+        "description": "Bounded main shortlist size; optional caller key prevents duplicate manual submissions."
+      },
+      "CombineStatus": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "vacancy_revision": {
+            "type": "integer",
+            "title": "Vacancy Revision"
+          },
+          "strict_schema_version": {
+            "type": "integer",
+            "title": "Strict Schema Version"
+          },
+          "strict_schema_hash": {
+            "type": "string",
+            "title": "Strict Schema Hash"
+          },
+          "pool_generation": {
+            "type": "integer",
+            "title": "Pool Generation"
+          },
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "stage": {
+            "type": "string",
+            "const": "main_selection",
+            "title": "Stage",
+            "default": "main_selection"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "retrying",
+              "failed",
+              "ready",
+              "obsolete"
+            ],
+            "title": "State"
+          },
+          "top_k": {
+            "type": "integer",
+            "title": "Top K"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "scanned_count": {
+            "type": "integer",
+            "title": "Scanned Count",
+            "default": 0
+          },
+          "passed_count": {
+            "type": "integer",
+            "title": "Passed Count",
+            "default": 0
+          },
+          "selected_count": {
+            "type": "integer",
+            "title": "Selected Count",
+            "default": 0
+          },
+          "filter_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Filter Counts"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "vacancy_id",
+          "vacancy_revision",
+          "strict_schema_version",
+          "strict_schema_hash",
+          "pool_generation",
+          "policy_version",
+          "policy_hash",
+          "state",
+          "top_k"
+        ],
+        "title": "CombineStatus",
+        "description": "Exact vacancy, registry, pool and scoring-policy generations of one durable run."
+      },
       "Consent": {
         "properties": {
           "processing": {
@@ -1356,6 +2040,72 @@
         "title": "CoordinateEvidence",
         "description": "Status and declared level, without arbitrary private provenance strings."
       },
+      "DeliveryRetryRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "candidate",
+              "vacancy"
+            ],
+            "title": "Source"
+          },
+          "event_id": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Event Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "event_id"
+        ],
+        "title": "DeliveryRetryRequest",
+        "description": "Explicitly retry a quarantined/backing-off local outbox event after repairing its cause."
+      },
+      "DeliveryStatus": {
+        "properties": {
+          "candidate_pending": {
+            "type": "integer",
+            "title": "Candidate Pending"
+          },
+          "vacancy_pending": {
+            "type": "integer",
+            "title": "Vacancy Pending"
+          },
+          "acknowledged_count": {
+            "type": "integer",
+            "title": "Acknowledged Count"
+          },
+          "queued_count": {
+            "type": "integer",
+            "title": "Queued Count"
+          },
+          "quarantined_count": {
+            "type": "integer",
+            "title": "Quarantined Count",
+            "default": 0
+          },
+          "retrying_count": {
+            "type": "integer",
+            "title": "Retrying Count",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_pending",
+          "vacancy_pending",
+          "acknowledged_count",
+          "queued_count"
+        ],
+        "title": "DeliveryStatus",
+        "description": "Persisted acknowledgement counts for the two outbox streams and combine queue."
+      },
       "GradeResult": {
         "properties": {
           "grade": {
@@ -1419,6 +2169,75 @@
         "title": "HTTPValidationError"
       },
       "JsonValue": {},
+      "MatchedFeature": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "group": {
+            "type": "string",
+            "title": "Group"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "target_level": {
+            "type": "number",
+            "title": "Target Level"
+          },
+          "candidate_level": {
+            "type": "number",
+            "title": "Candidate Level"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "confirmed",
+                  "partial",
+                  "self_reported",
+                  "pending",
+                  "rejected"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "agreement": {
+            "type": "number",
+            "title": "Agreement"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "contribution": {
+            "type": "number",
+            "title": "Contribution"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "index",
+          "group",
+          "key",
+          "target_level",
+          "candidate_level",
+          "status",
+          "agreement",
+          "confidence",
+          "contribution"
+        ],
+        "title": "MatchedFeature",
+        "description": "One explicit target and candidate evidence, with its computed strict contribution."
+      },
       "NarrativeClaim": {
         "properties": {
           "title": {
@@ -1625,6 +2444,171 @@
         ],
         "title": "SalaryRange",
         "description": "Inclusive salary bounds in RUB; zero is allowed for unpaid internships."
+      },
+      "ScoreBreakdown": {
+        "properties": {
+          "rating_score": {
+            "type": "number",
+            "title": "Rating Score"
+          },
+          "strict_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict Score"
+          },
+          "semantic_cosine": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Cosine"
+          },
+          "semantic_unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Unavailable Reason"
+          },
+          "rating_contribution": {
+            "type": "number",
+            "title": "Rating Contribution"
+          },
+          "strict_contribution": {
+            "type": "number",
+            "title": "Strict Contribution"
+          },
+          "semantic_contribution": {
+            "type": "number",
+            "title": "Semantic Contribution"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "top_matched_features": {
+            "items": {
+              "$ref": "#/components/schemas/MatchedFeature"
+            },
+            "type": "array",
+            "title": "Top Matched Features"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rating_score",
+          "strict_score",
+          "semantic_cosine",
+          "semantic_unavailable_reason",
+          "rating_contribution",
+          "strict_contribution",
+          "semantic_contribution",
+          "score",
+          "top_matched_features"
+        ],
+        "title": "ScoreBreakdown",
+        "description": "Available-channel weights, bounded semantic delta and reproducible main score."
+      },
+      "SelectionPage": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/CombineStatus"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run",
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "SelectionPage",
+        "description": "Only current, live main cards; stale pool/vacancy/schema generations cannot be served."
+      },
+      "SelectionState": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "visited",
+              "pending",
+              "attractive"
+            ],
+            "title": "State"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state",
+          "vacancy_id",
+          "candidate_id"
+        ],
+        "title": "SelectionState",
+        "description": "Persisted exclusion state, independent of disposable shortlist generations."
+      },
+      "SelectionStateInput": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "visited",
+              "pending",
+              "attractive"
+            ],
+            "title": "State"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "SelectionStateInput",
+        "description": "Server-side handoff for exclusion state; visited is permanently terminal for this vacancy."
       },
       "Skill": {
         "properties": {

@@ -57,6 +57,7 @@ class FilterDecision(Contract):
 
     passed: bool
     reasons: list[str]
+    factors: list[str] = Field(default_factory=list)
 
 
 class MatchedFeature(Contract):
@@ -100,6 +101,7 @@ class CandidateCard(Contract):
     rank: int
     confirmed_strength: int
     resume_url: str
+    filter_factors: list[str] = Field(default_factory=list)
     explanation: ScoreBreakdown
 
 

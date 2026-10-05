@@ -11,6 +11,10 @@ export type {
 export type {
   VacancyIntake, VacancyPipelineStatus, VacancyReady, VacancyReadyPage, VacancyWorkType,
 } from "./vacancy-pipeline.js";
+export type {
+  CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
+  ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
+} from "./matching.js";
 
 export type Role = "candidate" | "employer";
 

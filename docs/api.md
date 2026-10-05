@@ -98,7 +98,7 @@ Private owner PDF существует только во внутреннем ma
 Хранилище или upstream недоступны — 503 без DSN/исходных исключений.
 
 Контракты регистрации/подтверждения email, проведения теста, CRUD исходных claims,
-кандидатского JWT/ownership и доставки outbox в комбайн пока отсутствуют и входят
+кандидатского JWT/ownership пока отсутствуют и входят
 в соседние этапы. В рамках этой задачи их результаты поступают через intake.
 
 ## Подготовка вакансии к комбайну (цикл 1)
@@ -143,8 +143,7 @@ nullable semantic_vector/model_version/space_id и semantic_available.
 Пустой bio означает явно отсутствующий мягкий вектор; class-only остаётся допустим.
 Если bio задан, ошибка Harrier приводит к retry/failed, а не к потере текста.
 Изменение любых данных или уход из open немедленно отзывает старый ready.
-Outbox vacancy.ready/withdrawn сохраняется атомарно; его доставка и сам комбайн
-относятся к следующему этапу.
+Outbox vacancy.ready/withdrawn сохраняется атомарно и доставляется combine-worker.
 
 ## Структурированные условия кандидата для strict-фильтра
 
@@ -156,3 +155,31 @@ Relocation_ready=true с пустым списком допускает любо
 Они не меняют eligibility исходного пула, но комбайн исключает неизвестный формат.
 Новая `city` вакансии обязательна для ready любого формата. Legacy ready без
 города отзывается миграцией 003; исходные данные сохраняются как draft.
+
+## Основной отбор и доставка событий
+
+Все маршруты защищены тем же `X-Internal-Token` и опубликованы в OpenAPI
+FastAPI/Fastify; DTO находятся в `packages/shared/src/matching.ts`. Это server-to-server
+контракт; пользовательский JWT/ownership работодателя и UI тиндера ещё не подключены.
+
+| Метод и путь | Назначение |
+|---|---|
+| POST `/internal/vacancies/{id}/combine` | `{top_k?:1..500,idempotency_key?:UUID}` → CombineStatus |
+| GET `/internal/vacancies/{id}/combine` | текущий run, стадия main_selection и состояние |
+| POST `/internal/vacancies/{id}/combine/retry` | повтор failed/retrying либо обновление obsolete |
+| GET `/internal/vacancies/{id}/selections?limit=100&offset=0` | SelectionPage только одного актуального ready run |
+| PUT `/internal/vacancies/{id}/selection-state/{candidate_id}` | `{state:eligible\|visited\|pending\|attractive}` → SelectionState |
+| GET `/internal/matching/events` | DeliveryStatus: pending обоих streams, ACK, queued, retry/quarantine |
+| POST `/internal/matching/events/retry` | `{source:candidate\|vacancy,event_id:positive integer}` → DeliveryStatus |
+
+Top_k по умолчанию 50; ручной idempotency_key сохраняет исходный run,
+повтор с другими vacancy/top_k → 409. Автоматический consumer использует ту же
+очередь и настройки. State queued/processing/retrying/failed/ready/obsolete —
+технический статус, не бизнес-статус вакансии. ACK события не означает ready.
+
+Карточка содержит анонимное имя, city, зарплату, category/rank, public PDF URL,
+положительные filter_factors и числовые explanation (rating/strict/semantic,
+top matched features со статусами подтверждения). Контактов и private profile нет.
+Нет готовой вакансии → 404; нет актуального завершённого batch → 409.
+Изменения входов сразу закрывают чтение старых карточек до нового отбора.
+Visited необратим; pending/attractive можно явно вернуть в eligible.

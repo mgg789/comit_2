@@ -66,7 +66,14 @@ def strict_filter(vacancy: VacancyReady, candidate: MatchCandidate, *, excluded:
             reasons.append("relocation_destination_mismatch")
     if candidate.strict_schema_version != vacancy.strict_schema_version or candidate.strict_schema_hash != vacancy.strict_schema_hash:
         reasons.append("strict_schema_mismatch")
-    return FilterDecision(passed=not reasons, reasons=reasons)
+    factors: list[str] = []
+    if not reasons:
+        factors = ["class_match" if vacancy.class_key is not None else "class_unrestricted",
+                   "salary_overlap", "work_type_accepted", "strict_schema_current"]
+        factors.append("remote_location" if vacancy.type == "remote" else (
+            "same_city" if city == destination else "relocation_accepted"
+        ))
+    return FilterDecision(passed=not reasons, reasons=reasons, factors=factors)
 
 
 def score_candidate(vacancy: VacancyReady, candidate: MatchCandidate, policy: ScoringPolicy) -> ScoreBreakdown:
@@ -147,7 +154,8 @@ def select_candidates(vacancy: VacancyReady, candidates: list[MatchCandidate], p
     cards = [CandidateCard(candidate_id=value.candidate_id, profile_revision=value.profile_revision,
         position=position, display_name=value.display_name, city=value.city, salary=value.salary,
         category=value.category, rank=value.rank, confirmed_strength=value.confirmed_strength,
-        resume_url=value.resume_url, explanation=score)
+        resume_url=value.resume_url, explanation=score,
+        filter_factors=strict_filter(vacancy, value).factors)
         for position, (value, score) in enumerate(selected[:top_k], start=1)]
     return MainSelectionResult(scanned_count=len(candidates), passed_count=len(selected),
                                filter_counts=dict(counts), items=cards)

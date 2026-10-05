@@ -109,3 +109,51 @@ test("vacancy ready page uses the static route and anonymous intake never reache
   assert.equal(calls, 1);
   await app.close();
 });
+
+test("combine gateway validates controls and both exclusion IDs before forwarding", async () => {
+  const app = gateway();
+  let calls = 0;
+  await app.register(candidatePipelineRoutes, { token: "synthetic-test-token", transport: async (_url, options) => {
+    calls += 1;
+    assert.equal(new Headers(options?.headers).get("x-internal-token"), "synthetic-test-token");
+    return Response.json({ detail: "synthetic conflict" }, { status: 409 });
+  } });
+  const headers = { "x-internal-token": "synthetic-test-token" };
+  const url = "/internal/vacancies/00000000-0000-4000-8000-000000000001/combine";
+  assert.equal((await app.inject({ method: "POST", url, payload: {} })).statusCode, 401);
+  for (const payload of [{ top_k: 0 }, { top_k: 501 }, { top_k: true }, { top_k: "50" }, { unknown: 1 }]) {
+    assert.equal((await app.inject({ method: "POST", url, headers, payload })).statusCode, 400);
+  }
+  assert.equal(calls, 0);
+  assert.equal((await app.inject({ method: "POST", url, headers, payload: { top_k: 50,
+    idempotency_key: "00000000-0000-4000-8000-000000000002" } })).statusCode, 409);
+  const stateUrl = "/internal/vacancies/00000000-0000-4000-8000-000000000001/selection-state/invalid-uuid";
+  assert.equal((await app.inject({ method: "PUT", url: stateUrl, headers, payload: { state: "visited" } })).statusCode, 400);
+  assert.equal(calls, 1);
+  await app.close();
+});
+
+test("event delivery gateway exposes acknowledgements and validates retry stream identity", async () => {
+  const app = gateway();
+  let calls = 0;
+  const status = { candidate_pending: 0, vacancy_pending: 1, acknowledged_count: 4,
+    queued_count: 1, quarantined_count: 0, retrying_count: 0 };
+  await app.register(candidatePipelineRoutes, { token: "synthetic-test-token", transport: async (url, options) => {
+    calls += 1;
+    if (options?.method === "POST") {
+      assert.equal(new URL(String(url)).pathname, "/internal/matching/events/retry");
+      assert.deepEqual(JSON.parse(String(options.body)), { source: "vacancy", event_id: 1 });
+    }
+    return Response.json(status);
+  } });
+  const headers = { "x-internal-token": "synthetic-test-token" };
+  const result = await app.inject({ method: "GET", url: "/internal/matching/events", headers });
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(result.json(), status);
+  assert.equal((await app.inject({ method: "POST", url: "/internal/matching/events/retry", headers,
+    payload: { source: "arbitrary-table", event_id: 1 } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url: "/internal/matching/events/retry", headers,
+    payload: { source: "vacancy", event_id: 1 } })).statusCode, 200);
+  assert.equal(calls, 2);
+  await app.close();
+});

@@ -50,17 +50,25 @@ export async function candidatePipelineRoutes(app: FastifyInstance, options: Can
     { method: "GET", path: "/internal/vacancies/:vacancy_id", response: "VacancyPipelineStatus" },
     { method: "GET", path: "/internal/vacancies/:vacancy_id/ready", response: "VacancyReady" },
     { method: "POST", path: "/internal/vacancies/:vacancy_id/retry", response: "VacancyPipelineStatus" },
+    { method: "POST", path: "/internal/vacancies/:vacancy_id/combine", body: "CombineRequest", response: "CombineStatus" },
+    { method: "GET", path: "/internal/vacancies/:vacancy_id/combine", response: "CombineStatus" },
+    { method: "POST", path: "/internal/vacancies/:vacancy_id/combine/retry", response: "CombineStatus" },
+    { method: "GET", path: "/internal/vacancies/:vacancy_id/selections", response: "SelectionPage" },
+    { method: "PUT", path: "/internal/vacancies/:vacancy_id/selection-state/:candidate_id", body: "SelectionStateInput", response: "SelectionState" },
+    { method: "GET", path: "/internal/matching/events", response: "DeliveryStatus" },
+    { method: "POST", path: "/internal/matching/events/retry", body: "DeliveryRetryRequest", response: "DeliveryStatus" },
   ] as const;
   for (const route of routes) {
+    const paramNames = ["vacancy_id", "candidate_id"].filter(name => route.path.includes(`:${name}`));
     app.route({
       method: route.method,
       url: route.path,
       schema: {
         tags: [route.path.startsWith("/internal/vacancies") ? "vacancy-pipeline" : "candidate-pipeline"],
         security: [{ internalToken: [] }],
-        ...(route.path.includes(":candidate_id") || route.path.includes(":vacancy_id") ? { params: {
-          type: "object", required: [route.path.includes(":vacancy_id") ? "vacancy_id" : "candidate_id"],
-          properties: { [route.path.includes(":vacancy_id") ? "vacancy_id" : "candidate_id"]: { type: "string", format: "uuid" } },
+        ...(paramNames.length ? { params: {
+          type: "object", required: paramNames,
+          properties: Object.fromEntries(paramNames.map(name => [name, { type: "string", format: "uuid" }])),
         } } : {}),
         ...("body" in route ? { body: { $ref: `urn:comit:candidate:${route.body}` } } : {}),
         ...("response" in route ? { response: { 200: { $ref: `urn:comit:candidate:${route.response}` } } } : {}),

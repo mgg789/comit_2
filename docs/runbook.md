@@ -45,6 +45,7 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine serve
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine vacancy-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine combine-worker
 PORT=38080 pnpm --filter @comit/api start
 ```
 
@@ -101,6 +102,26 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 acceptance требуют разных свежих БД, поскольку оба добавляют одну координату.
 
 ## Локально
+
+Для основного отбора применить миграции 003/004 до запуска серверов. Отдельный
+`combine-worker` доставляет оба outbox и считает основной отбор; модель ему не
+нужна, он использует готовые вектора. ACK события означает сохранённое задание,
+а готовность карточек проверяется по state=ready конкретного combine run.
+`GET /internal/matching/events` показывает backlog, retry и quarantine.
+После исправления причины доступны отдельные retry задания и события.
+При изменении пула старые карточки возвращают 409 до завершения нового отбора;
+не готовая/закрытая вакансия возвращает 404. Обходить эти проверки нельзя.
+
+Полная локальная проверка требует свежую отдельную БД и три настоящих worker:
+
+```bash
+CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.venv/bin/python tests/combine_acceptance.py
+```
+
+200 кандидатов/10 вакансий проверяют фильтры, основной отбор, доставку событий,
+отзыв согласия, общую миграцию и закрытие. Скрипт меняет только свой локальный
+контур через HTTP; отчёт и вымышленные входы сохраняются в `tests/artifacts/`.
+Реранкер, пользовательская авторизация и интерфейс тиндера проверкой не охвачены.
 
 | Задача | Команда |
 |---|---|

@@ -10,6 +10,8 @@ import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
+from matching_engine.combine_routes import combine_router
+from matching_engine.combine_store import CombineStore
 from matching_engine.models import (
     CandidateProfile,
     CandidateStatus,
@@ -24,12 +26,16 @@ from matching_engine.vacancy_store import VacancyStore
 
 def create_app(*, store: Store | None = None, internal_token: str | None = None,
                encoder_ready: Callable[[], bool] | None = None,
-               vacancy_store: VacancyStore | None = None) -> FastAPI:
+               vacancy_store: VacancyStore | None = None,
+               combine_store: CombineStore | None = None) -> FastAPI:
     """Build routes without DB/model side effects; injected dependencies support tests only."""
     database_url = os.environ.get("DATABASE_URL")
     pipeline_store = store if store is not None else (Store(database_url) if database_url else None)
     vacancy_repository = vacancy_store if vacancy_store is not None else (
         VacancyStore(pipeline_store.database_url) if pipeline_store is not None else None
+    )
+    combine_repository = combine_store if combine_store is not None else (
+        CombineStore(pipeline_store.database_url) if pipeline_store is not None else None
     )
     token = internal_token if internal_token is not None else os.environ.get("CANDIDATE_PIPELINE_TOKEN")
     app = FastAPI(
@@ -77,6 +83,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
             "database": pipeline_store is not None and pipeline_store.ready(),
             "embedding": embedding_ready,
             "vacancy_database": vacancy_repository is not None and vacancy_repository.ready(),
+            "matching_database": combine_repository is not None and combine_repository.ready(),
         }
         available = all(checks.values())
         if not available:
@@ -145,4 +152,5 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
     app.include_router(vacancy_router(vacancy_repository, require_internal))
+    app.include_router(combine_router(combine_repository, require_internal))
     return app
