@@ -14,6 +14,7 @@ from pydantic import (
 )
 
 Grade = Literal["intern", "junior", "middle", "senior"]
+GradeStatus = Literal["approved", "self_reported"]
 Direction = Literal["backend", "frontend", "fullstack", "mobile", "devops", "data", "qa", "ml"]
 WorkType = Literal["onsite", "remote", "hybrid"]
 ClaimStatus = Literal["confirmed", "partial", "self_reported", "pending", "rejected"]
@@ -51,12 +52,24 @@ class Consent(Contract):
 
 
 class GradeResult(Contract):
-    """Upstream grade-test result; only approved results permit pool membership."""
+    """Upstream grade result, allowing a declared grade until testing confirms it.
+
+    A real test session and approval timestamp are mandatory for an approved result.
+    Self-reported grades deliberately keep both fields optional: the API must never
+    manufacture a test session identifier for a candidate who has not tested yet.
+    """
 
     grade: Grade
-    status: Literal["approved", "pending", "rejected"]
-    test_session_id: UUID
+    status: Literal["approved", "self_reported", "pending", "rejected"]
+    test_session_id: UUID | None = None
     approved_at: AwareDatetime | None = None
+
+    @model_validator(mode="after")
+    def approved_requires_test_evidence(self) -> "GradeResult":
+        """Reject approved grades without the immutable upstream test evidence."""
+        if self.status == "approved" and (self.test_session_id is None or self.approved_at is None):
+            raise ValueError("approved grade requires test_session_id and approved_at")
+        return self
 
 
 class Skill(Contract):
@@ -167,10 +180,11 @@ class CandidateProfile(Contract):
 
 
 class Category(Contract):
-    """Deterministic specialization and grade assigned from upstream test results."""
+    """Deterministic specialization and grade with its upstream evidence status."""
 
     specialization: Direction
     grade: Grade
+    grade_status: GradeStatus = "approved"
 
 
 class Coordinate(Contract):
@@ -268,8 +282,7 @@ def missing_requirements(profile: CandidateProfile) -> list[str]:
         (
             "approved_grade_result",
             profile.grade_result is not None
-            and profile.grade_result.status == "approved"
-            and profile.grade_result.approved_at is not None,
+            and profile.grade_result.status in ("approved", "self_reported"),
         ),
     ):
         if not present:
@@ -278,11 +291,13 @@ def missing_requirements(profile: CandidateProfile) -> list[str]:
 
 
 def category_for(profile: CandidateProfile) -> Category:
-    """Derive the category exclusively from an eligible upstream test snapshot."""
+    """Derive category from an eligible declaration or accepted test with explicit grade evidence."""
     if missing_requirements(profile) or profile.grade_result is None:
         raise ValueError("profile is not eligible for the pool")
     assert profile.primary_direction is not None
-    return Category(specialization=profile.primary_direction, grade=profile.grade_result.grade)
+    return Category(specialization=profile.primary_direction, grade=profile.grade_result.grade,
+                    grade_status=("self_reported" if profile.grade_result.status == "self_reported"
+                                  else "approved"))
 
 
 def confirmed_strength(profile: CandidateProfile) -> int:

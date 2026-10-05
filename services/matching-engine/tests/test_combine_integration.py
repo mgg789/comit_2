@@ -7,16 +7,11 @@ from uuid import UUID, uuid4
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
-from psycopg.types.json import Jsonb
-from test_contracts import eligible_profile
-from test_pipeline_integration import (
-    store as store,  # noqa: PLC0414 - register shared fixture.
+from matching_engine.combine_models import (
+    CombineRequest,
+    ScoringPolicy,
+    SelectionStateInput,
 )
-from test_pipeline_integration import worker
-from test_vacancy_contracts import eligible_vacancy
-from test_vacancy_integration import run
-
-from matching_engine.combine_models import CombineRequest, SelectionStateInput
 from matching_engine.combine_scoring import select_candidates
 from matching_engine.combine_store import CombineStore
 from matching_engine.combine_worker import CombineWorker
@@ -26,6 +21,14 @@ from matching_engine.main import create_app
 from matching_engine.models import CoordinateAddition
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.vacancy_store import VacancyStore
+from psycopg.types.json import Jsonb
+from test_contracts import eligible_profile
+from test_pipeline_integration import (
+    store as store,  # noqa: PLC0414 - register shared fixture.
+)
+from test_pipeline_integration import worker
+from test_vacancy_contracts import eligible_vacancy
+from test_vacancy_integration import run
 
 pytestmark = pytest.mark.integration
 
@@ -125,6 +128,26 @@ def test_manual_idempotency_and_top_k_controls_survive_future_automatic_runs(sto
     assert refreshed.run_id != queued.run_id and refreshed.top_k == 2 and refreshed.state == "ready"
     assert combines.request(vacancy_id, request).run_id == queued.run_id
     assert combines.request(vacancy_id, request).state == "obsolete"
+
+
+def test_policy_change_obsoletes_ready_selection_until_fresh_run(store: Store) -> None:
+    """A ready batch is unavailable under a changed scoring policy until recomputed."""
+    combines, vacancy_id, _ = setup_pool(store)
+    initial = combines.request(vacancy_id, CombineRequest(top_k=2))
+    finish(combines)
+    assert combines.selections(vacancy_id, 100, 0).run.run_id == initial.run_id
+
+    changed = CombineStore(store.database_url, policy=ScoringPolicy(version="test-policy-v3"))
+    assert changed.status(vacancy_id).state == "obsolete"
+    with pytest.raises(ConflictError):
+        changed.selections(vacancy_id, 100, 0)
+
+    refreshed = changed.request(vacancy_id, CombineRequest(top_k=2))
+    assert refreshed.state == "queued" and refreshed.run_id != initial.run_id
+    finish(changed)
+    ready = changed.selections(vacancy_id, 100, 0)
+    assert ready.run.run_id == refreshed.run_id
+    assert ready.run.policy_version == "test-policy-v3"
 
 
 def test_persistent_exclusions_visited_terminal_pending_releasable(store: Store) -> None:
@@ -438,3 +461,28 @@ def test_routes_protected_not_ready_and_selection_state_handoff(store: Store) ->
     assert client.get(f"/internal/vacancies/{vacancy_id}/selections?limit=0", headers=headers).status_code == 422
     assert client.get("/internal/matching/events", headers=headers).status_code == 200
     assert client.post("/internal/matching/events/retry", json={"source": "candidate", "event_id": 0}, headers=headers).status_code == 422
+
+
+def test_optional_owner_header_hides_foreign_vacancy(store: Store) -> None:
+    """Owner filtering returns the same 404 as a missing vacancy for foreign callers."""
+    combines, vacancy_id, _ = setup_pool(store)
+    client = TestClient(create_app(store=store, combine_store=combines, internal_token="test", encoder_ready=lambda: True))
+    headers = {"X-Internal-Token": "test"}
+    with connect(store.database_url) as connection:
+        owner_id = connection.execute(
+            "SELECT owner_id FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s",
+            (vacancy_id,),
+        ).fetchone()["owner_id"]
+
+    foreign = {**headers, "X-Owner-ID": str(uuid4())}
+    assert client.post(
+        f"/internal/vacancies/{vacancy_id}/combine",
+        json={"top_k": 2},
+        headers=foreign,
+    ).status_code == 404
+    owned = {**headers, "X-Owner-ID": str(owner_id)}
+    assert client.post(
+        f"/internal/vacancies/{vacancy_id}/combine",
+        json={"top_k": 2},
+        headers=owned,
+    ).status_code == 200

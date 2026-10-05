@@ -305,14 +305,14 @@ class Store:
                 raise ValueError("strict vector dimensions do not match active registry")
             connection.execute("""
                 INSERT INTO candidate_pipeline.pool
-                    (candidate_id,revision,schema_version,schema_hash,specialization,grade,grade_rank,
+                    (candidate_id,revision,schema_version,schema_hash,specialization,grade,grade_status,grade_rank,
                      confirmed_strength,strict_vector,strict_evidence,semantic_vector,semantic_model_version,
                      public_profile,public_pdf,owner_pdf)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::vector,%s,%s,%s,%s)
                 ON CONFLICT (candidate_id) DO UPDATE SET
                     revision=EXCLUDED.revision,schema_version=EXCLUDED.schema_version,
                     schema_hash=EXCLUDED.schema_hash,specialization=EXCLUDED.specialization,
-                    grade=EXCLUDED.grade,grade_rank=EXCLUDED.grade_rank,
+                    grade=EXCLUDED.grade,grade_status=EXCLUDED.grade_status,grade_rank=EXCLUDED.grade_rank,
                     confirmed_strength=EXCLUDED.confirmed_strength,
                     strict_vector=EXCLUDED.strict_vector,strict_evidence=EXCLUDED.strict_evidence,
                     semantic_vector=EXCLUDED.semantic_vector,
@@ -320,7 +320,7 @@ class Store:
                     public_profile=EXCLUDED.public_profile,public_pdf=EXCLUDED.public_pdf,
                     owner_pdf=EXCLUDED.owner_pdf,published_at=now()
             """, (job.candidate_id, job.revision, active.version, active.schema_hash,
-                  category.specialization, category.grade, GRADE_RANK[category.grade], strength,
+                  category.specialization, category.grade, category.grade_status, GRADE_RANK[category.grade], strength,
                   strict_vector, Jsonb(strict_evidence), json.dumps(semantic_vector), model_version,
                   Jsonb(public_profile),
                   public_pdf, owner_pdf))
@@ -388,7 +388,7 @@ class Store:
             WHERE candidate_id=%s AND revision=%s AND schema_version=%s
         """, (candidate_id, row["revision"], schema.version)).fetchone()
         profile = CandidateProfile.model_validate(row["profile"])
-        category = Category(specialization=profile.primary_direction, grade=profile.grade_result.grade) \
+        category = Category(specialization=profile.primary_direction, grade=profile.grade_result.grade, grade_status=profile.grade_result.status) \
             if not missing_requirements(profile) else None
         return CandidateStatus(
             candidate_id=candidate_id, profile_revision=row["revision"], state=row["state"],
@@ -421,7 +421,7 @@ class Store:
                 candidate_id=row["candidate_id"], profile_revision=row["revision"],
                 display_name=row["public_profile"]["display_name"], city=row["public_profile"]["city"],
                 salary=row["public_profile"]["salary"],
-                category=Category(specialization=row["specialization"], grade=row["grade"]),
+                category=Category(specialization=row["specialization"], grade=row["grade"], grade_status=row["grade_status"]),
                 rank=row["rank"], confirmed_strength=row["confirmed_strength"],
                 strict_vector=row["strict_vector"], strict_evidence=row["strict_evidence"],
                 strict_schema_version=row["schema_version"],

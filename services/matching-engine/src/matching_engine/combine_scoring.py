@@ -102,10 +102,13 @@ def score_candidate(vacancy: VacancyReady, candidate: MatchCandidate, policy: Sc
             target_level=target * 7, candidate_level=evidence.level, status=evidence.status,
             agreement=agreement, confidence=confidence, contribution=agreement * confidence))
     strict_score = sum(feature.contribution for feature in features) / len(features) if features else None
+    grade_status = candidate.category.grade_status
+    grade_confidence = (policy.declared_grade_confidence
+                        if grade_status == "self_reported" else 1.0)
     rating_weight = policy.rating_weight
     strict_weight = policy.strict_weight if strict_score is not None else 0.0
     denominator = rating_weight + strict_weight
-    rating_part = rating_weight / denominator * candidate.rating_score
+    rating_part = rating_weight / denominator * candidate.rating_score * grade_confidence
     strict_part = strict_weight / denominator * strict_score if strict_score is not None else 0.0
     base = rating_part + strict_part
     cosine: float | None = None
@@ -133,7 +136,8 @@ def score_candidate(vacancy: VacancyReady, candidate: MatchCandidate, policy: Sc
         semantic_cosine=cosine, semantic_unavailable_reason=unavailable,
         rating_contribution=rating_part, strict_contribution=strict_part,
         semantic_contribution=semantic_part, score=base + semantic_part,
-        top_matched_features=sorted(features, key=lambda item: (-item.contribution, item.index))[:5])
+        top_matched_features=sorted(features, key=lambda item: (-item.contribution, item.index))[:5],
+        grade_status=grade_status, grade_confidence=grade_confidence)
 
 
 def select_candidates(vacancy: VacancyReady, candidates: list[MatchCandidate], policy: ScoringPolicy,

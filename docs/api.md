@@ -37,6 +37,37 @@ JWT и отзываемая DB-сессия. Нормализованный emai
 профиля в пуле остаётся отдельным условием candidate pipeline. Обязательное согласие
 не превращает регистрацию в публикацию профиля.
 
+### Candidate source profile
+
+Профиль кандидата хранится в API-core как private account-owned source. Браузерные
+`GET/PUT/PATCH /candidate/profile` требуют candidate JWT или role cookie. PUT
+заменяет editable snapshot, PATCH применяет shallow patch; оба метода принимают
+`expected_revision` и возвращают `409 profile_revision_conflict` при устаревшей
+ревизии. Нулевая ревизия создаёт профиль. Поля proof, grade result, candidate ID,
+email и серверное время согласия запрещены в mutation.
+
+Editable narrative claims получают стабильный UUID на сервере. `facts` (домены,
+стеки, длительность, роль, production support) — структурированная декларация,
+а ссылка сама по себе не является evidence. Evidence возвращается отдельно и
+содержит canonical input SHA-256, status, verified value, provenance и
+`checked_at`; кандидат не может подменить этот канал.
+
+Профильное согласие использует `profile-v1`; клиент передаёт processing/pool/version,
+а `accepted_at` ставится сервером транзакционно. Account consent и pool consent
+не смешиваются. `POST /candidate/profile/projection/retry` повторяет только
+локальную terminal `failed` projection. `GET /candidate/pipeline` и
+`GET /candidate/resume.pdf` используют account ID из сессии.
+
+Browser profile projection выдаёт `self_reported` без выдуманного UUID тестовой
+сессии. Контракт предусматривает будущий trusted producer, который заменит его на
+legacy `approved` с реальными `test_session_id` и `approved_at`; этот producer и
+его replacement contour текущим browser/API проходом не реализованы. Будущий
+producer обязан обновить authoritative evidence API и enqueue новый exact snapshot;
+прямой approved intake в matching не заменяет source. Self reported
+grade допускается в пул при выполнении остальных требований, получает badge в
+public PDF, а в policy `main-v2` confidence `0.6` уменьшает только его rating
+contribution. Pending/rejected grade остаются блокирующими.
+
 ### testing-engine
 
 | Метод | Путь | Назначение |
@@ -99,8 +130,9 @@ PUT заменяет полный снимок; частичное заполн�
 дополнительные исходные поля сохраняются в `details`/`metadata` как JSON.
 
 Условия очереди: непустые имя и город, подтверждённый email, зарплатные границы,
-primary_direction, approved grade_result с UUID сессии и временем принятия,
-оба согласия с версией и aware timestamp. `consents.accepted_at/version` относятся
+primary_direction, `approved` или `self_reported` grade_result, оба согласия с
+версией и aware timestamp. Approved требует UUID сессии и время принятия;
+self_reported не получает выдуманный UUID. `consents.accepted_at/version` относятся
 к общей версии снимка обоих согласий; индивидуальный audit остаётся у источника.
 Неполный профиль сохраняется как draft с чек-листом, без публикации.
 
@@ -116,9 +148,10 @@ Private owner PDF существует только во внутреннем ma
 Входная валидация Fastify возвращает 400, Pydantic/неизвестная координата — 422.
 Хранилище или upstream недоступны — 503 без DSN/исходных исключений.
 
-Регистрация/подтверждение email и candidate JWT/ownership реализованы. CRUD исходных
-claims, профильная форма, проведение теста и публикация в пул ещё не входят в этот
-контур: pipeline получает уже собранный и проверенный upstream-снимок.
+Регистрация/подтверждение email, candidate JWT/ownership и source-profile CRUD
+разделены с matching projection. Проведение теста остаётся trusted upstream
+контуром; API не принимает от браузера `grade_result` или evidence и не делает
+самоотчёт подтверждённым.
 
 ## Подготовка вакансии к комбайну (цикл 1)
 
@@ -180,10 +213,10 @@ Relocation_ready=true с пустым списком допускает любо
 ## Основной отбор и доставка событий
 
 Все internal-маршруты защищены тем же `X-Internal-Token` и опубликованы в OpenAPI
-FastAPI/Fastify; DTO находятся в `packages/shared/src/matching.ts`. Это server-to-server
-контракт. Public employer gateway пока не публикует подборку Selection и не даёт
-CRUD опубликованного профиля вакансии; пользовательский JWT используется только в
-реализованных account/draft границах.
+FastAPI/Fastify; DTO находятся в `packages/shared/src/matching.ts`. Public employer
+gateway требует employer JWT/session, проверяет owner draft и затем передаёт
+server-derived `X-Owner-ID` upstream. Чужой draft, отсутствующий draft или
+matching vacancy возвращают единый 404 owner boundary.
 
 | Метод и путь | Назначение |
 |---|---|
@@ -195,14 +228,34 @@ CRUD опубликованного профиля вакансии; польз�
 | GET `/internal/matching/events` | DeliveryStatus: pending обоих streams, ACK, queued, retry/quarantine |
 | POST `/internal/matching/events/retry` | `{source:candidate\|vacancy,event_id:positive integer}` → DeliveryStatus |
 
+Для работодателя те же операции доступны только после `created` + accepted
+publication draft:
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| GET | `/employer/vacancy-drafts/{draft_id}/ready` | актуальный ready snapshot vacancy |
+| POST | `/employer/vacancy-drafts/{draft_id}/combine` | queue main selection |
+| GET | `/employer/vacancy-drafts/{draft_id}/combine` | durable combine status |
+| POST | `/employer/vacancy-drafts/{draft_id}/combine/retry` | retry failed/obsolete run |
+| GET | `/employer/vacancy-drafts/{draft_id}/selections` | owner-scoped current selection page |
+| GET | `/employer/vacancy-drafts/{draft_id}/candidates/{candidate_id}/resume.pdf` | PDF выбранного кандидата |
+
+Selection gateway повторно сверяет текущий source revision, consent и выбранный
+candidate перед выдачей каждой карточки/PDF. Падение projection кандидата вне
+запрошенной страницы не блокирует её; устаревший source watermark хотя бы одной
+карточки запрошенной страницы даёт 409 до пересборки, а
+отсутствующий кандидат в текущем selection — 404. `ACK` source outbox означает
+только доставку snapshot, не готовность vectors/PDF/pool.
+
 Top_k по умолчанию 50; ручной idempotency_key сохраняет исходный run,
 повтор с другими vacancy/top_k → 409. Автоматический consumer использует ту же
 очередь и настройки. State queued/processing/retrying/failed/ready/obsolete —
 технический статус, не бизнес-статус вакансии. ACK события не означает ready.
 
 Карточка содержит анонимное имя, city, зарплату, category/rank, public PDF URL,
-положительные filter_factors и числовые explanation (rating/strict/semantic,
-top matched features со статусами подтверждения). Контактов и private profile нет.
+положительные filter_factors и числовые explanation (raw rating, grade_status,
+grade confidence, strict/semantic, top matched features со статусами подтверждения).
+Контактов и private profile нет.
 Нет готовой вакансии → 404; нет актуального завершённого batch → 409.
 Изменения входов сразу закрывают чтение старых карточек до нового отбора.
 Visited необратим; pending/attractive можно явно вернуть в eligible.
@@ -270,5 +323,7 @@ multi-select группы объединяет выбранные неперес
 владельца; 409 — CAS/state/hash/schema конфликт; 503 — недоступная зависимость.
 Технические ошибки inference передаются через job state и безопасный error code.
 Auth/JWT/accounts и owner-scoped draft gateway реализованы. UI, public matching
-Selections и CRUD опубликованной вакансии пока не реализованы в этом проходе.
+gateway routes and CRUD опубликованной вакансии остаются отдельными этапами;
+описанные выше employer selection routes уже owner-scoped и проверяют актуальность
+источников.
 Подробности: [agents.md](agents.md).

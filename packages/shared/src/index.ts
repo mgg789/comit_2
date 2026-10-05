@@ -5,6 +5,11 @@
  */
 
 export type {
+  CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
+  CandidateProfileFields, CandidateProfileConsentInput, CandidateProfileMutation,
+  CandidateClaimEvidence, CandidateProjectionDelivery, CandidateProfileView,
+} from "./candidate-profile.js";
+export type {
   CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,
   CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill, StrictCoordinateEvidence,
 } from "./candidate-pipeline.js";
@@ -36,10 +41,11 @@ export const SPECIALIZATIONS = [
 ] as const;
 export type Specialization = (typeof SPECIALIZATIONS)[number];
 
-/** Category = specialization × grade, assigned only via survey + grade test (TZ §2). */
+/** Category records the chosen direction and the explicit evidence state of its grade. */
 export interface Category {
   specialization: Specialization;
   grade: Grade;
+  grade_status?: "approved" | "self_reported";
 }
 
 export interface SalaryRange {

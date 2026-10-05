@@ -2,11 +2,10 @@
 
 from io import BytesIO
 
-from pypdf import PdfReader
-
 from matching_engine.models import CandidateProfile, Category
 from matching_engine.privacy import sanitize_public_text
 from matching_engine.resume import render_resume
+from pypdf import PdfReader
 
 
 def test_public_resume_hides_contacts_in_every_narrative_and_preserves_statuses() -> None:
@@ -32,6 +31,16 @@ def test_public_resume_hides_contacts_in_every_narrative_and_preserves_statuses(
     owner = render_resume(profile, category, public=False)
     owner_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(owner)).pages)
     assert "ivan@example.test" in owner_text and "Иван Иванов" in owner_text
+
+
+def test_public_resume_labels_self_reported_grade() -> None:
+    profile = CandidateProfile(source_revision=1)
+    pdf = render_resume(profile, Category(
+        specialization="backend", grade="middle", grade_status="self_reported",
+    ))
+    text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(pdf)).pages)
+    assert "Статус грейда:" in text
+    assert "заявлено самостоятельно" in text
 
 
 def test_long_cyrillic_resume_paginates_without_losing_tail() -> None:

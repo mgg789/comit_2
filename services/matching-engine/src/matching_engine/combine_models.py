@@ -11,6 +11,7 @@ from matching_engine.models import (
     ClaimStatus,
     Contract,
     DurationMonths,
+    GradeStatus,
     NarrativeClaim,
     NarrativeRole,
     PoolEntry,
@@ -77,10 +78,11 @@ def project_narrative_facts(claims: dict[str, list[NarrativeClaim]]) -> list[Saf
 class ScoringPolicy(Contract):
     """Manual initial weights; policy snapshots belong to each durable run, not an LLM."""
 
-    version: str = Field(default="main-v1", min_length=1, max_length=100)
+    version: str = Field(default="main-v2", min_length=1, max_length=100)
     rating_weight: float = Field(default=0.45, ge=0, le=1, allow_inf_nan=False)
     strict_weight: float = Field(default=0.35, ge=0, le=1, allow_inf_nan=False)
     semantic_correction: float = Field(default=0.10, ge=0, le=0.20, allow_inf_nan=False)
+    declared_grade_confidence: float = Field(default=0.6, ge=0, le=1, allow_inf_nan=False)
     confidence: dict[ClaimStatus, float] = Field(default_factory=lambda: {
         "confirmed": 1.0, "partial": 0.8, "self_reported": 0.6,
         "pending": 0.5, "rejected": 0.0,
@@ -97,6 +99,8 @@ class ScoringPolicy(Contract):
             raise ValueError("evidence confidence must be finite and between zero and one")
         if self.confidence["rejected"] != 0 or self.confidence["confirmed"] != 1:
             raise ValueError("confirmed and rejected confidence must remain one and zero")
+        if self.declared_grade_confidence >= 1:
+            raise ValueError("self-reported grade confidence must be below approved confidence")
         return self
 
 
@@ -134,7 +138,12 @@ class MatchedFeature(Contract):
 
 
 class ScoreBreakdown(Contract):
-    """Available-channel weights, bounded semantic delta and reproducible main score."""
+    """Available-channel weights and reproducible score with raw rating provenance.
+
+    ``rating_score`` is the raw class percentile. ``rating_contribution`` applies
+    the grade-status confidence from the immutable policy snapshot, so a declared
+    grade cannot look like a tested grade while remaining eligible for the pool.
+    """
 
     rating_score: float
     strict_score: float | None
@@ -145,6 +154,8 @@ class ScoreBreakdown(Contract):
     semantic_contribution: float
     score: float
     top_matched_features: list[MatchedFeature]
+    grade_status: GradeStatus = "approved"
+    grade_confidence: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
 
 
 class CandidateCard(Contract):

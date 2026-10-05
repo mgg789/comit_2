@@ -1,7 +1,8 @@
 # Архитектура — Comit
 
-> Статус: backend первого цикла; email auth и owner gateway реализованы, frontend и
-> оставшиеся профильные/подборочные flows подключаются отдельными этапами.
+> Статус: backend первого цикла; email auth, account-owned candidate profile и
+> employer owner gateway реализованы, frontend и testing provider подключаются
+> отдельными этапами.
 > Канон-контекст: `context/40-architecture.md`; здесь — актуальное состояние кода.
 
 > Цикл 1: реализован серверный путь от собранного upstream-профиля до готового пула.
@@ -9,9 +10,10 @@
 > matching-engine хранит собственную JSONB-проекцию, версии координат, durable jobs,
 > два вектора, PDF и outbox в одной PostgreSQL. Отдельный worker строит артефакты;
 > отдельный migration job запускается перед serve/worker через local overlay.
-> Это сужение текущей задачи, не перенос будущего profile домена из API-core.
-> Auth имеет собственную PostgreSQL migration/outbox/session границу; testing
-> sessions, public matching selections и полная профильная форма пока не реализованы.
+> API-core хранит source profile и durable projection outbox, а matching-engine
+> принимает только exact trusted snapshot. Auth имеет собственную PostgreSQL
+> migration/outbox/session границу; тестовые сессии остаются trusted upstream
+> контуром. UI и production acceptance этим документом не подтверждаются.
 
 ## Контур
 
@@ -29,7 +31,7 @@ services/matching-engine     services/testing-engine     services/integration-en
 
 | Сервис | Стек | Ответственность | Почему отдельный |
 |---|---|---|---|
-| `apps/api` | Fastify, TS (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, owner-scoped account gateway, будущие профили/вакансии/приглашения, OpenAPI | Транзакционная логика, целостность |
+| `apps/api` | Fastify, TS (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, account-owned candidate source profile, employer owner gateway, вакансии/приглашения, OpenAPI | Транзакционная логика, целостность |
 | `services/matching-engine` | FastAPI, pgvector | Комбайн: strict filter → hybrid scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек; объяснимость выдачи | ML-эксперименты на Python, независимые релизы |
 | `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
 | `services/integration-engine` | FastAPI | Верификация внешних данных; мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`) | Внешние источники меняются независимо от ядра |
@@ -38,7 +40,8 @@ services/matching-engine     services/testing-engine     services/integration-en
 
 Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор
 (`context/80`, решение Q3); account/draft gateway уже даёт owner boundary, но
-public hiring chat и matching selection endpoints ещё не подключены.
+public hiring chat и frontend остаются отдельными этапами; matching selection
+gateway уже даёт owner boundary.
 
 ## Auth и ownership
 
@@ -49,11 +52,12 @@ HS256 JWT с role-bound claims и случайным sid; PostgreSQL храни�
 поэтому logout/revoke действует до истечения JWT. Account consent на обработку
 данных отделён от согласия candidate profile на публикацию в пуле.
 
-Public employer draft/agent paths и candidate pipeline/PDF paths получают account
-ID из проверенного JWT или HttpOnly role cookie. Клиент не может выбрать owner через
-`X-Owner-ID` или query; internal service-to-service endpoints по-прежнему требуют
-сервисный token. Public matching Selection, published vacancy profile CRUD и
-candidate profile CRUD остаются отсутствующими контрактами.
+Public employer draft/agent, candidate profile и candidate pipeline/PDF paths
+получают account ID из проверенного JWT или HttpOnly role cookie. Клиент не может
+выбрать owner через `X-Owner-ID` или query; internal service-to-service endpoints
+по-прежнему требуют сервисный token. Employer selection gateway дополнительно
+проверяет owner draft, publication state, текущий source watermark и consent
+каждого выбранного кандидата; foreign/absent records дают единый 404.
 
 ## Ключевые потоки
 
@@ -66,8 +70,8 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
 Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 
-1. Регистрация кандидата: email-подтверждение → опрос специализации → заявленный грейд → `testing-engine` формирует вариант → результат → категория → профиль в пуле.
-2. Создание вакансии: строгие параметры + ЗП «от–до» (обязательна) + описание → вектор в `matching-engine` → Active → комбайн → Selection с объяснением → HasCandidates.
+1. Регистрация кандидата: email-подтверждение → CAS source profile → отдельные profile/pool consents → exact snapshot projection. Browser projection выдаёт self_reported; подготовленный trusted replacement producer позднее сможет заменить его через API source/evidence и новую outbox запись.
+2. Создание вакансии: строгие параметры + ЗП «от–до» (обязательна) + описание → вектор в `matching-engine` → ready/open → employer combine → Selection с объяснением.
 3. Тиндер: карточки из Selected с обоснованием → лайк/скип → коррекция вектора вакансии → следующая карточка.
 4. Приглашение: ЗП обязательна; статусы у обеих сторон; контакты раскрываются только после принятия (п. 2.2 ТЗ).
 5. Добор: события изменения пула → порог изменчивости → переотбор без Visited/Pending/Attractive.
@@ -77,6 +81,8 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 - Каждый сервис отвечает `GET /healthz` (контракт smoke-гейта); `/ready` — для зависимостей.
 - Контракты типов — `packages/shared`; OpenAPI — схемы Fastify (api) и pydantic-модели (engines).
 - Веса скоринга и формулы живут только в `matching-engine`.
+- Source profile CAS/evidence принадлежат API-core; matching получает exact snapshot через durable outbox.
+- ACK outbox означает доставку snapshot, а не готовность vectors/PDF/pool.
 - БД: одна PostgreSQL, схемы по сервисам; auth миграция применяется явно до serve,
   matching/agents миграции имеют собственные runners (docs/data.md).
 

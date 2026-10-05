@@ -55,8 +55,8 @@ export interface CandidateIntake {
   primary_direction?: import("./index.js").Specialization | null;
   grade_result?: {
     grade: import("./index.js").Grade;
-    status: "approved" | "pending" | "rejected";
-    test_session_id: string;
+    status: "approved" | "pending" | "rejected" | "self_reported";
+    test_session_id?: string | null;
     approved_at?: string | null;
   } | null;
   consents?: { processing?: boolean; pool?: boolean; accepted_at?: string | null; version?: string | null };

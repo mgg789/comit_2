@@ -47,6 +47,33 @@ ACK и записью delivery может повторить письмо; эт�
 OTP verify остаётся at-most-once. Фактическая доставка и production состояние этой
 схемой не подтверждаются.
 
+## Source profile кандидата
+
+Миграция `apps/api/migrations/002_candidate_profiles.sql` хранит account-owned
+source profile отдельно от matching projection:
+
+| Таблица | Назначение |
+|---|---|
+| `candidate_profiles` | editable fields, CAS revision, server-owned profile consent и updated_at |
+| `candidate_profile_evidence` | отдельные proof rows: stable evidence key, canonical input hash, status, verified value, provenance, checked_at |
+| `candidate_profile_outbox` | полный exact source snapshot, source revision, lease/retry/ACK state и безопасный error code |
+
+Нарративные claim ID генерируются сервером и сохраняются между PATCH. Facts
+(domains, stacks, duration, role, production support) входят в canonical JSON
+отдельно от narrative text. SHA-256 считается после сортировки ключей и без
+`undefined`; ссылки не переводят claim в confirmed автоматически.
+
+`expected_revision` защищает PUT/PATCH compare-and-swap; revision zero создаёт
+первый snapshot. Profile consent версии `profile-v1` и server timestamp пишутся
+в одной транзакции с source profile. Account consent не даёт pool consent, а
+клиент не может прислать `accepted_at`, evidence или `verified_value`.
+
+Outbox worker передаёт ровно сохранённый snapshot во внутренний matching API и
+принимает ACK только для того же candidate/revision. Lease fencing и bounded retry
+защищают от старого worker; одна неисправная projection не блокирует другие
+профили. ACK означает доставку source snapshot, но не completion строгого и
+semantic vectors, PDF или pool-ready.
+
 ## Миграции
 
 - api-core: явный Node/pg runner с checksum/advisory lock; файлы в `apps/api/migrations/`.
@@ -68,7 +95,7 @@ OTP verify остаётся at-most-once. Фактическая доставк�
 | candidates | полный private JSONB, source_revision, внутренняя revision, хеш и состояние |
 | strict_schemas / settings | append-only координаты, версии/хеши, активное поколение |
 | jobs | durable очередь, unique(candidate_id,revision,schema_version), lease/heartbeat/retry |
-| pool | снимок категории, ранга, строгого float8[], semantic vector(640), evidence и двух PDF bytea |
+| pool | снимок категории (включая `grade_status`), ранга, строгого float8[], semantic vector(640), evidence и двух PDF bytea |
 | embedding_cache | SHA-256(model_version + semantic_text) → vector(640); исходного текста нет |
 | outbox | candidate.ready / candidate.withdrawn, revision/schema_version, ordered id, delivered_at |
 | migrations | имя SQL, SHA-256, время применения |
@@ -152,6 +179,11 @@ Run уникален по vacancy revision/schema/pool generation/policy hash/to
 транзакцией. Чтение проверяет те же входы и полный набор candidate ID/revision;
 карточки разных поколений не смешиваются. Private contacts/narratives не входят
 в candidates_snapshot или cards; PDF сохраняется отдельно в candidate pool.
+Текущая ручная policy — `main-v2`: raw class rating сохраняется в explanation,
+а коэффициент declared-grade confidence `0.6` применяется только к rating
+contribution для `grade_status=self_reported`; strict contribution не меняется.
+Старые snapshots с `main-v1` продолжают читаться по сохранённому policy JSON;
+новая версия не требует destructive migration и получает новый policy hash.
 ACK outbox, inbox и постановка задания атомарны; при storage failure событие
 остаётся недоставленным. При malformed snapshot savepoint изолирует одну запись,
 после ограниченных повторов она остаётся в quarantine до ручного retry.
@@ -162,11 +194,16 @@ ACK outbox, inbox и постановка задания атомарны; пр�
 `role`, `production_support`. Каждое значение имеет собственный статус и приватный
 provenance. Отсутствие означает неизвестность; произвольные `details` не преобразуются
 автоматически. Ссылки проверяются по общему реестру, включая rejected.
-Новые поля не меняют текущий текст Harrier и fingerprint документа.
+Новые поля не меняют текущий текст Harrier и fingerprint документа. Проверка ссылки
+по реестру может записать отдельный status, но ссылка или narrative text не создают
+confirmed evidence автоматически.
 
 Миграция005 добавляет `rerank_pipeline`: immutable artifacts/settings pointer,
 runs/controls/cards/manual_requests. Идентичность запуска — main ID, artifact,
 feature schema и tail policy hashes; nullable artifact участвует в uniqueness.
+Fingerprint feature schema включает полную текущую `ScoringPolicy`, поэтому старый
+обученный rerank-артефакт с другой policy несовместим; в таком случае runtime
+использует явный fallback `R₀`, а не молча применяет устаревшие веса.
 Safe narrative projection входит в main snapshot без текста/provenance/контактов.
 Результаты одной транзакцией сохраняют candidate ID/revision и полный порядок.
 Миграции001–004 не изменяются. Экспериментальные datasets/cache не коммитятся.

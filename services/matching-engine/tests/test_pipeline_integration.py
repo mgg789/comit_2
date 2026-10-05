@@ -6,8 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from test_contracts import eligible_profile
-
+from matching_engine.combine_store import CombineStore
 from matching_engine.database import connect, migrate
 from matching_engine.embeddings import EmbeddingUnavailable
 from matching_engine.main import create_app
@@ -16,6 +15,7 @@ from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.strict import build_strict_vector
 from matching_engine.strict_evidence import build_strict_evidence
 from matching_engine.worker import Worker
+from test_contracts import eligible_profile
 
 pytestmark = pytest.mark.integration
 
@@ -173,6 +173,42 @@ def publish_job(store: Store, job) -> bool:
         renderer(None, None, None), renderer(None, None, None),
         build_strict_evidence(job.profile, job.schema),
     )
+
+
+@pytest.mark.parametrize("grade_status", ["self_reported", "approved"])
+def test_publish_persists_grade_status_across_pool_status_and_combine_candidates(
+    store: Store, grade_status: str,
+) -> None:
+    """A published grade keeps its source evidence in every matching read model."""
+    candidate_id = uuid4()
+    profile = eligible_profile(
+        grade_result=(
+            {"grade": "middle", "status": "self_reported"}
+            if grade_status == "self_reported"
+            else eligible_profile().grade_result.model_dump(mode="json")
+        ),
+    )
+    store.intake(candidate_id, profile)
+    job = store.claim(lease_seconds=30, max_attempts=5)
+    assert job is not None
+    assert publish_job(store, job)
+
+    with connect(store.database_url) as connection:
+        row = connection.execute(
+            "SELECT grade_status FROM candidate_pipeline.pool WHERE candidate_id=%s",
+            (candidate_id,),
+        ).fetchone()
+        assert row is not None and row["grade_status"] == grade_status
+        candidate = next(
+            value for value in CombineStore._candidates(connection)
+            if value.candidate_id == candidate_id
+        )
+
+    pool_entry = next(value for value in store.pool(100, 0).items if value.candidate_id == candidate_id)
+    assert pool_entry.category.grade_status == grade_status
+    assert store.status(candidate_id).category is not None
+    assert store.status(candidate_id).category.grade_status == grade_status
+    assert candidate.category.grade_status == grade_status
 
 
 def test_stale_worker_cannot_publish_after_profile_change(store: Store) -> None:

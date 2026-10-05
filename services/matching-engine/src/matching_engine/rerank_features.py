@@ -51,7 +51,7 @@ class FeatureVector:
 
 
 def feature_schema(schema: StrictSchema) -> FeatureSchema:
-    """Bind exact registry order, main-v1 and pinned Harrier space; never pad new keys."""
+    """Bind exact registry order, the current main policy and pinned Harrier space; never pad new keys."""
     if schema.schema_hash != schema_hash(schema.coordinates) or any(
         coordinate.index != index for index, coordinate in enumerate(schema.coordinates)
     ):
@@ -63,7 +63,7 @@ def feature_schema(schema: StrictSchema) -> FeatureSchema:
     raw.extend(INTERACTIONS)
     names = (*raw, *(f"available.{name}" for name in raw))
     payload = {"version": FEATURE_VERSION, "names": names, "registry": schema.schema_hash,
-               "main_policy": "main-v1", "semantic_space": EMBEDDING_SPACE_ID,
+               "main_policy": ScoringPolicy().model_dump(), "semantic_space": EMBEDDING_SPACE_ID,
                "missing": "train-observed-mean-plus-availability:v1", "confidence": CONFIDENCE}
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return FeatureSchema(names, digest, schema.schema_hash)

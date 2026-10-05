@@ -11,7 +11,8 @@
     "test": "tsx --test tests/*.test.ts",
     "start": "node dist/server.js",
     "auth:migrate": "tsx src/auth/migrate.ts",
-    "auth:mail-worker": "tsx src/auth/mail-worker.ts"
+    "auth:mail-worker": "tsx src/auth/mail-worker.ts",
+    "profile:worker": "tsx src/profiles/worker.ts"
   },
   "dependencies": {
     "@comit/shared": "workspace:*",

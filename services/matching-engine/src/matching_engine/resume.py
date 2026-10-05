@@ -18,6 +18,8 @@ from matching_engine.privacy import sanitize_public_text
 _FONT_LOCK = Lock()
 _STATUS = {"confirmed": "подтверждено", "partial": "частично подтверждено",
            "self_reported": "самооценка", "pending": "ожидает проверки", "rejected": "отклонено"}
+_GRADE_STATUS = {"approved": "подтверждено тестированием",
+                 "self_reported": "заявлено самостоятельно (самооценка; тестирование ещё не пройдено)"}
 
 
 def render_resume(profile: CandidateProfile, category: Category, public: bool = True) -> bytes:
@@ -44,6 +46,7 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
 
     add("Резюме кандидата" if public else profile.display_name, title)
     add(f"{category.specialization.upper()} / {category.grade.upper()}")
+    add(f"Статус грейда: {_GRADE_STATUS[category.grade_status]}")
     add(f"Город: {profile.city}")
     if profile.salary:
         add(f"Ожидания: {profile.salary.from_rub:,} - {profile.salary.to_rub:,} RUB".replace(",", " "), redact=False)

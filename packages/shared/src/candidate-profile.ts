@@ -1,0 +1,84 @@
+import type { ClaimStatus, JsonValue } from "./candidate-pipeline.js";
+import type { Grade, Specialization } from "./index.js";
+
+/** A declared coordinate. Verification fields are never accepted from the candidate. */
+export interface CandidateDeclaredSkill { key: string; level: number }
+
+/** Structured narrative facts are declarations, independently of their surrounding prose. */
+export interface CandidateDeclaredFacts {
+  domains?: string[];
+  stacks?: string[];
+  duration_months?: number | null;
+  role?: "developer" | "lead" | "architect" | "analyst" | "designer" | "researcher" | "qa" | "devops" | "other" | null;
+  production_support?: boolean | null;
+}
+
+/** Stable IDs identify claims across edits; a link alone never confirms a claim. */
+export interface CandidateDeclaredNarrative {
+  id?: string;
+  title: string;
+  description?: string;
+  link?: string | null;
+  organization?: string | null;
+  facts?: CandidateDeclaredFacts | null;
+}
+
+/** Editable profile fields. Omission preserves a field in PATCH; arrays replace whole groups. */
+export interface CandidateProfileFields {
+  display_name?: string;
+  phone?: string | null;
+  city?: string;
+  work_types?: ("onsite" | "remote" | "hybrid")[] | null;
+  relocation_ready?: boolean | null;
+  relocation_cities?: string[];
+  salary?: { from_rub: number; to_rub: number } | null;
+  primary_direction?: Specialization | null;
+  declared_grade?: Grade | null;
+  domains?: CandidateDeclaredSkill[];
+  stacks?: CandidateDeclaredSkill[];
+  soft_skills?: CandidateDeclaredSkill[];
+  description?: string;
+  projects?: CandidateDeclaredNarrative[];
+  experience?: CandidateDeclaredNarrative[];
+  achievements?: CandidateDeclaredNarrative[];
+  preferences?: string[];
+}
+
+/** Explicit profile consent, separate from registration consent; timestamps are server-owned. */
+export interface CandidateProfileConsentInput { processing: boolean; pool: boolean; version: string }
+
+/** Compare-and-swap profile mutation; revision zero creates the first profile. */
+export interface CandidateProfileMutation {
+  expected_revision: number;
+  fields: CandidateProfileFields;
+  consent?: CandidateProfileConsentInput;
+}
+
+/** Proofs are a separate read-only channel; unchanged input hashes can preserve future verification. */
+export interface CandidateClaimEvidence {
+  input_hash: string;
+  status: ClaimStatus;
+  verified_value: JsonValue | null;
+  provenance: string[];
+  checked_at: string | null;
+}
+
+/** Durable delivery describes intake acknowledgement, not completion of vectors or the PDF. */
+export interface CandidateProjectionDelivery {
+  state: "queued" | "processing" | "retrying" | "failed" | "delivered";
+  source_revision: number;
+  projected_revision: number;
+  attempts: number;
+  error_code: string | null;
+}
+
+/** Private account-owned source profile; matching owns its derived pool projection. */
+export interface CandidateProfileView {
+  candidate_id: string;
+  revision: number;
+  fields: CandidateProfileFields;
+  evidence: Record<string, CandidateClaimEvidence>;
+  consents: CandidateProfileConsentInput & { accepted_at: string | null };
+  projection: CandidateProjectionDelivery;
+  updated_at: string;
+}

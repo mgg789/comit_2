@@ -4,10 +4,6 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
-from pydantic import ValidationError
-from test_contracts import eligible_profile
-from test_vacancy_contracts import eligible_vacancy
-
 from matching_engine.combine_models import MatchCandidate, ScoringPolicy
 from matching_engine.combine_scoring import (
     policy_hash,
@@ -20,6 +16,9 @@ from matching_engine.strict import build_strict_vector, initial_schema
 from matching_engine.strict_evidence import build_strict_evidence
 from matching_engine.vacancy_features import build_strict_features
 from matching_engine.vacancy_models import VacancyReady, missing_requirements
+from pydantic import ValidationError
+from test_contracts import eligible_profile
+from test_vacancy_contracts import eligible_vacancy
 
 
 def vacancy(**values) -> VacancyReady:
@@ -133,6 +132,25 @@ def test_class_only_and_optional_semantics_are_bounded_and_explained() -> None:
     assert mismatch.score == .5 and mismatch.semantic_unavailable_reason == "semantic_space_mismatch"
 
 
+def test_self_reported_grade_confidence_only_scales_raw_rating_contribution() -> None:
+    policy = ScoringPolicy()
+    approved = score_candidate(vacancy(), candidate(rating_score=.8), policy)
+    declared = score_candidate(
+        vacancy(),
+        candidate(rating_score=.8, category=Category(
+            specialization="backend", grade="middle", grade_status="self_reported",
+        )),
+        policy,
+    )
+    assert approved.rating_score == declared.rating_score == .8
+    assert approved.grade_status == "approved" and approved.grade_confidence == 1
+    assert declared.grade_status == "self_reported"
+    assert declared.grade_confidence == pytest.approx(.6)
+    assert declared.rating_contribution == pytest.approx(approved.rating_contribution * .6)
+    assert declared.strict_score == approved.strict_score
+    assert declared.score == pytest.approx(approved.score * .6)
+
+
 def test_top_k_has_stable_order_no_hard_tail_cutoff_and_filter_counts() -> None:
     target = vacancy()
     values = [candidate(candidate_id=UUID(int=index), rating_score=score)
@@ -150,6 +168,7 @@ def test_top_k_has_stable_order_no_hard_tail_cutoff_and_filter_counts() -> None:
 
 def test_policy_hash_and_malformed_artifacts_are_explicit() -> None:
     policy = ScoringPolicy()
+    assert policy.version == "main-v2" and policy.declared_grade_confidence == pytest.approx(.6)
     assert policy_hash(policy) == policy_hash(ScoringPolicy())
     assert policy_hash(policy) != policy_hash(ScoringPolicy(semantic_correction=.05))
     with pytest.raises(ValidationError):

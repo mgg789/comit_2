@@ -12,7 +12,7 @@ Create. Только Create отправляет неизменяемый сни
 Опубликованные вектора, готовность и события комбайна остаются в matching-engine.
 Операционные контракты и ограничения: [docs/agents.md](../docs/agents.md).
 
-> **Статус: каркас реализован и задеплоен (05.10.2026).** Репо mgg789/comit_2: pnpm-монорепо `apps/{candidate,employer,testing,welcome,api}` + `packages/{shared,ui-kit,api-client}` + `services/{matching,testing,integration}-engine`; docker-compose dev/prod; CI/CD на self-hosted раннерах mgg-server; деплой `/home/mgg/comit`, web :8088. Живая документация — `docs/` репо; канон — `context/`. api-core на **Fastify** (решение 05.10).
+> **Статус: кодовый каркас и локальные контракты.** Репо mgg789/comit_2: pnpm-монорепо `apps/{candidate,employer,testing,welcome,api}` + `packages/{shared,ui-kit,api-client}` + `services/{matching,testing,integration}-engine`; docker-compose dev/prod; api-core на **Fastify**. Production/deploy и внешний runtime этим документом не подтверждаются. Живая документация — `docs/` репо; канон — `context/`.
 
 > Принцип: микросервисность там, где она даёт смысл (ML-слой и тестирование на Python отделены от транзакционного ядра), без раздувания. ТЗ приветствует микросервисы, но и модульный монолит допустим; оценивается техпроработка (7%) — простота и воспроизводимость важнее количества сервисов.
 
@@ -25,7 +25,7 @@ Create. Только Create отправляет неизменяемый сни
 └──────────────────────────────────────┬───────────────────────────────────────────────────────────────┘
                                        │ REST (OpenAPI) / WebSocket(опц.)
 ┌──────────────────────────────────────┴───────────────────────┐
-│  api-core (Node.js, Fastify)                                  │  — auth/email, профили, вакансии,
+│  api-core (Node.js, Fastify)                                  │  — auth/email, source-профили, вакансии,
 │  транзакционное ядро + роли + правила видимости п.2.2         │    приглашения, статусы, rating ledger
 └───────┬──────────────────────────────┬────────────────────────┘
         │ events/HTTP                  │
@@ -45,7 +45,7 @@ Create. Только Create отправляет неизменяемый сни
 
 | Сервис | Стек | Ответственность | Почему отдельный |
 |---|---|---|---|
-| `api-core` | Node.js, Fastify, TypeScript (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, owner-scoped account gateway; будущие профили, вакансии, приглашения/статусы, ledger и OpenAPI | Транзакционная логика, целостность |
+| `api-core` | Node.js, Fastify, TypeScript (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, CAS source profile/evidence/outbox, owner-scoped gateway; вакансии, приглашения/статусы, ledger и OpenAPI | Транзакционная логика, целостность |
 | `matching-engine` | Python (FastAPI) + pgvector | Комбайн: strict filter → scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек (коррекция вектора, маски-пробы); объяснимость выдачи | ML-эксперименты руками на Python; независимые релизы |
 | `testing-engine` | Python (FastAPI) | Банк TestBlueprint, seeded-генерация вариантов, автопроверка кода (песочница), скоринг, адаптивный грейд-тест | Изолированный CPU-интенсивный домен |
 | `web` | React+TS monorepo (4 app) | Кабинеты по ролям | Параллельная разработка |
@@ -62,7 +62,7 @@ OTP не логируется: SMTP worker получает код из заши
 
 ## Ключевые потоки (end-to-end)
 
-1. **Регистрация кандидата**: email OTP → account consent → опрос специализации → выбор заявленного грейда → `testing-engine` формирует вариант → результат → категория присвоена → отдельное profile/pool consent → профиль в пуле. Account creation само по себе в пул не публикует.
+1. **Профиль кандидата**: email OTP → account consent → CAS source profile → отдельное profile/pool consent → exact snapshot в durable outbox → matching projection. Browser projection выдаёт self_reported; подготовленный контракт будущего trusted producer предусматривает approved replacement через API source/evidence и новую outbox запись.
 2. **Создание вакансии**: обязательные строгие параметры + ЗП + описание → вектор вакансии строится в `matching-engine` → статус Active → комбайн → Selection(top-k) → статус HasCandidates.
 3. **Тиндер**: карточки из Selected с объяснением попадания → лайк/скип → `matching-engine` корректирует вектор вакансии → next card. Контрольные пробы (маски) — внутри фида.
 4. **Приглашение**: из Attractive → Invitation (ЗП обязательна) → кандидат видит предложение (без контактов до принятия) → Accept → контакты раскрыты → встреча/собес → Offer|Rejected+обязательный Feedback → SLA-контроль (3 раб. дня → Suspended вакансии).
@@ -73,9 +73,10 @@ OTP не логируется: SMTP worker получает код из заши
 - **Docker**: `docker-compose.yml` поднимает все сервисы; Dockerfile на сервис; seed-скрипт синтетики.
 - **OpenAPI**: api-core генерирует спецификацию через Fastify swagger; FastAPI — из коробки; собираем в одну витрину `/docs`.
 - **152-ФЗ**: согласие при регистрации (текст + флаг), приватность-настройки профиля (что видно работодателю), ролевой RBAC на эндпоинтах.
-- **Auth ownership**: public employer draft/agent gateway и candidate pipeline/PDF
-  используют account ID из JWT/HttpOnly cookie; клиент не задаёт владельца. Public
-  matching selections, profile CRUD и published vacancy CRUD пока отсутствуют.
+- **Auth ownership**: public employer draft/agent/selection и candidate profile/
+  pipeline/PDF получают account ID из JWT/HttpOnly cookie; клиент не задаёт владельца.
+  Internal matching routes дополнительно требуют service token; foreign/absent owner
+  records дают единый 404.
 - **Производительность**: десятки пользователей — тривиально; подборка ≤ 3–5 c (комбайн по 1–10k кандидатов — pgvector + pre-filter справляется).
 - **Код**: MIT/Apache-2.0 для всего стороннего; наш код открыт (репо).
 

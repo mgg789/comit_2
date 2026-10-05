@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
@@ -28,16 +28,19 @@ export async function migrate(pool: Pool): Promise<string[]> {
       )
     `);
 
-    const migration = await readFile(join(migrationDirectory, "001_accounts.sql"), "utf8");
-    const name = basename("001_accounts.sql");
-    const checksum = createHash("sha256").update(migration, "utf8").digest("hex");
-    const existing = await client.query<MigrationRow>("SELECT checksum FROM auth_migrations WHERE name = $1", [name]);
-    const row = existing.rows[0];
-    if (row && row.checksum !== checksum) throw new Error(`applied migration changed: ${name}`);
-    if (!row) {
-      await client.query(migration);
-      await client.query("INSERT INTO auth_migrations(name, checksum) VALUES ($1, $2)", [name, checksum]);
-      applied.push(name);
+    const names = (await readdir(migrationDirectory)).filter(name => /^\d+_[a-z_]+\.sql$/.test(name)).sort();
+    for (const filename of names) {
+      const migration = await readFile(join(migrationDirectory, filename), "utf8");
+      const name = basename(filename);
+      const checksum = createHash("sha256").update(migration, "utf8").digest("hex");
+      const existing = await client.query<MigrationRow>("SELECT checksum FROM auth_migrations WHERE name = $1", [name]);
+      const row = existing.rows[0];
+      if (row && row.checksum !== checksum) throw new Error(`applied migration changed: ${name}`);
+      if (!row) {
+        await client.query(migration);
+        await client.query("INSERT INTO auth_migrations(name, checksum) VALUES ($1, $2)", [name, checksum]);
+        applied.push(name);
+      }
     }
     await client.query("COMMIT");
     return applied;

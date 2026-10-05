@@ -42,6 +42,8 @@ export interface MatchedFeature {
 }
 /** Computed factors are the source of a card's explanation; no LLM selection decisions. */
 export interface ScoreBreakdown {
+  grade_status?: "approved" | "self_reported";
+  grade_confidence?: number;
   rating_score: number;
   strict_score: number | null;
   semantic_cosine: number | null;

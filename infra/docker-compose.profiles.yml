@@ -1,0 +1,19 @@
+# Opt-in source-profile handoff; layer after candidate-pipeline and auth overlays.
+services:
+  candidate-profile-worker:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    command: ["node", "dist/profiles/worker.js"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      CANDIDATE_PIPELINE_TOKEN: ${CANDIDATE_PIPELINE_TOKEN:?Set a private service token}
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      candidate-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_started
+    restart: unless-stopped

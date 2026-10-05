@@ -3,7 +3,8 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification } from "@comit/shared";
+import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -32,6 +33,18 @@ export interface ApiClient {
   getAccount(role: AccountRole): Promise<AccountView>;
   /** Revoke this session, or all account sessions when all is true. */
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
+  /** Read the private editable source profile, including proof and delivery states. */
+  getCandidateProfile(): Promise<CandidateProfileView>;
+  /** CAS update; replace discards omitted editable fields, while PATCH preserves them. */
+  saveCandidateProfile(body: CandidateProfileMutation, replace?: boolean): Promise<CandidateProfileView>;
+  /** Retry the current failed matching handoff without changing profile revision. */
+  retryCandidateProjection(): Promise<CandidateProfileView>;
+  /** Read readiness only for a draft owned by the employer account. */
+  getVacancyReady(draftId: string): Promise<VacancyReady>;
+  /** Queue main top-k selection for an owned published vacancy draft. */
+  requestSelection(draftId: string, body: CombineRequest): Promise<CombineStatus>;
+  /** Return the current contact-free selection page and public authorised PDF links. */
+  getSelection(draftId: string, limit?: number, offset?: number): Promise<SelectionPage>;
 }
 
 /** Create a same-origin API client; optional Bearer credentials override session cookies server-side. */
@@ -63,5 +76,11 @@ export function createApiClient({
     verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
+    getCandidateProfile: () => request("GET", "/candidate/profile"),
+    saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
+    retryCandidateProjection: () => request("POST", "/candidate/profile/projection/retry", {}),
+    getVacancyReady: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/ready`),
+    requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),
+    getSelection: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/selections?limit=${limit}&offset=${offset}`),
   };
 }

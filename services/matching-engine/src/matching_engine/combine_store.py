@@ -106,7 +106,7 @@ class CombineStore:
             candidate_id=row["candidate_id"], profile_revision=row["revision"],
             display_name=row["public_profile"]["display_name"], city=row["public_profile"]["city"],
             salary=row["public_profile"]["salary"],
-            category=Category(specialization=row["specialization"], grade=row["grade"]),
+            category=Category(specialization=row["specialization"], grade=row["grade"], grade_status=row["grade_status"]),
             rank=row["rank"], class_size=row["class_size"],
             rating_score=1.0 if row["class_size"] == 1 else 1 - (row["rating_rank"] - 1) / (row["class_size"] - 1),
             confirmed_strength=row["confirmed_strength"], strict_vector=row["strict_vector"],
@@ -143,8 +143,9 @@ class CombineStore:
             JOIN matching_pipeline.runs r ON r.run_id=c.current_run_id WHERE c.vacancy_id=%s""",
             (vacancy_id,)).fetchone()
 
-    @staticmethod
-    def _valid(connection: psycopg.Connection, row: dict) -> bool:
+    def _valid(self, connection: psycopg.Connection, row: dict) -> bool:
+        if row["policy_hash"] != policy_hash(self.policy):
+            return False
         metadata = connection.execute("""
             SELECT 1 FROM matching_pipeline.controls c
             JOIN matching_pipeline.settings ms ON ms.pool_generation=%s

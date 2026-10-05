@@ -34,11 +34,74 @@ AUTH_ROUTE_TEST_DATABASE_URL='postgres://...' \
 Без этих переменных DB acceptance тесты пропускаются; crypto/unit и transport
 проверки не доказывают работу PostgreSQL или реальную доставку.
 
-## Candidate pipeline: запуск с собранными данными
+## Candidate source profile и projection worker
 
-Это серверный поток, не регистрация пользователя. Нужны PostgreSQL 16 + pgvector,
-Python 3.12, зависимости сервиса, private `CANDIDATE_PIPELINE_TOKEN`, exact cached
-Harrier revision. Токен не передавать клиентским приложениям и не писать в логи.
+Перед запуском API или worker примените API migration runner: он читает
+`apps/api/migrations/001_accounts.sql` и `002_candidate_profiles.sql` в
+лексикографическом порядке, держит advisory lock и сохраняет SHA-256 checksum;
+изменение уже применённого SQL останавливает запуск.
+
+```bash
+DATABASE_URL='postgres://...' pnpm --filter @comit/api auth:migrate
+```
+
+Для локального opt-in контура с уже настроенным PostgreSQL можно использовать
+`infra/docker-compose.profiles.yml` после candidate-pipeline и auth overlays:
+`candidate-profile-worker` запускает собранный `dist/profiles/worker.js` с
+`MATCHING_ENGINE_URL` и `CANDIDATE_PIPELINE_TOKEN`, после API и engine миграций.
+Рабочий процесс профиля не получает SMTP credentials. Для полного контура
+создания вакансии также подключается agents overlay:
+
+```bash
+docker compose -f infra/docker-compose.yml \
+  -f infra/docker-compose.candidate-pipeline.yml \
+  -f infra/docker-compose.agents.yml -f infra/docker-compose.auth.yml \
+  -f infra/docker-compose.profiles.yml up -d
+```
+
+Source profile API работает под candidate JWT/session и принимает только
+`expected_revision`, editable fields и явное profile consent. `accepted_at` ставится
+сервером для версии `profile-v1`; evidence, verified values, grade result и
+candidate UUID не принимаются из браузера. PUT заменяет snapshot, PATCH применяет
+CAS shallow patch, массивы заменяются целиком.
+
+После записи API атомарно добавляет canonical exact snapshot в
+`candidate_profile_outbox`. Worker доставляет его через `PUT
+/internal/candidates/{id}/profile`, проверяет ACK candidate/revision и сохраняет
+результат только под своим lease. Запуск:
+
+```bash
+DATABASE_URL='postgres://...' \
+CANDIDATE_PIPELINE_TOKEN='(из secret environment)' \
+MATCHING_ENGINE_URL='http://matching-engine:8101' \
+  pnpm --filter @comit/api profile:worker
+```
+
+Для одного job используйте `profile:worker -- --once`. ACK означает, что
+matching-engine принял snapshot; он не означает завершение strict/semantic
+vectors, PDF или `pool.state=ready`. Ошибка одного кандидата остаётся локальной
+его source revision и не блокирует остальные projection rows. Для terminal
+`failed` используйте `POST /candidate/profile/projection/retry` от имени самого
+кандидата; активная или уже доставленная projection этим методом не перезапускается.
+
+Self reported grade может попасть в пул после выполнения остальных требований;
+public PDF обязан показать badge. В `main-v2` коэффициент 0.6 уменьшает только
+rating contribution self reported. Контракт будущего trusted testing source
+предусматривает approved grade с реальными `test_session_id` и `approved_at`; этот
+producer пока не интегрирован в browser/API contour. UUID самоотчёту не создаётся.
+
+Эти команды описывают локальный контур. Фактический PostgreSQL/Harrier acceptance,
+production deployment и пользовательский runtime требуют отдельного свежего
+прогона; наличие worker process или ACK не является доказательством готового пула.
+
+## Candidate pipeline: source profile и matching projection
+
+Account-owned source profile и matching projection — разные границы. Browser profile
+методы описаны в [candidate-profile.md](candidate-profile.md); internal intake
+остаётся trusted service-to-service контрактом. Для matching нужны PostgreSQL 16 +
+pgvector, Python 3.12, зависимости сервиса, private `CANDIDATE_PIPELINE_TOKEN`,
+exact cached Harrier revision. Токен не передавать клиентским приложениям и не писать
+в логи.
 
 ```bash
 uv venv --python 3.12 services/matching-engine/.venv

@@ -6,6 +6,8 @@ import { readSmtpConfig } from "./mail.js";
 import { AuthStore } from "./store.js";
 import { authRoutes } from "../routes/auth.js";
 import { accountRoutes } from "../routes/accounts.js";
+import { candidateProfileRoutes } from "../routes/candidate-profile.js";
+import { ProfileStore } from "../profiles/store.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
 export async function authDomain(app: FastifyInstance): Promise<void> {
@@ -31,7 +33,8 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   const store = new AuthStore(pool, config.secret, { accountConsentVersion: config.consentVersion });
   let mailConfigured = true;
   try { readSmtpConfig(); } catch { mailConfigured = false; }
-  const options = { config, store, mailConfigured };
+  const options = { config, store, mailConfigured, profiles: new ProfileStore(pool) };
   await app.register(authRoutes, options);
+  await app.register(candidateProfileRoutes, options);
   await app.register(accountRoutes, options);
 }

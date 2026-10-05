@@ -1,24 +1,25 @@
 # Конвейер соискателя: данные и путь до пула комбайна (цикл 1 / спринт S2, v3)
 
 > **Уточнение и реализация цикла 1, 05.10.2026 (v3, заменяет связанные правила v2 ниже).**
-> Текущая задача начинается с уже собранных данных и принятого грейд-теста;
-> регистрация, extraction, проведение теста и модерация не входят в эту реализацию.
+> Текущий контур принимает account-owned source profile через CAS и durable
+> projection outbox. Проведение теста остаётся trusted upstream контуром, но
+> пользовательская декларация грейда может быть self_reported до его принятия.
 > Два самостоятельных вектора: strict (15 доменов + 16 стеков + 6 soft skills,
 > все заявленные уровни /7) и semantic (Harrier-270M 640D по описанию, проектам,
 > опыту, достижениям и предпочтениям). Каждая группа может быть подтверждена
 > или нет: уровни не отбрасываются, статус/происхождение — отдельные входные данные.
 > Rejected остаётся в профиле/evidence, но координата равна 0; отсутствующее значение
 > имеет статус null. Числовой strict нельзя трактовать без evidence.
-> Подтверждение отдельно влияет на tie-breaker ранга; доверительные веса комбайна
-> относятся к следующему этапу. Проекция и очередь — matching-engine,
-> защищённый транспорт — API-core; будущий домен пользователей/профилей остаётся API-core.
+> Подтверждение отдельно влияет на tie-breaker ранга; grade confidence в main-v2
+> влияет только на rating contribution self_reported. Source profile и evidence
+> принадлежат API-core, exact snapshot и очередь projection доставляются в
+> matching-engine защищённым сервисным транспортом.
 > Контракты и запуск: [[../docs/api.md]], [[../docs/data.md]], [[../docs/runbook.md]].
 > Публикация атомарна после strict + semantic + public/owner PDF; изменение профиля
 > и отзыв согласия снимают старую публикацию. Новая координата вызывает backfill
 > всех прошлых профилей с fail-closed переходом поколения. Разделы v2 ниже описывают
-> более широкий S2-план; профильный CRUD, проведение теста и публикационный consent
-> в этом цикле ещё не реализованы. Email auth/account session boundary уже реализованы
-> отдельно в API-core.
+> более широкий S2-план; UI и реальный testing provider не входят в этот контур.
+> Email auth/account session boundary и profile CRUD реализованы отдельно в API-core.
 > При добавлении vacancy intake общий справочник расширен самостоятельным `ml`;
 > он не объединяется с `data`. Оба пула мигрируют по одному реестру координат.
 
@@ -28,12 +29,15 @@
 
 ## 0. Ключевое решение v2: «образ» вместо специализации
 
-Кандидат не размечается меткой «бэкенд/ML». **Образ** = совокупность подтверждённых уровней по 15 доменам + 16 стекам (+6 софтскиллов для показа), каждый на шкале 0–7. Грейд и категория — **производные** от образа (§4), а не самоописание.
+Кандидат не размечается меткой «бэкенд/ML». **Образ** = все заявленные уровни по 15 доменам + 16 стекам (+6 soft skills для показа), каждый на шкале 0–7, с отдельным статусом и provenance. Грейд и категория — производные declared/trusted grade snapshot с явным статусом (§4), а не данные резюме.
 
 Стыковка с ТЗ (обязательно для жюри): ТЗ требует «опрос → самостоятельный выбор предполагаемого грейда → тестирование на заявленный грейд» и категории «специализация × грейд». Читаем так:
 - **Направление** (пресет доменов, например «Backend»: алгоритмы, SQL, RestAPI, архитектура + postgres/python) выбирается при регистрации как primary — это и есть «опрос по отрасли и специализации».
 - **Заявленный грейд** выбирается кандидатом; **грейд-тест** проверяет домены направления на заявленном уровне → подтверждает/понижает/повышает (правила ТЗ без изменений).
-- **Категория работодателя** = {direction, grade}, где grade — функция от подтверждённых уровней образа (§4). Категория выводится системой из тестов, а не из резюме — требование ТЗ «выдача по категориям из опроса и тестирования, а не самоописанных данных» выполняется.
+- **Категория работодателя** = {direction, grade, grade_status}. `approved` приходит из
+  trusted теста, `self_reported` — явная временная декларация без выдуманного UUID;
+  обе категории выводятся из intake, а не из свободного текста резюме. После принятия
+  теста self_reported snapshot заменяется approved.
 
 ## 1. Инвентарь данных соискателя (модель Mike)
 
@@ -65,17 +69,21 @@
 | **stacks** | python; node; go; php; react; vue; angular; html_css_jquery; tailwind; electron; figma; postgres; mongo; sqlite; mysql; docker | 16 |
 | **softskills** | teamwork; representation; time_management; project_management; leadership; self_organization | 6 |
 
-Поля строки: `subject_type, subject_key, self_level 0–7, confirmed_level 0–7|null, source (manual|quiz|grade_test|project|experience|fsp), status (draft|pending|confirmed|rejected), points`.
+Поля строки: `subject_type, subject_key, self_level 0–7, confirmed_level 0–7|null, source (manual|quiz|grade_test|project|experience|fsp), status (self_reported|pending|confirmed|partial|rejected), points`.
 
 - `self_level` — кандидат заявляет при заполнении (стартовый сигнал для подбора заданий).
 - `confirmed_level` — **системно**: домены и стеки — из квизов/грейд-теста (ML, Mike), стеки также через evidence проектов/опыта; софтскиллы — **self-declared, confirmed_level = null, 0 очков** (⚠️ дефолт: объективной верификации нет — честно помечаем работодателю «самооценка»).
-- В образ и вектор попадают только confirmed уровни; self_level — только для калибровки сложности заданий.
+- В strict vector попадают все заявленные уровни и отдельный evidence status; rejected получает нулевую координату, отсутствующее значение остаётся `null`. Ссылки и narrative text не создают evidence автоматически.
 
 ### D. Достижения (`achievements`) — Codex
 `{title, type, level, evidence?, source}`. Типы (справочник, расширяется): olympiad, hackathon, certificate, fsp_rank, fsp_event, publication, other. Уровень → очки: 5 / 10 / 15 / 20 (таблица в конфиге). ФСП-типы наполняются из integration-engine (fsp_id — nullable; **отсутствие истории ФСП — норма**, обязательный кейс ТЗ).
 
 ### E. Проекты (`projects`) — Codex
-`{title, description, link|file, stack[], my_role, participants}`. Evidence (ссылка/файл) обязательна → auto-verified, очки; стек проекта подтверждает соответствующие stack-профилизации (source=project).
+`{title, description, link|file, stack[], my_role, participants}`. Ссылка или файл
+сохраняются как заявленный источник и сами по себе не становятся evidence и не
+дают очки; подтверждение требует отдельного trusted/manual статуса. Стек проекта
+остаётся declared до такой проверки и не переводит профилизацию в confirmed
+автоматически.
 
 ### F. Опыт (`work_experiences`) — Codex
 Минимум Mike: `место : должность : срок`. Рекомендую добавить `stack[]` и `summary` — иначе опыт нечего скармливать эмбеддингу и нечего подтверждать стекам. Верификация — mock-модератор в демо (решение Q8), очки 10/место, кап 30.
@@ -84,7 +92,7 @@
 | Артефакт | Кто/как |
 |---|---|
 | Типизированное резюме (PDF) | генерится из данных — автогенерация PDF-профиля (ТЗ 2.1), Codex |
-| **Образ** (confirmed-профилизаций) | система: тесты + evidence-подтверждения |
+| **Образ** (заявленные уровни + статусы) | система хранит декларации, evidence и подтверждённые значения отдельно |
 | Два вектора | matching-engine: strict = 37 заявленных уровней /7 + evidence; semantic = Harrier-640D по description+projects+experience+achievements+preferences; `vector(640)` |
 | Подтверждения (статусы) | система: quiz/grade_test/evidence/mock-moderator/fsp — поля status/confirmed_level/points |
 | rating_points + ledger | формула §5 |
@@ -92,7 +100,7 @@
 
 ## 2. Условие входа в пул
 
-`обязательные поля ∧ processing/pool согласия с version/time ∧ принятый грейд primary-направления ∧ зп min/max ∧ strict/semantic построены ∧ PDF готов`
+`обязательные поля ∧ processing/pool согласия с version/time ∧ approved ИЛИ self_reported grade primary-направления ∧ зп min/max ∧ strict/semantic построены ∧ PDF готов`
 
 Не выполнено → `draft` с чек-листом «что докрутить». Очки 0 — не препятствие.
 
@@ -113,9 +121,9 @@
 
 ## 4. Грейд и категории как производные образа
 
-- При регистрации: выбор **primary-направления** (пресет доменов) + заявленный грейд → грейд-тест направления на заявленном уровне → confirmed_level доменов направления (IRT 2PL, Mike) → грейд.
+- При регистрации: выбор **primary-направления** (пресет доменов) + declared grade. Browser projection выдаёт `grade_status=self_reported`; подготовленный контракт будущего trusted test producer заменяет snapshot на `approved` с реальной session UUID и `approved_at` только через API authoritative evidence и новую outbox запись.
 - Остальные домены/стеки добираются квизами (короткие, по 5–8 заданий на уровень) и evidence — неблокирующий фон, растит образ и очки.
-- Категория в БД: `candidate_categories {direction, grade, derived_from snapshot}` — пересчитывается системой; мульти-категорийность (несколько направлений) — за рамками MVP (идея №12, [[95-beyond-mvp]]).
+- Категория в БД: `candidate_categories {direction, grade, grade_status, derived_from snapshot}` — self_reported допускается в пул, но public PDF явно показывает badge. В `main-v2` коэффициент 0.6 применяется только к rating contribution self_reported. Мульти-категорийность остаётся за рамками MVP.
 
 ## 5. Формула очков (конфиг YAML, капы)
 
@@ -130,13 +138,14 @@
 | софтскиллы | **0** (самооценка) | — |
 | регулярные задачи | +1, refresh freshness | — |
 
-Правила: только confirmed/evidence-статусы дают очки; каждое начисление — запись в `rating_ledger`; пересчёт вектора — событие.
+Правила: skill/narrative очки дают только confirmed/evidence-статусы; grade confidence не превращает самоотчёт в evidence и учитывается только в main rating contribution. Каждое начисление — запись в `rating_ledger`; пересчёт вектора — событие.
 
 ## 6. Стейт-машина
 
 ```
-registered → profile_draft → direction_chosen(primary + заявленный грейд) → testing
-testing → graded (confirmed | принял ниже | принял выше) → vector_building → in_pool ⇄ paused
+registered → profile_draft → direction_chosen(primary + declared grade) → self_reported|testing
+self_reported → vector_building → in_pool ⇄ paused
+testing → graded (approved: confirmed | принял ниже | принял выше) → vector_building → in_pool
 параллельно: proficiencies/achievements/projects/experience → pending → confirmed/rejected → recompute
 грейд-тест: не прошёл → уровень ниже сразу; повтор заявленного — cooldown 3 мес (⚠️ дефолт)
 ```
@@ -166,14 +175,14 @@ POST /internal/pool/upsert {candidate_id, categories[], features, dense,
 ## 8. Задача для Codex (acceptance criteria цикла 1)
 
 1. Справочники доменов/стеков/софтскиллов/типов достижений/направлений — в `packages/shared` (+seed), заменить старый SPECIALIZATIONS.
-2. Миграции профиля: candidate_profiles, **proficiencies**, achievements, projects, work_experiences, grade_attempts, rating_ledger, candidate_categories.
+2. Source profile: CAS revision, stable claim UUID, canonical evidence hash, server-owned profile consent и exact snapshot outbox.
 3. Auth/account уже реализован отдельной API-core миграцией: register/OTP verify, JWT и revocable DB session; согласие на обработку аккаунта не заменяет pool consent.
-4. Профиль: поля B, приватность, правила видимости (контакты — после accept; анонимная карточка: образ-топ, грейд, очки, ФСП-бейджи, город, зп-ожидания — без ФИО-полного и контактов).
+4. Профиль: поля B, privacy/visibility, self_reported grade badge, approved test replacement и matching-ready checklist; контакты остаются за post-accept boundary.
 5. Заполнение профилизаций: self_level + пояснение уровня (рубрикация §3 в UI).
 6. PDF: загрузка → эвристический extraction → экран подтверждения → профилизаций/claims (source=pdf_confirmed).
 7. Грейд-тест: оркестрация по §7, attempts, cooldown, присвоение категории, UX offered_lower/higher.
 8. Достижения/проекты/опыт: CRUD + evidence-верификация + mock-модерация; очки по §5 (конфиг YAML).
-9. Триггеры ML: после graded и после каждого confirmed → vector + pool/upsert (гейт §2).
+9. Триггеры ML: после self_reported snapshot и после approved/evidence update → vector + pool/upsert (гейт §2).
 10. Автогенерация типизированного PDF-резюме.
 11. Тесты: стейт-машина, cooldown, формула с капами, happy-path register→pool.
 

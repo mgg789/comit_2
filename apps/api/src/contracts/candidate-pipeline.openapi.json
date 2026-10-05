@@ -888,6 +888,23 @@
             }
           },
           {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          },
+          {
             "name": "x-internal-token",
             "in": "header",
             "required": false,
@@ -956,6 +973,23 @@
             }
           },
           {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          },
+          {
             "name": "x-internal-token",
             "in": "header",
             "required": false,
@@ -1013,6 +1047,23 @@
               "type": "string",
               "format": "uuid",
               "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
             }
           },
           {
@@ -1099,6 +1150,23 @@
             }
           },
           {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          },
+          {
             "name": "x-internal-token",
             "in": "header",
             "required": false,
@@ -1166,6 +1234,23 @@
               "type": "string",
               "format": "uuid",
               "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
             }
           },
           {
@@ -2005,6 +2090,15 @@
               "senior"
             ],
             "title": "Grade"
+          },
+          "grade_status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "self_reported"
+            ],
+            "title": "Grade Status",
+            "default": "approved"
           }
         },
         "additionalProperties": false,
@@ -2014,7 +2108,7 @@
           "grade"
         ],
         "title": "Category",
-        "description": "Deterministic specialization and grade assigned from upstream test results."
+        "description": "Deterministic specialization and grade with its upstream evidence status."
       },
       "CombineRequest": {
         "properties": {
@@ -2407,14 +2501,22 @@
             "type": "string",
             "enum": [
               "approved",
+              "self_reported",
               "pending",
               "rejected"
             ],
             "title": "Status"
           },
           "test_session_id": {
-            "type": "string",
-            "format": "uuid",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Test Session Id"
           },
           "approved_at": {
@@ -2434,11 +2536,10 @@
         "type": "object",
         "required": [
           "grade",
-          "status",
-          "test_session_id"
+          "status"
         ],
         "title": "GradeResult",
-        "description": "Upstream grade-test result; only approved results permit pool membership."
+        "description": "Upstream grade result, allowing a declared grade until testing confirms it.\n\nA real test session and approval timestamp are mandatory for an approved result.\nSelf-reported grades deliberately keep both fields optional: the API must never\nmanufacture a test session identifier for a candidate who has not tested yet."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3356,6 +3457,22 @@
             },
             "type": "array",
             "title": "Top Matched Features"
+          },
+          "grade_status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "self_reported"
+            ],
+            "title": "Grade Status",
+            "default": "approved"
+          },
+          "grade_confidence": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Grade Confidence",
+            "default": 1.0
           }
         },
         "additionalProperties": false,
@@ -3372,7 +3489,7 @@
           "top_matched_features"
         ],
         "title": "ScoreBreakdown",
-        "description": "Available-channel weights, bounded semantic delta and reproducible main score."
+        "description": "Available-channel weights and reproducible score with raw rating provenance.\n\n``rating_score`` is the raw class percentile. ``rating_contribution`` applies\nthe grade-status confidence from the immutable policy snapshot, so a declared\ngrade cannot look like a tested grade while remaining eligible for the pool."
       },
       "SelectionPage": {
         "properties": {

@@ -5,8 +5,6 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
-
 from matching_engine.main import create_app
 from matching_engine.models import (
     CandidateProfile,
@@ -20,6 +18,7 @@ from matching_engine.strict import (
     validate_coordinates,
 )
 from matching_engine.strict_evidence import build_strict_evidence
+from pydantic import ValidationError
 
 
 def eligible_profile(**overrides) -> CandidateProfile:
@@ -50,11 +49,32 @@ def eligible_profile(**overrides) -> CandidateProfile:
 def test_eligibility_and_category_are_based_on_approved_test() -> None:
     profile = eligible_profile()
     assert missing_requirements(profile) == []
-    assert category_for(profile).model_dump() == {"specialization": "backend", "grade": "middle"}
+    assert category_for(profile).model_dump() == {
+        "specialization": "backend", "grade": "middle", "grade_status": "approved",
+    }
     profile.grade_result.status = "pending"
     assert "approved_grade_result" in missing_requirements(profile)
     with pytest.raises(ValueError):
         category_for(profile)
+
+
+def test_self_reported_grade_is_pool_ready_but_preserves_declared_status() -> None:
+    profile = eligible_profile(
+        grade_result={"grade": "middle", "status": "self_reported"},
+    )
+    assert missing_requirements(profile) == []
+    assert category_for(profile).grade_status == "self_reported"
+    profile.consents.pool = False
+    assert missing_requirements(profile) == ["pool_consent"]
+
+
+@pytest.mark.parametrize("missing", ["test_session_id", "approved_at"])
+def test_approved_grade_requires_real_test_evidence(missing: str) -> None:
+    grade = {"grade": "middle", "status": "approved",
+             "test_session_id": str(uuid4()), "approved_at": datetime.now(UTC)}
+    grade[missing] = None
+    with pytest.raises(ValidationError, match="approved grade requires"):
+        eligible_profile(grade_result=grade)
 
 
 def test_draft_checklist_and_consent_revocation() -> None:

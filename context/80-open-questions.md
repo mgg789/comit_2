@@ -40,7 +40,10 @@
 ### Q8. Верификация полей и веса рейтинга
 Рейтинг — очки за подтверждённое. Но кто подтверждает «опыт работы» в MVP без реальных проверок?
 **Варианты:** (a) все поля самоподтверждаются, очки за структурированность+тесты; (b) мок-верификация (статус pending → verified по времени/флагом модератора для демо); (c) очки только за объективное: тесты, ФСП, выполненные проекты (ссылки/репо).
-**Рекомендация:** (c) + (b) для демо: честная формула «очки = объективные подтверждения», мок-модерация показывает контур. Веса — таблицей в документации.
+**Решение:** source profile хранит декларации и evidence раздельно. Self reported
+grade допускается в пул с явным badge; `main-v2` применяет confidence 0.6 только к
+его rating contribution. Skill/narrative самооценка не создаёт подтверждённые
+очки; ссылки и текст не превращаются в evidence автоматически.
 
 ### Q9. Какие данные ФСП-профиля моделируем
 API не дадут — придумываем сами. Отображение работодателю — творческая задача.
@@ -82,11 +85,14 @@ production/server deploy этим документом не подтвержда
 | C  | Тестирование | Блэк-бокс-заглушка **только в рамках первого 24-ч спринта** (сквозной сценарий работает сразу), живая blueprint-механика — в следующих спринтах | 05.10 |
 | Q7 | Keycloak | Свой email+JWT с claims-структурой Keycloak + шов в документации (решение по умолчанию) | 05.10 |
 | Q7a | Auth storage | Passwordless OTP через encrypted PostgreSQL SMTP outbox; один email — один fixed role; custom JWT + revocable DB session. Account consent отделён от profile/pool consent | 06.10 |
-| Q7b | Auth ownership | Public employer drafts/agents и candidate pipeline/PDF получают owner только из JWT/cookie; public matching selections и profile CRUD пока отсутствуют | 06.10 |
+| Q7b | Auth ownership | Public employer drafts/agents/selections и candidate profile/pipeline/PDF получают owner только из JWT/cookie; internal matching дополнительно требует service token | 06.10 |
 | Q10| SLA-штраф | Мягкая версия в MVP: warn → ограничение новых приглашений; полная — концепцией | 05.10 |
 | Q12| Эмбеддинг-модель | **`microsoft/harrier-oss-v1-270m`, 640D** (решение Mike): базовая в S3, контрастивный дотюн на синтетике в S5 с eval-гейтом base-vs-tuned; MLX-вариант — эксперименты на Mac, прод — CPU на mgg-server | 05.10 |
 | Q12b| LLM для PDF-разбора и объяснений | **Облачная LLM** (решение Mike): Sverk API либо РФ-облако (YandexGPT/GigaChat — 152-ФЗ, данные в РФ); обязателен эвристический fallback для офлайн-контура, один интерфейс клиента, ключи только в env | 05.10 |
 | Q15| Что обучаем | Веса скоринга (линейный LTR), реранкер (pairwise-логрегрессия), IRT-параметры (2PL), гиперпараметры тиндер-лупа (на агентах), дотюн Harrier — всё на синтетике из своего генератора; детали — [[50-matching-engine]] | 05.10 |
 | Q14| Деплой | Свой сервер (docker-compose) + демо-аккаунты + видео-фоллбэк | 05.10 |
+| Q16 | Candidate source/projection | API-core владеет CAS source profile, stable claim UUID, canonical evidence hash, server profile-v1 consent и exact snapshot outbox; matching ACK не равен pool-ready | 06.10 |
+| Q17 | Grade status | `approved` сохраняет legacy test-session contract; `self_reported` не получает выдуманный UUID, допускается в pool, public PDF показывает badge, approved test заменяет его | 06.10 |
+| Q18 | Main policy | `main-v2`; raw rating остаётся в explanation, declared-grade confidence `0.6` применяется только к self_reported rating contribution; старые policy snapshots читаются | 06.10 |
 
 Режим работы: **спринты по ~24 часа**. Спринт 1 — скелеты + сквозной сценарий с блэк-бокс-тестированием; далее живые механики по плану [[70-mvp-scope]].
