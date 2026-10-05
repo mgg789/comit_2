@@ -1,0 +1,14 @@
+{
+  "luna_generation_calls": 1,
+  "actual_token_usage": null,
+  "usage_note": "Provider token accounting unavailable; no token total fabricated. One bounded scenario-design reply only.",
+  "qwen_generation_calls": 1,
+  "laya_pair_calls": 20,
+  "mass_generation_started": false,
+  "training_on_teacher_labels_started": false,
+  "pilot_report_hash": "945fe39fe8a225fa03fce14d6b26c17ab185ebe763ccc9c7c17f01da5c654c91",
+  "luna_initial_failures": 2,
+  "luna_initial_failures_note": "Agent-thread limit rejected attempts before execution; no generation budget charged.",
+  "luna_seed_hash": "564dd21defbe465ca2575c45c8de89e9902e185e2ee46da2038a092a6778d53c",
+  "report_hash": "09020a9130d3071e5a4530fc1f0f71521f7644fca26898811a9dc54b26c130ea"
+}

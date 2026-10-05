@@ -12,6 +12,7 @@ from matching_engine.embeddings import EMBEDDING_SPACE_ID
 from matching_engine.main import create_app
 from matching_engine.models import CoordinateAddition
 from matching_engine.rerank_features import feature_schema
+from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import rerank_cards
 from matching_engine.rerank_models import RerankRequest
 from matching_engine.rerank_store import RerankStore
@@ -55,17 +56,34 @@ def artifact_for(store: Store, *, approved: bool = True, tail: float | None = No
     values = [0.0] * len(features.names)
     values[features.names.index("salary_midpoint_ratio")] = 1.0
     from matching_engine.combine_models import ScoringPolicy
+    receipts = {}
+    for person in ("user", "assistant"):
+        answers = [{"pair_id": f"test-only/{person}/{index}", "choice": "A", "factual_issue": None} for index in range(20)]
+        receipts[person] = {"answers": answers, "hash": digest(answers), "packet_hash": digest({"synthetic_test_only": person}),
+                            "pair_ids": sorted(answer["pair_id"] for answer in answers)}
     return {"model_version": "test-only-v1", "feature_names": list(features.names),
         "feature_schema_hash": features.schema_hash, "strict_schema_hash": store.schema().schema_hash,
         "main_policy_hash": policy_hash(ScoringPolicy()), "semantic_space_id": EMBEDDING_SPACE_ID,
         "coefficients": values, "means": [0.0]*len(values), "scales": [1.0]*len(values), "tail_gap": tail,
         "dataset_hash": "test-only", "split_hash": "test-only", "label_cache_hash": "test-only", "evaluation_hash": "test-only", "training": {},
-        "gate": {"passed": approved, "golden_families": 12, "minimum_decisive_pairs_per_family": 6,
+        "gate": {"passed": approved, "protocol_valid": True, "label_validation_passed": True,
+            "golden_families": 12, "minimum_decisive_pairs_per_family": 6,
             "macro_ndcg_delta": .1, "ndcg_delta_ci_low": .01, "macro_pair_accuracy": .8,
             "macro_pair_delta": .1, "pair_delta_ci_low": .01,
             "tail": {"validated": True, "calibration_recall": 1.0, "golden_relevant_count": 60,
                 "golden_recall": 1.0, "golden_wilson_low": .94}},
-        "reviews": {"user_pairs": 20, "assistant_pairs": 20, "disjoint_blind": True, "factual_issues": []}}
+        "reviews": {"user_pairs": 20, "assistant_pairs": 20, "disjoint_blind": True,
+                    "factual_issues": [], "dataset_hash": "test-only", "receipts": receipts}}
+
+
+def test_declared_review_counts_without_receipts_cannot_activate(store: Store) -> None:
+    """Review evidence is required at registration/promotion, not only by the offline CLI."""
+    artifact = artifact_for(store)
+    artifact["reviews"].pop("receipts")
+    reranks = RerankStore(store.database_url)
+    identity = reranks.register(artifact)
+    with pytest.raises(ConflictError, match="quality"):
+        reranks.promote(identity)
 
 
 def test_atomic_enqueue_and_fallback_pages_are_contact_free(store: Store) -> None:

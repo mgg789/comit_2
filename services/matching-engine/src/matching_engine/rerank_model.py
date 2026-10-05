@@ -1,6 +1,7 @@
 """Portable linear R₀ artifacts and pure offline inference with explicit fallback."""
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
@@ -74,13 +75,39 @@ def promotion_eligible(value: dict) -> bool:
     """Require held-out quality and completed disjoint reviews before activation."""
     artifact = RerankArtifact.model_validate(value)
     gate, reviews = artifact.gate, artifact.reviews
+    receipts = reviews.get("receipts", {})
+    if not isinstance(receipts, dict) or set(receipts) != {"user", "assistant"} or reviews.get("dataset_hash") != artifact.dataset_hash:
+        return False
+    review_ids = []
+    for person in ("user", "assistant"):
+        receipt = receipts[person]
+        if not isinstance(receipt, dict):
+            return False
+        answers = receipt.get("answers", [])
+        if not isinstance(answers, list) or len(answers) != 20 or any(not isinstance(answer, dict) for answer in answers):
+            return False
+        ids = [answer.get("pair_id") for answer in answers]
+        if any(not isinstance(identifier, str) for identifier in ids) or len(set(ids)) != 20:
+            return False
+        if receipt.get("hash") != digest(answers) or receipt.get("pair_ids") != sorted(ids):
+            return False
+        if not isinstance(receipt.get("packet_hash"), str) or not re.fullmatch(r"[0-9a-f]{64}", receipt["packet_hash"]):
+            return False
+        if any(answer.get("choice") not in ("A", "B", "tie", "insufficient") or answer.get("factual_issue") for answer in answers):
+            return False
+        review_ids.append(set(ids))
+    if review_ids[0] & review_ids[1]:
+        return False
     if artifact.tail_gap is not None:
         tail = gate.get("tail", {})
         if (tail.get("validated") is not True or tail.get("calibration_recall", 0) < .95
                 or tail.get("golden_relevant_count", 0) < 50 or tail.get("golden_recall", 0) < .95
                 or tail.get("golden_wilson_low", 0) < .90):
             return False
-    return (gate.get("passed") is True
+    return (not artifact.training.get("test_only", False)
+            and gate.get("passed") is True
+            and gate.get("protocol_valid") is True
+            and gate.get("label_validation_passed") is True
             and gate.get("golden_families", 0) >= 12
             and gate.get("minimum_decisive_pairs_per_family", 0) >= 6
             and gate.get("macro_ndcg_delta", 0) >= .02

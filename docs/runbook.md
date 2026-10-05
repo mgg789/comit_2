@@ -164,3 +164,34 @@ candidate/vacancy/combine workers продолжают прежний поток
 Operator регистрация и активация разделены; не обходить gates ради демонстрации.
 При stale result проверять сначала main run, затем artifact/feature/tail hashes.
 Retry сохраняет идемпотентность и не возвращает просмотренных кандидатов.
+
+### Ограниченный offline эксперимент
+
+Из корня репозитория использовать Python окружение matching-engine с extras
+`dev` (включает sklearn для проверок) или `training` для отдельного обучения.
+В командах ниже `PYTHONPATH=services/matching-engine/src`; путь к Python —
+`services/matching-engine/.venv/bin/python`. Запускается только локальный jev-local;
+команды не управляют его worker/model settings.
+
+1. `python tests/rerank_pilot.py`:5 профилей/20 сравнений, без расхода grade-бюджета.
+2. `python -m matching_engine.rerank_experiment manifest`, затем `generate`.
+   Последняя команда отказывает после проваленного пилота. Лимиты с учётом
+   повторов:60 семейств/600 профилей/3000 pair/600 grade; cache/usage сохраняются.
+3. `python -m matching_engine.rerank_experiment train`: только cached данные.
+   Source/семейства фиксированы, нормализация train-only, C выбирается по validation.
+   Dataset/code seals запрещают настройку по уже раскрытому golden; максимум2
+   попытки обучения в одном эксперименте, одинаковый успешный запуск replay.
+4. `python -m matching_engine.rerank_experiment review-package`: раздельные blind
+   JSON packets по20 пар. Ответы: список `{pair_id,choice,factual_issue}`;
+   choice=A/B/tie/insufficient, factual_issue=null либо описание реальной ошибки.
+   Assistant review не заменяет human review и не считается человеческой статистикой.
+5. `python -m matching_engine.rerank_experiment seal-reviews --user-review <file> --assistant-review <file>`
+   создаёт новый `artifact-reviewed.json` с реальными receipts. Ответы пользователя
+   автоматически не заполняются. Ошибки/непройденные gates запрещают активацию.
+6. При настроенном DATABASE_URL: `python -m matching_engine.rerank_experiment register --artifact <file>`
+   возвращает SHA; отдельный `promote --hash <SHA>` повторно проверяет gates и
+   атомарно переставляет active pointer/ставит задания актуальным main batches.
+
+По умолчанию artifacts расположены в `tests/artifacts/reranker/`, git-ignored.
+В live worker нет sklearn, provider calls и обучения. Реальный текущий pilot
+stopped: не обходить эту блокировку изменением JSON-флага или увеличением бюджета.
