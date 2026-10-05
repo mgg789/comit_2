@@ -14,6 +14,12 @@ jobs:
     name: Build & run prod stack on mgg-server
     runs-on: [self-hosted, ci]
     steps:
+      # Container jobs (ci js/python) leave root-owned files in the shared
+      # workspace; a root container chowns them back to the runner user.
+      - name: Fix workspace ownership
+        run: >
+          docker run --rm -v "/home/mgg/actions-runners/${RUNNER_NAME}:/work" alpine:3.20
+          chown -R "$(id -u):$(id -g)" /work/_work/comit_2
       - uses: actions/checkout@v5
       - name: Load server env
         run: |
