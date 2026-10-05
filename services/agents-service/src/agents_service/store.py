@@ -301,39 +301,85 @@ class Store:
         guard = request if isinstance(request, RevisionRequest) else RevisionRequest.model_validate(request)
         owner, draft = _uuid(owner_id), _uuid(draft_id)
         with connect(self.database_url) as connection:
-            row = self._get_row(connection, owner, draft, lock=True)
-            if row["revision"] != guard.expected_revision:
-                raise StaleRevisionError("draft revision is stale")
-            if row["state"] == "summary":
-                current_summary = SummarySnapshot.model_validate(row["summary"])
-                if (current_summary.strict_schema_version == schema.version
-                        and current_summary.strict_schema_hash == schema.schema_hash):
-                    return self._view(row)
-                # Registry rollover requires a fresh seal even when field revision is unchanged.
-            if row["state"] in {"creating", "created"}:
-                raise ConflictError("published draft cannot be approved again")
-            fields = self._canonical_fields(row["fields"])
-            self._validate_coordinates(fields, schema)
-            missing = self._missing(fields)
-            if missing:
-                raise InvalidDraftError("missing requirements: " + ",".join(missing))
-            summary_data = {
-                "revision": row["revision"],
-                "fields": fields.model_dump(by_alias=True),
-                "strict_schema_version": schema.version,
-                "strict_schema_hash": schema.schema_hash,
-            }
-            digest = _body_hash(summary_data)
-            summary = SummarySnapshot(
-                revision=row["revision"], summary_hash=digest, fields=fields,
-                strict_schema_version=schema.version, strict_schema_hash=schema.schema_hash,
-            )
-            connection.execute(
-                "UPDATE agents_service.drafts SET state='summary', summary=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
-                (Jsonb(summary.model_dump(by_alias=True)), owner, draft),
-            )
-            updated = self._get_row(connection, owner, draft)
+            updated = self._approve_tx(connection, owner, draft, guard, schema)
         return self._view(updated)
+
+    def _approve_tx(
+        self,
+        connection: psycopg.Connection,
+        owner_id: UUID,
+        draft_id: UUID,
+        request: RevisionRequest,
+        schema: SchemaSnapshot,
+    ) -> Mapping[str, Any]:
+        """Approve one draft while retaining the caller's transaction boundary."""
+        row = self._get_row(connection, owner_id, draft_id, lock=True)
+        if row["revision"] != request.expected_revision:
+            raise StaleRevisionError("draft revision is stale")
+        if row["state"] == "summary":
+            current_summary = SummarySnapshot.model_validate(row["summary"])
+            if (current_summary.strict_schema_version == schema.version
+                    and current_summary.strict_schema_hash == schema.schema_hash):
+                return row
+            # Registry rollover requires a fresh seal even when field revision is unchanged.
+        if row["state"] in {"creating", "created"}:
+            raise ConflictError("published draft cannot be approved again")
+        fields = self._canonical_fields(row["fields"])
+        self._validate_coordinates(fields, schema)
+        missing = self._missing(fields)
+        if missing:
+            raise InvalidDraftError("missing requirements: " + ",".join(missing))
+        summary_data = {
+            "revision": row["revision"],
+            "fields": fields.model_dump(by_alias=True),
+            "strict_schema_version": schema.version,
+            "strict_schema_hash": schema.schema_hash,
+        }
+        digest = _body_hash(summary_data)
+        summary = SummarySnapshot(
+            revision=row["revision"], summary_hash=digest, fields=fields,
+            strict_schema_version=schema.version, strict_schema_hash=schema.schema_hash,
+        )
+        connection.execute(
+            "UPDATE agents_service.drafts SET state='summary', summary=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
+            (Jsonb(summary.model_dump(by_alias=True)), owner_id, draft_id),
+        )
+        return self._get_row(connection, owner_id, draft_id)
+
+    def patch_in_connection(
+        self,
+        connection: psycopg.Connection,
+        owner_id: UUID | str,
+        draft_id: UUID | str,
+        expected_revision: int,
+        fields: DraftFields | Mapping[str, Any],
+        schema: SchemaSnapshot,
+        *,
+        source: str = "agent",
+        source_metadata: Mapping[str, JsonValue] | None = None,
+    ) -> DraftView:
+        """Apply an agent/form patch without committing the caller's journal transaction."""
+        request = DraftPatch(
+            expected_revision=expected_revision,
+            fields=fields if isinstance(fields, DraftFields) else DraftFields.model_validate(fields),
+        )
+        row = self._patch_tx(
+            connection, _uuid(owner_id), _uuid(draft_id), request, schema,
+            source=source, source_metadata=source_metadata,
+        )
+        return self._view(row)
+
+    def approve_in_connection(
+        self,
+        connection: psycopg.Connection,
+        owner_id: UUID | str,
+        draft_id: UUID | str,
+        expected_revision: int,
+        schema: SchemaSnapshot,
+    ) -> DraftView:
+        """Approve without committing so an agent journal can share the same transaction."""
+        row = self._approve_tx(connection, _uuid(owner_id), _uuid(draft_id), RevisionRequest(expected_revision=expected_revision), schema)
+        return self._view(row)
 
     def _enqueue_tx(
         self,
@@ -419,6 +465,7 @@ class Store:
         model_version: str,
         schema_version: int,
         schema_hash: str,
+        provenance: Mapping[str, JsonValue] | None = None,
     ) -> DraftView:
         """Apply a Laya suggestion through the normal CAS path and preserve human fields."""
         if schema_version != schema.version or schema_hash != schema.schema_hash:
@@ -434,6 +481,7 @@ class Store:
                 "model_version": model_version,
                 "schema_version": schema_version,
                 "schema_hash": schema_hash,
+                **dict(provenance or {}),
             },
         )
 
@@ -450,6 +498,7 @@ class Store:
         schema_version: int,
         schema_hash: str,
         result: Mapping[str, Any] | None = None,
+        provenance: Mapping[str, JsonValue] | None = None,
     ) -> DraftView:
         """Apply Laya fields and acknowledge its lease atomically in one transaction."""
         if schema_version != schema.version or schema_hash != schema.schema_hash:
@@ -460,6 +509,7 @@ class Store:
             "model_version": model_version,
             "schema_version": schema_version,
             "schema_hash": schema_hash,
+            **dict(provenance or {}),
         }
         request = DraftPatch(
             expected_revision=expected_revision,
@@ -511,6 +561,28 @@ class Store:
                 idempotency_key=idempotency_key, draft_id=_uuid(draft_id) if draft_id else None,
                 session_id=_uuid(session_id) if session_id else None, max_attempts=max_attempts,
             )
+        return self._job(row)
+
+    def enqueue_in_connection(
+        self,
+        connection: psycopg.Connection,
+        owner_id: UUID | str,
+        kind: JobKind,
+        payload: Mapping[str, Any],
+        *,
+        idempotency_key: str | None = None,
+        draft_id: UUID | str | None = None,
+        session_id: UUID | str | None = None,
+        max_attempts: int = 5,
+    ) -> JobView:
+        """Enqueue while retaining the caller's transaction for a journaled side effect."""
+        if not 1 <= max_attempts <= 20:
+            raise ValueError("max_attempts must be 1..20")
+        row = self._enqueue_tx(
+            connection, owner_id=_uuid(owner_id), kind=kind, payload=payload,
+            idempotency_key=idempotency_key, draft_id=_uuid(draft_id) if draft_id else None,
+            session_id=_uuid(session_id) if session_id else None, max_attempts=max_attempts,
+        )
         return self._job(row)
 
     def retry_job(self, owner_id: UUID | str, job_id: UUID | str) -> JobView:
