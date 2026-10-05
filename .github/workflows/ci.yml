@@ -16,7 +16,7 @@ jobs:
     container:
       image: node:22-bookworm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install pnpm
         run: npm install -g pnpm@9.14.2
       - name: Install dependencies
@@ -32,7 +32,7 @@ jobs:
     container:
       image: python:3.12-bookworm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install services with dev deps
         run: |
           pip install --no-cache-dir \
@@ -62,7 +62,13 @@ jobs:
       INTEGRATION_PORT: 18103
       POSTGRES_PORT: 18432
     steps:
-      - uses: actions/checkout@v4
+      # Container jobs run as root and leave root-owned files in the shared
+      # workspace; a root container chowns them back to the runner user.
+      - name: Fix workspace ownership
+        run: >
+          docker run --rm -v "/home/mgg/actions-runners/${RUNNER_NAME}:/work" alpine:3.20
+          chown -R "$(id -u):$(id -g)" /work/_work/comit_2
+      - uses: actions/checkout@v5
       - name: Start dev stack (isolated project and ports)
         run: docker compose -p comit-ci -f infra/docker-compose.yml up -d --build
       - name: Run smoke gate
