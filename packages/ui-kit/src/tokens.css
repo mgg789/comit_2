@@ -1,0 +1,19 @@
+/**
+ * Comit design tokens.
+ * Palette follows the FSP brand book direction (deep violet primary, warm accents).
+ * Exact brand values land here after the brand book is imported (context/10, resources).
+ */
+:root {
+  --comit-primary: #7b2fbe;
+  --comit-primary-dark: #5c1f96;
+  --comit-accent: #b84ff5;
+  --comit-surface: #ffffff;
+  --comit-bg: #f7f5fb;
+  --comit-text: #1f1b2e;
+  --comit-text-muted: #6d6786;
+  --comit-danger: #d64562;
+  --comit-success: #2f9e6e;
+
+  --comit-radius: 12px;
+  --comit-space-unit: 4px;
+}

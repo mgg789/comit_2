@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: JS typecheck & build
+    runs-on: [self-hosted, ci]
+    container:
+      image: node:22-bookworm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pnpm
+        run: npm install -g pnpm@9.14.2
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r typecheck
+      - name: Build
+        run: pnpm -r build
+
+  python:
+    name: Python services tests
+    runs-on: [self-hosted, ci]
+    container:
+      image: python:3.12-bookworm
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install services with dev deps
+        run: |
+          pip install --no-cache-dir \
+            -e "./services/matching-engine[dev]" \
+            -e "./services/testing-engine[dev]" \
+            -e "./services/integration-engine[dev]"
+      - name: Run tests
+        run: >
+          pytest
+          services/matching-engine/tests
+          services/testing-engine/tests
+          services/integration-engine/tests
+          -q
+
+  smoke:
+    name: Compose smoke gate
+    runs-on: [self-hosted, ci]
+    # Host ports are shared: smoke runs must not overlap each other or the deploy.
+    concurrency:
+      group: smoke-host
+      cancel-in-progress: false
+    env:
+      # 38xxx band: verified free on mgg-server (18xxx collides with navix-api)
+      WEB_PORT: 38088
+      API_PORT: 38080
+      MATCHING_PORT: 38101
+      TESTING_PORT: 38102
+      INTEGRATION_PORT: 38103
+      POSTGRES_PORT: 38432
+    steps:
+      # Container jobs run as root and leave root-owned files in the shared
+      # workspace; a root container chowns them back to the runner user.
+      - name: Fix workspace ownership
+        run: >
+          docker run --rm -v "/home/mgg/actions-runners/${RUNNER_NAME}:/work" alpine:3.20
+          chown -R "$(id -u):$(id -g)" /work/_work/comit_2
+      - uses: actions/checkout@v5
+      - name: Start dev stack (isolated project and ports)
+        run: docker compose -p comit-ci -f infra/docker-compose.yml up -d --build
+      - name: Run smoke gate
+        run: ./tests/smoke.sh
+      - name: Tear down
+        if: always()
+        run: docker compose -p comit-ci -f infra/docker-compose.yml down -v --remove-orphans
