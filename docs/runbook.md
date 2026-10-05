@@ -293,6 +293,13 @@ raw7/10, derived8/10, decisive5/10; ledger28/676/119. Повтор сохран�
 [diagnosis](rerank-frontend05-diagnosis.md). Passed robustness pilot сам по себе
 также не разрешает обучение, смешивание teacher versions или активацию R₀.
 
+Альтернативный Gemma pilot: `python -m matching_engine.rerank_gemma_pilot prepare|run`
+с тем же PYTHONPATH. Требует sealed blind review; сохраняет отдельные model/prompt
+receipts, использует общий pair ledger и партии максимум пяти HTTP-вызовов.
+Первый запуск stopped после пяти ответов с ошибками формата; повтор читает кэш
+без новых запросов. Ledger28/681/119. Новый format probe автоматически не запускается.
+Источник, команды и ограничения — [пилот Gemma](rerank-gemma-teacher-pilot.md).
+
 ### Повтор backend приёмки
 
 При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings

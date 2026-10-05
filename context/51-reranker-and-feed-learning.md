@@ -415,3 +415,13 @@ decisive5<6: stopped. Ledger28/676/119, новоеusage13824input/1515outputtoke
 Подробности и пределы причинных выводов —
 [diagnosis](../docs/rerank-frontend05-diagnosis.md),
 [hashed report](../data/validation/rerank-frontend05-diagnosis.json).
+
+Альтернативный Gemma teacher pilot (`gemma4-vlm`, pair-only OpenAI endpoint)
+запечатал десять пар validation/calibration и blind assistant review до API.
+Первая партия пяти запросов дала четыре `length` и один неверный тип evidence;
+остальные пятнадцать не отправлены. Valid responses=0, качество разметки и
+симметрия не оценены. Ledger28/681/119, actualusage3534input+5968outputtokens.
+Старыйcache/defaultteacher/cohort сохранены; обучение и активация остановлены.
+Новый format probe и пересмотр объёма пока только предложены:
+[Gemma pilot](../docs/rerank-gemma-teacher-pilot.md),
+[hashed report](../data/validation/rerank-gemma-teacher-pilot.json).
