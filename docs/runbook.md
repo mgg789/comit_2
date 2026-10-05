@@ -154,3 +154,13 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 | CI-джоба висит в `queued` | раннеры заняты или офлайн: `gh api repos/mgg789/comit_2/actions/runners` |
 | Smoke конфликтует с деплоем | один `smoke-host` concurrency на все прогоны; не убирай его |
 | 409/странные порты на сервере | занят `WEB_PORT`: смени в `/home/mgg/comit/.env` и redeploy |
+
+## Baseline R₀
+
+Применить новую миграцию штатным `python -m matching_engine migrate`, затем
+запустить отдельный `python -m matching_engine rerank-worker`. Существующие
+candidate/vacancy/combine workers продолжают прежний поток. Порты не добавляются.
+Без активной модели worker публикует явный main_fallback.
+Operator регистрация и активация разделены; не обходить gates ради демонстрации.
+При stale result проверять сначала main run, затем artifact/feature/tail hashes.
+Retry сохраняет идемпотентность и не возвращает просмотренных кандидатов.

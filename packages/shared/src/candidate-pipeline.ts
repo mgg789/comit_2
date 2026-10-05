@@ -11,11 +11,32 @@ export interface PipelineSkill {
   status: ClaimStatus;
   provenance?: string[];
 }
+/** Typed fact with evidence independent of its parent narrative; provenance remains private. */
+export interface PipelineNarrativeValue<T> {
+  value: T;
+  status: ClaimStatus;
+  provenance?: string[];
+}
+/** Domain/stack reference validated against the active strict registry. */
+export interface PipelineNarrativeReference {
+  key: string;
+  status: ClaimStatus;
+  provenance?: string[];
+}
+/** Explicit input facts; durations are integer months in 0..1200, never extracted from prose. */
+export interface PipelineNarrativeFacts {
+  domains?: PipelineNarrativeReference[];
+  stacks?: PipelineNarrativeReference[];
+  duration_months?: PipelineNarrativeValue<number> | null;
+  role?: PipelineNarrativeValue<"developer" | "lead" | "architect" | "analyst" | "designer" | "researcher" | "qa" | "devops" | "other"> | null;
+  production_support?: PipelineNarrativeValue<boolean> | null;
+}
 /** Narrative claims preserve evidence details in private storage. */
 export interface PipelineNarrative {
   title: string;
   description?: string;
   status: ClaimStatus;
+  facts?: PipelineNarrativeFacts | null;
   details?: Record<string, JsonValue>;
   provenance?: string[];
 }

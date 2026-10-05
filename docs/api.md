@@ -183,3 +183,19 @@ top matched features со статусами подтверждения). Кон
 Нет готовой вакансии → 404; нет актуального завершённого batch → 409.
 Изменения входов сразу закрывают чтение старых карточек до нового отбора.
 Visited необратим; pending/attractive можно явно вернуть в eligible.
+
+## Baseline rerank (internal token)
+
+`POST /internal/vacancies/{id}/rerank` принимает необязательный UUID
+`idempotency_key`; `GET` того же пути возвращает durable статус.
+`POST /internal/vacancies/{id}/rerank/retry` повторяет терминальное задание.
+`GET /internal/vacancies/{id}/rerank/selections?kind=recommended|reserve&limit=100&offset=0`
+возвращает отдельную страницу выбранного режима из одного актуального запуска.
+Нет актуального main/готового rerank →409; неготовая/закрытая вакансия →404.
+
+Карточка сохраняет исходные explanation и `main_position`; добавляет
+`rerank_position`, nullable `rerank_score`, вклады признаков, disposition и
+`artifact_hash`. Статус содержит feature/tail hashes, `mode`, `fallback_reason`,
+число рекомендованных, резерва и оставшихся вне top-k. При fallback нет обученного
+score, rerank_position=null, весь main top-k остаётся рекомендованным.
+Обучение и активация доступны только operator CLI, без HTTP endpoint.

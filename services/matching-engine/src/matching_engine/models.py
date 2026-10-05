@@ -70,12 +70,52 @@ class Skill(Contract):
     )
 
 
+NarrativeRole = Literal["developer", "lead", "architect", "analyst", "designer", "researcher", "qa", "devops", "other"]
+DurationMonths = Annotated[int, Field(strict=True, ge=0, le=1200)]
+StrictBoolean = Annotated[bool, Field(strict=True)]
+
+
+class NarrativeReference(Contract):
+    """Explicit domain/stack reference, independently verified; provenance stays private."""
+
+    key: str = Field(min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9_-]*$")
+    status: ClaimStatus
+    provenance: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(default_factory=list, max_length=30)
+
+
+class NarrativeValue[FactValue](Contract):
+    """A typed scalar fact with its own upstream evidence state and private provenance."""
+
+    value: FactValue
+    status: ClaimStatus
+    provenance: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(default_factory=list, max_length=30)
+
+
+class NarrativeFacts(Contract):
+    """Optional structured facts; absence means unknown, never inferred from prose."""
+
+    domains: list[NarrativeReference] = Field(default_factory=list, max_length=1000)
+    stacks: list[NarrativeReference] = Field(default_factory=list, max_length=1000)
+    duration_months: NarrativeValue[DurationMonths] | None = None
+    role: NarrativeValue[NarrativeRole] | None = None
+    production_support: NarrativeValue[StrictBoolean] | None = None
+
+    @model_validator(mode="after")
+    def unique_references(self) -> "NarrativeFacts":
+        """Reject duplicate references within a group without conflating status and level."""
+        for refs in (self.domains, self.stacks):
+            if len({ref.key for ref in refs}) != len(refs):
+                raise ValueError("duplicate narrative reference within group")
+        return self
+
+
 class NarrativeClaim(Contract):
     """Project, experience or achievement text plus the upstream evidence state."""
 
     title: str = Field(min_length=1, max_length=300)
     description: str = Field(default="", max_length=10000)
     status: ClaimStatus
+    facts: NarrativeFacts | None = None
     details: dict[str, JsonValue] = Field(default_factory=dict, max_length=100)
     provenance: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(
         default_factory=list, max_length=30

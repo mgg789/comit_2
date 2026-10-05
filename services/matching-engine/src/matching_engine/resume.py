@@ -68,6 +68,17 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
                 add(f"{claim.title} - {_STATUS[claim.status]}", heading)
                 if claim.description:
                     add(claim.description)
+                if claim.facts is not None:
+                    for fact_label, refs in (("Домены проекта", claim.facts.domains),
+                                             ("Стек проекта", claim.facts.stacks)):
+                        for ref in refs:
+                            add(f"{fact_label}: {ref.key} - {_STATUS[ref.status]}")
+                    for name, fact_label in (("duration_months", "Длительность, месяцев"),
+                                             ("role", "Роль"), ("production_support", "Эксплуатация")):
+                        fact = getattr(claim.facts, name)
+                        if fact is not None:
+                            value = ("да" if fact.value else "нет") if isinstance(fact.value, bool) else str(fact.value)
+                            add(f"{fact_label}: {value} - {_STATUS[fact.status]}")
                 for key in ("summary", "my_role", "role", "position", "stack", "duration"):
                     value = claim.details.get(key)
                     if isinstance(value, (str, list)):

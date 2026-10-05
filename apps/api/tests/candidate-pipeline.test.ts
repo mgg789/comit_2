@@ -157,3 +157,26 @@ test("event delivery gateway exposes acknowledgements and validates retry stream
   assert.equal(calls, 2);
   await app.close();
 });
+
+test("rerank gateway validates caller identity and preserves reserve pagination", async () => {
+  const app = gateway();
+  let calls = 0;
+  await app.register(candidatePipelineRoutes, { token: "synthetic-test-token", transport: async (url, options) => {
+    calls += 1;
+    const upstream = new URL(String(url));
+    assert.equal(new Headers(options?.headers).get("x-internal-token"), "synthetic-test-token");
+    if (options?.method === "GET") {
+      assert.equal(upstream.search, "?kind=reserve&limit=2&offset=1");
+    }
+    return Response.json({ detail: "current rerank selection is not ready" }, { status: 409 });
+  } });
+  const url = "/internal/vacancies/00000000-0000-4000-8000-000000000001/rerank";
+  const headers = { "x-internal-token": "synthetic-test-token" };
+  assert.equal((await app.inject({ method: "POST", url, payload: {} })).statusCode, 401);
+  assert.equal((await app.inject({ method: "POST", url, headers, payload: { idempotency_key: "bad" } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url, headers, payload: { unknown: true } })).statusCode, 400);
+  assert.equal((await app.inject({ method: "POST", url, headers, payload: {} })).statusCode, 409);
+  assert.equal((await app.inject({ method: "GET", url: `${url}/selections?kind=reserve&limit=2&offset=1`, headers })).statusCode, 409);
+  assert.equal(calls, 2);
+  await app.close();
+});

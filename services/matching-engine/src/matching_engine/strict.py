@@ -55,6 +55,12 @@ def validate_coordinates(profile: CandidateProfile, schema: StrictSchema) -> Non
         for skill in skills:
             if (group, skill.key) not in known:
                 raise ValueError(f"unknown coordinate: {group}/{skill.key}")
+    for claim in (*profile.projects, *profile.experience, *profile.achievements):
+        if claim.facts is not None:
+            for group, refs in (("domain", claim.facts.domains), ("stack", claim.facts.stacks)):
+                for ref in refs:
+                    if (group, ref.key) not in known:
+                        raise ValueError(f"unknown narrative coordinate: {group}/{ref.key}")
 
 
 def build_strict_vector(profile: CandidateProfile, schema: StrictSchema) -> list[float]:

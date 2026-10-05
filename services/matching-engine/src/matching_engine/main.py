@@ -19,6 +19,8 @@ from matching_engine.models import (
     PoolPage,
     StrictSchema,
 )
+from matching_engine.rerank_routes import rerank_router
+from matching_engine.rerank_store import RerankStore
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.vacancy_routes import vacancy_router
 from matching_engine.vacancy_store import VacancyStore
@@ -27,7 +29,8 @@ from matching_engine.vacancy_store import VacancyStore
 def create_app(*, store: Store | None = None, internal_token: str | None = None,
                encoder_ready: Callable[[], bool] | None = None,
                vacancy_store: VacancyStore | None = None,
-               combine_store: CombineStore | None = None) -> FastAPI:
+               combine_store: CombineStore | None = None,
+               rerank_store: RerankStore | None = None) -> FastAPI:
     """Build routes without DB/model side effects; injected dependencies support tests only."""
     database_url = os.environ.get("DATABASE_URL")
     pipeline_store = store if store is not None else (Store(database_url) if database_url else None)
@@ -36,6 +39,9 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     )
     combine_repository = combine_store if combine_store is not None else (
         CombineStore(pipeline_store.database_url) if pipeline_store is not None else None
+    )
+    rerank_repository = rerank_store if rerank_store is not None else (
+        RerankStore(pipeline_store.database_url) if pipeline_store is not None else None
     )
     token = internal_token if internal_token is not None else os.environ.get("CANDIDATE_PIPELINE_TOKEN")
     app = FastAPI(
@@ -84,6 +90,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
             "embedding": embedding_ready,
             "vacancy_database": vacancy_repository is not None and vacancy_repository.ready(),
             "matching_database": combine_repository is not None and combine_repository.ready(),
+            "rerank_database": rerank_repository is not None and rerank_repository.ready(),
         }
         available = all(checks.values())
         if not available:
@@ -153,4 +160,5 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
 
     app.include_router(vacancy_router(vacancy_repository, require_internal))
     app.include_router(combine_router(combine_repository, require_internal))
+    app.include_router(rerank_router(rerank_repository, require_internal))
     return app

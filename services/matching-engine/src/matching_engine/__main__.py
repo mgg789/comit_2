@@ -16,7 +16,7 @@ def main() -> None:
     """Run one chosen mode, using environment configuration without exposing credentials."""
     parser = argparse.ArgumentParser(description="Comit candidate pipeline")
     parser.add_argument("mode", nargs="?", default="serve",
-                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker"))
+                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker"))
     parser.add_argument("--once", action="store_true", help="Process one available worker job")
     args = parser.parse_args()
     if args.mode == "serve":
@@ -31,6 +31,8 @@ def main() -> None:
         return
     from matching_engine.combine_store import CombineStore
     from matching_engine.combine_worker import CombineWorker
+    from matching_engine.rerank_store import RerankStore
+    from matching_engine.rerank_worker import RerankWorker
     from matching_engine.vacancy_store import VacancyStore
     from matching_engine.vacancy_worker import VacancyWorker
     from matching_engine.worker import Worker
@@ -39,7 +41,9 @@ def main() -> None:
         "max_attempts": int(os.environ.get("PIPELINE_MAX_ATTEMPTS", "5")),
         "retry_base_seconds": int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30")),
     }
-    if args.mode == "combine-worker":
+    if args.mode == "rerank-worker":
+        worker = RerankWorker(RerankStore(database_url), **options)
+    elif args.mode == "combine-worker":
         worker = CombineWorker(CombineStore(database_url), **options)
     elif args.mode == "vacancy-worker":
         worker = VacancyWorker(VacancyStore(database_url), **options)

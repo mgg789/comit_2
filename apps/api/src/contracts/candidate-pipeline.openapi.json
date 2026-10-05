@@ -1328,6 +1328,291 @@
           }
         }
       }
+    },
+    "/internal/vacancies/{vacancy_id}/rerank": {
+      "post": {
+        "tags": [
+          "baseline-rerank"
+        ],
+        "summary": "Request",
+        "description": "Queue one versioned top-k snapshot; optional caller keys persist across restart.",
+        "operationId": "request_internal_vacancies__vacancy_id__rerank_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerankRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "baseline-rerank"
+        ],
+        "summary": "Status",
+        "description": "Read progress including explicit fallback and stale snapshot state.",
+        "operationId": "status_internal_vacancies__vacancy_id__rerank_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/rerank/retry": {
+      "post": {
+        "tags": [
+          "baseline-rerank"
+        ],
+        "summary": "Retry",
+        "description": "Refresh current inputs or reset bounded terminal failures.",
+        "operationId": "retry_internal_vacancies__vacancy_id__rerank_retry_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/rerank/selections": {
+      "get": {
+        "tags": [
+          "baseline-rerank"
+        ],
+        "summary": "Selections",
+        "description": "Return a page from a single valid run and disposition, preserving main explanations.",
+        "operationId": "selections_internal_vacancies__vacancy_id__rerank_selections_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "recommended",
+                "reserve"
+              ],
+              "type": "string",
+              "default": "recommended",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RerankPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2263,6 +2548,16 @@
             ],
             "title": "Status"
           },
+          "facts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NarrativeFacts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "details": {
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"
@@ -2290,6 +2585,221 @@
         ],
         "title": "NarrativeClaim",
         "description": "Project, experience or achievement text plus the upstream evidence state."
+      },
+      "NarrativeFacts": {
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeReference"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Domains"
+          },
+          "stacks": {
+            "items": {
+              "$ref": "#/components/schemas/NarrativeReference"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Stacks"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NarrativeValue_Annotated_int__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True___Ge_ge_0___Le_le_1200_____"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NarrativeValue_Literal__developer____lead____architect____analyst____designer____researcher____qa____devops____other___"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "production_support": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NarrativeValue_Annotated_bool__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True_____"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NarrativeFacts",
+        "description": "Optional structured facts; absence means unknown, never inferred from prose."
+      },
+      "NarrativeReference": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "title": "Key"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "status"
+        ],
+        "title": "NarrativeReference",
+        "description": "Explicit domain/stack reference, independently verified; provenance stays private."
+      },
+      "NarrativeValue_Annotated_bool__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True_____": {
+        "properties": {
+          "value": {
+            "type": "boolean",
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "status"
+        ],
+        "title": "NarrativeValue[Annotated[bool, FieldInfo(annotation=NoneType, required=True, metadata=[Strict(strict=True)])]]"
+      },
+      "NarrativeValue_Annotated_int__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True___Ge_ge_0___Le_le_1200_____": {
+        "properties": {
+          "value": {
+            "type": "integer",
+            "maximum": 1200.0,
+            "minimum": 0.0,
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "status"
+        ],
+        "title": "NarrativeValue[Annotated[int, FieldInfo(annotation=NoneType, required=True, metadata=[Strict(strict=True), Ge(ge=0), Le(le=1200)])]]"
+      },
+      "NarrativeValue_Literal__developer____lead____architect____analyst____designer____researcher____qa____devops____other___": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "enum": [
+              "developer",
+              "lead",
+              "architect",
+              "analyst",
+              "designer",
+              "researcher",
+              "qa",
+              "devops",
+              "other"
+            ],
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "provenance": {
+            "items": {
+              "type": "string",
+              "maxLength": 1000,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "status"
+        ],
+        "title": "NarrativeValue[Literal['developer', 'lead', 'architect', 'analyst', 'designer', 'researcher', 'qa', 'devops', 'other']]"
       },
       "PoolEntry": {
         "properties": {
@@ -2422,6 +2932,346 @@
         ],
         "title": "PoolPage",
         "description": "Bounded pool page; ranks are global within each direction."
+      },
+      "RerankCard": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          },
+          "filter_factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filter Factors"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/ScoreBreakdown"
+          },
+          "main_position": {
+            "type": "integer",
+            "title": "Main Position"
+          },
+          "rerank_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Position"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "learned",
+              "main_fallback"
+            ],
+            "title": "Mode"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "reserve"
+            ],
+            "title": "Kind"
+          },
+          "rerank_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Score"
+          },
+          "rerank_contributions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Rerank Contributions"
+          },
+          "artifact_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "position",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "resume_url",
+          "explanation",
+          "main_position",
+          "rerank_position",
+          "mode",
+          "kind",
+          "rerank_score",
+          "artifact_hash"
+        ],
+        "title": "RerankCard",
+        "description": "Original main factors remain visible alongside versioned R0 contributions."
+      },
+      "RerankPage": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/RerankStatus"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "reserve"
+            ],
+            "title": "Kind"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RerankCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run",
+          "kind",
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "RerankPage",
+        "description": "One separate recommended/reserve page; candidates outside main top-k are absent."
+      },
+      "RerankRequest": {
+        "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "RerankRequest",
+        "description": "Optional caller identity persists across retries without duplicating a run."
+      },
+      "RerankStatus": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "main_run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Main Run Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "artifact_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Hash"
+          },
+          "feature_schema_hash": {
+            "type": "string",
+            "title": "Feature Schema Hash"
+          },
+          "tail_policy_hash": {
+            "type": "string",
+            "title": "Tail Policy Hash"
+          },
+          "stage": {
+            "type": "string",
+            "const": "baseline_rerank",
+            "title": "Stage",
+            "default": "baseline_rerank"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "processing",
+              "retrying",
+              "failed",
+              "ready",
+              "obsolete"
+            ],
+            "title": "State"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "learned",
+                  "main_fallback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "selected_count": {
+            "type": "integer",
+            "title": "Selected Count"
+          },
+          "recommended_count": {
+            "type": "integer",
+            "title": "Recommended Count",
+            "default": 0
+          },
+          "reserve_count": {
+            "type": "integer",
+            "title": "Reserve Count",
+            "default": 0
+          },
+          "unranked_by_reranker_count": {
+            "type": "integer",
+            "title": "Unranked By Reranker Count"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "main_run_id",
+          "vacancy_id",
+          "artifact_hash",
+          "feature_schema_hash",
+          "tail_policy_hash",
+          "state",
+          "selected_count",
+          "unranked_by_reranker_count"
+        ],
+        "title": "RerankStatus",
+        "description": "Exact immutable main/model identities; obsolete results are never served."
       },
       "SalaryRange": {
         "properties": {

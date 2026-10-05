@@ -92,3 +92,44 @@ export interface SelectionState extends SelectionStateInput {
   vacancy_id: string;
   candidate_id: string;
 }
+
+/** Optional durable identity binds manual requests to the original immutable run. */
+export interface RerankRequest { idempotency_key?: string | null; }
+/** Versioned baseline top-k result; reserve never implies the full pool is exhausted. */
+export interface RerankStatus {
+  run_id: string;
+  main_run_id: string;
+  vacancy_id: string;
+  artifact_hash: string | null;
+  feature_schema_hash: string;
+  tail_policy_hash: string;
+  stage: "baseline_rerank";
+  state: CombineStatus["state"];
+  mode: "learned" | "main_fallback" | null;
+  fallback_reason: string | null;
+  attempt_count: number;
+  error_code: string | null;
+  selected_count: number;
+  recommended_count: number;
+  reserve_count: number;
+  unranked_by_reranker_count: number;
+  published_at: string | null;
+}
+/** Main factors are preserved with explicit scalar R0 score and feature contributions. */
+export interface RerankCard extends CandidateCard {
+  main_position: number;
+  rerank_position: number | null;
+  mode: "learned" | "main_fallback";
+  kind: "recommended" | "reserve";
+  rerank_score: number | null;
+  rerank_contributions: Record<string, number>;
+  artifact_hash: string | null;
+}
+/** Separate recommended/reserve page from a single current immutable run. */
+export interface RerankPage {
+  run: RerankStatus;
+  kind: "recommended" | "reserve";
+  items: RerankCard[];
+  limit: number;
+  offset: number;
+}

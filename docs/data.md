@@ -132,3 +132,18 @@ Run уникален по vacancy revision/schema/pool generation/policy hash/to
 ACK outbox, inbox и постановка задания атомарны; при storage failure событие
 остаётся недоставленным. При malformed snapshot savepoint изолирует одну запись,
 после ограниченных повторов она остаётся в quarantine до ручного retry.
+
+## Типизированные факты и миграция005
+
+`NarrativeClaim.facts` необязателен: domain/stack ссылки, `duration_months`,
+`role`, `production_support`. Каждое значение имеет собственный статус и приватный
+provenance. Отсутствие означает неизвестность; произвольные `details` не преобразуются
+автоматически. Ссылки проверяются по общему реестру, включая rejected.
+Новые поля не меняют текущий текст Harrier и fingerprint документа.
+
+Миграция005 добавляет `rerank_pipeline`: immutable artifacts/settings pointer,
+runs/controls/cards/manual_requests. Идентичность запуска — main ID, artifact,
+feature schema и tail policy hashes; nullable artifact участвует в uniqueness.
+Safe narrative projection входит в main snapshot без текста/provenance/контактов.
+Результаты одной транзакцией сохраняют candidate ID/revision и полный порядок.
+Миграции001–004 не изменяются. Экспериментальные datasets/cache не коммитятся.

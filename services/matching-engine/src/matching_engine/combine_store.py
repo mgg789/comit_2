@@ -18,11 +18,12 @@ from matching_engine.combine_models import (
     SelectionPage,
     SelectionState,
     SelectionStateInput,
+    project_narrative_facts,
 )
 from matching_engine.combine_scoring import policy_hash
 from matching_engine.database import PIPELINE_LOCK, connect
 from matching_engine.embeddings import EMBEDDING_SPACE_ID, MODEL_VERSION
-from matching_engine.models import Category
+from matching_engine.models import Category, NarrativeClaim
 from matching_engine.store import ConflictError, NotFoundError
 from matching_engine.vacancy_models import VacancyReady
 from matching_engine.vacancy_store import VacancyStore
@@ -85,6 +86,8 @@ class CombineStore:
         rows = connection.execute("""
             WITH ready AS (
                 SELECT p.*,c.profile->'work_types' AS work_types,
+                    jsonb_build_object('projects',c.profile->'projects',
+                        'experience',c.profile->'experience','achievements',c.profile->'achievements') AS narratives,
                     c.profile->'relocation_ready' AS relocation_ready,
                     c.profile->'relocation_cities' AS relocation_cities,
                     row_number() OVER (PARTITION BY p.specialization
@@ -117,6 +120,8 @@ class CombineStore:
             published_at=row["published_at"], resume_url=f"/internal/pool/{row['candidate_id']}/resume.pdf",
             work_types=row["work_types"], relocation_ready=row["relocation_ready"],
             relocation_cities=row["relocation_cities"] or [],
+            narrative_facts=project_narrative_facts({key: [NarrativeClaim.model_validate(claim)
+                for claim in (claims or [])] for key, claims in row["narratives"].items()}),
         ) for row in rows]
 
     @staticmethod
@@ -336,6 +341,9 @@ class CombineStore:
             connection.execute("""UPDATE matching_pipeline.runs SET state='ready',scanned_count=%s,passed_count=%s,
                 selected_count=%s,filter_counts=%s,published_at=now(),updated_at=now(),lease_token=NULL,lease_until=NULL,error_code=NULL
                 WHERE run_id=%s""", (result.scanned_count, result.passed_count, len(result.items), Jsonb(result.filter_counts), job.run_id))
+            from matching_engine.rerank_store import RerankStore
+            published = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (job.run_id,)).fetchone()
+            RerankStore.queue(connection, published)
             return True
 
     def fail(self, job: CombineJob, error_code: str, max_attempts: int, retry_base_seconds: int) -> None:

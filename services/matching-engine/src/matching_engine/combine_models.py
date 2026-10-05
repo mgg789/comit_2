@@ -10,10 +10,68 @@ from matching_engine.models import (
     Category,
     ClaimStatus,
     Contract,
+    DurationMonths,
+    NarrativeClaim,
+    NarrativeRole,
     PoolEntry,
     SalaryRange,
+    StrictBoolean,
     WorkType,
 )
+
+
+class SafeNarrativeReference(Contract):
+    """Registry reference and evidence only; no arbitrary private strings."""
+
+    key: str
+    status: ClaimStatus
+
+
+class SafeNarrativeValue[SafeFactValue](Contract):
+    """Bounded typed value and evidence suitable for immutable matching snapshots."""
+
+    value: SafeFactValue
+    status: ClaimStatus
+
+
+class PublicNarrativeFacts(Contract):
+    """Safe typed facts projection, excluding titles, text, details and provenance."""
+
+    domains: list[SafeNarrativeReference] = Field(default_factory=list)
+    stacks: list[SafeNarrativeReference] = Field(default_factory=list)
+    duration_months: SafeNarrativeValue[DurationMonths] | None = None
+    role: SafeNarrativeValue[NarrativeRole] | None = None
+    production_support: SafeNarrativeValue[StrictBoolean] | None = None
+
+
+class SafeNarrativeFacts(Contract):
+    """One typed narrative snapshot; rejected status is retained but earns no credit."""
+
+    kind: Literal["project", "experience", "achievement"]
+    status: ClaimStatus
+    facts: PublicNarrativeFacts
+
+
+def project_narrative_facts(claims: dict[str, list[NarrativeClaim]]) -> list[SafeNarrativeFacts]:
+    """Strip private strings from parsed narrative groups; never infer missing facts.
+
+    Keys are projects/experience/achievements. Rejected inputs remain auditable;
+    the feature builder excludes rejected parent claims and individual facts.
+    """
+    output: list[SafeNarrativeFacts] = []
+    for key, kind in (("projects", "project"), ("experience", "experience"), ("achievements", "achievement")):
+        for claim in claims.get(key, []):
+            if claim.facts is None:
+                continue
+            raw = claim.facts.model_dump()
+            for group in ("domains", "stacks"):
+                raw[group] = [{"key": ref["key"], "status": ref["status"]} for ref in raw[group]]
+            for name in ("duration_months", "role", "production_support"):
+                if raw[name] is not None:
+                    raw[name] = {"value": raw[name]["value"], "status": raw[name]["status"]}
+            output.append(SafeNarrativeFacts(kind=kind, status=claim.status,
+                                             facts=PublicNarrativeFacts.model_validate(raw)))
+    return output
 
 
 class ScoringPolicy(Contract):
@@ -50,6 +108,7 @@ class MatchCandidate(PoolEntry):
     work_types: list[WorkType] | None = None
     relocation_ready: bool | None = None
     relocation_cities: list[str] = Field(default_factory=list)
+    narrative_facts: list[SafeNarrativeFacts] = Field(default_factory=list)
 
 
 class FilterDecision(Contract):

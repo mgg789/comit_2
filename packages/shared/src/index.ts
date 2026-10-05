@@ -14,6 +14,7 @@ export type {
 export type {
   CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
   ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
+  RerankCard, RerankPage, RerankRequest, RerankStatus,
 } from "./matching.js";
 
 export type Role = "candidate" | "employer";
