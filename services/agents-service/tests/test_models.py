@@ -42,3 +42,12 @@ def test_schema_snapshot_rejects_duplicate_coordinates() -> None:
                 {"index": 0, "group": "domain", "key": "sql"},
             ],
         )
+
+
+def test_title_is_included_in_published_metadata_limits() -> None:
+    """Reject drafts whose added title would make matching intake reject metadata."""
+    with pytest.raises(ValidationError):
+        DraftFields(title="Backend", metadata={str(index): index for index in range(100)})
+    with pytest.raises(ValidationError):
+        DraftFields(title="Backend", metadata={"large": "я" * 32760})
+    assert DraftFields(title="Backend", metadata={"title": "old"}).title == "Backend"

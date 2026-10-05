@@ -50,6 +50,10 @@ check_status() {
 
 check "api"           "http://localhost:${API_PORT}/healthz"          '"service":"api-core"' || failures=$((failures + 1))
 check "matching"      "http://localhost:${MATCHING_PORT}/healthz"     '"service":"matching-engine"' || failures=$((failures + 1))
+if [[ -n "${AGENTS_PORT:-}" ]]; then
+  check "agents" "http://localhost:${AGENTS_PORT}/healthz" '"service":"agents-service"' || failures=$((failures + 1))
+  check "agents DB ready" "http://localhost:${AGENTS_PORT}/ready" '"status":"ready"' || failures=$((failures + 1))
+fi
 check "testing"       "http://localhost:${TESTING_PORT}/healthz"      '"service":"testing-engine"' || failures=$((failures + 1))
 check "integration"   "http://localhost:${INTEGRATION_PORT}/healthz"  '"service":"integration-engine"' || failures=$((failures + 1))
 check "web root"      "http://localhost:${WEB_PORT}/"                 "работа настигает сама" || failures=$((failures + 1))

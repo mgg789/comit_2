@@ -129,7 +129,12 @@ class DraftFields(Contract):
         """Reject reversed salary bounds before a revision can be persisted."""
         if self.zp_min is not None and self.zp_max is not None and self.zp_min > self.zp_max:
             raise ValueError("zp_max must be greater than or equal to zp_min")
-        if len(json.dumps(self.metadata, ensure_ascii=False, separators=(",", ":")).encode()) > 65536:
+        published_metadata = dict(self.metadata)
+        if self.title is not None:
+            published_metadata["title"] = self.title
+        if len(published_metadata) > 100:
+            raise ValueError("metadata must leave room for the vacancy title")
+        if len(json.dumps(published_metadata, ensure_ascii=False).encode()) > 65536:
             raise ValueError("metadata exceeds 64 KiB")
         return self
 
@@ -220,3 +225,17 @@ class JobView(Contract):
     lease_until: str | None = None
     result: dict[str, JsonValue] | None = None
     error: str | None = None
+
+
+class MatchingStatus(Contract):
+    """Checked matching intake/readiness projection; acceptance is separate from ready."""
+
+    vacancy_id: UUID
+    revision: int = Field(strict=True, ge=1, le=SAFE_JSON_INTEGER)
+    source_revision: int = Field(strict=True, ge=1, le=SAFE_JSON_INTEGER)
+    status: Literal["draft", "open", "pending", "closed", "done"]
+    state: Literal["draft", "queued", "processing", "retrying", "failed", "ready"]
+    missing_requirements: list[str]
+    strict_schema_version: int | None = None
+    attempt_count: int = 0
+    error_code: str | None = None

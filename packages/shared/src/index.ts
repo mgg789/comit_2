@@ -18,6 +18,7 @@ export type {
 } from "./matching.js";
 
 export type Role = "candidate" | "employer";
+export type * from "./agents.js";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;
 export type Grade = (typeof GRADES)[number];

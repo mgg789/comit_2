@@ -8,6 +8,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import { healthRoutes } from "./routes/health.js";
 import { candidatePipelineRoutes, candidateValidationOptions } from "./routes/candidate-pipeline.js";
+import { agentsRoutes } from "./routes/agents.js";
 
 const app = Fastify({
   logger: true,
@@ -31,6 +32,7 @@ await app.register(swagger, {
 await app.register(swaggerUi, { routePrefix: "/docs" });
 await app.register(healthRoutes);
 await app.register(candidatePipelineRoutes);
+await app.register(agentsRoutes);
 
 const port = Number(process.env.PORT ?? 8080);
 await app.listen({ port, host: "0.0.0.0" });

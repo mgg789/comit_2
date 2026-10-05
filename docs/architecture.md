@@ -32,6 +32,7 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `services/matching-engine` | FastAPI, pgvector | Комбайн: strict filter → hybrid scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек; объяснимость выдачи | ML-эксперименты на Python, независимые релизы |
 | `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
 | `services/integration-engine` | FastAPI | Верификация внешних данных; мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`) | Внешние источники меняются независимо от ядра |
+| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
 Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор (context/80, решение Q3).
@@ -69,6 +70,7 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 | matching-engine | 8101 | `MATCHING_PORT` |
 | testing-engine | 8102 | `TESTING_PORT` |
 | integration-engine | 8103 | `INTEGRATION_PORT` |
+| agents-service | 8104 внутри compose | `PORT`, opt-in overlay |
 | postgres | 5433→5432 | `POSTGRES_PORT` |
 
 В prod (`infra/docker-compose.prod.yml`) публикуется только web; engines и БД — внутренняя сеть.

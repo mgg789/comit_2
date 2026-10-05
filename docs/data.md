@@ -147,6 +147,7 @@ feature schema и tail policy hashes; nullable artifact участвует в un
 Safe narrative projection входит в main snapshot без текста/provenance/контактов.
 Результаты одной транзакцией сохраняют candidate ID/revision и полный порядок.
 Миграции001–004 не изменяются. Экспериментальные datasets/cache не коммитятся.
+
 ## Editorial-черновик вакансии
 
 Схема `agents_service`, миграция `001_vacancy_drafts.sql`: `drafts` хранит поля,
@@ -161,3 +162,11 @@ Approve не публикует данные: он сохраняет summary т
 Истечение последнего lease переводит и job, и связанную публикацию в failed,
 сбрасывает lease и оставляет безопасный код `max_attempts_exceeded`.
 Владелец неизменяем; `owner_id` здесь учётный UUID, а не система аккаунтов.
+
+`002_agent_sessions.sql`: сессии с pinned knowledge/definition hashes, turns с
+идемпотентностью и бюджетами, сообщения, typed interactions, tool journal и
+owner-scoped provider cache. `003_interaction_revision.sql` привязывает контрол
+к ревизии черновика. Инструмент, его journal и новая turn revision фиксируются
+одной транзакцией; provider checkpoint хранится до инструментов. Истечение lease
+запрещает старому worker любые записи. Несовпадение packaged knowledge hash
+останавливает старую сессию с явной ошибкой, не заменяя её инструкции.

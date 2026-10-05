@@ -410,10 +410,20 @@ class Store:
             INSERT INTO agents_service.jobs
                 (job_id, kind, owner_id, draft_id, session_id, idempotency_key, body_hash, payload, max_attempts)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (owner_id, kind, idempotency_key) DO NOTHING
             """,
             (job_id, kind, owner_id, draft_id, session_id, idempotency_key, digest, Jsonb(dict(payload)), max_attempts),
         )
-        return connection.execute("SELECT * FROM agents_service.jobs WHERE job_id=%s", (job_id,)).fetchone()
+        inserted = connection.execute("SELECT * FROM agents_service.jobs WHERE job_id=%s", (job_id,)).fetchone()
+        if inserted is not None:
+            return inserted
+        existing = connection.execute(
+            "SELECT * FROM agents_service.jobs WHERE owner_id=%s AND kind=%s AND idempotency_key=%s FOR UPDATE",
+            (owner_id, kind, idempotency_key),
+        ).fetchone()
+        if existing is None or existing["body_hash"] != digest:
+            raise ConflictError("idempotency key was reused with a different payload")
+        return existing
 
     def submit(self, owner_id: UUID | str, draft_id: UUID | str, request: CreateRequest | Mapping[str, Any], schema: SchemaSnapshot) -> DraftView:
         """Record the human publication confirmation and enqueue one frozen matching intake."""

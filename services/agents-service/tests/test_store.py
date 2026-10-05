@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import pytest
@@ -58,6 +59,20 @@ def complete_fields() -> dict[str, object]:
         "stacks": {"python": 4},
         "soft_skills": {"teamwork": 2},
     }
+
+
+def test_concurrent_enqueue_returns_one_idempotent_job(store: Store) -> None:
+    """Concurrent identical requests return one job instead of a uniqueness error."""
+    owner = uuid4()
+
+    def enqueue(_index: int):
+        return store.enqueue_job(owner, "enrichment", {"input": "synthetic"}, idempotency_key="concurrent")
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        jobs = list(executor.map(enqueue, range(8)))
+    assert len({job.job_id for job in jobs}) == 1
+    with pytest.raises(ConflictError):
+        store.enqueue_job(owner, "enrichment", {"input": "different"}, idempotency_key="concurrent")
 
 
 def test_owner_scope_and_stale_cas(store: Store, schema: SchemaSnapshot) -> None:

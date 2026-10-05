@@ -135,7 +135,31 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 | Dev-сервер одного аппа | `pnpm --filter @comit/web-candidate dev` |
 | OpenAPI api-core | http://localhost:8080/docs (или `/api/docs` через nginx) |
 
-## Сервер (mgg-server)
+## Создание вакансий: локальные проверки
+
+Сервис и opt-in контейнер описаны в [agents.md](agents.md). Перед запуском явно
+применить миграции `python -m agents_service migrate`; `/ready` проверяет таблицы.
+Для smoke дополнительного контура задать `AGENTS_PORT` — проверяются liveness и БД.
+При ошибке публикации повторять job через `/agents/jobs/{id}/retry`: снимок после
+Create заморожен. `created` означает ACK intake; вектора и готовность читать через
+`/vacancy-drafts/{id}/pipeline`.
+
+Реальная синтетическая приёмка запускается отдельно от unit-тестов:
+
+```sh
+PYTHONPATH=services/agents-service/src:services/matching-engine/src \
+  python tests/vacancy_creation_acceptance.py --provider-file /path/to/provider-config.txt
+```
+
+Требуются отдельная `AGENTS_ACCEPTANCE_DATABASE_URL`, работающие API/agents/matching,
+локальный Laya и Harrier; адреса и внутренние токены передаются через env.
+Файл провайдера читается только в память процесса. Скрипт пишет игнорируемый протокол
+`tests/artifacts/vacancy-creation-acceptance.json`, проверяет manual/Laya/DeepSeek,
+summary/edit/Create, ownership, вектора, события и карточки. Для продолжения
+проверки уже созданных вакансий использовать `--resume-report` с этим протоколом.
+Это проверка интеграции; качество выведенных моделью уровней требует калибровки.
+
+## Сервер (mgg-server): операции
 
 | Задача | Команда |
 |---|---|

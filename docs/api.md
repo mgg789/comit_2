@@ -199,3 +199,50 @@ Visited необратим; pending/attractive можно явно вернут�
 число рекомендованных, резерва и оставшихся вне top-k. При fallback нет обученного
 score, rerank_position=null, весь main top-k остаётся рекомендованным.
 Обучение и активация доступны только operator CLI, без HTTP endpoint.
+
+## Создание вакансии: форма и агент
+
+Контракт `agents-service` генерируется из FastAPI в
+`apps/api/src/contracts/agents.openapi.json` и `packages/shared/src/agents.ts`
+командой `PYTHONPATH=services/agents-service/src python tests/generate_agents_contract.py`.
+Fastify использует тот же OpenAPI для allowlist, body/response/UUID schemas.
+Все нижеперечисленные пути требуют `X-Internal-Token=AGENTS_SERVICE_TOKEN` и
+`X-Owner-ID=UUID`. Это доверенный транспорт и учёт владельца, не аккаунты/JWT.
+Реквизиты владельца не принимаются из поля JSON; чужая запись возвращает 404.
+
+| Метод и путь | Тело/результат |
+|---|---|
+| GET `/internal/agents/taxonomy` | Три группы действующего строгого реестра |
+| POST `/internal/vacancy-drafts` | `{fields?: DraftFields}` → DraftView |
+| GET `/internal/vacancy-drafts?limit=50&offset=0` | Owner-scoped DraftView[], limit 1–100 |
+| GET `/internal/vacancy-drafts/{id}` | Общий черновик, provenance, missing, summary, publication |
+| PATCH `/internal/vacancy-drafts/{id}` | `{expected_revision,fields}`: частичный патч, группы заменяются целиком |
+| POST `/internal/vacancy-drafts/{id}/enrich` | `{expected_revision}` → JobView; только форма/Laya |
+| POST `/internal/vacancy-drafts/{id}/approve` | `{expected_revision}` → DraftView в summary |
+| POST `/internal/vacancy-drafts/{id}/create` | `{expected_revision,summary_hash}` → создаваемая/созданная публикация |
+| GET `/internal/vacancy-drafts/{id}/pipeline` | MatchingStatus после принятия intake |
+| GET `/internal/agents/jobs/{id}` | Durable job, попытки/состояние/безопасная ошибка |
+| POST `/internal/agents/jobs/{id}/retry` | JobView; failed/retrying, сохранённые эффекты не повторяются |
+| POST `/internal/agents/sessions` | `{draft_id}` → AgentSession |
+| GET `/internal/agents/sessions/{id}` | Сессия, последний turn, актуальный черновик, сообщения и интеракции |
+| POST `/internal/agents/sessions/{id}/turns` | `{expected_revision,idempotency_key,message}` → JobView |
+| POST `/internal/agents/sessions/{id}/interactions/{interaction_id}` | `{expected_revision,value}` → continuation JobView |
+
+`approve` доступен форме и агенту без дополнительного подтверждения и не публикует
+вакансию. Create подтверждает точный summary. Любая правка до Create удаляет старый
+summary. Обязательны title, zp_min/zp_max, daily, city, type и class **или** domens/stacks;
+bio/soft skills необязательны. Уровни 0–7, неизвестный ключ → отказ. Class aliases
+`back/front/ML`, форматы `очно/дистант/гибрид` нормализуются в общие enum.
+После Create данные заморожены; повтор с тем же hash/revision идемпотентен.
+
+Agent interactions содержат `draft_revision`, typed option values, `field_target`:
+поле или `domens.key|stacks.key|soft_skills.key`. Slider меняет одну координату;
+multi-select группы объединяет выбранные непересекающиеся объекты `{key:level}`.
+Устаревший контрол не перезаписывает новую ручную правку. Опции валидируются сервером;
+повтор уже принятого ответа с тем же значением возвращает тот же continuation job.
+
+401 — нет доверенного токена; 400/422 — неверный контракт; 404 — нет записи данного
+владельца; 409 — CAS/state/hash/schema конфликт; 503 — недоступная зависимость.
+Технические ошибки inference передаются через job state и безопасный error code.
+UI, JWT/accounts и редактирование опубликованной вакансии не реализованы в этом проходе.
+Подробности: [agents.md](agents.md).
