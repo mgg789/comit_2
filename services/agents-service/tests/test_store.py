@@ -113,3 +113,29 @@ def test_job_lease_guard_retry_and_publication_transition(store: Store, schema: 
     done = store.succeed_job(claimed.job_id, claimed.lease_token, {"status": "accepted"})
     assert done.state == "succeeded"
     assert store.get(owner, draft.draft_id).state == "created"
+
+
+def test_last_expired_publication_lease_quarantines_draft_and_blocks_approval(store: Store, schema: SchemaSnapshot) -> None:
+    """An exhausted publication lease cannot remain pending or reopen a failed draft."""
+    owner = uuid4()
+    draft = store.create(owner, complete_fields(), schema)
+    approved = store.approve(owner, draft.draft_id, {"expected_revision": 1}, schema)
+    submitted = store.submit(owner, draft.draft_id, {"expected_revision": 1, "summary_hash": approved.summary.summary_hash}, schema)
+    assert submitted.publication is not None
+    with connect(store.database_url) as connection:
+        connection.execute(
+            "UPDATE agents_service.jobs SET max_attempts=1 WHERE job_id=%s",
+            (submitted.publication.job_id,),
+        )
+    claimed = store.claim_job("publication", lease_seconds=30)
+    assert claimed is not None
+    with connect(store.database_url) as connection:
+        connection.execute(
+            "UPDATE agents_service.jobs SET lease_until=now()-interval '1 second' WHERE job_id=%s",
+            (claimed.job_id,),
+        )
+    assert store.claim_job("publication") is None
+    failed = store.get(owner, draft.draft_id)
+    assert failed.state == "failed" and failed.publication and failed.publication.status == "failed"
+    with pytest.raises(ConflictError):
+        store.approve(owner, draft.draft_id, {"expected_revision": 1}, schema)

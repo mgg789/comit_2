@@ -322,7 +322,7 @@ class Store:
                     and current_summary.strict_schema_hash == schema.schema_hash):
                 return row
             # Registry rollover requires a fresh seal even when field revision is unchanged.
-        if row["state"] in {"creating", "created"}:
+        if row["state"] in {"creating", "created", "failed"}:
             raise ConflictError("published draft cannot be approved again")
         fields = self._canonical_fields(row["fields"])
         self._validate_coordinates(fields, schema)
@@ -631,15 +631,28 @@ class Store:
         if not 1 <= lease_seconds <= 3600:
             raise ValueError("lease_seconds must be 1..3600")
         with connect(self.database_url) as connection:
-            connection.execute(
+            quarantined = connection.execute(
                 """
                 UPDATE agents_service.jobs
                 SET state='failed', error='max_attempts_exceeded', lease_token=NULL, lease_until=NULL, updated_at=now()
                 WHERE attempts >= max_attempts
                   AND ((state IN ('queued','retrying') AND available_at <= now())
                     OR (state='processing' AND lease_until <= now()))
+                RETURNING draft_id, kind
                 """
-            )
+            ).fetchall()
+            for poisoned in quarantined:
+                if poisoned["kind"] == "publication" and poisoned["draft_id"] is not None:
+                    connection.execute(
+                        """
+                        UPDATE agents_service.drafts
+                        SET state='failed', publication=jsonb_set(
+                            jsonb_set(COALESCE(publication,'{}'::jsonb), '{status}', '"failed"'::jsonb),
+                            '{error}', to_jsonb('max_attempts_exceeded'::text)), updated_at=now()
+                        WHERE draft_id=%s AND state='creating'
+                        """,
+                        (poisoned["draft_id"],),
+                    )
             params: tuple[Any, ...] = (kind,) if kind else ()
             kind_clause = "AND kind=%s" if kind else ""
             row = connection.execute(

@@ -80,17 +80,27 @@ class DraftFields(Contract):
     class_key: Direction | None = Field(default=None, alias="class")
     metadata: dict[str, JsonValue] = Field(default_factory=dict, max_length=100)
 
-    @field_validator("type", mode="before")
+    @field_validator(
+        "type",
+        mode="before",
+        json_schema_input_type=WorkType | Literal["очно", "дистант", "гибрид"] | None,
+    )
     @classmethod
     def normalize_type(cls, value: object) -> object:
         """Accept legacy Russian work-format labels while storing canonical values."""
-        return {"очно": "onsite", "дистант": "remote", "гибрид": "hybrid"}.get(value, value)
+        return {"очно": "onsite", "дистант": "remote", "гибрид": "hybrid"}.get(value, value) \
+            if isinstance(value, str) else value
 
-    @field_validator("class_key", mode="before")
+    @field_validator(
+        "class_key",
+        mode="before",
+        json_schema_input_type=Direction | Literal["back", "front", "ML"] | None,
+    )
     @classmethod
     def normalize_class(cls, value: object) -> object:
         """Map the three established upstream aliases to the eight canonical directions."""
-        return {"back": "backend", "front": "frontend", "ML": "ml"}.get(value, value)
+        return {"back": "backend", "front": "frontend", "ML": "ml"}.get(value, value) \
+            if isinstance(value, str) else value
 
     @field_validator("daily", "city")
     @classmethod

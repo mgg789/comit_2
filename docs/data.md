@@ -147,3 +147,17 @@ feature schema и tail policy hashes; nullable artifact участвует в un
 Safe narrative projection входит в main snapshot без текста/provenance/контактов.
 Результаты одной транзакцией сохраняют candidate ID/revision и полный порядок.
 Миграции001–004 не изменяются. Экспериментальные datasets/cache не коммитятся.
+## Editorial-черновик вакансии
+
+Схема `agents_service`, миграция `001_vacancy_drafts.sql`: `drafts` хранит поля,
+владельца, CAS-ревизию, происхождение полей, недостающие требования, immutable
+summary и состояние публикации. `jobs` — очередь publication/enrichment/agent_turn
+с owner-scoped idempotency key, hash payload, lease/token, попытками и backoff.
+`migrations` проверяет checksum применённых SQL; `settings` хранит версию схемы.
+
+Approve не публикует данные: он сохраняет summary текущей ревизии. Только Create
+с совпадающими revision/hash ставит полный matching intake в очередь. После Create
+снимок заморожен, включая terminal failure; исправление доставки идёт через retry.
+Истечение последнего lease переводит и job, и связанную публикацию в failed,
+сбрасывает lease и оставляет безопасный код `max_attempts_exceeded`.
+Владелец неизменяем; `owner_id` здесь учётный UUID, а не система аккаунтов.

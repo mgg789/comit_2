@@ -16,6 +16,10 @@ def test_draft_fields_normalize_aliases_and_reject_reversed_salary() -> None:
         DraftFields(title=" ")
     with pytest.raises(ValidationError):
         DraftFields.model_validate({"unknown": 1})
+    with pytest.raises(ValidationError):
+        DraftFields.model_validate({"type": ["remote"]})
+    with pytest.raises(ValidationError):
+        DraftFields.model_validate({"class": {"value": "backend"}})
 
 
 def test_patch_preserves_unset_fields_and_create_hash_is_strict() -> None:
