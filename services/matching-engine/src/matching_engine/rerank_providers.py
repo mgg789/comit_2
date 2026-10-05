@@ -23,6 +23,12 @@ ENDPOINTS = {"generation": "/api/v1/chat/completions", "pair": "/v1/choice", "gr
 SYSTEMONE_URL = "https://ai.sverk.tech/v1/systemone"
 SYSTEMONE_MODEL = "kev-latest"
 SYSTEMONE_PROMPT_VERSION = "rerank-systemone-v1"
+SYSTEMONE_PAIR_PROMPT_VERSION = "rerank-systemone-pair-v2"
+SYSTEMONE_PAIR_ABSTENTION_POLICY = {
+    "minimum_confidence": .2,
+    "minimum_probability_gap": .05,
+    "calibrated": False,
+}
 GENERATION_URL = "https://ai.sverk.tech/v1/chat/completions"
 GENERATION_MODEL = "qwen3.8-27b"
 GENERATION_PROMPT_VERSION = "rerank-sverk-generation-v2"
@@ -57,10 +63,12 @@ def _atomic_write(path: Path, value: dict) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def teacher_identity() -> dict[str, str]:
-    """Bind pilot and dataset labels to the explicitly authorized teacher contract."""
+def teacher_identity(prompt_version: str = SYSTEMONE_PROMPT_VERSION) -> dict[str, str]:
+    """Identify one authorized teacher prompt; the default preserves existing v1 receipts."""
+    if prompt_version not in (SYSTEMONE_PROMPT_VERSION, SYSTEMONE_PAIR_PROMPT_VERSION):
+        raise ValueError("unknown SystemOne teacher prompt version")
     return {"endpoint": SYSTEMONE_URL, "model": SYSTEMONE_MODEL,
-            "prompt_version": SYSTEMONE_PROMPT_VERSION}
+            "prompt_version": prompt_version}
 
 
 class BudgetExceeded(RuntimeError):
@@ -249,11 +257,14 @@ class SystemOneProviders(LocalProviders):
     """
 
     def __init__(self, directory: Path, base_url: str = "http://127.0.0.1:12444",
-                 *, key_file: Path | None = None, generator_model: str = GENERATION_MODEL) -> None:
-        """Select an authorized generator; all models share the experiment ledger and slots."""
+                 *, key_file: Path | None = None, generator_model: str = GENERATION_MODEL,
+                 pair_prompt_version: str = SYSTEMONE_PROMPT_VERSION) -> None:
+        """Select authorized generator/pair prompts while preserving the shared ledger and slots."""
         generation_identity(generator_model)
+        teacher_identity(pair_prompt_version)
         super().__init__(directory, base_url)
         self.generator_model = generator_model
+        self.pair_prompt_version = pair_prompt_version
         self.key_file = key_file or Path(os.environ.get(
             "RERANK_SYSTEMONE_KEY_FILE", str(Path.home() / "Desktop/qwen_token.txt"))).expanduser()
 
@@ -263,7 +274,8 @@ class SystemOneProviders(LocalProviders):
     def _identity(self, path: str, payload: dict, kind: str) -> dict:
         if kind == "generation":
             return {"path": path, "payload": payload, "kind": kind, **generation_identity(self.generator_model)}
-        return {"path": path, "payload": payload, "kind": kind, **teacher_identity()}
+        prompt_version = self.pair_prompt_version if kind == "pair" else SYSTEMONE_PROMPT_VERSION
+        return {"path": path, "payload": payload, "kind": kind, **teacher_identity(prompt_version)}
 
     def _request(self, path: str, payload: dict, kind: str) -> Request:
         endpoint = GENERATION_URL if kind == "generation" else SYSTEMONE_URL
@@ -369,9 +381,9 @@ class SystemOneProviders(LocalProviders):
             raise ValueError("teacher returned invalid confidence")
         return answer
 
-    def pair(self, vacancy: dict, a: dict, b: dict, preferences: str) -> str:
-        """Compare synthetic raw facts; computed matching scores must remain blind."""
-        response = self.request("/v1/systemone", {
+    def _pair_payload(self, vacancy: dict, a: dict, b: dict, preferences: str) -> dict:
+        """Build versioned teacher input without HTTP, credentials, cache access, or budget use."""
+        payload = {
             "state": json.dumps({"vacancy": vacancy, "A": a, "B": b, "preferences": preferences},
                                 ensure_ascii=False, sort_keys=True),
             "model": SYSTEMONE_MODEL,
@@ -380,12 +392,52 @@ class SystemOneProviders(LocalProviders):
                 "criteria": {"A": "A preferable to B", "B": "B preferable to A",
                              "tie": "Comparable overall suitability",
                              "insufficient": "Insufficient facts to compare"}}},
-        }, "pair")
+        }
+        if self.pair_prompt_version == SYSTEMONE_PAIR_PROMPT_VERSION:
+            payload["state"] = json.dumps({"vacancy": vacancy, "preferences": preferences, "A": a, "B": b},
+                                          ensure_ascii=False)
+            payload["questions"]["preference"] = {"type": "choice", "instructions": (
+                "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. "
+                "Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; "
+                "compare skill levels separately from evidence reliability. Grade is the formal test result; "
+                "a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending "
+                "are different evidence states: uncertainty reduces certainty without erasing declared skills. "
+                "Null duration_months and production_support are unknown, never zero months or false. "
+                "Use only explicit technical requirements; do not invent technical minima. A class-only vacancy "
+                "has no unstated technical requirements, and missing facts are not a negative qualification. "
+                "Use salary overlap as an eligibility constraint only when the declared vacancy requires it. "
+                "Salary affects preference only when the employer explicitly mentions it. Do not invent salary "
+                "thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed "
+                "against known technical fit; cheaper does not automatically defeat stronger fit. "
+                "When unknown tradeoffs prevent a justified preference, use tie "
+                "for a supported comparable fit or insufficient for uncertainty that prevents comparison. "
+                "Tie means genuine comparable suitability supported by available facts; insufficient means the facts "
+                "do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. "
+                "Candidate position must never be a preference factor."
+            ), "criteria": {
+                "A": "Candidate A is materially preferable to candidate B for the stated vacancy and preferences based on known facts.",
+                "B": "Candidate B is materially preferable to candidate A for the stated vacancy and preferences based on known facts.",
+                "tie": "Available facts support genuinely comparable overall suitability under the stated preferences.",
+                "insufficient": "Missing or uncertain facts prevent a justified comparison under the stated preferences.",
+            }}
+        return payload
+
+    def pair(self, vacancy: dict, a: dict, b: dict, preferences: str) -> str:
+        """Compare raw facts; optional v2 abstains on uncalibrated low confidence or a small gap."""
+        response = self.request("/v1/systemone", self._pair_payload(vacancy, a, b, preferences), "pair")
         answer = self._answer(response, "preference", ("A", "B", "tie", "insufficient"))
         label = answer.get("choice")
         probabilities = answer["probabilities"]
         if label not in probabilities or probabilities[label] != max(probabilities.values()):
             raise ValueError("teacher choice contradicts its distribution")
+        if self.pair_prompt_version == SYSTEMONE_PAIR_PROMPT_VERSION:
+            ordered = sorted(probabilities.values(), reverse=True)
+            gap = ordered[0] - ordered[1]
+            minimum_gap = SYSTEMONE_PAIR_ABSTENTION_POLICY["minimum_probability_gap"]
+            # Decimal JSON probabilities can subtract to just below an exact threshold.
+            small_gap = gap < minimum_gap and not math.isclose(gap, minimum_gap, rel_tol=0, abs_tol=1e-12)
+            if answer["confidence"] < SYSTEMONE_PAIR_ABSTENTION_POLICY["minimum_confidence"] or small_gap:
+                return "insufficient"
         if list(probabilities.values()).count(max(probabilities.values())) != 1:
             return "tie"
         return label

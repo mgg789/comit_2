@@ -12,10 +12,14 @@ import pytest
 from matching_engine.rerank_providers import (
     QWEN,
     SYSTEMONE_MODEL,
+    SYSTEMONE_PAIR_ABSTENTION_POLICY,
+    SYSTEMONE_PAIR_PROMPT_VERSION,
+    SYSTEMONE_PROMPT_VERSION,
     SYSTEMONE_URL,
     BudgetExceeded,
     LocalProviders,
     SystemOneProviders,
+    digest,
     teacher_identity,
 )
 
@@ -349,3 +353,165 @@ def test_grade_requires_finite_bounded_numeric_score(provider, monkeypatch, scor
     monkeypatch.setattr(provider, "request", lambda *_args: response)
     with pytest.raises(ValueError):
         provider.grade({}, {}, "synthetic")
+
+
+def _pair_v2(provider):
+    return SystemOneProviders(provider.directory, key_file=provider.key_file,
+                              pair_prompt_version=SYSTEMONE_PAIR_PROMPT_VERSION)
+
+
+def _pair_response(label="A", confidence=.7, probabilities=None):
+    if probabilities is None:
+        probabilities = dict.fromkeys(("A", "B", "tie", "insufficient"), .1)
+        probabilities[label] = .7
+    return {"model": SYSTEMONE_MODEL, "answers": {"preference": {
+        "choice": label, "confidence": confidence, "probabilities": probabilities}}}
+
+
+def test_v1_pair_payload_and_cache_hash_remain_exactly_compatible(provider):
+    vacancy, a, b = {"class": "backend"}, {"levels": {"python": 2}}, {"levels": {"python": 4}}
+    payload = provider._pair_payload(vacancy, a, b, "Prefer Python")
+    assert provider.pair_prompt_version == SYSTEMONE_PROMPT_VERSION
+    assert payload == {"state": (
+        '{"A": {"levels": {"python": 2}}, "B": {"levels": {"python": 4}}, '
+        '"preferences": "Prefer Python", "vacancy": {"class": "backend"}}'),
+        "model": "kev-latest", "questions": {"preference": {"type": "choice",
+            "instructions": "Which candidate better fits these employer preferences? Consider stated facts and uncertainty.",
+            "criteria": {"A": "A preferable to B", "B": "B preferable to A",
+                         "tie": "Comparable overall suitability", "insufficient": "Insufficient facts to compare"}}}}
+    assert digest(provider._identity("/v1/systemone", payload, "pair")) == (
+        "d66f8aaaed0981208acb1f3fb44e415bd0543841ba445d73ec4b2d172869db67")
+    assert teacher_identity() == {"endpoint": SYSTEMONE_URL, "model": SYSTEMONE_MODEL,
+                                  "prompt_version": "rerank-systemone-v1"}
+    assert set(teacher_identity(SYSTEMONE_PAIR_PROMPT_VERSION)) == {"endpoint", "model", "prompt_version"}
+
+
+def test_opt_in_pair_v2_does_not_change_grade_payload_identity_or_cache(provider, monkeypatch):
+    corrected = _pair_v2(provider)
+    captured = []
+    response = {"model": SYSTEMONE_MODEL, "answers": {"suitability": {
+        "score": 2, "confidence": .7, "probabilities": {"0": .1, "1": .1, "2": .7, "3": .1}}}}
+
+    def respond(request):
+        captured.append(json.loads(request.data))
+        return io.BytesIO(json.dumps(response).encode())
+
+    monkeypatch.setattr(provider, "_open", respond)
+    assert provider.grade({"class": "backend"}, {"grade": "junior"}, "Prefer exact fit") == 2
+    payload = captured[0]
+    expected = provider._identity("/v1/systemone", payload, "grade")
+    assert expected["prompt_version"] == SYSTEMONE_PROMPT_VERSION
+    assert corrected._identity("/v1/systemone", payload, "grade") == expected
+    monkeypatch.setattr(corrected, "_open", lambda _request: pytest.fail("v2 repeated cached grade HTTP"))
+    monkeypatch.setattr(corrected, "_api_key", lambda: pytest.fail("v2 read a key for cached grade"))
+    assert corrected.grade({"class": "backend"}, {"grade": "junior"}, "Prefer exact fit") == 2
+    assert json.loads((provider.directory / "usage.json").read_text()) == {"grade": 1}
+
+
+def test_pair_v2_orders_context_first_and_preserves_unverified_unknown_facts(provider, monkeypatch):
+    corrected = _pair_v2(provider)
+    a = {"grade": "junior", "description": "Senior role in a personal project", "levels": {"react": 5},
+         "status": "self_reported", "duration_months": None, "production_support": None}
+    b = {"grade": "middle", "levels": {"react": 4}, "status": "confirmed",
+         "duration_months": 12, "production_support": False}
+    original_a, original_b = deepcopy(a), deepcopy(b)
+    monkeypatch.setattr(corrected, "_open", lambda _request: pytest.fail("pure payload helper performed HTTP"))
+    monkeypatch.setattr(corrected, "_api_key", lambda: pytest.fail("pure payload helper read credentials"))
+    payload = corrected._pair_payload({"class": "frontend"}, a, b, "Prefer economical known fit")
+    state = json.loads(payload["state"])
+    assert list(state) == ["vacancy", "preferences", "A", "B"]
+    assert state["A"] == original_a and state["B"] == original_b
+    assert a == original_a and b == original_b
+    question = payload["questions"]["preference"]
+    instructions = question["instructions"]
+    for rule in ("0..7", "separately from evidence", "formal test result", "does not reassign grade",
+                 "confirmed".capitalize(), "partial", "self_reported", "pending", "unknown, never zero",
+                 "do not invent technical minima", "class-only", "missing facts are not a negative qualification",
+                 "Salary economy", "known technical fit", "employer explicitly mentions it", "salary overlap",
+                 "minimum technical fit", "genuine", "Swapping A and B"):
+        assert rule in instructions
+    criteria = question["criteria"]
+    assert criteria["A"].translate(str.maketrans("AB", "BA")) == criteria["B"]
+    assert "comparable" in criteria["tie"] and "uncertain" in criteria["insufficient"]
+    assert not (provider.directory / "usage.json").exists()
+
+
+@pytest.mark.parametrize("label,confidence,probabilities,expected", [
+    ("A", .199, {"A": .7, "B": .1, "tie": .1, "insufficient": .1}, "insufficient"),
+    ("A", .2, {"A": .7, "B": .1, "tie": .1, "insufficient": .1}, "A"),
+    ("A", .7, {"A": .4245, "B": .3755, "tie": .1, "insufficient": .1}, "insufficient"),
+    ("A", .7, {"A": .45, "B": .4, "tie": .1, "insufficient": .05}, "A"),
+    ("A", .7, {"A": .251, "B": .25, "tie": .25, "insufficient": .249}, "insufficient"),
+    ("A", .7, {"A": .5, "B": .5, "tie": 0., "insufficient": 0.}, "insufficient"),
+    ("tie", .7, {"A": .1, "B": .1, "tie": .7, "insufficient": .1}, "tie"),
+    ("tie", .199, {"A": .1, "B": .1, "tie": .7, "insufficient": .1}, "insufficient"),
+    ("insufficient", .7, {"A": .1, "B": .1, "tie": .1, "insufficient": .7}, "insufficient"),
+])
+def test_pair_v2_abstains_without_changing_raw_response(provider, monkeypatch, label, confidence, probabilities, expected):
+    corrected = _pair_v2(provider)
+    response = _pair_response(label, confidence, probabilities)
+    original = deepcopy(response)
+    monkeypatch.setattr(corrected, "request", lambda *_args: response)
+    assert corrected.pair({}, {}, {}, "synthetic") == expected
+    assert response == original
+    assert SYSTEMONE_PAIR_ABSTENTION_POLICY == {
+        "minimum_confidence": .2, "minimum_probability_gap": .05, "calibrated": False}
+
+
+def test_pair_prompt_versions_cache_raw_probabilities_separately_with_one_shared_ledger(provider, monkeypatch):
+    corrected = _pair_v2(provider)
+    response = _pair_response(confidence=.1284)
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return io.BytesIO(json.dumps(response).encode())
+
+    monkeypatch.setattr(provider, "_open", respond)
+    monkeypatch.setattr(corrected, "_open", respond)
+    assert provider.pair({}, {"status": "self_reported"}, {}, "synthetic") == "A"
+    assert corrected.pair({}, {"status": "self_reported"}, {}, "synthetic") == "insufficient"
+    assert len(calls) == 2
+    records = [json.loads(path.read_text()) for path in provider.directory.glob("*.json") if path.name != "usage.json"]
+    assert {record["request"]["prompt_version"] for record in records} == {
+        SYSTEMONE_PROMPT_VERSION, SYSTEMONE_PAIR_PROMPT_VERSION}
+    assert len({record["request_hash"] for record in records}) == 2
+    assert all(record["response"] == response for record in records)
+    assert all(record["response"]["answers"]["preference"]["choice"] == "A" for record in records)
+    assert json.loads((provider.directory / "usage.json").read_text()) == {"pair": 2}
+    provider.key_file.unlink()
+    for teacher, expected in ((provider, "A"), (corrected, "insufficient")):
+        monkeypatch.setattr(teacher, "_open", lambda _request: pytest.fail("cached pair repeated HTTP"))
+        monkeypatch.setattr(teacher, "_api_key", lambda: pytest.fail("cached pair read a key"))
+        assert teacher.pair({}, {"status": "self_reported"}, {}, "synthetic") == expected
+    assert json.loads((provider.directory / "usage.json").read_text()) == {"pair": 2}
+
+
+def test_new_pair_prompt_does_not_reset_an_exhausted_shared_pair_budget(provider, monkeypatch):
+    corrected = _pair_v2(provider)
+    (provider.directory / "usage.json").write_text(json.dumps({"pair": 3000, "grade": 9, "generation": 4}))
+    monkeypatch.setattr(corrected, "_open", lambda _request: pytest.fail("new prompt bypassed exhausted pair budget"))
+    monkeypatch.setattr(corrected, "_api_key", lambda: pytest.fail("exhausted pair budget read a key"))
+    with pytest.raises(BudgetExceeded):
+        corrected.pair({}, {}, {}, "synthetic")
+    assert json.loads((provider.directory / "usage.json").read_text()) == {"pair": 3000, "grade": 9, "generation": 4}
+
+
+def test_v2_low_confidence_never_masks_a_malformed_teacher_choice(provider, monkeypatch):
+    corrected = _pair_v2(provider)
+    response = _pair_response("B", confidence=.1, probabilities={"A": .7, "B": .1, "tie": .1, "insufficient": .1})
+    monkeypatch.setattr(corrected, "request", lambda *_args: response)
+    with pytest.raises(ValueError, match="contradicts its distribution"):
+        corrected.pair({}, {}, {}, "synthetic")
+
+
+@pytest.mark.parametrize("version", ["", "rerank-systemone-v2", "rerank-systemone-pair-v3", "rerank-sverk-generation-v2"])
+def test_unrecognized_pair_prompt_is_rejected_before_cache_creation_or_http(tmp_path, monkeypatch, version):
+    monkeypatch.setattr(SystemOneProviders, "_open", lambda *_args: pytest.fail("invalid prompt performed HTTP"))
+    monkeypatch.setattr(SystemOneProviders, "_api_key", lambda *_args: pytest.fail("invalid prompt read a key"))
+    with pytest.raises(ValueError, match="unknown SystemOne teacher prompt version"):
+        teacher_identity(version)
+    directory = tmp_path / "invalid-prompt-cache"
+    with pytest.raises(ValueError, match="unknown SystemOne teacher prompt version"):
+        SystemOneProviders(directory, pair_prompt_version=version)
+    assert not directory.exists()

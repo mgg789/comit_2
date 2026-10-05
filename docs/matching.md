@@ -307,6 +307,11 @@ tests/test_rerank_generation.py tests/test_rerank_resume.py tests/test_rerank_sy
 ошибки в четырёх нетронутых test-файлах; они не исправлялись в этом проходе.
 Production, удалённый CI, image build и обучение R₀ на полной разметке не проверялись.
 
+Диагностика трёх frontend-05 пар и отдельный opt-in pair-промпт v2:
+[разбор фактов, blind audit и bounded pilot](rerank-frontend05-diagnosis.md).
+В новом pilot исходные3пары симметричны, но общий raw7/10 и decisive5/10 ниже
+гейтов. Учебный cohort/default teacher не изменён; training/activation остановлены.
+
 Границы активации: golden12/min6 decisive pairs на семью, macro NDCG Δ≥0.02,
 macro accuracy≥0.65/Δ≥0.03 и нижняя95% family-bootstrap граница обоих Δ>0.
 Поддержанные срезы (≥3 семьи) не должны просесть больше0.03.

@@ -403,3 +403,15 @@ SystemOne успешно выполнил 164 pair и 30 grade запросов,
 frontend-06 без разметки; Gemma5профилей за13.87с. Общие счётчики теперь
 generation28/pair656/grade119, raw140/valid139; остановка teacher сохраняется.
 Отчёт — [mixed generator pilot](../data/validation/rerank-mixed-generation-pilot.json).
+
+Последующая диагностика frontend-05: exact swaps подтверждены, два v1 прямых
+решения имели confidence0.1284/0.1940 и принимались без abstention. Blind fact
+review ассистентом предпочёл более сильные профили, но не устанавливает эталон
+работодательских tradeoffs. Опциональный pair-промпт v2 уточняет grade/role,
+evidence/missing facts/зарплату; старыеv1receipts/defaultteacher не изменены.
+Новый frozen20callpilot исправил3исходныхпары, однако raw7/10<8/10 и
+decisive5<6: stopped. Ledger28/676/119, новоеusage13824input/1515outputtokens,
+старыйcache сохранёнпобайтно. Обучение/расширение/активация не возобновляются.
+Подробности и пределы причинных выводов —
+[diagnosis](../docs/rerank-frontend05-diagnosis.md),
+[hashed report](../data/validation/rerank-frontend05-diagnosis.json).

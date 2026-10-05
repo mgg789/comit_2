@@ -284,6 +284,15 @@ pilot Qwen/Gemma дал10валидных профилей для frontend-06; G
 прежние отчёты сохраняются; обучение на неполном dataset и активация запрещены.
 Не изменять диапазоны, метки, receipts или бюджет вручную для обхода проверок.
 
+Для cache-only расследования frontend-05 и отдельного двадцатизапросного pilot
+использовать `python -m matching_engine.rerank_diagnostics audit|pilot` с тем же
+PYTHONPATH. Opt-in pair v2 исправил3исходныхswaps, но весь pilot остановлен:
+raw7/10, derived8/10, decisive5/10; ledger28/676/119. Повтор сохранённого отчёта
+не отправляет HTTP; interrupted started receipt блокирует automatic retry.
+Условия, source hashes, blind assistant receipt и commands —
+[diagnosis](rerank-frontend05-diagnosis.md). Passed robustness pilot сам по себе
+также не разрешает обучение, смешивание teacher versions или активацию R₀.
+
 ### Повтор backend приёмки
 
 При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings
