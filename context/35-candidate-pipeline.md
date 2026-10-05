@@ -1,130 +1,158 @@
-# Конвейер соискателя: данные и путь до пула комбайна (цикл 1 / спринт S2)
+# Конвейер соискателя: данные и путь до пула комбайна (цикл 1 / спринт S2, v2)
 
-> Скоуп: от момента, когда данные зафиксированы, до попадания в пул комбайна с категорией, грейдом и данными. Распределение: **алгоритмы — Codex** (CRUD, стейт-машина, очки, оркестрация), **ML — Mike** (IRT-скоринг сессий, вектора, комбайн). Канон: ТЗ п. 2.1 (кабинет кандидата), решения Q5/Q8/Q12 ([[80-open-questions]]), хранение — одна Postgres + JSONB ([[30-domain-model]]).
+> v2 — модель данных от Mike (05.10, вечер): домены/стеки/софтскиллы на единой шкале 0–7, «образ» кандидата вместо грубых специализаций. Распределение: **алгоритмы — Codex**, **ML — Mike** (IRT-скоринг, вектора, комбайн). Канон: ТЗ п. 2.1, решения [[80-open-questions]], хранение — одна Postgres + JSONB ([[30-domain-model]]).
 >
-> ⚠️ Два решения проведены как **дефолты Mike-агента, ожидают подтверждения** (05.10, вопросы заданы, ответа нет): (1) зарплатные ожидания кандидата обязательны для пула и видимы работодателю в анонимной карточке; (2) пересдача — тест уровнем ниже сразу, повтор заявленного грейда через cooldown 3 месяца. Если Mike решит иначе — меняются пункт B (salary_expectations), §2 (гейт) и пункт E (cooldown-логика).
+> ⚠️ Дефолты агента, ожидают подтверждения Mike: (1) софтскиллы — self-declared, показываются, 0 очков; (2) пересдача: уровень ниже — сразу, повтор заявленного грейда — cooldown 3 месяца; (3) якорная рубрикация шкалы 0–7 (§3).
 
-## 0. Границы: Codex / Mike
+## 0. Ключевое решение v2: «образ» вместо специализации
 
-| Часть | Кто | Состав |
-|---|---|---|
-| Пайплайн-алгоритмы | **Codex** | миграции+модели, auth+consent, профиль/приватность, PDF-загрузка+эвристический парсер, опрос, оркестрация грейд-теста (вызовы testing-engine), cooldown, claims+ledger+очки, триггеры вектора, автогенерация PDF-профиля, юнит-тесты |
-| ML-компоненты | **Mike** | IRT-скоринг и решение по грейду в testing-engine; построитель вектора (фичи + Harrier 640D) и pool-upsert в matching-engine; генератор синтетики |
-| Готово | — | integration-engine: мок ФСП (404-семантика отсутствия истории), health-контракты, compose |
+Кандидат не размечается меткой «бэкенд/ML». **Образ** = совокупность подтверждённых уровней по 15 доменам + 16 стекам (+6 софтскиллов для показа), каждый на шкале 0–7. Грейд и категория — **производные** от образа (§4), а не самоописание.
 
-## 1. Инвентарь данных соискателя
+Стыковка с ТЗ (обязательно для жюри): ТЗ требует «опрос → самостоятельный выбор предполагаемого грейда → тестирование на заявленный грейд» и категории «специализация × грейд». Читаем так:
+- **Направление** (пресет доменов, например «Backend»: алгоритмы, SQL, RestAPI, архитектура + postgres/python) выбирается при регистрации как primary — это и есть «опрос по отрасли и специализации».
+- **Заявленный грейд** выбирается кандидатом; **грейд-тест** проверяет домены направления на заявленном уровне → подтверждает/понижает/повышает (правила ТЗ без изменений).
+- **Категория работодателя** = {direction, grade}, где grade — функция от подтверждённых уровней образа (§4). Категория выводится системой из тестов, а не из резюме — требование ТЗ «выдача по категориям из опроса и тестирования, а не самоописанных данных» выполняется.
+
+## 1. Инвентарь данных соискателя (модель Mike)
 
 ### A. Идентичность и согласия (`users`, `consents`) — Codex
-| Поле | Тип | Примечание |
-|---|---|---|
-| email | string, уникальный | подтверждение кодом (dev: код в лог — явное решение, не заглушка) |
-| password_hash | string | argon2/bcrypt |
-| role | enum | candidate \| employer |
-| consent_processing | {granted, version, ts} | 152-ФЗ, обязателен для всего |
-| consent_publication | {granted, version, ts} | согласие на показ в базе работодателям; **без него нет входа в пул** |
+| Поле | Примечание |
+|---|---|
+| name | display-имя, приватность: полное/имя/ник |
+| email | уникальный, подтверждение кодом (dev: код в лог) |
+| phone | контакт, видимость — только после принятия приглашения (ТЗ 2.2.2) |
+| password_hash | argon2/bcrypt |
+| согласие на обработку (152-ФЗ) | version + ts |
+| **согласие на попадание в пул** | version + ts; без него нет входа в пул |
 
 ### B. Профиль (`candidate_profiles`) — Codex
-| Поле | Тип | Источник | Примечание |
-|---|---|---|---|
-| display_name | string | ручной/PDF | приватность: полное имя / имя / ник |
-| contacts | JSONB {email, phone?, telegram?, preferred} | ручной/PDF | видимость контактов — только после принятия приглашения (ТЗ 2.2.2), не настраивается |
-| city, ready_to_relocate | string, bool | ручной/PDF | участвует в strict-фильтре |
-| work_format | enum | ручной | remote/office/hybrid |
-| employment | enum | ручной | full/part/internship |
-| about | text | ручной/PDF | **сырьё для плотного эмбеддинга** |
-| salary_expectations | {from, to} RUB | ручной | предлагаю **обязательным для пула** и видимым работодателю — иначе матчинг по ЗП фиктивен (вопрос к Mike ниже) |
-| privacy_settings | JSONB | ручной | show_name_mode, show_salary, search_visible (pause пула) |
-
-### C. Резюме-документ (`resume_documents`) — Codex
-- file (хранение: volume/локальный диск в MVP), uploaded_at.
-- `parsed_json` — результат extraction: {full_name, contacts[], stack[], roles[], years_total, positions[], soft_skills[]} (ТЗ 2.1).
-- status: `parsed → confirmed | discarded`; человек **подтверждает/правит** поля — только после подтверждения создаются claims (`source=pdf_confirmed`). Extraction никогда не пишет в верифицированные данные напрямую.
-- Реализация extraction: `LlmClient` интерфейс; MVP-реализация — эвристики (pdf-parse + словари стека), облачная (Sverk/РФ-облако) подключается в S4 по env.
-
-### D. Верифицируемые заявления (`verified_claims`) — Codex (реестр), очки — общая формула
-| type | payload JSONB | source | верификация | очки |
-|---|---|---|---|---|
-| work_experience | {company, title, from, to, stack[], summary} | manual / pdf_confirmed | **mock-модератор** (демо-кнопка; в концепции — реальная проверка) | 10/место, кап 30 |
-| project | {title, role, link?, repo?, stack[], summary} | manual / pdf_confirmed | evidence-ссылка обязательна → auto-verified | 8, кап 24 |
-| skill | {name, level} | manual / test_result | **skill-квиз в testing-engine** либо привязка к evidence | 3/навык, кап 15 |
-| education | {institution, degree, year} | manual / pdf_confirmed | без верификации — **0 очков, только показ** | 0 |
-| fsp_event | {title, year, place} | **fsp_registry** (integration-engine) | auto по мок-реестру | 2/событие, кап 10 |
-| fsp_rank | {rank} | fsp_registry | auto | III=5, II=10, I=15, КМС=20, МС=30 |
-
-Правила: в рейтинг и вектор попадают только `verified`; `rejected` — с причиной; все начисления — записи в `rating_ledger` (claim_id, points, reason, ts) + денормализованный `rating_points` на профиле. Кандидат без истории ФСП — норма (блок просто отсутствует).
-
-### E. Тестирование (`surveys`, `grade_attempts`, `test_sessions`) — оркестрация Codex, скоринг Mike
-- `surveys`: industry, specialization (из справочника), answers JSONB — обязательный шаг до теста (ТЗ).
-- `grade_attempt`: claimed_grade, specialization, sessions[], decision `confirmed | offered_lower | offered_higher | failed`, assigned_grade, `cooldown_until`.
-- Логика: не прошёл на заявленный → предложение теста на уровень ниже (можно сразу или позже); прошёл уверенно → предложение повысить; **повторная попытка того же грейда — через cooldown 3 месяца** (антифарминг); смена грейда в любую сторону ограничена cooldown'ом (ТЗ).
-- Регулярные задачи (доп. функционал, S5): результат обновляет `freshness`.
-
-### F. ФСП-блок — integration-engine (готово), Codex — связка
-- `fsp_id` (nullable), `linked_at`, снапшот из `GET /fsp/participants/{id}`; ранг/рейтинг → очки + отдельная ось `fsp_boost` (нормализация 0..1) для скоринга.
-
-### G. Производные (только система, кандидату read-only)
-| Поле | Откуда |
+| Поле | Примечание |
 |---|---|
-| category = {specialization, grade} | **только тест** (не резюме, не очки) |
-| rating_points + ledger | формула выше |
-| vector: `features` JSONB (интерпретируемые, из verified) + `dense vector(640)` (Harrier по about/описаниям) + `model_version` | **matching-engine (Mike)** |
-| freshness_score | decay по времени, апдейт регулярными задачами |
-| pool_status | draft → in_pool ⇄ paused (кандидат может скрыть себя) |
-| profile_completion % | UI-подсказка «что докрутить» |
+| место жительства | strict-фильтр |
+| готовность к переезду | bool |
+| готовность к удалёнке | bool (вместе с форматом работодателя — strict-фильтр) |
+| ожидаемая зп min / max | RUB; дефолт: обязательны для пула, видимы работодателю в анонимной карточке (⚠️ дефолт) |
+| about | свободный текст — сырьё для плотного эмбеддинга |
+| privacy_settings | show_name_mode, search_visible (pause пула) |
 
-## 2. Условие входа в пул (гейт конвейера)
+### C. Профилизации (`proficiencies`) — центральная таблица v2
+Одна структура для трёх групп, справочники в `packages/shared` (заменяют старый SPECIALIZATIONS):
+| Группа | Субъекты (ключи) | n |
+|---|---|---|
+| **domens** | algorithms; sql; doc_databases; rest_api; cybersecurity; data_analytics_stats; classical_ml; neural_nets; nlp_and_arbitrary_data; ai_agents; math; ux_userflow; architecture_thinking; devops; lowlevel_optimization | 15 |
+| **stacks** | python; node; go; php; react; vue; angular; html_css_jquery; tailwind; electron; figma; postgres; mongo; sqlite; mysql; docker | 16 |
+| **softskills** | teamwork; representation; time_management; project_management; leadership; self_organization | 6 |
 
-`consent_publication ∧ categoryassigned ∧ salary_expectations заполнены ∧ vector built`
+Поля строки: `subject_type, subject_key, self_level 0–7, confirmed_level 0–7|null, source (manual|quiz|grade_test|project|experience|fsp), status (draft|pending|confirmed|rejected), points`.
 
-Невыполнение = кандидат остаётся в `draft` с явным чек-листом в UI («что сделать, чтобы попасть в базу»). Очки 0 — не препятствие (ТЗ: рейтинг начинается с 0).
+- `self_level` — кандидат заявляет при заполнении (стартовый сигнал для подбора заданий).
+- `confirmed_level` — **системно**: домены и стеки — из квизов/грейд-теста (ML, Mike), стеки также через evidence проектов/опыта; софтскиллы — **self-declared, confirmed_level = null, 0 очков** (⚠️ дефолт: объективной верификации нет — честно помечаем работодателю «самооценка»).
+- В образ и вектор попадают только confirmed уровни; self_level — только для калибровки сложности заданий.
 
-## 3. Стейт-машина конвейера
+### D. Достижения (`achievements`) — Codex
+`{title, type, level, evidence?, source}`. Типы (справочник, расширяется): olympiad, hackathon, certificate, fsp_rank, fsp_event, publication, other. Уровень → очки: 5 / 10 / 15 / 20 (таблица в конфиге). ФСП-типы наполняются из integration-engine (fsp_id — nullable; **отсутствие истории ФСП — норма**, обязательный кейс ТЗ).
+
+### E. Проекты (`projects`) — Codex
+`{title, description, link|file, stack[], my_role, participants}`. Evidence (ссылка/файл) обязательна → auto-verified, очки; стек проекта подтверждает соответствующие stack-профилизации (source=project).
+
+### F. Опыт (`work_experiences`) — Codex
+Минимум Mike: `место : должность : срок`. Рекомендую добавить `stack[]` и `summary` — иначе опыт нечего скармливать эмбеддингу и нечего подтверждать стекам. Верификация — mock-модератор в демо (решение Q8), очки 10/место, кап 30.
+
+### G. Системно-заполняемое (read-only для кандидата)
+| Артефакт | Кто/как |
+|---|---|
+| Типизированное резюме (PDF) | генерится из данных — автогенерация PDF-профиля (ТЗ 2.1), Codex |
+| **Образ** (confirmed-профилизаций) | система: тесты + evidence-подтверждения |
+| Вектор | matching-engine (Mike): интерпретируемая часть = нормализованный вектор 37 confirmed-уровней + флаги evidence; плотная часть = Harrier-640D по about+projects+experience; `vector(640)` |
+| Подтверждения (статусы) | система: quiz/grade_test/evidence/mock-moderator/fsp — поля status/confirmed_level/points |
+| rating_points + ledger | формула §5 |
+| freshness | decay + регулярные задачи (S5) |
+
+## 2. Условие входа в пул
+
+`согласие на пул ∧ primary-направление пройдено (грейд присвоен) ∧ зп min/max заполнены ∧ вектор построен`
+
+Не выполнено → `draft` с чек-листом «что докрутить». Очки 0 — не препятствие.
+
+## 3. Шкала 0–7: якорная рубрикация (⚠️ дефолт, общая для всех групп)
+
+| Уровень | Якорь |
+|---|---|
+| 0 | нет |
+| 1 | слышал, читал — практических задач не решал |
+| 2 | решал типовые задачи под присмотром |
+| 3 | решаю типовые задачи самостоятельно |
+| 4 | уверенно + краевые случаи, выбираю инструменты |
+| 5 | проектирую решения, обучаю других |
+| 6 | эксперт: нестандартные задачи, арбитраж |
+| 7 | создаю методы/инструменты, лидер мнения |
+
+Грейд-маппинг (производная): intern 1–2, junior 3, middle 4–5, senior 6–7 (junior+/middle+ — интерполяция для UI). Рубрика служит и форматом вопросов (квиз «укажи уровень» валидируется против теста).
+
+## 4. Грейд и категории как производные образа
+
+- При регистрации: выбор **primary-направления** (пресет доменов) + заявленный грейд → грейд-тест направления на заявленном уровне → confirmed_level доменов направления (IRT 2PL, Mike) → грейд.
+- Остальные домены/стеки добираются квизами (короткие, по 5–8 заданий на уровень) и evidence — неблокирующий фон, растит образ и очки.
+- Категория в БД: `candidate_categories {direction, grade, derived_from snapshot}` — пересчитывается системой; мульти-категорийность (несколько направлений) — за рамками MVP (идея №12, [[95-beyond-mvp]]).
+
+## 5. Формула очков (конфиг YAML, капы)
+
+| Источник | Очки | Кап |
+|---|---|---|
+| confirmed домен: level × 2 | до 14/домен | 40 |
+| confirmed стек: level × 2 | до 14/стек | 25 |
+| достижение: по уровню | 5–20 | 30 |
+| проект (с evidence) | 8 | 24 |
+| место опыта (mock-verified) | 10 | 30 |
+| достижение ФСП | см. D (ранг 5–30) | — |
+| софтскиллы | **0** (самооценка) | — |
+| регулярные задачи | +1, refresh freshness | — |
+
+Правила: только confirmed/evidence-статусы дают очки; каждое начисление — запись в `rating_ledger`; пересчёт вектора — событие.
+
+## 6. Стейт-машина
 
 ```
-registered → profile_draft → survey_done → grade_claimed → testing
-testing → categorized (confirmed | принял offered_lower/higher)
-categorized → vector_building (auto) → in_pool ⇄ paused
-параллельно всегда: claims draft → pending → verified/rejected
-  verified → +очки (ledger) → событие recompute_vector → порог изменчивости добора (S3)
-grade_attempt failed → (a) тест на уровень ниже когда угодно, (b) повтор заявленного — через 3 мес
+registered → profile_draft → direction_chosen(primary + заявленный грейд) → testing
+testing → graded (confirmed | принял ниже | принял выше) → vector_building → in_pool ⇄ paused
+параллельно: proficiencies/achievements/projects/experience → pending → confirmed/rejected → recompute
+грейд-тест: не прошёл → уровень ниже сразу; повтор заявленного — cooldown 3 мес (⚠️ дефолт)
 ```
 
-## 4. Контракты ML-сервисов (граница Codex ↔ Mike)
+## 7. Контракты ML-сервисов (граница Codex ↔ Mike) — обновление v2
 
 ### testing-engine (Mike)
 ```
-POST /sessions          {candidate_id, kind:"grade", specialization, claimed_grade}
-                        → {session_id, seed, items[]}
-POST /sessions/{id}/answers {answers[]} → {…}
-GET  /sessions/{id}     → {status, theta, decision: confirmed|offered_lower|offered_higher,
-                           suggested_grade, item_stats[]}   ← IRT 2PL
+POST /sessions  {candidate_id, kind:"grade"|"quiz", subject_key, claimed_level 0–7}
+                → {session_id, seed, items[]}
+GET  /sessions/{id} → {status, theta, confirmed_level, decision:
+                       confirmed|offered_lower|offered_higher, item_stats[]}
 ```
 
 ### matching-engine (Mike)
 ```
 POST /internal/candidates/{id}/vector
-     {claims_verified[], about, category} → {features, dense[640], model_version}
-POST /internal/pool/upsert
-     {candidate_id, category, features, dense, rating_points, fsp_boost, freshness}
-     → {pool_version}          ← идемпотентно, по candidate_id
+     {proficiencies_confirmed[], about, projects[], experiences[], direction}
+     → {features, dense[640], model_version}
+POST /internal/pool/upsert {candidate_id, categories[], features, dense,
+                            rating_points, fsp_boost, freshness} → {pool_version}
 ```
 
 ### integration-engine (готово)
-```
-GET /fsp/participants/{fsp_id} → 200 | 404 (истории нет — норма)
-```
+`GET /fsp/participants/{id}` → 200 | 404 (норма).
 
-## 5. Задача для Codex (acceptance criteria цикла 1)
+## 8. Задача для Codex (acceptance criteria цикла 1)
 
-1. Миграции + типизированные модели всех таблиц A–G (ORM: предлагаю **Prisma** — JSONB, миграции, типы; решение за Codex при обосновании).
-2. Auth: register → email-подтверждение (dev: код в лог), login (JWT, Keycloak-совместимые claims), consent-запись.
-3. Профиль + приватность: CRUD, правила видимости в ответах API (контакты — только после accept; анонимная карточка для подборки).
-4. PDF: загрузка → эвристический extraction → экран подтверждения → создание claims (`source=pdf_confirmed`).
-5. Опрос + справочник специализаций/грейдов (seed из `packages/shared`).
-6. Грейд-тест: оркестрация testing-engine по контрактам §4, запись attempts, cooldown, присвоение категории, обработка offered_lower/higher (UX выбора).
-7. Claims + ledger + формула очков (таблица вынесена в конфиг YAML), капы, recompute-события.
-8. Триггеры ML: после categorized и после каждого verified → vector + pool/upsert (при выполнении гейта §2).
-9. Автогенерация PDF-профиля (ТЗ 2.1).
-10. Тесты: стейт-машина, cooldown, формула очков (капы), happy-path интеграционный (register→pool).
+1. Справочники доменов/стеков/софтскиллов/типов достижений/направлений — в `packages/shared` (+seed), заменить старый SPECIALIZATIONS.
+2. Миграции: users/consents, candidate_profiles, **proficiencies**, achievements, projects, work_experiences, grade_attempts, rating_ledger, candidate_categories.
+3. Auth: register/email-подтверждение (dev: код в лог)/login JWT + согласия (обработка + пул).
+4. Профиль: поля B, приватность, правила видимости (контакты — после accept; анонимная карточка: образ-топ, грейд, очки, ФСП-бейджи, город, зп-ожидания — без ФИО-полного и контактов).
+5. Заполнение профилизаций: self_level + пояснение уровня (рубрикация §3 в UI).
+6. PDF: загрузка → эвристический extraction → экран подтверждения → профилизаций/claims (source=pdf_confirmed).
+7. Грейд-тест: оркестрация по §7, attempts, cooldown, присвоение категории, UX offered_lower/higher.
+8. Достижения/проекты/опыт: CRUD + evidence-верификация + mock-модерация; очки по §5 (конфиг YAML).
+9. Триггеры ML: после graded и после каждого confirmed → vector + pool/upsert (гейт §2).
+10. Автогенерация типизированного PDF-резюме.
+11. Тесты: стейт-машина, cooldown, формула с капами, happy-path register→pool.
 
-Не входит в цикл 1: чат, приглашения (S4), регулярные задачи (S5), витрина.
+Не входит: чат, приглашения (S4), регулярные задачи (S5), витрина, мульти-категорийность.
