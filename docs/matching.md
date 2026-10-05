@@ -228,3 +228,20 @@ macro accuracy≥0.65/Δ≥0.03 и нижняя95% family-bootstrap границ
 Хвост требует минимум50 релевантных cal/gold, recall≥95%, gold Wilson lower≥90%;
 иначе tail_gap=null. Teacher validity выводится из sealed pilot/swap receipts,
 провенанс покрывает весь request/response cache и ledger, не только выбранные метки.
+
+## Локальная backend приёмка, 06.10.2026
+
+В новой отдельной loopback PG БД проведены5 синтетических профилей из Qwen
+и3 вакансии: mixed, class-only, пустой bio. Настоящий pinned Harrier640 и5 public
+PDF подготовлены до main top-k=3; typed facts сохранены в safe snapshot.
+Основной отбор и durable R₀ публикуют явный artifact_absent fallback, по2 кандидата
+на вакансию остаются вне top-k. Shared schema37→38 закрывает старые карточки
+(404 до готовности вакансии, затем409 до нового main), после backfill поток
+восстанавливается. Все24 outbox события ACK, backlog/retry/quarantine=0.
+
+Отдельный запуск собранного Fastify и настоящего FastAPI по HTTP проверил401,
+статусы, recommended/reserve страницы и повторную постановку того же run.
+Оба временных процесса остановлены; прежний контур не менялся.
+Отчёт — [rerank-backend-acceptance.json](../data/validation/rerank-backend-acceptance.json).
+Это проверка backend контрактов. Обученного активного R₀ и golden оценки нет:
+пилот teacher остановлен, human/assistant golden reviews ещё не выполнены.

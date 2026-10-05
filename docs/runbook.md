@@ -195,3 +195,14 @@ Retry сохраняет идемпотентность и не возвраща
 По умолчанию artifacts расположены в `tests/artifacts/reranker/`, git-ignored.
 В live worker нет sklearn, provider calls и обучения. Реальный текущий pilot
 stopped: не обходить эту блокировку изменением JSON-флага или увеличением бюджета.
+
+### Повтор backend приёмки
+
+При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings
+extra и exact cached Harrier выполнить `python tests/rerank_acceptance.py`.
+Создаётся новая БД с уникальным именем `comit_reranker_acceptance_*`; существующие
+БД не очищаются. Скрипт использует сохранённые synthetic pilot-profiles и настоящий
+Harrier, проверяет typed facts/PDFs/durable delivery/backfill. Не запускает teacher.
+После `pnpm build` выполнить `python tests/rerank_http_acceptance.py`: только
+короткие собственные FastAPI/Fastify процессы на свободных портах, с cleanup.
+Отчёт и service logs сохраняются в ignored artifacts; credentials не печатаются.
