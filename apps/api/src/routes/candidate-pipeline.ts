@@ -45,17 +45,22 @@ export async function candidatePipelineRoutes(app: FastifyInstance, options: Can
     { method: "POST", path: "/internal/strict-schema/coordinates", body: "CoordinateAddition", response: "StrictSchema" },
     { method: "GET", path: "/internal/pool", response: "PoolPage" },
     { method: "GET", path: "/internal/pool/:candidate_id/resume.pdf" },
+    { method: "PUT", path: "/internal/vacancies/:vacancy_id", body: "VacancyInput", response: "VacancyPipelineStatus" },
+    { method: "GET", path: "/internal/vacancies/ready", response: "VacancyReadyPage" },
+    { method: "GET", path: "/internal/vacancies/:vacancy_id", response: "VacancyPipelineStatus" },
+    { method: "GET", path: "/internal/vacancies/:vacancy_id/ready", response: "VacancyReady" },
+    { method: "POST", path: "/internal/vacancies/:vacancy_id/retry", response: "VacancyPipelineStatus" },
   ] as const;
   for (const route of routes) {
     app.route({
       method: route.method,
       url: route.path,
       schema: {
-        tags: ["candidate-pipeline"],
+        tags: [route.path.startsWith("/internal/vacancies") ? "vacancy-pipeline" : "candidate-pipeline"],
         security: [{ internalToken: [] }],
-        ...(route.path.includes(":candidate_id") ? { params: {
-          type: "object", required: ["candidate_id"],
-          properties: { candidate_id: { type: "string", format: "uuid" } },
+        ...(route.path.includes(":candidate_id") || route.path.includes(":vacancy_id") ? { params: {
+          type: "object", required: [route.path.includes(":vacancy_id") ? "vacancy_id" : "candidate_id"],
+          properties: { [route.path.includes(":vacancy_id") ? "vacancy_id" : "candidate_id"]: { type: "string", format: "uuid" } },
         } } : {}),
         ...("body" in route ? { body: { $ref: `urn:comit:candidate:${route.body}` } } : {}),
         ...("response" in route ? { response: { 200: { $ref: `urn:comit:candidate:${route.response}` } } } : {}),

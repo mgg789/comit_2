@@ -25,3 +25,8 @@ Run locally after `make up`:
 
 Never run integration cleanup against a live pool; see `docs/runbook.md` for
 the separate unit, PostgreSQL, real-model and smoke verification contours.
+
+- `vacancy_pool_acceptance.py` — real gateway/PG/both workers/Harrier verification
+  for ten sparse vacancy snapshots, explicit-zero masks, query/document space,
+  shared schema backfill and status withdrawal/reopen. Requires a separate fresh
+  local database; writes `artifacts/vacancy-pool-acceptance.json` (ignored).

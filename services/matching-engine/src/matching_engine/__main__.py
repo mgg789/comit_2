@@ -15,7 +15,7 @@ from matching_engine.store import Store
 def main() -> None:
     """Run one chosen mode, using environment configuration without exposing credentials."""
     parser = argparse.ArgumentParser(description="Comit candidate pipeline")
-    parser.add_argument("mode", nargs="?", default="serve", choices=("serve", "migrate", "worker"))
+    parser.add_argument("mode", nargs="?", default="serve", choices=("serve", "migrate", "worker", "vacancy-worker"))
     parser.add_argument("--once", action="store_true", help="Process one available worker job")
     args = parser.parse_args()
     if args.mode == "serve":
@@ -28,8 +28,14 @@ def main() -> None:
         for name in migrate(database_url):
             print(f"Applied migration: {name}")
         return
+    from matching_engine.vacancy_store import VacancyStore
+    from matching_engine.vacancy_worker import VacancyWorker
     from matching_engine.worker import Worker
-    worker = Worker(Store(database_url),
+    worker = VacancyWorker(VacancyStore(database_url),
+                    lease_seconds=int(os.environ.get("PIPELINE_LEASE_SECONDS", "300")),
+                    max_attempts=int(os.environ.get("PIPELINE_MAX_ATTEMPTS", "5")),
+                    retry_base_seconds=int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30"))) \
+        if args.mode == "vacancy-worker" else Worker(Store(database_url),
                     lease_seconds=int(os.environ.get("PIPELINE_LEASE_SECONDS", "300")),
                     max_attempts=int(os.environ.get("PIPELINE_MAX_ATTEMPTS", "5")),
                     retry_base_seconds=int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30")))

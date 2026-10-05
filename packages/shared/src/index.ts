@@ -8,6 +8,9 @@ export type {
   CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,
   CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill, StrictCoordinateEvidence,
 } from "./candidate-pipeline.js";
+export type {
+  VacancyIntake, VacancyPipelineStatus, VacancyReady, VacancyReadyPage, VacancyWorkType,
+} from "./vacancy-pipeline.js";
 
 export type Role = "candidate" | "employer";
 
@@ -21,6 +24,7 @@ export const SPECIALIZATIONS = [
   "mobile",
   "devops",
   "data",
+  "ml",
   "qa",
 ] as const;
 export type Specialization = (typeof SPECIALIZATIONS)[number];
@@ -41,11 +45,10 @@ export interface SalaryRange {
 /** Vacancy lifecycle (context/30-domain-model.md). */
 export type VacancyStatus =
   | "draft"
-  | "active"
-  | "has_candidates"
-  | "suspended"
+  | "open"
+  | "pending"
   | "closed"
-  | "archived";
+  | "done";
 
 /** Candidate position inside one vacancy's selection funnel. */
 export type SelectionStage =

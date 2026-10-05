@@ -44,6 +44,7 @@ Build/подготовка модели требуют доступных пак
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine migrate
 PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine serve
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine vacancy-worker
 PORT=38080 pnpm --filter @comit/api start
 ```
 
@@ -79,6 +80,25 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 идемпотентность, миграцию 37→38, новую partial координату, отзыв согласия и stale409.
 Сохраняет отчёт и PDF в git-ignored `tests/artifacts/`.
 Нельзя параллельно запускать integration cleanup и acceptance на одной БД.
+
+## Проверки vacancy pipeline
+
+Перед запуском обновлённых серверов применить migration 002; оба worker работают
+от одной DATABASE_URL, каждый в отдельном процессе. Локальный overlay включает
+candidate-worker и vacancy-worker с общим persistent кэшем. `/ready` проверяет
+обе схемы. Бизнес-статус open не заменяет техническую готовность артефактов.
+
+```bash
+# Только свежая отдельная БД; API и оба настоящих worker уже запущены.
+CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.venv/bin/python tests/vacancy_pool_acceptance.py
+```
+
+Десять синтетических вакансий проверяют class-only/domain-only/stack-only/mixed,
+явный ноль, неполные снимки и soft-only. Реальный Harrier проверяется для query
+вакансии и document кандидата; затем оба пула мигрируют 37→38. Также проверяются
+идемпотентность, отзыв pending, reopen и stale409. Отчёт — ignored
+`tests/artifacts/vacancy-pool-acceptance.json`. Candidate acceptance и vacancy
+acceptance требуют разных свежих БД, поскольку оба добавляют одну координату.
 
 ## Локально
 

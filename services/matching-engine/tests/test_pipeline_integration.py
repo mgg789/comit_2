@@ -29,7 +29,8 @@ def store() -> Store:
     migrate(database_url)
     with connect(database_url) as connection:
         connection.execute("""
-            TRUNCATE candidate_pipeline.outbox,candidate_pipeline.jobs,candidate_pipeline.pool,
+            TRUNCATE vacancy_pipeline.outbox,vacancy_pipeline.jobs,vacancy_pipeline.ready,
+                     vacancy_pipeline.vacancies,candidate_pipeline.outbox,candidate_pipeline.jobs,candidate_pipeline.pool,
                      candidate_pipeline.candidates,candidate_pipeline.embedding_cache
             RESTART IDENTITY
         """)
@@ -76,10 +77,11 @@ def test_migrations_are_idempotent_and_checksum_guarded(store: Store) -> None:
     finally:
         from hashlib import sha256
         from importlib.resources import files
-        sql = files("matching_engine").joinpath("migrations/001_candidate_pipeline.sql").read_text()
         with connect(store.database_url) as connection:
-            connection.execute("UPDATE candidate_pipeline.migrations SET checksum=%s",
-                               (sha256(sql.encode()).hexdigest(),))
+            for migration in files("matching_engine").joinpath("migrations").iterdir():
+                if migration.name.endswith(".sql"):
+                    connection.execute("UPDATE candidate_pipeline.migrations SET checksum=%s WHERE name=%s",
+                                       (sha256(migration.read_text().encode()).hexdigest(), migration.name))
 
 
 def test_complete_pipeline_api_rank_and_contact_free_pool(store: Store) -> None:

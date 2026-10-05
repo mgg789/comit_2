@@ -81,6 +81,7 @@ export interface CandidatePoolEntry {
   strict_schema_hash: string;
   semantic_vector: number[];
   semantic_model_version: string;
+  semantic_space_id: string;
   published_at: string;
   resume_url: string;
 }

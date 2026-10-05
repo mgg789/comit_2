@@ -18,13 +18,19 @@ from matching_engine.models import (
     StrictSchema,
 )
 from matching_engine.store import ConflictError, NotFoundError, Store
+from matching_engine.vacancy_routes import vacancy_router
+from matching_engine.vacancy_store import VacancyStore
 
 
 def create_app(*, store: Store | None = None, internal_token: str | None = None,
-               encoder_ready: Callable[[], bool] | None = None) -> FastAPI:
+               encoder_ready: Callable[[], bool] | None = None,
+               vacancy_store: VacancyStore | None = None) -> FastAPI:
     """Build routes without DB/model side effects; injected dependencies support tests only."""
     database_url = os.environ.get("DATABASE_URL")
     pipeline_store = store if store is not None else (Store(database_url) if database_url else None)
+    vacancy_repository = vacancy_store if vacancy_store is not None else (
+        VacancyStore(pipeline_store.database_url) if pipeline_store is not None else None
+    )
     token = internal_token if internal_token is not None else os.environ.get("CANDIDATE_PIPELINE_TOKEN")
     app = FastAPI(
         title="Comit Matching Engine", version="0.2.0",
@@ -70,6 +76,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
             "authentication": bool(token),
             "database": pipeline_store is not None and pipeline_store.ready(),
             "embedding": embedding_ready,
+            "vacancy_database": vacancy_repository is not None and vacancy_repository.ready(),
         }
         available = all(checks.values())
         if not available:
@@ -137,4 +144,5 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                         media_type="application/pdf",
                         headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"})
 
+    app.include_router(vacancy_router(vacancy_repository, require_internal))
     return app

@@ -9,6 +9,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from matching_engine.database import PIPELINE_LOCK, connect
+from matching_engine.embeddings import EMBEDDING_SPACE_ID
 from matching_engine.models import (
     GRADE_RANK,
     CandidateProfile,
@@ -183,6 +184,8 @@ class Store:
                     WHEN missing_requirements='[]'::jsonb THEN 'queued' ELSE 'draft' END,
                     updated_at=now()
             """)
+            from matching_engine.vacancy_store import rebuild_for_schema
+            rebuild_for_schema(connection, new.version)
             return new
 
     def claim(self, lease_seconds: int, max_attempts: int) -> Job | None:
@@ -421,7 +424,8 @@ class Store:
                 strict_vector=row["strict_vector"], strict_evidence=row["strict_evidence"],
                 strict_schema_version=row["schema_version"],
                 strict_schema_hash=row["schema_hash"], semantic_vector=json.loads(row["vector"]),
-                semantic_model_version=row["semantic_model_version"], published_at=row["published_at"],
+                semantic_model_version=row["semantic_model_version"],
+                semantic_space_id=EMBEDDING_SPACE_ID, published_at=row["published_at"],
                 resume_url=f"/internal/pool/{row['candidate_id']}/resume.pdf",
             ) for row in rows], limit=limit, offset=offset)
 

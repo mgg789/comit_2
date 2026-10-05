@@ -5,7 +5,7 @@ import math
 import os
 import threading
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from matching_engine.models import CandidateProfile
 from matching_engine.privacy import sanitize_public_text
@@ -17,6 +17,8 @@ MODEL_ID = "microsoft/harrier-oss-v1-270m"
 MODEL_REVISION = "31de22b673913c7d658c0f03f792d77c2dcf8ebd"
 MODEL_VERSION = f"{MODEL_ID}@{MODEL_REVISION}:document:chunks1024:v1"
 CHUNK_TOKENS = 1024
+EMBEDDING_SPACE_ID = f"{MODEL_ID}@{MODEL_REVISION}:640:last-token:l2"
+VACANCY_PROMPT = "Instruct: Given a job description, retrieve relevant candidate profiles for the role.\nQuery: "
 
 
 class EmbeddingUnavailable(RuntimeError):
@@ -57,7 +59,15 @@ class HarrierEncoder:
 
     model_version = MODEL_VERSION
 
-    def __init__(self) -> None:
+    def __init__(self, role: Literal["document", "vacancy_query"] = "document") -> None:
+        """Select document or vacancy query instruction within the same pinned embedding space."""
+        if role not in ("document", "vacancy_query"):
+            raise ValueError("unsupported embedding role")
+        self.role = role
+        self.model_version = MODEL_VERSION if role == "document" else (
+            f"{MODEL_ID}@{MODEL_REVISION}:vacancy_query:chunks1024:prompt-v1"
+        )
+        self.embedding_space_id = EMBEDDING_SPACE_ID
         self._model: SentenceTransformer | None = None
         self._lock = threading.Lock()
 
@@ -86,7 +96,8 @@ class HarrierEncoder:
                         MODEL_ID, revision=MODEL_REVISION, device="cpu",
                         local_files_only=True, trust_remote_code=False,
                     )
-                    self._model.max_seq_length = CHUNK_TOKENS + 8
+                    # Reserve query instruction tokens without changing document encoding.
+                    self._model.max_seq_length = CHUNK_TOKENS + (80 if self.role == "vacancy_query" else 8)
                 tokenizer = self._model.tokenizer
                 tokens = tokenizer.encode(text, add_special_tokens=False)
                 token_chunks = [tokens[i:i + CHUNK_TOKENS] for i in range(0, len(tokens), CHUNK_TOKENS)]
@@ -96,6 +107,7 @@ class HarrierEncoder:
                 vectors = self._model.encode(
                     chunks, batch_size=1, normalize_embeddings=True,
                     show_progress_bar=False, convert_to_numpy=True,
+                    **({"prompt": VACANCY_PROMPT} if self.role == "vacancy_query" else {}),
                 )
                 pooled = np.average(vectors, axis=0, weights=[max(1, len(c)) for c in token_chunks])
                 norm = float(np.linalg.norm(pooled))

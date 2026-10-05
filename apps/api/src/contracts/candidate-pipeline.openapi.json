@@ -546,6 +546,327 @@
           }
         }
       }
+    },
+    "/internal/vacancies/ready": {
+      "get": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Page",
+        "description": "Page only current eligible artifacts in the active strict generation.",
+        "operationId": "page_internal_vacancies_ready_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyReadyPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}": {
+      "put": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Intake",
+        "description": "Persist the canonical snapshot and original wire values, then queue eligible vacancies.",
+        "operationId": "intake_internal_vacancies__vacancy_id__put",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VacancyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyPipelineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Status",
+        "description": "Read pipeline progress separately from business lifecycle status.",
+        "operationId": "status_internal_vacancies__vacancy_id__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyPipelineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/ready": {
+      "get": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Ready",
+        "description": "Read one completed preparation snapshot; absent readiness returns 404.",
+        "operationId": "ready_internal_vacancies__vacancy_id__ready_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyReady"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/retry": {
+      "post": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Retry",
+        "description": "Explicitly restart a failed or backing-off current preparation job.",
+        "operationId": "retry_internal_vacancies__vacancy_id__retry_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyPipelineStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -619,7 +940,8 @@
                   "mobile",
                   "devops",
                   "data",
-                  "qa"
+                  "qa",
+                  "ml"
                 ]
               },
               {
@@ -812,7 +1134,8 @@
               "mobile",
               "devops",
               "data",
-              "qa"
+              "qa",
+              "ml"
             ],
             "title": "Specialization"
           },
@@ -1174,6 +1497,10 @@
             "type": "string",
             "title": "Semantic Model Version"
           },
+          "semantic_space_id": {
+            "type": "string",
+            "title": "Semantic Space Id"
+          },
           "published_at": {
             "type": "string",
             "format": "date-time",
@@ -1201,6 +1528,7 @@
           "strict_schema_hash",
           "semantic_vector",
           "semantic_model_version",
+          "semantic_space_id",
           "published_at",
           "resume_url"
         ],
@@ -1331,6 +1659,555 @@
         ],
         "title": "StrictSchema",
         "description": "Version and hash identify both ordering and normalization of coordinates."
+      },
+      "VacancyInput": {
+        "properties": {
+          "source_revision": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Source Revision"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "pending",
+              "closed",
+              "done"
+            ],
+            "title": "Status",
+            "default": "draft"
+          },
+          "zp_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zp Min"
+          },
+          "zp_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9007199254740991.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zp Max"
+          },
+          "daily": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "onsite",
+                  "remote",
+                  "hybrid"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "очно",
+                  "дистант",
+                  "гибрид"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "bio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bio",
+            "default": ""
+          },
+          "domens": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Domens"
+          },
+          "stacks": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Stacks"
+          },
+          "soft_skills": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Soft Skills"
+          },
+          "class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "backend",
+                  "frontend",
+                  "fullstack",
+                  "mobile",
+                  "devops",
+                  "data",
+                  "qa",
+                  "ml"
+                ]
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "back",
+                  "front",
+                  "ML"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "maxProperties": 100,
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_revision"
+        ],
+        "title": "VacancyInput",
+        "description": "Canonical trusted snapshot; incomplete drafts persist without invented requirements."
+      },
+      "VacancyPipelineStatus": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "source_revision": {
+            "type": "integer",
+            "title": "Source Revision"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "open",
+              "pending",
+              "closed",
+              "done"
+            ],
+            "title": "Status"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "queued",
+              "processing",
+              "retrying",
+              "failed",
+              "ready"
+            ],
+            "title": "State"
+          },
+          "missing_requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Requirements"
+          },
+          "strict_schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strict Schema Version"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count",
+            "default": 0
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "revision",
+          "source_revision",
+          "status",
+          "state",
+          "missing_requirements"
+        ],
+        "title": "VacancyPipelineStatus",
+        "description": "Business status and artifact state are independent, revision-safe dimensions."
+      },
+      "VacancyReady": {
+        "properties": {
+          "source_revision": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Source Revision"
+          },
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "open",
+            "title": "Status"
+          },
+          "zp_min": {
+            "type": "integer",
+            "title": "Zp Min"
+          },
+          "zp_max": {
+            "type": "integer",
+            "title": "Zp Max"
+          },
+          "daily": {
+            "type": "string",
+            "title": "Daily"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "onsite",
+              "remote",
+              "hybrid"
+            ],
+            "title": "Type"
+          },
+          "bio": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Bio",
+            "default": ""
+          },
+          "domens": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Domens"
+          },
+          "stacks": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Stacks"
+          },
+          "soft_skills": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_-]*$": {
+                "type": "integer",
+                "maximum": 7.0,
+                "minimum": 0.0
+              }
+            },
+            "propertyNames": {
+              "maxLength": 100,
+              "minLength": 1
+            },
+            "type": "object",
+            "maxProperties": 1000,
+            "title": "Soft Skills"
+          },
+          "class": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "backend",
+                  "frontend",
+                  "fullstack",
+                  "mobile",
+                  "devops",
+                  "data",
+                  "qa",
+                  "ml"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "maxProperties": 100,
+            "title": "Metadata"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "build_mode": {
+            "type": "string",
+            "enum": [
+              "class_only",
+              "requirements_only",
+              "mixed"
+            ],
+            "title": "Build Mode"
+          },
+          "strict_vector": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Strict Vector"
+          },
+          "requirement_mask": {
+            "items": {
+              "type": "boolean"
+            },
+            "type": "array",
+            "title": "Requirement Mask"
+          },
+          "strict_schema_version": {
+            "type": "integer",
+            "title": "Strict Schema Version"
+          },
+          "strict_schema_hash": {
+            "type": "string",
+            "title": "Strict Schema Hash"
+          },
+          "semantic_vector": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Vector"
+          },
+          "semantic_model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Model Version"
+          },
+          "semantic_space_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Space Id"
+          },
+          "semantic_available": {
+            "type": "boolean",
+            "title": "Semantic Available"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_revision",
+          "owner_id",
+          "status",
+          "zp_min",
+          "zp_max",
+          "daily",
+          "type",
+          "vacancy_id",
+          "revision",
+          "build_mode",
+          "strict_vector",
+          "requirement_mask",
+          "strict_schema_version",
+          "strict_schema_hash",
+          "semantic_vector",
+          "semantic_model_version",
+          "semantic_space_id",
+          "semantic_available",
+          "published_at"
+        ],
+        "title": "VacancyReady",
+        "description": "Complete selection input; omitted coordinates remain distinct from explicit zero."
+      },
+      "VacancyReadyPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VacancyReady"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "limit",
+          "offset"
+        ],
+        "title": "VacancyReadyPage",
+        "description": "Bounded page containing only current, active-schema, ready vacancies."
       },
       "ValidationError": {
         "properties": {

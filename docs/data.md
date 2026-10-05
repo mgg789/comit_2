@@ -79,3 +79,24 @@ Cached semantic vectors используются повторно, если те
 Полный синтетический вход: `data/seed/candidate-pipeline.json` (4 вымышленных
 профиля). Проверка `tests/candidate_pool_acceptance.py` предназначена только
 для отдельной локальной БД: она добавляет rust и отзывает согласие у одного профиля.
+
+## Проекция вакансий
+
+Миграция `002_vacancy_pipeline.sql` создаёт отдельную схему `vacancy_pipeline`:
+vacancies (canonical/raw JSONB, owner, две ревизии, business status/state/checklist),
+jobs (lease/retry, unique vacancy/revision/schema), ready (strict float8[],
+boolean requirement_mask[], nullable vector(640), fingerprints), outbox
+(vacancy.ready/withdrawn). Миграция 001 остаётся неизменной.
+Кандидаты и вакансии используют один реестр координат и embedding_cache.
+Изменение схемы в одной транзакции отзывает оба ready-пула и создаёт backfill
+для всех сохранённых кандидатов и вакансий, включая неполные снимки.
+Новая координата вакансии: значение 0, mask=false. Старые значения/маски не меняются.
+Ready чтение и публикация требуют текущую ревизию и активную схему;
+публикация дополнительно проверяет непросроченный lease.
+
+`semantic_space_id` в обеих проекциях обозначает совместимое пространство модели;
+`semantic_model_version` отдельно фиксирует способ построения document/query.
+Bio без содержимого не создаёт embedding cache entry. Отсутствующий вектор
+хранится как NULL вместе с NULL fingerprints, не как нулевая заглушка.
+Реальный synthetic acceptance: `data/seed/vacancy-pipeline.json` (10 случаев) и
+`tests/vacancy_pool_acceptance.py`; только свежая изолированная локальная БД.

@@ -100,3 +100,48 @@ Private owner PDF существует только во внутреннем ma
 Контракты регистрации/подтверждения email, проведения теста, CRUD исходных claims,
 кандидатского JWT/ownership и доставки outbox в комбайн пока отсутствуют и входят
 в соседние этапы. В рамках этой задачи их результаты поступают через intake.
+
+## Подготовка вакансии к комбайну (цикл 1)
+
+Та же серверная граница `X-Internal-Token`; employer JWT и проверка владельца
+в браузерном API ещё не реализованы. Internal методы доступны доверенному источнику.
+
+| Метод | Путь | Контракт / результат |
+|---|---|---|
+| PUT | `/internal/vacancies/{vacancy_id}` | полный `VacancyInput` → `VacancyPipelineStatus` |
+| GET | `/internal/vacancies/{vacancy_id}` | бизнес-статус, состояние обработки, checklist, безопасный error_code |
+| POST | `/internal/vacancies/{vacancy_id}/retry` | повтор failed/retrying; иначе 409 |
+| GET | `/internal/vacancies/ready?limit=100&offset=0` | `VacancyReadyPage`, только актуальные готовые снимки |
+| GET | `/internal/vacancies/{vacancy_id}/ready` | `VacancyReady`; 404 до готовности или после отзыва |
+
+TS DTO: `packages/shared/src/vacancy-pipeline.ts`; OpenAPI генерируется той же
+командой выше. `source_revision` обязателен, целое 1…9007199254740991
+(Number.MAX_SAFE_INTEGER); зарплаты ограничены тем же максимумом. Это сохраняет
+точность JSON при прохождении JavaScript-шлюза. Все остальные поля
+можно не передать при сохранении неполного снимка. `owner_id` — UUID; после
+назначения его нельзя менять/удалять. Правила ревизий и идемпотентности как у кандидата.
+Исходные wire значения сохраняются в raw_input, канонические — в profile.
+
+Готовность требует owner_id, zp_min и zp_max (целые рубли ≥0, min≤max),
+непустой daily, type, status=open и хотя бы class **или** непустой domens/stacks.
+Техническое state=ready выдаётся только после успешной сборки артефактов.
+Бизнес-статусы: draft/open/pending/closed/done; переходы задаёт источник.
+Type: onsite/remote/hybrid; принимаются очно/дистант/гибрид. Class — общий
+справочник направлений, включая самостоятельный ml; aliases back/front/ML.
+
+Domens, stacks и soft_skills — словари `{ключ: целое 0…7}`. Ключ должен быть
+из соответствующей группы общего реестра strict-schema; неизвестный — 422.
+Bio (до 10000 символов) и любые группы могут быть пустыми. Входной bio=null
+нормализуется в пустую строку; исходный null остаётся в raw_input. Soft-only и bio-only
+сохраняются с checklist, но не квалифицируют вакансию для комбайна.
+Metadata — JSON, до 100 ключей и 64 KiB. Неизвестные верхнеуровневые поля,
+bool вместо числового уровня и выход за диапазон отклоняются.
+
+Ready содержит все канонические данные, revision/source_revision,
+build_mode, strict_vector, requirement_mask, strict schema version/hash,
+nullable semantic_vector/model_version/space_id и semantic_available.
+Пустой bio означает явно отсутствующий мягкий вектор; class-only остаётся допустим.
+Если bio задан, ошибка Harrier приводит к retry/failed, а не к потере текста.
+Изменение любых данных или уход из open немедленно отзывает старый ready.
+Outbox vacancy.ready/withdrawn сохраняется атомарно; его доставка и сам комбайн
+относятся к следующему этапу.

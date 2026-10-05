@@ -12,3 +12,7 @@ Demo and seed data. Ready-made datasets do not exist for the hackathon
   cycle-one acceptance: backend junior/senior, data middle, and a draft lacking
   pool consent. Includes confirmed, partial and declared hard/soft claims.
   Used only with a disposable local pipeline database, never imported into prod.
+
+- `seed/vacancy-pipeline.json` — ten fictional sparse vacancy snapshots: class,
+  domain, stack, mixed ML, explicit zero, soft-only, bio-only, empty, missing salary,
+  and pending. Includes expected eligibility; not a relevance benchmark dataset.

@@ -27,7 +27,13 @@
 - `GradeAttempt` (заявленный грейд, результат: confirmed | offered-lower | offered-higher, дата; cooldown на смену грейда — дефолт 3 месяца).
 
 ### Вакансии и подбор
-- `Vacancy` (company, специализация, грейд, стек[], строгие параметры, свободное описание, salaryFrom/salaryTo **обязательно**, формат/локация, статус).
+- `Vacancy` (цикл 1): owner_id, status, zp_min/zp_max, daily, type, bio,
+  необязательный class, словари domens/stacks/soft_skills с уровнями 0–7.
+  Для готовности нужны owner_id, обе зарплатные границы, daily, type, status=open
+  и хотя бы class ИЛИ непустой domens/stacks. Soft skills одни не достаточны.
+  Неполные снимки сохраняются, но не публикуются для комбайна.
+- Канонические классы intake: backend/frontend/fullstack/mobile/devops/data/qa/ml;
+  back/front/ML нормализуются. `ml` самостоятельный класс, не синоним data.
 - `VacancyVector` (плотная часть — эмбеддинг описания; интерпретируемая часть — веса фич; версия; объяснимый снапшот).
 - `Selection` (vacancyId × candidateId: score, объяснение попадания, стадия, история стадий).
 
@@ -40,9 +46,9 @@
 ## Статусные модели
 
 ```
-Vacancy: Draft → Active → HasCandidates → Closed(найм)
-                          ↘ Suspended (SLA-штраф, 4 дня) → Active
-                          ↘ Archived
+Vacancy business status: draft | open | pending | closed | done
+Vacancy preparation: draft → queued → processing → ready
+                              ↘ retrying → failed (manual retry)
 
 Candidate-in-category: Registered → Tested(category assigned) → InPool
 
@@ -58,6 +64,11 @@ Invitation: Sent → Viewed → Accepted | Declined
 
 Application (доп): Sent → Viewed → Accepted | Declined (статусы видят обе стороны)
 ```
+
+Уточнение Mike от 05.10 заменяет прежние Active/HasCandidates/Suspended/Archived.
+Техническая готовность отдельна от бизнес-статуса; только open допускает ready.
+Изменение снимка или закрытие немедленно отзывает ready. Автоматические переходы
+по SLA и стадиям найма этим intake не реализуются.
 
 ## Правила видимости (обязательные по п. 2.2 ТЗ — проверяемость на ревью)
 

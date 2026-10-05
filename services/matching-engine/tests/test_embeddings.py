@@ -6,6 +6,8 @@ from types import ModuleType
 import pytest
 
 from matching_engine.embeddings import (
+    EMBEDDING_SPACE_ID,
+    MODEL_VERSION,
     EmbeddingUnavailable,
     HarrierEncoder,
     build_semantic_text,
@@ -41,3 +43,14 @@ def test_model_unavailable_is_explicit_and_never_fake(monkeypatch, tmp_path) -> 
     monkeypatch.setitem(sys.modules, "sentence_transformers", unavailable)
     with pytest.raises(EmbeddingUnavailable, match="^harrier_unavailable$"):
         encoder.encode("test")
+
+
+def test_vacancy_query_and_candidate_documents_share_space_but_not_cache_version() -> None:
+    document = HarrierEncoder()
+    query = HarrierEncoder(role="vacancy_query")
+    assert document.model_version == MODEL_VERSION
+    assert query.model_version != document.model_version
+    assert document.embedding_space_id == query.embedding_space_id == EMBEDDING_SPACE_ID
+    assert query.role == "vacancy_query"
+    with pytest.raises(ValueError, match="unsupported embedding role"):
+        HarrierEncoder(role="unknown")

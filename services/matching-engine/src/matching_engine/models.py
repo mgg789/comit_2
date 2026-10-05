@@ -14,7 +14,7 @@ from pydantic import (
 )
 
 Grade = Literal["intern", "junior", "middle", "senior"]
-Direction = Literal["backend", "frontend", "fullstack", "mobile", "devops", "data", "qa"]
+Direction = Literal["backend", "frontend", "fullstack", "mobile", "devops", "data", "qa", "ml"]
 ClaimStatus = Literal["confirmed", "partial", "self_reported", "pending", "rejected"]
 CoordinateGroup = Literal["domain", "stack", "soft_skill"]
 GRADE_RANK = {"intern": 0, "junior": 1, "middle": 2, "senior": 3}
@@ -176,6 +176,7 @@ class PoolEntry(Contract):
     strict_schema_hash: str
     semantic_vector: list[float]
     semantic_model_version: str
+    semantic_space_id: str
     published_at: datetime
     resume_url: str
 
