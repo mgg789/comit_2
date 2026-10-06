@@ -14,6 +14,8 @@ from matching_engine.combine_routes import combine_router
 from matching_engine.combine_store import CombineStore
 from matching_engine.feed_routes import feed_router
 from matching_engine.feed_store import FeedStore
+from matching_engine.hypothesis_routes import hypothesis_router
+from matching_engine.hypothesis_store import HypothesisStore
 from matching_engine.models import (
     CandidateProfile,
     CandidateStatus,
@@ -68,6 +70,8 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
         return pipeline_store
 
     app.include_router(preference_router(PreferenceStore(pipeline_store.database_url) if pipeline_store else None,
+                                         require_internal))
+    app.include_router(hypothesis_router(HypothesisStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
 
     @app.exception_handler(ConflictError)

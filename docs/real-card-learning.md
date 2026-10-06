@@ -127,3 +127,7 @@ events требуют вызова клиентского контракта, о
 Реакция и постановка задания атомарны. Learning status сборщика продолжает
 описывать только collection/export, поле `training_started` в старом export
 не является статусом worker. Его состояние доступно через vacancy preferences API.
+
+## Исследовательские пары
+
+[Hypothesis policy](hypothesis-learning.md) сохраняет pair ID/role/контраст, условные selection/order probabilities до показа. Экспорт HMAC-псевдонимизирует pair ID и показывает sample_scope для новых outside-top-k samples. Global propensity остаётся null; известные условные вероятности не дают поддержки всех альтернативных действий в полном пуле. Like/dislike учат существующий learner; no-action без метки.

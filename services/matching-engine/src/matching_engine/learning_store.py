@@ -130,6 +130,8 @@ class LearningStore:
             WHERE candidate_id=%s AND withdrawn_at IS NULL""", (candidate_id,))
         from matching_engine.preference_store import PreferenceStore
         PreferenceStore.withdraw(connection, candidate_id)
+        from matching_engine.hypothesis_store import HypothesisStore
+        HypothesisStore.withdraw(connection, candidate_id)
         return result.rowcount
 
     def export(self, directory: Path, key: bytes, *, source: str = "operational", limit: int = 10000) -> dict:
@@ -204,11 +206,19 @@ class LearningStore:
                             "preference_revision": exposure["card"].get("preference_revision", 0),
                             "preference_score": exposure["card"].get("preference_score"),
                             "order_revision": exposure["card"].get("order_revision", 0),
+                            "hypothesis_pair_id": pseudonym(key, "hypothesis-pair", exposure["card"]["hypothesis_pair_id"]) if exposure["card"].get("hypothesis_pair_id") else None,
+                            "hypothesis_id": exposure["card"].get("hypothesis_id"),
+                            "hypothesis_role": exposure["card"].get("hypothesis_role"),
+                            "hypothesis_policy_hash": exposure["card"].get("hypothesis_policy_hash"),
+                            "hypothesis_parameters": exposure["card"].get("hypothesis_parameters"),
+                            "pair_selection_probability": exposure["card"].get("selection_probability"),
+                            "order_probability": exposure["card"].get("order_probability"),
+                            "probability_scope": exposure["card"].get("probability_scope"),
                             "tail_policy_hash": exposure["tail_policy_hash"], "events": exposure["events"],
                             "action": action, "label": 1 if action == "like" else 0 if action == "dislike" else None,
                             "label_kind": "explicit_behavior" if action else "unlabeled",
                             "censoring": "session_expired" if action is None and exposure["expires_at"] < datetime.now(exposure["expires_at"].tzinfo) else None,
-                            "selection_policy": "deterministic_bounded_preferences" if exposure["card"].get("preference_state") == "personalized" else "deterministic_no_exploration",
+                            "selection_policy": "matched_pair_exploration_v1" if exposure["card"].get("hypothesis_pair_id") else ("deterministic_bounded_preferences" if exposure["card"].get("preference_state") == "personalized" else "deterministic_no_exploration"),
                             "propensity": None})
                     value = {"dataset_version": DATASET_VERSION, "source": row["source"],
                         "main_run_id": pseudonym(key, "main", row["main_run_id"]),
@@ -217,6 +227,7 @@ class LearningStore:
                         "candidate_group": pseudonym(key, "candidate", row["candidate_id"]),
                         "vacancy_revision": row["vacancy_revision"], "profile_revision": row["profile_revision"],
                         "published_at": row["published_at"].isoformat(), "main_position": row["main_position"],
+                        "sample_scope": row.get("sample_scope", "main_top_k"),
                         "main_score": row["main_score"], "strict_schema_hash": row["schema_hash"],
                         "feature_schema_hash": row["feature_schema_hash"], "main_policy_hash": row["policy_hash"],
                         "outside_top_k": row["outside_top_k"], "feature_hash": row["feature_hash"],

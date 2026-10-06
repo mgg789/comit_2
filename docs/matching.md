@@ -492,3 +492,7 @@ source consent. Сам CLI остаётся теневым; дополнител
 quality gate, source consent locks и отдельный реестр не меняют базовый комбайн.
 Применение переставляет только unserved suffix и сохраняет delivered receipts.
 Rollback/reset доступны владельцу вакансии. [Правила](preference-learning.md).
+
+## Проверка локальных гипотез
+
+[Matched-pair exploration](hypothesis-learning.md) подключена к feed delivery после preference refresh:2 research cards на18 обычных unique deliveries, сохраняемые вероятности выбора/порядка, full snapshot eligibility и bounded сравнения. H1–H8/H10 проверяются по доступным фактам, H9 не имеет таксономии. Frozen20 decisive batch сообщает локальные свидетельства; learner получает исходные explicit actions один раз, новые обязательные фильтры не создаются. Основное пополнение/исчерпание §6 отдельно.

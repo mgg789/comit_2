@@ -316,6 +316,170 @@
         }
       }
     },
+    "/internal/vacancies/{vacancy_id}/hypotheses": {
+      "get": {
+        "tags": [
+          "vacancy-hypotheses"
+        ],
+        "summary": "Status",
+        "description": "Read hypotheses and incomplete comparisons for one owned vacancy.",
+        "operationId": "status_internal_vacancies__vacancy_id__hypotheses_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/hypotheses/{action}": {
+      "post": {
+        "tags": [
+          "vacancy-hypotheses"
+        ],
+        "summary": "Command",
+        "description": "Pause new exploration, resume or discard old evidence with CAS and UUID replay.",
+        "operationId": "command_internal_vacancies__vacancy_id__hypotheses__action__post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "pause",
+                "resume",
+                "reset"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -3905,6 +4069,115 @@
             "type": "integer",
             "title": "Order Revision",
             "default": 0
+          },
+          "hypothesis_pair_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Pair Id"
+          },
+          "hypothesis_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "H1",
+                  "H2",
+                  "H3",
+                  "H4",
+                  "H5",
+                  "H6",
+                  "H7",
+                  "H8",
+                  "H9",
+                  "H10"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Id"
+          },
+          "hypothesis_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "test",
+                  "control"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Role"
+          },
+          "hypothesis_policy_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis Policy Hash"
+          },
+          "hypothesis_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Hypothesis Parameters"
+          },
+          "selection_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Probability"
+          },
+          "order_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order Probability"
+          },
+          "probability_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "conditional_pair_and_order_at_budget_opportunity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability Scope"
+          },
+          "exploration_added": {
+            "type": "boolean",
+            "title": "Exploration Added",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -4322,6 +4595,187 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HypothesisStatus": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "context_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Hash"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "hypotheses": {
+            "items": {
+              "$ref": "#/components/schemas/HypothesisSummary"
+            },
+            "type": "array",
+            "title": "Hypotheses"
+          },
+          "search_report": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Search Report"
+          },
+          "pairs": {
+            "type": "integer",
+            "title": "Pairs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "revision",
+          "enabled",
+          "context_hash",
+          "policy_hash",
+          "hypotheses",
+          "search_report",
+          "pairs"
+        ],
+        "title": "HypothesisStatus",
+        "description": "Collection and bounded search state, excluding IDs, facts and feature payloads."
+      },
+      "HypothesisSummary": {
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "enum": [
+              "H1",
+              "H2",
+              "H3",
+              "H4",
+              "H5",
+              "H6",
+              "H7",
+              "H8",
+              "H9",
+              "H10"
+            ],
+            "title": "Hypothesis Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unclear",
+              "supported",
+              "not_supported",
+              "not_testable"
+            ],
+            "title": "Status"
+          },
+          "supporting": {
+            "type": "integer",
+            "title": "Supporting"
+          },
+          "opposing": {
+            "type": "integer",
+            "title": "Opposing"
+          },
+          "decisive": {
+            "type": "integer",
+            "title": "Decisive"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "observed_decisive": {
+            "type": "integer",
+            "title": "Observed Decisive"
+          },
+          "post_batch_decisive": {
+            "type": "integer",
+            "title": "Post Batch Decisive"
+          },
+          "batch_status": {
+            "type": "string",
+            "enum": [
+              "collecting",
+              "frozen",
+              "invalidated"
+            ],
+            "title": "Batch Status"
+          },
+          "confidence_interval": {
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Confidence Interval"
+          },
+          "minimum_decisive_pairs": {
+            "type": "integer",
+            "title": "Minimum Decisive Pairs"
+          },
+          "familywise_alpha": {
+            "type": "number",
+            "title": "Familywise Alpha"
+          },
+          "multiple_testing_families": {
+            "type": "integer",
+            "title": "Multiple Testing Families"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "calibration_status": {
+            "type": "string",
+            "const": "uncalibrated_baseline",
+            "title": "Calibration Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "hypothesis_id",
+          "status",
+          "supporting",
+          "opposing",
+          "decisive",
+          "total",
+          "observed_decisive",
+          "post_batch_decisive",
+          "batch_status",
+          "confidence_interval",
+          "minimum_decisive_pairs",
+          "familywise_alpha",
+          "multiple_testing_families",
+          "policy_hash",
+          "calibration_status"
+        ],
+        "title": "HypothesisSummary",
+        "description": "A fixed twenty-decisive-pair batch; diagnostics remain local and uncalibrated."
       },
       "JsonValue": {},
       "MatchedFeature": {
@@ -4903,7 +5357,10 @@
           },
           "selection_bias": {
             "type": "string",
-            "const": "deterministic_feedback_unknown_propensity",
+            "enum": [
+              "feedback_unknown_global_propensity",
+              "deterministic_feedback_unknown_propensity"
+            ],
             "title": "Selection Bias"
           }
         },

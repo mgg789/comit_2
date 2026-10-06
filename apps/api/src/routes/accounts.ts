@@ -141,7 +141,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   };
   // Employer matching contracts come from the same generated OpenAPI as the private engine.
   for (const [path, methods] of Object.entries(engineSpec.paths)) {
-    const match = /^\/internal\/vacancies\/\{vacancy_id\}(\/(?:feed|saved|visited|preferences)(?:\/.*)?)$/.exec(path);
+    const match = /^\/internal\/vacancies\/\{vacancy_id\}(\/(?:feed|saved|visited|preferences|hypotheses)(?:\/.*)?)$/.exec(path);
     if (!match) continue;
     const suffix = match[1]!;
     for (const [method, raw] of Object.entries(methods)) {

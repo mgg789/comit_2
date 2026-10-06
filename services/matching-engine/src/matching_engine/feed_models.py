@@ -44,6 +44,15 @@ class FeedCard(CandidateCard):
     preference_contributions: dict[str, float] = Field(default_factory=dict)
     preference_state: Literal["baseline", "personalized"] = "baseline"
     order_revision: int = 0
+    hypothesis_pair_id: UUID | None = None
+    hypothesis_id: Literal["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H10"] | None = None
+    hypothesis_role: Literal["test", "control"] | None = None
+    hypothesis_policy_hash: str | None = None
+    hypothesis_parameters: dict[str, object] = Field(default_factory=dict)
+    selection_probability: float | None = Field(default=None, gt=0, le=1)
+    order_probability: float | None = Field(default=None, gt=0, le=1)
+    probability_scope: Literal["conditional_pair_and_order_at_budget_opportunity"] | None = None
+    exploration_added: bool = False
 
 
 class FeedPage(Contract):

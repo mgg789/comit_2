@@ -170,6 +170,24 @@ export interface FeedCard extends RerankCard {
   preference_state?: "baseline" | "personalized";
   /** Ordering revision frozen when this card was delivered. */
   order_revision?: number;
+  /** Durable comparison identity; null for ordinary feed cards. */
+  hypothesis_pair_id?: string | null;
+  /** Vacancy-local hypothesis family tested by this comparison. */
+  hypothesis_id?: HypothesisId | null;
+  /** Assigned side of the comparison, independent of delivery order. */
+  hypothesis_role?: "test" | "control" | null;
+  /** Comparison policy identity frozen when the pair was selected. */
+  hypothesis_policy_hash?: string | null;
+  /** Fixed contrast direction and policy thresholds; excludes participant numeric facts. */
+  hypothesis_parameters?: Record<string, unknown>;
+  /** Conditional pair selection probability at this budget opportunity. */
+  selection_probability?: number | null;
+  /** Conditional randomized pair order probability. */
+  order_probability?: number | null;
+  /** These probabilities describe this bounded opportunity, not the full pool. */
+  probability_scope?: "conditional_pair_and_order_at_budget_opportunity" | null;
+  /** Whether bounded exploration added this card to the ordinary portion. */
+  exploration_added?: boolean;
 }
 /** Stable opaque position cursor; own feedback does not reorder this portion. */
 export interface FeedPage {
@@ -199,13 +217,49 @@ export interface PreferenceStatus {
   job_state: string | null;
   error_code: string | null;
   policy_hash: string;
-  selection_bias: "deterministic_feedback_unknown_propensity";
+  selection_bias: "feedback_unknown_global_propensity" | "deterministic_feedback_unknown_propensity";
 }
 
 /** Employer-authorized, revision-checked preference control mutation. */
 export interface PreferenceCommand {
   idempotency_key: string;
   expected_revision: number;
+}
+
+/** Fixed hypothesis families; families require observed comparable profile evidence. */
+export type HypothesisId = "H1" | "H2" | "H3" | "H4" | "H5" | "H6" | "H7" | "H8" | "H9" | "H10";
+
+/** Vacancy-local comparison evidence; only explicit opposing reactions are decisive. */
+export interface HypothesisSummary {
+  hypothesis_id: HypothesisId;
+  status: "not_testable" | "unclear" | "supported" | "not_supported";
+  supporting: number;
+  opposing: number;
+  decisive: number;
+  total: number;
+  observed_decisive: number;
+  post_batch_decisive: number;
+  batch_status: "collecting" | "frozen" | "invalidated";
+  confidence_interval: [number, number];
+  minimum_decisive_pairs: number;
+  familywise_alpha: number;
+  multiple_testing_families: number;
+  policy_hash: string;
+  calibration_status: "uncalibrated_baseline";
+  /** Explicit reason when observed profile evidence cannot test a family. */
+  disabled_reason?: string | null;
+}
+
+/** Employer-owned exploration control and bounded comparison report for one vacancy. */
+export interface HypothesisStatus {
+  vacancy_id: string;
+  revision: number;
+  enabled: boolean;
+  context_hash: string | null;
+  policy_hash: string;
+  hypotheses: HypothesisSummary[];
+  search_report: Record<string, unknown>;
+  pairs: number;
 }
 /** One reaction per served exposure; UUID key is scoped to employer and vacancy. */
 export interface FeedDecisionRequest { exposure_id: string; action: "like" | "dislike"; idempotency_key: string; }

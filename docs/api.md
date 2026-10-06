@@ -432,3 +432,7 @@ FeedCard дополнен preference revision/model hash/score/adjustment/contri
 preference position/state и delivery order revision; FeedPage содержит текущий
 order_revision. Shared, generated engine OpenAPI, gateway и api-client обновлены
 синхронно. [Доставка и управление](preference-learning.md#доставка-и-управление).
+
+## Проверка гипотез вакансии
+
+GET `/api/employer/vacancy-drafts/{draft_id}/hypotheses` и POST `.../hypotheses/{pause|resume|reset}` проксируют owner-scoped matching контракты; тело команд — `PreferenceCommand` (UUID/CAS). `HypothesisStatus` содержит10 `HypothesisSummary`, context/policy/revision и bounded search report без участников/фактов. `FeedCard` дополнен optional pair/family/role/parameters, conditional pair selection/order probabilities, scope и exploration_added. Старые карточки имеют null/default значения. Вероятности не называются global propensity. [Семантика](hypothesis-learning.md).

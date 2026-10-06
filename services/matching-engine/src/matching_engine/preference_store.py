@@ -416,7 +416,7 @@ class PreferenceStore:
         if not control:
             return {"vacancy_id": vacancy_id, "revision": 0, "enabled": True, "state": "collecting", "active_model_hash": None,
                     "eligible_reactions": 0, "fresh_reactions": 0, "job_id": None, "job_state": None, "error_code": None,
-                    "policy_hash": policy_hash(), "selection_bias": "deterministic_feedback_unknown_propensity"}
+                    "policy_hash": policy_hash(), "selection_bias": "feedback_unknown_global_propensity"}
         active = PreferenceStore.active(connection, control)
         try:
             rows = PreferenceStore._observations(connection, control)
@@ -430,7 +430,7 @@ class PreferenceStore:
                 "fresh_reactions": sum(control["last_attempt_at"] is None or timestamp(row["decision_at"]) > control["last_attempt_at"] for row in rows),
                 "job_id": latest["job_id"] if latest else None, "job_state": latest["state"] if latest else None,
                 "error_code": latest["error_code"] if latest else None, "policy_hash": policy_hash(),
-                "selection_bias": "deterministic_feedback_unknown_propensity"}
+                "selection_bias": "feedback_unknown_global_propensity"}
 
     def command(self, owner_id: UUID, vacancy_id: UUID, action: str, key: UUID, expected_revision: int) -> dict:
         """Owner-scoped CAS/idempotent reset, rollback-to-R0 or retry of the same sealed failed job."""

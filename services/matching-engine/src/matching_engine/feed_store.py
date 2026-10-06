@@ -84,7 +84,8 @@ class FeedStore:
                     AND to_regclass('feed_pipeline.saved') IS NOT NULL
                     AND to_regclass('feed_pipeline.visited') IS NOT NULL
                     AND to_regclass('learning_pipeline.events') IS NOT NULL
-                    AND to_regclass('preference_pipeline.jobs') IS NOT NULL AS ready""").fetchone()["ready"])
+                    AND to_regclass('preference_pipeline.jobs') IS NOT NULL
+                    AND to_regclass('hypothesis_pipeline.pairs') IS NOT NULL AS ready""").fetchone()["ready"])
         except psycopg.Error:
             return False
 
@@ -301,6 +302,7 @@ class FeedStore:
             LEFT JOIN learning_pipeline.samples s ON s.main_run_id=f.main_run_id AND s.candidate_id=e.candidate_id
             WHERE e.session_id=%s AND e.served_at IS NULL AND e.position>
                 (SELECT COALESCE(max(position),0) FROM feed_pipeline.exposures WHERE session_id=%s AND served_at IS NOT NULL)
+                AND e.card->>'hypothesis_pair_id' IS NULL AND NOT e.exploration_suppressed
             ORDER BY e.position FOR UPDATE OF e""", (session["session_id"], session["session_id"])).fetchall()
         artifact = None
         if active:
@@ -356,6 +358,8 @@ class FeedStore:
         stale = self._validate_session(connection, session)
         session = self._refresh_preferences(connection, session)
         after = _decode_cursor(cursor)
+        from matching_engine.hypothesis_store import HypothesisStore
+        session = HypothesisStore.prepare(connection, session, after)
         rows = connection.execute("""SELECT e.*,d.action,
                 COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
                 COALESCE(v.last_assessment,'null'::jsonb) AS change_assessment
@@ -364,6 +368,7 @@ class FeedStore:
             LEFT JOIN feed_pipeline.visited v ON v.owner_id=e.owner_id AND v.vacancy_id=e.vacancy_id
                 AND v.candidate_id=e.candidate_id
             WHERE e.session_id=%s AND e.position>%s AND d.exposure_id IS NULL
+                AND NOT e.exploration_suppressed
                 AND NOT (e.candidate_id = ANY(%s::uuid[]))
             ORDER BY e.position LIMIT %s""", (session_id, after, list(stale), limit + 1)).fetchall()
         has_more = len(rows) > limit
@@ -374,6 +379,14 @@ class FeedStore:
             for row in rows:
                 row["served_at"] = row["served_at"] or connection.execute("SELECT now() AS value").fetchone()["value"]
                 LearningStore.event(connection, row, "delivered")
+            # Credit actual deliveries before signalling the end of this page:
+            # a feasible full-pool pair may create the next two slots now.
+            session = HypothesisStore.prepare(connection, session, rows[-1]["position"])
+            has_more = bool(connection.execute("""SELECT 1 FROM feed_pipeline.exposures e
+                LEFT JOIN feed_pipeline.decisions d USING(exposure_id) WHERE e.session_id=%s
+                AND e.position>%s AND d.exposure_id IS NULL AND NOT e.exploration_suppressed
+                AND NOT(e.candidate_id=ANY(%s::uuid[])) LIMIT 1""",
+                (session_id, rows[-1]["position"], list(stale))).fetchone())
         items = [self._card(row, badges=list(row["history_badges"] or [])) for row in rows]
         next_cursor = _encode_cursor(rows[-1]["position"]) if rows and has_more else None
         return FeedPage(session_id=session_id, vacancy_id=session["vacancy_id"], vacancy_revision=session["vacancy_revision"],
@@ -551,6 +564,8 @@ class FeedStore:
                 ON CONFLICT DO NOTHING""", (row["vacancy_id"],))
             connection.execute("UPDATE matching_pipeline.controls SET revision=revision+1 WHERE vacancy_id=%s", (row["vacancy_id"],))
             CombineStore(self.database_url)._queue(connection, row["vacancy_id"])
+            from matching_engine.hypothesis_store import HypothesisStore
+            HypothesisStore.seal(connection, row, vacancy)
             return FeedDecision(receipt_id=receipt_id, exposure_id=request.exposure_id, vacancy_id=row["vacancy_id"],
                 candidate_id=row["candidate_id"], action=request.action, idempotency_key=request.idempotency_key,
                 saved=request.action == "like", visited=request.action == "dislike", history_badges=badges)

@@ -25,7 +25,7 @@ class PreferenceStatus(Contract):
     job_state: str | None
     error_code: str | None
     policy_hash: str
-    selection_bias: Literal["deterministic_feedback_unknown_propensity"]
+    selection_bias: Literal["feedback_unknown_global_propensity", "deterministic_feedback_unknown_propensity"]
 
 
 class PreferenceCommand(Contract):

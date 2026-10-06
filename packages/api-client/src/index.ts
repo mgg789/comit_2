@@ -4,7 +4,7 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand,
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile } from "@comit/shared";
 
@@ -67,6 +67,14 @@ export interface ApiClient {
   resetPreferences(draftId: string, body: PreferenceCommand): Promise<PreferenceStatus>;
   /** Roll back the active live preference model using a revision-checked command. */
   rollbackPreferences(draftId: string, body: PreferenceCommand): Promise<PreferenceStatus>;
+  /** Read bounded comparison evidence for the employer's owned vacancy draft. */
+  getHypothesisStatus(draftId: string): Promise<HypothesisStatus>;
+  /** Pause exploration with a revision-checked idempotent control command. */
+  pauseHypotheses(draftId: string, body: PreferenceCommand): Promise<HypothesisStatus>;
+  /** Resume exploration with a revision-checked idempotent control command. */
+  resumeHypotheses(draftId: string, body: PreferenceCommand): Promise<HypothesisStatus>;
+  /** Invalidate prior hypothesis evidence and reset its budget using a CAS command. */
+  resetHypotheses(draftId: string, body: PreferenceCommand): Promise<HypothesisStatus>;
   /** Invite an eligible candidate using immutable vacancy terms and a UUID retry key. */
   inviteCandidate(draftId: string, body: InviteRequest): Promise<RecruitmentView>;
   /** Close a saved shortlist entry before inviting; this decision is employer-only. */
@@ -138,6 +146,10 @@ export function createApiClient({
     retryPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/retry`, body),
     resetPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/reset`, body),
     rollbackPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/rollback`, body),
+    getHypothesisStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses`),
+    pauseHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/pause`, body),
+    resumeHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/resume`, body),
+    resetHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/reset`, body),
     inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),
     rejectSavedCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment/reject`, body),
     getEmployerRecruitment: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment?limit=${limit}&offset=${offset}`),

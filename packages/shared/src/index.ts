@@ -22,6 +22,7 @@ export type {
   RerankCard, RerankPage, RerankRequest, RerankStatus,
   FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
   PreferenceStatus, PreferenceCommand,
+  HypothesisId, HypothesisSummary, HypothesisStatus,
 } from "./matching.js";
 
 export type Role = "candidate" | "employer";

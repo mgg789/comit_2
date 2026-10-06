@@ -222,3 +222,7 @@ reset исключил прежние реакции. Исходный private r
 истёкший во время fit. API:44 passed,1 skip внешнего QGramm сервиса; typecheck,
 build, scoped Ruff и `make smoke` (12/12) зелёные. Harrier E2E применил001–009;
 010 затем применена в той же БД и проверена финальными PG тестами и smoke.
+
+## Исследование предпочтений
+
+Теперь [сопоставимые гипотезы](hypothesis-learning.md) добавляют ограниченные случайные pair/order назначения. Ранние deterministic receipts остаются историческими; новые research receipts имеют условные вероятности. Global propensity неизвестна, learner/gates продолжают оценивать наблюдаемую механику, не causal gain. Status selection_bias допускает legacy deterministic marker и текущий `feedback_unknown_global_propensity`.

@@ -629,3 +629,11 @@ Owner может reset с cutoff либо rollback с выключением aut
 Harrier, R₀, строгие фильтры, tail и top-k граница прежние. Исследовательские
 показы и вероятности альтернативного выбора не реализованы; selection bias явен.
 [Реестр, команды и контракты](../docs/preference-learning.md).
+
+## Реализованный backend проверки гипотез —07.10.2026
+
+Следующий после live preference learner слой §§4–5 подключён к feed delivery. Новая additive011 migration хранит context/epoch controls, matched pair assignments и frozen20 decisive batches. Initial uncalibrated allocation2 research cards/18 ordinary unique deliveries, weighted feasible pair choice и50/50order фиксируются до показа. Full immutable main snapshot проходит прежние filters/source revisions/consent; candidate reserve/outside-top-k допускается с отдельным exploration sample_scope. Поиск ограничен5000snapshot/200comparison inputs и явно не объявляет исчерпание.
+
+H1–H8/H10 используют явные признаки/факты; H9 disabled до adjacency taxonomy. First20 decisive batch + approximate Wilson/Bonferroni10 фиксируется, поздние данные не перезапускают проверку. Неразмеченные/одинаковые реакции не решающие. Отзыв инвалидирует batch и очищает производные параметры без подстановки поздних примеров. Вывод локальный descriptive, не causal preference proof; learner получает исходные действия без двойного веса. Delivered positions/receipts неизменны, partial pair pinned, pause/resume/reset ownerCAS. Global propensity остаётся null при известных conditional pair/order probabilities.
+
+§6 normal buffer refill/exhaustion, frontend viewport/Tinder и server deployment отдельно. Контракты и команды: [docs/hypothesis-learning.md](../docs/hypothesis-learning.md).
