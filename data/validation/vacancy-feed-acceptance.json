@@ -1,0 +1,36 @@
+{
+  "result": "passed",
+  "checked_at": "2026-10-06T11:49:00+03:00",
+  "source_commit": "52d36e1",
+  "scope": "authenticated_backend_vacancy_feed",
+  "database": "comit_profile_acceptance_feed_final3",
+  "candidate_count": 4,
+  "top_k": 3,
+  "embedding_provider": "pinned_local_harrier_640d",
+  "rerank_mode": "main_fallback",
+  "smtp_used": false,
+  "checks": [
+    "real_http_auth_and_encrypted_mailbox",
+    "source_profile_projection_real_harrier_pool",
+    "manual_draft_approve_create_main_and_real_r0_fallback",
+    "public_feed_session_cursor_owner_pdf",
+    "like_saved_dislike_visited_idempotent",
+    "text_only_update_does_not_release_visited",
+    "grade_upgrade_n_gt_k_visited_updated_badge",
+    "rerun_released_badge_and_new_dislike_baseline"
+  ],
+  "verification": {
+    "matching_postgresql": {"passed": 519, "skipped": 0},
+    "api_postgresql": {"passed": 31, "skipped": 0},
+    "typecheck": "passed",
+    "build": "passed",
+    "scoped_ruff": "passed",
+    "smoke": {"passed": 14, "failed": 0},
+    "read_only_inspection": "ready_for_commit"
+  },
+  "limitations": [
+    "No learned reranker artifact was activated or quality-evaluated.",
+    "UI, personalized preference learning and production deployment are outside this scope.",
+    "Saved PDF expiry and withdrawal are covered by PostgreSQL integration tests; the HTTP scenario covers current exposure PDF consent guards."
+  ]
+}

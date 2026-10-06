@@ -380,3 +380,27 @@ Dislike и like в одной транзакции сохраняют решен
 Метрика и начальные веса: [политика изменения](feed-change-policy.md).
 Обучение персональных предпочтений использует эту историю в следующем проходе;
 в этом контуре реакция не переписывает уровни, доказательства или ML-score.
+
+## Приёмка ленты, 06.10.2026
+
+В отдельной локальной БД четыре кандидата прошли email-код, source profile,
+projection, настоящий Harrier640 и PDF. Работодатель создал вакансию, получил
+main top-k=3 и порцию R₀ в явном `main_fallback`. Реальные HTTP-запросы проверили
+курсор, анонимный PDF, like/saved, dislike/visited и идемпотентный повтор реакции.
+Правка текста сохранила visited с N=0; повышение грейда дало N>K,
+`visited_updated`, повторный подбор и бадж. Повторный dislike установил новый
+baseline, сохранив предыдущую историю. SMTP и внешние модели не вызывались.
+
+После интеграции с `dev` выполнены 519 matching-тестов с PostgreSQL без пропусков;
+31 API-тест с PostgreSQL, `pnpm typecheck`, `pnpm build`, scoped Ruff и smoke14
+также прошли. PG-регрессии отдельно проверяют две одновременные реакции,
+конфликт idempotency key, повтор candidate.ready, legacy baseline при отстающем
+пуле, сохранённую карточку после TTL и её блокировку после отзыва из пула.
+Команды: `python -m pytest services/matching-engine/tests -q` с отдельным
+`PIPELINE_TEST_DATABASE_URL`; `pnpm exec tsx --test --test-concurrency=1 tests/*.test.ts`
+из `apps/api` с четырьмя test database env; `python tests/vacancy_feed_acceptance.py`
+с отдельным `FEED_ACCEPTANCE_DATABASE_URL`; `./tests/smoke.sh` с портами локального контура.
+
+[Отчёт приёмки](../data/validation/vacancy-feed-acceptance.json) фиксирует область
+и ограничения. Обучение предпочтений, качество активной learned-модели, UI и
+production deployment этой проверкой не подтверждаются.
