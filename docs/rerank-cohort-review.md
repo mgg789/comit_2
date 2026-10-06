@@ -21,6 +21,8 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 
 Файлы: `assistant-packet.json`, `assistant-packet.md`, `user-packet.json`,
 `user-packet.md`. Каждый JSON содержит `packet_hash`, исходные hashes и 20 cases.
+В ответе нужно скопировать поле `packet_hash` из JSON: это канонический seal
+содержимого без самого hash-поля, а не SHA-256 байтов Markdown/JSON-файла.
 `pair_id`, `family_id`, `a_index`, `b_index` связывают ответ с точными исходными
 профилями. Description доступно как исходный текст; оно не устанавливает
 длительность, эксплуатацию, роль или другие типизированные факты. Уровни 0–7
