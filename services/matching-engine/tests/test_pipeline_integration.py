@@ -38,7 +38,7 @@ def store() -> Store:
             TRUNCATE """ + matching_tables + """ vacancy_pipeline.outbox,vacancy_pipeline.jobs,vacancy_pipeline.ready,
                      vacancy_pipeline.vacancies,candidate_pipeline.outbox,candidate_pipeline.jobs,candidate_pipeline.pool,
                      candidate_pipeline.candidates,candidate_pipeline.embedding_cache
-            RESTART IDENTITY
+            RESTART IDENTITY CASCADE
         """)
         connection.execute("INSERT INTO rerank_pipeline.settings(singleton) VALUES(true)")
         connection.execute("UPDATE candidate_pipeline.settings SET active_schema_version=1")

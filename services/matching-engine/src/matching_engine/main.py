@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 
 from matching_engine.combine_routes import combine_router
 from matching_engine.combine_store import CombineStore
+from matching_engine.feed_routes import feed_router
+from matching_engine.feed_store import FeedStore
 from matching_engine.models import (
     CandidateProfile,
     CandidateStatus,
@@ -30,7 +32,8 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                encoder_ready: Callable[[], bool] | None = None,
                vacancy_store: VacancyStore | None = None,
                combine_store: CombineStore | None = None,
-               rerank_store: RerankStore | None = None) -> FastAPI:
+               rerank_store: RerankStore | None = None,
+               feed_store: FeedStore | None = None) -> FastAPI:
     """Build routes without DB/model side effects; injected dependencies support tests only."""
     database_url = os.environ.get("DATABASE_URL")
     pipeline_store = store if store is not None else (Store(database_url) if database_url else None)
@@ -42,6 +45,9 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     )
     rerank_repository = rerank_store if rerank_store is not None else (
         RerankStore(pipeline_store.database_url) if pipeline_store is not None else None
+    )
+    feed_repository = feed_store if feed_store is not None else (
+        FeedStore(pipeline_store.database_url) if pipeline_store is not None else None
     )
     token = internal_token if internal_token is not None else os.environ.get("CANDIDATE_PIPELINE_TOKEN")
     app = FastAPI(
@@ -91,6 +97,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
             "vacancy_database": vacancy_repository is not None and vacancy_repository.ready(),
             "matching_database": combine_repository is not None and combine_repository.ready(),
             "rerank_database": rerank_repository is not None and rerank_repository.ready(),
+            "feed_database": feed_repository is not None and feed_repository.ready(),
         }
         available = all(checks.values())
         if not available:
@@ -161,4 +168,5 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     app.include_router(vacancy_router(vacancy_repository, require_internal))
     app.include_router(combine_router(combine_repository, require_internal))
     app.include_router(rerank_router(rerank_repository, require_internal))
+    app.include_router(feed_router(feed_repository, require_internal))
     return app

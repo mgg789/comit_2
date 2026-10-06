@@ -1,6 +1,6 @@
 /** Browser/API-client gateways derive ownership from authenticated accounts, never request headers. */
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods } from "fastify";
-import type { AgentsDraftView, CandidateCard, SelectionPage } from "@comit/shared";
+import type { AgentsDraftView, CandidateCard, FeedCard, SelectionPage } from "@comit/shared";
 import type { ProfileStore } from "../profiles/store.js";
 import agentsSpec from "../contracts/agents.openapi.json" with { type: "json" };
 import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { type: "json" };
@@ -126,12 +126,133 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     } catch { return reply.code(503).send({ detail: "pipeline_unavailable" }); }
   });
 
-  const selectionCurrent = async (items: CandidateCard[]) => {
+  const selectionCurrent = async (items: Pick<CandidateCard, "candidate_id" | "profile_revision">[]) => {
     if (!options.profiles) return false;
     const profiles = options.profiles;
     const results = await Promise.all(items.map(item => profiles.isSelectionCurrent(item.candidate_id, item.profile_revision)));
     return results.every(Boolean);
   };
+  const querySchema = (name: string, schema: Schema): Schema => {
+    // URL parameters are strings; global intake validation intentionally disables coercion.
+    if (name === "limit") return { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" };
+    if (name === "offset") return { type: "string", pattern: "^(0|[1-9][0-9]*)$", maxLength: 15 };
+    if (name === "cursor") return { type: "string", pattern: "^[A-Za-z0-9_-]{1,30}$" };
+    return refs(schema, "matching");
+  };
+  // Feed contracts come from the same generated OpenAPI as the private engine.
+  for (const [path, methods] of Object.entries(engineSpec.paths)) {
+    const match = /^\/internal\/vacancies\/\{vacancy_id\}(\/(?:feed|saved|visited)(?:\/.*)?)$/.exec(path);
+    if (!match) continue;
+    const suffix = match[1]!;
+    for (const [method, raw] of Object.entries(methods)) {
+      if (!["get", "post"].includes(method)) continue;
+      const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
+        requestBody?: { content: { "application/json": { schema: Schema } } };
+        responses: { "200"?: { content?: { "application/json"?: { schema: Schema } } } } };
+      const params = operation.parameters?.filter(value => value.in === "path" && value.name !== "vacancy_id") ?? [];
+      const queries = operation.parameters?.filter(value => value.in === "query") ?? [];
+      const response = operation.responses["200"]?.content?.["application/json"]?.schema;
+      app.route<{ Params: { draft_id: string; [key: string]: string } }>({
+        method: method.toUpperCase() as HTTPMethods,
+        url: `/employer/vacancy-drafts/:draft_id${suffix.replace(/\{([^}]+)\}/g, ":$1")}`,
+        schema: { tags: ["employer-feed"], security: [{ bearerAuth: [] }, { employerSession: [] }],
+          params: { type: "object", additionalProperties: false, required: ["draft_id", ...params.map(value => value.name)],
+            properties: { draft_id: { type: "string", format: "uuid" }, ...Object.fromEntries(params.map(value => [value.name, refs(value.schema, "matching")])) } },
+          ...(queries.length ? { querystring: { type: "object", additionalProperties: false,
+            properties: Object.fromEntries(queries.map(value => [value.name, querySchema(value.name, value.schema)])) } } : {}),
+          ...(operation.requestBody ? { body: refs(operation.requestBody.content["application/json"].schema, "matching") } : {}),
+          ...(response ? { response: { 200: refs(response, "matching") } } : {}),
+        }, onRequest: guard("employer"), handler: async (request, reply) => {
+          const identity = identities.get(request);
+          if (!identity || !agentsToken || !matchingToken || !options.profiles) return reply.code(503).send({ detail: "feed_unavailable" });
+          const headers = { "x-internal-token": matchingToken, "x-owner-id": identity.accountId, "content-type": "application/json" };
+          reply.header("cache-control", "no-store");
+          try {
+            const draftResult = await transport(new URL(`/internal/vacancy-drafts/${request.params.draft_id}`, agentsUrl), {
+              headers: { "x-internal-token": agentsToken, "x-owner-id": identity.accountId }, signal: AbortSignal.timeout(10000), redirect: "error" });
+            if (!draftResult.ok) return reply.code(draftResult.status).send({ detail: "owner_record_not_found" });
+            const draft = await draftResult.json() as AgentsDraftView;
+            if (draft.owner_id !== identity.accountId || draft.draft_id !== request.params.draft_id) return reply.code(404).send({ detail: "owner_record_not_found" });
+            if (draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
+            const resolved = suffix.replace(/\{([^}]+)\}/g, (_full, key: string) => encodeURIComponent(request.params[key]!));
+            const upstream = new URL(`/internal/vacancies/${draft.vacancy_id}${resolved}`, matchingUrl);
+            upstream.search = new URL(request.url, "http://gateway.invalid").search;
+            if (method === "post" && suffix === "/feed/decisions") {
+              const body = request.body as { exposure_id: string; idempotency_key: string };
+              const receipt = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}/feed/decisions/${encodeURIComponent(body.idempotency_key)}`, matchingUrl), {
+                headers, signal: AbortSignal.timeout(10000), redirect: "error" });
+              if (receipt.status === 404) {
+                const exposure = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}/feed/exposures/${encodeURIComponent(body.exposure_id)}`, matchingUrl), {
+                  headers, signal: AbortSignal.timeout(10000), redirect: "error" });
+                if (!exposure.ok) return reply.code(exposure.status).send(await exposure.json());
+                const item = await exposure.json() as FeedCard;
+                if (item.exposure_id !== body.exposure_id || !await selectionCurrent([item])) return reply.code(409).send({ detail: "feed_source_obsolete" });
+              } else if (!receipt.ok) return reply.code(receipt.status).send(await receipt.json());
+            }
+            const result = await transport(upstream, { method: method.toUpperCase(), headers,
+              ...(method === "post" ? { body: JSON.stringify(request.body) } : {}), signal: AbortSignal.timeout(10000), redirect: "error" });
+            const payload: unknown = await result.json();
+            if (!result.ok) return reply.code(result.status).send(payload);
+            // Every card-bearing response must pass the API-owned source consent watermark.
+            const cards: Pick<CandidateCard, "candidate_id" | "profile_revision">[] = [];
+            const scan = (value: unknown): void => {
+              if (!value || typeof value !== "object") return;
+              if (Array.isArray(value)) { value.forEach(scan); return; }
+              const record = value as Record<string, unknown>;
+              if (typeof record.candidate_id === "string" && typeof record.profile_revision === "number" && "resume_url" in record) cards.push({ candidate_id: record.candidate_id, profile_revision: record.profile_revision });
+              else Object.values(record).forEach(scan);
+            };
+            scan(payload);
+            if (!await selectionCurrent(cards)) return reply.code(409).send({ detail: "feed_source_obsolete" });
+            const rewrite = (value: unknown, exposureId?: string): unknown => {
+              if (!value || typeof value !== "object") return value;
+              if (Array.isArray(value)) return value.map(item => rewrite(item, exposureId));
+              const record = value as Record<string, unknown>;
+              const currentExposure = typeof record.exposure_id === "string" ? record.exposure_id : exposureId;
+              return Object.fromEntries(Object.entries(record).map(([key, child]) => [key,
+                key === "resume_url" && currentExposure ? `/api/employer/vacancy-drafts/${draft.draft_id}/feed/exposures/${currentExposure}/resume.pdf` : rewrite(child, currentExposure)]));
+            };
+            return reply.send(rewrite(payload));
+          } catch { return reply.code(503).send({ detail: "feed_unavailable" }); }
+        },
+      });
+    }
+  }
+  app.get<{ Params: { draft_id: string; exposure_id: string } }>("/employer/vacancy-drafts/:draft_id/feed/exposures/:exposure_id/resume.pdf", {
+    schema: { tags: ["employer-feed"], security: [{ bearerAuth: [] }, { employerSession: [] }],
+      params: { type: "object", additionalProperties: false, required: ["draft_id", "exposure_id"],
+        properties: { draft_id: { type: "string", format: "uuid" }, exposure_id: { type: "string", format: "uuid" } } },
+      response: { 200: { type: "string", format: "binary" } }, produces: ["application/pdf"] }, onRequest: guard("employer"),
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity || !agentsToken || !matchingToken || !options.profiles) return reply.code(503).send({ detail: "feed_unavailable" });
+    const headers = { "x-internal-token": matchingToken, "x-owner-id": identity.accountId };
+    reply.header("cache-control", "no-store");
+    try {
+      const draftResult = await transport(new URL(`/internal/vacancy-drafts/${request.params.draft_id}`, agentsUrl), {
+        headers: { "x-internal-token": agentsToken, "x-owner-id": identity.accountId }, signal: AbortSignal.timeout(10000), redirect: "error" });
+      if (!draftResult.ok) return reply.code(draftResult.status).send({ detail: "owner_record_not_found" });
+      const draft = await draftResult.json() as AgentsDraftView;
+      if (draft.owner_id !== identity.accountId || draft.draft_id !== request.params.draft_id) return reply.code(404).send({ detail: "owner_record_not_found" });
+      if (draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
+      const exposureUrl = new URL(`/internal/vacancies/${draft.vacancy_id}/feed/exposures/${request.params.exposure_id}`, matchingUrl);
+      const exposure = await transport(exposureUrl, { headers, signal: AbortSignal.timeout(10000), redirect: "error" });
+      if (!exposure.ok) return reply.code(exposure.status).send(await exposure.json());
+      const item = await exposure.json() as FeedCard;
+      if (!await selectionCurrent([item])) return reply.code(409).send({ detail: "feed_source_obsolete" });
+      const resume = await transport(new URL(`/internal/pool/${item.candidate_id}/resume.pdf`, matchingUrl), {
+        headers, signal: AbortSignal.timeout(10000), redirect: "error" });
+      if (!resume.ok) return reply.code(resume.status).send(await resume.json());
+      const bytes = Buffer.from(await resume.arrayBuffer());
+      const checked = await transport(exposureUrl, { headers, signal: AbortSignal.timeout(10000), redirect: "error" });
+      if (!checked.ok) return reply.code(409).send({ detail: "feed_source_obsolete" });
+      const checkedItem = await checked.json() as FeedCard;
+      if (item.exposure_id !== request.params.exposure_id || checkedItem.exposure_id !== item.exposure_id
+        || checkedItem.candidate_id !== item.candidate_id || checkedItem.profile_revision !== item.profile_revision
+        || !await selectionCurrent([checkedItem])) return reply.code(409).send({ detail: "feed_source_obsolete" });
+      return reply.type("application/pdf").header("x-content-type-options", "nosniff").send(bytes);
+    } catch { return reply.code(503).send({ detail: "feed_unavailable" }); }
+  });
   const publicRoutes = [
     { method: "GET", suffix: "/ready", upstream: "/ready", response: "VacancyReady" },
     { method: "POST", suffix: "/combine", upstream: "/combine", body: "CombineRequest", response: "CombineStatus" },

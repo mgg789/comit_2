@@ -1698,6 +1698,620 @@
           }
         }
       }
+    },
+    "/internal/vacancies/{vacancy_id}/feed": {
+      "post": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Open Feed",
+        "description": "Open a fresh 24-hour session for the owned vacancy.",
+        "operationId": "open_feed_internal_vacancies__vacancy_id__feed_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/feed/decisions": {
+      "post": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Decide",
+        "description": "Record one like or dislike and return a replay-safe receipt.",
+        "operationId": "decide_internal_vacancies__vacancy_id__feed_decisions_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/feed/decisions/{idempotency_key}": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Read Receipt",
+        "description": "Read a prior receipt before a source freshness precheck.",
+        "operationId": "read_receipt_internal_vacancies__vacancy_id__feed_decisions__idempotency_key__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency Key"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedDecision"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/feed/exposures/{exposure_id}": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Read Exposure",
+        "description": "Validate current source membership for action and redacted-PDF access.",
+        "operationId": "read_exposure_internal_vacancies__vacancy_id__feed_exposures__exposure_id__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "exposure_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Exposure Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedCard"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/feed/{session_id}": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Continue Feed",
+        "description": "Continue one immutable session with an opaque stable position cursor.",
+        "operationId": "continue_feed_internal_vacancies__vacancy_id__feed__session_id__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/saved": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Saved",
+        "description": "List saved candidates for this employer and vacancy.",
+        "operationId": "saved_internal_vacancies__vacancy_id__saved_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedListPage_SavedCard_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/visited": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Visited",
+        "description": "List visited baselines and history badges for this vacancy.",
+        "operationId": "visited_internal_vacancies__vacancy_id__visited_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedListPage_VisitedCard_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2484,6 +3098,461 @@
         ],
         "title": "DeliveryStatus",
         "description": "Persisted acknowledgement counts for the two outbox streams and combine queue."
+      },
+      "FeedCard": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          },
+          "filter_factors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Filter Factors"
+          },
+          "explanation": {
+            "$ref": "#/components/schemas/ScoreBreakdown"
+          },
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "recommended",
+              "reserve"
+            ],
+            "title": "Kind"
+          },
+          "main_position": {
+            "type": "integer",
+            "title": "Main Position"
+          },
+          "rerank_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Position"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "learned",
+              "main_fallback"
+            ],
+            "title": "Mode"
+          },
+          "rerank_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rerank Score"
+          },
+          "rerank_contributions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Rerank Contributions"
+          },
+          "artifact_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Hash"
+          },
+          "served_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Served At"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "like",
+                  "dislike"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "history_badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "History Badges"
+          },
+          "change_assessment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Assessment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "position",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "resume_url",
+          "explanation",
+          "exposure_id",
+          "session_id",
+          "kind",
+          "main_position",
+          "rerank_position",
+          "mode",
+          "rerank_score",
+          "artifact_hash"
+        ],
+        "title": "FeedCard",
+        "description": "A served exposure with immutable source identity and feedback metadata."
+      },
+      "FeedDecision": {
+        "properties": {
+          "receipt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Receipt Id"
+          },
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "like",
+              "dislike"
+            ],
+            "title": "Action"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "visited": {
+            "type": "boolean",
+            "title": "Visited"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
+          },
+          "history_badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "History Badges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "receipt_id",
+          "exposure_id",
+          "vacancy_id",
+          "candidate_id",
+          "action",
+          "idempotency_key",
+          "saved",
+          "visited"
+        ],
+        "title": "FeedDecision",
+        "description": "Durable action receipt; replay returns the same receipt without reapplying it."
+      },
+      "FeedDecisionRequest": {
+        "properties": {
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "like",
+              "dislike"
+            ],
+            "title": "Action"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "exposure_id",
+          "action",
+          "idempotency_key"
+        ],
+        "title": "FeedDecisionRequest",
+        "description": "One explicit action bound to a served exposure and caller idempotency key."
+      },
+      "FeedListPage_SavedCard_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SavedCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "FeedListPage[SavedCard]"
+      },
+      "FeedListPage_VisitedCard_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VisitedCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "limit",
+          "offset",
+          "has_more"
+        ],
+        "title": "FeedListPage[VisitedCard]"
+      },
+      "FeedPage": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "vacancy_revision": {
+            "type": "integer",
+            "title": "Vacancy Revision"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedCard"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "vacancy_id",
+          "vacancy_revision",
+          "policy_hash",
+          "expires_at",
+          "cursor",
+          "next_cursor",
+          "has_more",
+          "items"
+        ],
+        "title": "FeedPage",
+        "description": "Stable position-cursor page from one 24-hour immutable session."
+      },
+      "FeedRequest": {
+        "properties": {
+          "include_reserve": {
+            "type": "boolean",
+            "title": "Include Reserve",
+            "default": false
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FeedRequest",
+        "description": "Open one immutable feed session for a vacancy owned by the caller."
       },
       "GradeResult": {
         "properties": {
@@ -3396,6 +4465,56 @@
         "title": "SalaryRange",
         "description": "Inclusive salary bounds in RUB; zero is allowed for unpaid internships."
       },
+      "SavedCard": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Saved At"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeedCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "candidate_id",
+          "profile_revision",
+          "exposure_id",
+          "saved_at",
+          "card"
+        ],
+        "title": "SavedCard",
+        "description": "An employer-scoped saved candidate projection with its source revision."
+      },
       "ScoreBreakdown": {
         "properties": {
           "rating_score": {
@@ -3531,7 +4650,8 @@
               "eligible",
               "visited",
               "pending",
-              "attractive"
+              "attractive",
+              "visited_updated"
             ],
             "title": "State"
           },
@@ -3575,7 +4695,7 @@
           "state"
         ],
         "title": "SelectionStateInput",
-        "description": "Server-side handoff for exclusion state; visited is permanently terminal for this vacancy."
+        "description": "Trusted handoff cannot manually release visited; feed policy owns structural release."
       },
       "Skill": {
         "properties": {
@@ -4258,6 +5378,103 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VisitedCard": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "evaluated_revision": {
+            "type": "integer",
+            "title": "Evaluated Revision"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "eligible",
+              "visited",
+              "visited_updated",
+              "pending",
+              "attractive"
+            ],
+            "title": "State"
+          },
+          "exposure_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exposure Id"
+          },
+          "baseline_origin": {
+            "type": "string",
+            "enum": [
+              "exposure",
+              "legacy_migration"
+            ],
+            "title": "Baseline Origin"
+          },
+          "visited_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visited At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "history_badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "History Badges"
+          },
+          "assessment": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Assessment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "candidate_id",
+          "profile_revision",
+          "evaluated_revision",
+          "state",
+          "exposure_id",
+          "baseline_origin",
+          "visited_at",
+          "updated_at"
+        ],
+        "title": "VisitedCard",
+        "description": "An employer-scoped visited baseline retaining history across re-impressions."
       }
     }
   }

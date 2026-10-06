@@ -242,13 +242,15 @@ class DeliveryRetryRequest(Contract):
 
 
 class SelectionStateInput(Contract):
-    """Server-side handoff for exclusion state; visited is permanently terminal for this vacancy."""
+    """Trusted handoff cannot manually release visited; feed policy owns structural release."""
 
     state: Literal["eligible", "visited", "pending", "attractive"]
 
 
 class SelectionState(SelectionStateInput):
     """Persisted exclusion state, independent of disposable shortlist generations."""
+
+    state: Literal["eligible", "visited", "pending", "attractive", "visited_updated"]
 
     vacancy_id: UUID
     candidate_id: UUID
