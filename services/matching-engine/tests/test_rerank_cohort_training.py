@@ -132,8 +132,8 @@ def corpus_root(tmp_path_factory):
     _write(root / "semantic-cache.json", {})
     _write(target / "semantic-cache.json", {})
     _write(root / "rerank-grounded-cohort-v1/manifest.json", {"ledger_before": {"generation": 0}})
-    before = {"generation": 60, "pair": 24, "grade": 0}
-    after = {"generation": 60, "pair": 1484, "grade": 430}
+    before = {"generation": 60, "pair": 52, "grade": 0}
+    after = {"generation": 60, "pair": 1512, "grade": 430}
     attempts = {"generation": 0, "pair": 1460, "grade": 430}
     bound, accounting = _spent_profiles(root, 60, 0)
     code_names = ("rerank_cohort.py", "rerank_cohort_provider.py", "rerank_cohort_features.py", "rerank_description_repair.py",
@@ -411,17 +411,17 @@ def repaired_root(corpus_root, tmp_path_factory):
     shutil.copytree(corpus_root, root, copy_function=os.link)
     base = root / module.DEFAULT_COHORT
     dataset = json.loads((base / "dataset.json").read_text())
-    family = next(row for row in dataset["families"] if row["manifest"]["family_id"] == "backend-01")
+    family = next(row for row in dataset["families"] if row["manifest"]["family_id"] == "backend-02")
     provider = CohortProviders(root / "provider-cache", cohort_id=module.DEFAULT_COHORT)
     indices = list(itertools.combinations(range(7), 2))
     for position in (1, 2):
         a, b = indices[(0, 7, 14)[position]]
-        family["swap_answers"][position] = _pair(root, provider, base, f"backend-01-pair-{b}-{a}",
+        family["swap_answers"][position] = _pair(root, provider, base, f"backend-02-pair-{b}-{a}",
             family["vacancy"], family["traits"][b], family["traits"][a], family["manifest"]["policy"], "B")
     family["swap_audits"], family["quarantined"] = [True, False, False], True
-    pinned = _write(base / "families/backend-01.json", family, "record_hash")
-    dataset["families"] = [pinned if row["manifest"]["family_id"] == "backend-01" else row for row in dataset["families"]]
-    dataset["quality"].update(swap_correct=178, quarantined_families=["backend-01"], passed=False)
+    pinned = _write(base / "families/backend-02.json", family, "record_hash")
+    dataset["families"] = [pinned if row["manifest"]["family_id"] == "backend-02" else row for row in dataset["families"]]
+    dataset["quality"].update(swap_correct=178, quarantined_families=["backend-02"], passed=False)
     dataset = _write(base / "dataset.json", dataset, "dataset_hash")
     report = json.loads((base / "report.json").read_text())
     report.update(dataset_hash=dataset["dataset_hash"], quality=dataset["quality"])
@@ -439,8 +439,8 @@ def repaired_root(corpus_root, tmp_path_factory):
 
         patch.setattr(pair_repair.PairRepairProviders, "_open", opened)
         repaired = pair_repair.run_pair_repair(root)
-        assert repaired["quality"]["passed"] and len(repaired["selected_families"]) == 16
-        assert "backend-01" in repaired["selected_families"]
+        assert repaired["quality"]["passed"] and len(repaired["selected_families"]) == 17
+        assert "backend-02" in repaired["selected_families"]
     target = root / pair_repair.VERSION
     packet = json.loads((target / "reviews/assistant-packet.json").read_text())
     manual = {"packet_hash": packet["packet_hash"], "reviewer_kind": "assistant", "labels": [
@@ -459,6 +459,7 @@ def repaired(repaired_root, tmp_path, monkeypatch):
     root = tmp_path / "artifacts"
     shutil.copytree(repaired_root, root, copy_function=os.link)
     target = root / pair_repair.VERSION
+    _fixture_historical_pins(root, monkeypatch)
     # Nomination is pinned to its original reviewed bytes, not to this copied path.
     monkeypatch.setattr(HarrierEncoder, "encode", lambda *_: pytest.fail("Harrier inference during repair fit"))
     for provider in (CohortProviders, pair_repair.PairRepairProviders):
@@ -491,6 +492,22 @@ def test_verified_pair_repair_can_train_after_base_quality_failure_in_own_namesp
     assert not report["raw_teacher_quality"]["passed"] and report["effective_teacher_quality"]["passed"]
     assert report["namespace"] == pair_repair.VERSION and report["pair_repair"]["base_dataset_hash"] != report["pinned"]["dataset_hash"]
     assert not report["activation_allowed"] and report["derived_pair_corrections"] == 0
+    provenance = report["label_provenance"]
+    assert provenance["validation_entirely_rule_derived"] and provenance["golden_oracle_families"] == 0
+    assert provenance["split_counts"]["rule_derived_class_only"] == {"train": 8, "validation": 8, "calibration": 0, "golden": 0}
+    assert provenance["oracle_local_receipts"] == 384 and provenance["oracle_remote_calls"] == 0
+    assert provenance["oracle_code_hash"] == report["pair_repair"]["oracle_code_hash"]
+    quality = report["effective_label_quality"]
+    assert quality["swap_total"] == 132 and quality["oracle_swap_total"] == 48
+    assert quality["teacher_passed"] and quality["oracle_passed"] and report["effective_quality_has_mixed_label_sources"]
+    assert report["label_source_metrics"]["llm_pair_teacher"]["validation"]["golden_families"] == 0
+    assert report["label_source_metrics"]["llm_pair_teacher"]["golden"]["golden_families"] == 12
+    assert report["label_source_metrics"]["rule_derived_class_only"]["validation"]["golden_families"] == 8
+    assert report["concurrent_pair_attempts"]["charged_pair_attempts"] == 52
+    assert all(not row["pilot_passed"] for row in report["concurrent_pair_attempts"]["pilots"].values())
+    reconciliation = report["pair_repair"]["charge_reconciliation"]
+    assert reconciliation["pilot_charges_already_in_base"] == 0
+    assert reconciliation["additional_charged_pair_attempts"] == 8 + 24
     semantics = report["policy_evaluation"]
     assert semantics["suitability_policy_original"] and not semantics["independent_suitability_regraded"]
     assert len(semantics["families_with_different_pair_and_suitability_policy"]) == 16
@@ -509,7 +526,7 @@ def test_verified_pair_repair_can_train_after_base_quality_failure_in_own_namesp
     assert module.compare_test_only_review(root, manual, derived_dataset_file=target / "dataset.json")["agreements"] == 20
 
 
-@pytest.mark.parametrize("mutation", ["old_review", "failed_quality", "feature", "grade", "raw_pair", "base_pair", "policy", "comparison", "path"])
+@pytest.mark.parametrize("mutation", ["old_review", "failed_quality", "feature", "grade", "raw_pair", "base_pair", "policy", "comparison", "path", "oracle_receipt", "extra_oracle_receipt", "teacher_180", "oracle_gold", "source_metrics"])
 def test_derived_repair_requires_exact_provenance_and_new_review_before_fit(repaired, monkeypatch, mutation):
     root, target, manual = repaired
     base = root / module.DEFAULT_COHORT
@@ -527,7 +544,7 @@ def test_derived_repair_requires_exact_provenance_and_new_review_before_fit(repa
         _write(target / "dataset.json", value, "dataset_hash")
     elif mutation in ("raw_pair", "base_pair"):
         folder = target if mutation == "raw_pair" else base
-        job = json.loads((folder / "jobs/backend-01-pair-0-1-0.json").read_text())
+        job = json.loads((folder / "jobs/backend-02-pair-0-1-0.json").read_text())
         path = root / "provider-cache" / f'{job["request_hash"]}.json'
         value = json.loads(path.read_text())
         value["response"]["choices"][0]["message"]["content"] = "{}"
@@ -542,6 +559,28 @@ def test_derived_repair_requires_exact_provenance_and_new_review_before_fit(repa
         value = json.loads(path.read_text())
         value["pair_repair_report_hash"] = "wrong"
         _write(path, value, "report_hash")
+    elif mutation in ("oracle_receipt", "extra_oracle_receipt"):
+        path = target / "oracle-receipts/backend-01-pair-0-1.json"
+        value = json.loads(path.read_text())
+        if mutation == "oracle_receipt":
+            value["oracle_code_hash"] = "different-rule-source"
+            _write(path, value, "record_hash")
+        else:
+            _write(path.with_name("unadmitted-local-receipt.json"), value, "record_hash")
+    elif mutation in ("teacher_180", "oracle_gold", "source_metrics"):
+        value = json.loads((target / "dataset.json").read_text())
+        if mutation == "teacher_180":
+            value["quality"].update(swap_correct=180, swap_total=180)
+        elif mutation == "oracle_gold":
+            family = next(row for row in value["families"] if row["manifest"]["split"] == "golden")
+            family["pair_repair"] = {"label_source": "rule_derived_class_only"}
+            family["teacher"] = {"label_source": "rule_derived_class_only", "model": None}
+        else:
+            value["source_metrics"]["rule_derived_class_only"]["families"] = 17
+        value = _write(target / "dataset.json", value, "dataset_hash")
+        repaired_report = json.loads((target / "repair-report.json").read_text())
+        repaired_report.update(dataset_hash=value["dataset_hash"], quality=value["quality"], source_metrics=value["source_metrics"])
+        _write(target / "repair-report.json", repaired_report, "report_hash")
     derived = target / "dataset.json" if mutation != "path" else base / "dataset.json"
     with pytest.raises((ValueError, KeyError)):
         module.run_test_only_training(root, assistant_review_file=manual, derived_dataset_file=derived)
@@ -608,45 +647,47 @@ def concurrent_root(corpus_root, tmp_path_factory):
     shutil.copytree(corpus_root, root, copy_function=os.link)
     base = root / module.DEFAULT_COHORT
     _historical_fixture(root)
-    absent = (base / "dataset.json", max((base / "families").glob("*.json")))
-    for path in absent:
-        path.rename(path.with_suffix(".pending"))
-    try:
-        with pytest.MonkeyPatch.context() as patch:
-            patch.setattr(pair_repair.PairRepairProviders, "_api_key", lambda _: "offline-test-key")
-
-            def opened(_, request):
-                state = json.loads(json.loads(request.data)["messages"][1]["content"])
-                answer = repair_answer(state["vacancy"], state["A"], state["B"], state["policy"])
-                response = {"model": "qwen3.8-27b", "choices": [{"finish_reason": "stop", "message": {
-                    "content": json.dumps(answer, ensure_ascii=False)}}]}
-                return io.BytesIO(json.dumps(response).encode())
-
-            patch.setattr(pair_repair.PairRepairProviders, "_open", opened)
-            pair_repair.run_pair_repair(root, pilot_only=True)
-    finally:
-        for path in absent:
-            path.with_suffix(".pending").rename(path)
-    report = json.loads((base / "report.json").read_text())
-    report["ledger_after"] = json.loads((root / "provider-cache/usage.json").read_text())
-    _write(base / "report.json", report, "report_hash")
+    assert (base / "dataset.json").is_file()
     return root
 
 
 def _historical_fixture(root):
-    """Use the repair suite's audited failed pilot, charged before this fixture's base."""
-    _previous_fixture(root)
-    target = root / pair_repair.PREVIOUS_VERSION
-    before = json.loads((root / module.DEFAULT_COHORT / "manifest.json").read_text())["ledger_before"]
-    manifest = json.loads((target / "pilot-manifest.json").read_text())
-    manifest["ledger_before_pilot"] = {**before, "pair": before["pair"] - 24}
-    manifest = _write(target / "pilot-manifest.json", manifest, "manifest_hash")
-    report = json.loads((target / "pilot-report.json").read_text())
-    report["pilot_manifest_hash"] = manifest["manifest_hash"]
-    report = _write(target / "pilot-report.json", report, "report_hash")
-    closure = json.loads((target / "closure-observation.json").read_text())
-    closure.update(pilot_manifest_hash=manifest["manifest_hash"], pilot_report_hash=report["report_hash"], global_ledger=before)
-    _write(target / "closure-observation.json", closure, "observation_hash")
+    """Replay both failed legacy raw pilots during the base's open accounting window."""
+    base = root / module.DEFAULT_COHORT
+    base_manifest = json.loads((base / "manifest.json").read_text())
+    snapshot = deepcopy(base_manifest["ledger_before"])
+    for version, spec in pair_repair.PRIOR_REPAIRS.items():
+        _previous_fixture(root, version)
+        target = root / version
+        manifest = json.loads((target / "pilot-manifest.json").read_text())
+        manifest.update(version=version, base_cohort=module.DEFAULT_COHORT,
+                        ledger_before_pilot=deepcopy(snapshot), pinned_base_family_audits={})
+        manifest = _write(target / "pilot-manifest.json", manifest, "manifest_hash")
+        snapshot["pair"] += 20 + spec["retry"]
+        report = json.loads((target / "pilot-report.json").read_text())
+        report.update(pilot_manifest_hash=manifest["manifest_hash"], generation_calls=0, grade_calls=0,
+                      activation_allowed=False, ledger_after_pilot=deepcopy(snapshot))
+        report = _write(target / "pilot-report.json", report, "report_hash")
+        closure = json.loads((target / "closure-observation.json").read_text())
+        closure.update(pilot_manifest_hash=manifest["manifest_hash"], pilot_report_hash=report["report_hash"],
+                       global_ledger=deepcopy(snapshot), base_cohort=module.DEFAULT_COHORT,
+                       base_completed_families=38, observer_kind="assistant", observed_at="2026-10-06T10:00:00+00:00",
+                       base_attempt_budget={"generation": 0, "pair": 1, "grade": 0})
+        _write(target / "closure-observation.json", closure, "observation_hash")
+    ledger = json.loads((root / "provider-cache/usage.json").read_text())
+    ledger["pair"] += 52
+    _write(root / "provider-cache/usage.json", ledger)
+    report = json.loads((base / "report.json").read_text())
+    report["ledger_after"] = ledger
+    _write(base / "report.json", report, "report_hash")
+
+
+def _fixture_historical_pins(root, monkeypatch):
+    """Use fixture observation seals while retaining checkpoint code/prompt identities."""
+    pins = deepcopy(module.HISTORICAL_PILOT_PINS)
+    for version in pins:
+        pins[version]["observation_hash"] = json.loads((root / version / "closure-observation.json").read_text())["observation_hash"]
+    monkeypatch.setattr(module, "HISTORICAL_PILOT_PINS", pins)
 
 
 @pytest.fixture
@@ -654,6 +695,7 @@ def concurrent(concurrent_root, tmp_path, monkeypatch):
     root = tmp_path / "artifacts"
     shutil.copytree(concurrent_root, root, copy_function=os.link)
     target = root / module.DEFAULT_COHORT
+    _fixture_historical_pins(root, monkeypatch)
     for provider in (CohortProviders, pair_repair.PairRepairProviders):
         monkeypatch.setattr(provider, "_api_key", lambda *_: pytest.fail("credential read during exact reconciliation"))
         monkeypatch.setattr(provider, "_open", lambda *_: pytest.fail("HTTP during exact reconciliation"))
@@ -662,18 +704,23 @@ def concurrent(concurrent_root, tmp_path, monkeypatch):
 
 
 def test_concurrent_pilot_charges_are_exactly_reconciled_without_admitting_its_labels(concurrent):
-    report = _run(concurrent)
-    accounting = report["pinned"]["concurrent_pair_attempts"]
-    assert accounting["charged_pair_attempts"] == 20
-    pilot = accounting["pilots"][pair_repair.VERSION]
-    assert pilot["accounting_only_no_label_admission"] and not pilot["remote_timestamp_attestation"]
-    assert pilot["local_operator_observation"] and report["pinned"]["pair_repair"] is None
+    root, target, _ = concurrent
+    manifest, sources = review._sources(root, module.DEFAULT_COHORT)
+    accounting = module._concurrent_pilots(root, manifest, sources, manifest["ledger_before"],
+        json.loads((target / "report.json").read_text())["ledger_after"],
+        json.loads((target / "attempt-budget.json").read_text()), None)
+    assert accounting["charged_pair_attempts"] == 52 and len(accounting["pilots"]) == 2
+    for pilot in accounting["pilots"].values():
+        assert not pilot["pilot_passed"] and pilot["accounting_only_no_label_admission"]
+        assert not pilot["remote_timestamp_attestation"] and pilot["local_operator_observation"]
+    with pytest.raises(ValueError, match="verified passed current hybrid repair"):
+        _run(concurrent)
 
 
 @pytest.mark.parametrize("mutation", ["extra_charge", "started", "observation", "budget", "retry_nonce"])
 def test_concurrent_allowance_rejects_unaccounted_or_unproven_reservations(concurrent, monkeypatch, mutation):
     root, _, _ = concurrent
-    target = root / pair_repair.VERSION
+    target = root / "rerank-grounded-pair-repair-v2"
     monkeypatch.setattr(module, "train", lambda *_: pytest.fail("fit accepted unverified concurrent allowance"))
     if mutation == "extra_charge":
         path = root / "provider-cache/usage.json"
@@ -715,13 +762,14 @@ def test_concurrent_allowance_rejects_unaccounted_or_unproven_reservations(concu
         _run(concurrent)
 
 
-def test_metadata_rebind_preserves_exact_decisions_and_policy_context_without_claiming_new_review(repaired):
+@pytest.mark.parametrize("previous_namespace", ["rerank-grounded-pair-repair-v1", "rerank-grounded-pair-repair-v2"])
+def test_metadata_rebind_preserves_exact_decisions_and_policy_context_without_claiming_new_review(repaired, previous_namespace):
     root, target, manual_path = repaired
     packet = json.loads((target / "reviews/assistant-packet.json").read_text())
     manual = json.loads(manual_path.read_text())
     old_packet = deepcopy(packet)
     old_packet["pair_repair_pilot_manifest_hash"] = "previous-pilot-manifest"
-    old = root / pair_repair.PREVIOUS_VERSION / "reviews"
+    old = root / previous_namespace / "reviews"
     old_packet = _write(old / "assistant-packet.json", old_packet, "packet_hash")
     old_manual = {**manual, "packet_hash": old_packet["packet_hash"]}
     _write(old / "assistant-review.json", old_manual)
@@ -741,65 +789,16 @@ def test_metadata_rebind_preserves_exact_decisions_and_policy_context_without_cl
         module._review_metadata_rebind(root, target / "reviews", packet, changed)
 
 
-def test_current_failed_pilot_12_valid_11_correct_4_swaps_blocks_even_base_fit(concurrent, monkeypatch):
-    root, base, _ = concurrent
+@pytest.mark.parametrize("state", ["failed", "incomplete"])
+def test_current_failed_or_incomplete_v3_pilot_blocks_even_base_fit(cohort, monkeypatch, state):
+    root, base, _ = cohort
     target = root / pair_repair.VERSION
-    report = json.loads((target / "pilot-report.json").read_text())
-    failed = {0, 1, 2, 3, 4, 5, 6, 8}
-    for index in (*failed, 10):
-        row = report["rows"][index]
-        path = target / "jobs" / f'pilot-{row["case_id"]}-{int(row["swapped"])}-0.json'
-        job = json.loads(path.read_text())
-        raw_path = root / "provider-cache" / f'{job["request_hash"]}.json'
-        raw = json.loads(raw_path.read_text())
-        bad = deepcopy(job["answer"])
-        bad.update(label="B" if bad["label"] == "A" else "A", reason_code="prefer_known_facts")
-        raw["response"]["choices"][0]["message"]["content"] = json.dumps(bad, ensure_ascii=False)
-        raw["response_hash"] = digest(raw["response"])
-        _write(raw_path, raw)
-        if index == 10:
-            job.update(answer=bad, answer_hash=digest(bad))
-            row["answer"] = bad
-        else:
-            job.pop("answer")
-            job.pop("answer_hash")
-            job.update(state="failed", error_type="ValueError", fatal_http_statuses=[])
-            row.update(answer=None, error="pair repair response invalid after one bounded repair")
-            retry = deepcopy(raw)
-            request = retry["request"]
-            request.update(attempt=1, prompt_version=pair_repair.PAIR_PROMPT_VERSION + "-repair1")
-            request["payload"]["messages"][0]["content"] += module._REPAIR_SENTENCE
-            state = json.loads(request["payload"]["messages"][1]["content"])
-            state["request_nonce"]["attempt"] = 1
-            request["payload"]["messages"][1]["content"] = json.dumps(state, ensure_ascii=False, sort_keys=True)
-            key = digest(request)
-            retry["request_hash"] = key
-            _write(root / "provider-cache" / f"{key}.json", retry)
-            _write(path.with_name(path.name.replace("-0.json", "-1.json")),
-                   {**job, "request_hash": key, "attempt": 1})
-        _write(path, job)
-    ledger = json.loads((root / "provider-cache/usage.json").read_text())
-    ledger["pair"] += 8
-    _write(root / "provider-cache/usage.json", ledger)
-    report.update(valid=12, correct=11, swap_correct=4, passed=False, ledger_after_pilot=ledger)
-    report = _write(target / "pilot-report.json", report, "report_hash")
-    _write(target / "budget.json", {"pilot_initial": 20, "pilot_retry": 8, "family_initial": 0, "family_retry": 0})
-    jobs = {path.name: json.loads(path.read_text()) for path in (target / "jobs").glob("*.json")}
-    closure = json.loads((target / "closure-observation.json").read_text())
-    closure.update(pilot_report_hash=report["report_hash"], pilot_passed=False, job_receipts_hash=digest(jobs),
-        raw_response_hashes={job["request_hash"]: json.loads((root / "provider-cache" / f'{job["request_hash"]}.json').read_text())["response_hash"]
-                             for job in jobs.values()}, actual_pair_reservations=28, global_ledger=ledger)
-    _write(target / "closure-observation.json", closure, "observation_hash")
-    base_report = json.loads((base / "report.json").read_text())
-    base_report["ledger_after"] = ledger
-    _write(base / "report.json", base_report, "report_hash")
-    manifest, sources = review._sources(root, module.DEFAULT_COHORT)
-    accounting = module._concurrent_pilots(root, manifest, sources, manifest["ledger_before"], ledger,
-                                           json.loads((base / "attempt-budget.json").read_text()), None)
-    assert accounting["charged_pair_attempts"] == 28 and not accounting["pilots"][pair_repair.VERSION]["pilot_passed"]
+    _write(target / "pilot-manifest.json", {"version": pair_repair.VERSION}, "manifest_hash")
+    if state == "failed":
+        _write(target / "pilot-report.json", {"passed": False, "valid": 8, "correct": 7, "swap_correct": 3}, "report_hash")
     monkeypatch.setattr(module, "train", lambda *_: pytest.fail("base fit bypassed failed current pilot"))
     with pytest.raises(ValueError, match="current pair-repair pilot has not passed"):
-        _run(concurrent)
+        _run(cohort)
     assert not (base / "test-only-training/train-request.json").exists()
 
 

@@ -73,15 +73,22 @@ from matching_engine.vacancy_features import (
 )
 from matching_engine.vacancy_models import VacancyInput, VacancyReady, build_mode
 
-ADAPTER_VERSION = "sealed-grounded-test-fit-v2"
+ADAPTER_VERSION = "sealed-grounded-test-fit-v3"
 DEFAULT_COHORT = "rerank-grounded-cohort-v9"
 SPLITS = {"train": 32, "validation": 8, "calibration": 8, "golden": 12}
 PAIR_REPAIR_MODULES = {pair_repair.VERSION: pair_repair}
 HISTORICAL_PILOT_PINS = {
     "rerank-grounded-pair-repair-v1": {
+        "source_commit": "7585ee7b382a406cd0e75a852883e36cd2f31790",
         "code_hash": "6c2e64302e7b11fdc3e373b9b8793f67cd45857e5c4b0566626db38302182f74",
         "observation_hash": "34c64ce384283b38689df6c7fb8adf4675f1d9035fda755f2c958e93c4df1597",
         "prompt_version": "rerank-uniform-cohort-pair-v3",
+    },
+    "rerank-grounded-pair-repair-v2": {
+        "source_commit": "6d4179889e1f6d9dc42a4dbae7885cad038133e9",
+        "code_hash": "3eff712ceda2179970eaf6598cd49f0e2c3b90d144a9ad1d127a7ebad9a5bc56",
+        "observation_hash": "01660db08da76c30c06018d84de29ac402fa9d372f2ba612bb6ccdfe390b9c94",
+        "prompt_version": "rerank-uniform-cohort-pair-v4",
     },
 }
 _REPAIR_SENTENCE = " Repair attempt: obey every required field, typed bound and exact citation; JSON only."
@@ -339,9 +346,16 @@ def _review_metadata_rebind(directory: Path, target: Path, packet: dict, manual:
     if not path.exists():
         return None
     receipt = _verified(path, "receipt_hash")
-    previous = directory / "rerank-grounded-pair-repair-v1" / "reviews"
-    old_packet = _verified(previous / "assistant-packet.json", "packet_hash")
-    old_manual = _read(previous / "assistant-review.json")
+    previous_packets = []
+    for namespace in HISTORICAL_PILOT_PINS:
+        previous = directory / namespace / "reviews"
+        if (previous / "assistant-packet.json").exists():
+            candidate = _verified(previous / "assistant-packet.json", "packet_hash")
+            if candidate["packet_hash"] == receipt.get("old_packet_hash"):
+                previous_packets.append((candidate, _read(previous / "assistant-review.json")))
+    if len(previous_packets) != 1:
+        raise ValueError("blind review metadata rebind lacks a unique pinned historical packet")
+    old_packet, old_manual = previous_packets[0]
     review._manual(old_manual, old_packet)
     ignored = {"packet_hash", "pair_repair_pilot_manifest_hash"}
     if ({key: value for key, value in old_packet.items() if key not in ignored}
@@ -500,7 +514,7 @@ def _base_charges(directory: Path, target: Path, cohort_id: str, attempts: dict,
 
 def _concurrent_pilots(directory: Path, manifest: dict, sources: dict, before: dict, after: dict,
                        attempts: dict, repair: tuple | None) -> dict:
-    known = {"rerank-grounded-pair-repair-v1", "rerank-grounded-pair-repair-v2"}
+    known = set(HISTORICAL_PILOT_PINS)
     pins, count = {}, 0
     for namespace in sorted(known):
         target = directory / namespace
@@ -642,6 +656,7 @@ def _concurrent_pilots(directory: Path, manifest: dict, sources: dict, before: d
             raise ValueError("current pilot report/closure ledger snapshot differs")
         pins[namespace] = {"manifest_hash": pilot_manifest["manifest_hash"], "report_hash": report["report_hash"],
                            "code_hash": expected_code, "observation_hash": observation["observation_hash"],
+                           "source_commit": None if historical is None else historical["source_commit"],
                            "job_receipts_hash": digest(expected_jobs), "raw_response_hashes": raw_hashes,
                            "charged_pair_attempts": initial + retry, "pilot_passed": report["passed"],
                            "accounting_only_no_label_admission": True, "local_operator_observation": True,
@@ -680,7 +695,65 @@ def _repair_context(directory: Path, cohort_id: str, dataset: dict, cohort_repor
             or any(any(family.get(key) != original[family["manifest"]["family_id"]].get(key) for key in preserved)
                    for family in effective["families"])):
         raise ValueError("derived repair changed frozen source/features/independent suitability")
+    quality = effective["quality"]
+    if (quality.get("swap_total") != 132 or quality.get("swap_correct", 0) < 119
+            or quality.get("teacher_passed") is not True or quality.get("oracle_passed") is not True
+            or quality.get("oracle_swap_correct") != 48 or quality.get("oracle_swap_total") != 48
+            or quality.get("golden_families") != 12 or quality.get("minimum_golden_decisive_pairs", 0) < 6
+            or quality.get("quarantined_families") != []):
+        raise ValueError("hybrid repair must pass separate 132 teacher and 48 rule reverse gates")
     return effective, report, adapter
+
+
+def _label_provenance(directory: Path, dataset: dict, repair: tuple | None) -> dict:
+    """Describe verified label sources and allocation without rerunning a label rule."""
+    sources, splits, local_ids = {}, {}, []
+    for family in dataset["families"]:
+        item, revision = family["manifest"], family.get("pair_repair")
+        identifier, split = item["family_id"], item["split"]
+        source = "llm_pair_teacher" if revision is None else revision.get("label_source")
+        if source not in ("llm_pair_teacher", "rule_derived_class_only"):
+            raise ValueError("unknown effective pair-label source")
+        class_only = not any(family["vacancy"][key] for key in ("domens", "stacks", "soft_skills"))
+        if source == "rule_derived_class_only":
+            if repair is None or not class_only or split not in ("train", "validation"):
+                raise ValueError("rule-derived labels must stay in class-only train/validation families")
+            local_ids.append(identifier)
+        elif repair is not None and class_only:
+            raise ValueError("hybrid class-only source lacks explicit rule-derived lineage")
+        sources[identifier] = source
+        splits.setdefault(source, dict.fromkeys(SPLITS, 0))[split] += 1
+    receipts, oracle_hash, metrics = {}, None, None
+    if repair is not None:
+        adapter = repair[2]
+        metrics = dataset["source_metrics"]
+        expected_metrics = {"rule_derived_class_only": {"families": 16, "reverse_proofs": 48,
+                            "oracle_version": adapter.oracle.VERSION},
+                            "llm_pair_teacher": {"families": 44, "reverse_comparisons": 132},
+                            "human_review_verified": False}
+        if (metrics != expected_metrics or repair[1]["source_metrics"] != metrics
+                or splits.get("rule_derived_class_only") != {"train": 8, "validation": 8, "calibration": 0, "golden": 0}
+                or splits.get("llm_pair_teacher") != {"train": 24, "validation": 0, "calibration": 8, "golden": 12}):
+            raise ValueError("hybrid source metrics or split allocation changed")
+        oracle_hash = dataset["oracle_code_hash"]
+        if oracle_hash != repair[1]["oracle_code_hash"]:
+            raise ValueError("hybrid oracle code provenance differs between sealed dataset/report")
+        # Public validate_pair_repair already verifies every rule input, answer and code hash.
+        pairs = list(itertools.combinations(range(7), 2))
+        orientations = [*pairs, *((pairs[i][1], pairs[i][0]) for i in (0, 7, 14))]
+        expected_names = {f"{identifier}-pair-{a}-{b}.json" for identifier in local_ids for a, b in orientations}
+        folder = directory / adapter.VERSION / "oracle-receipts"
+        if {path.name for path in folder.glob("*.json")} != expected_names:
+            raise ValueError("hybrid local receipt set must contain exactly 384 admitted rule decisions")
+        receipts = {name: _verified(folder / name, "record_hash")["record_hash"] for name in sorted(expected_names)}
+    return {"by_family": dict(sorted(sources.items())), "split_counts": splits,
+            "source_metrics": metrics, "oracle_code_hash": oracle_hash,
+            "oracle_local_receipts": len(receipts), "oracle_local_receipts_hash": digest(receipts),
+            "oracle_remote_calls": 0, "human_review_verified": False,
+            "validation_entirely_rule_derived": repair is not None,
+            "selection_limitation": (None if repair is None else
+                "All eight validation families use the synthetic class-only rule; C selection does not independently validate LLM nonclass preferences."),
+            "golden_oracle_families": 0, "source_metrics_used_for_tuning": False}
 
 
 def _repair_packet(cohort_id: str, manifest: dict, sources: dict, repair_report: dict, adapter: ModuleType) -> dict:
@@ -791,6 +864,16 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
     current_pilot = concurrent["pilots"].get(current_namespace)
     if current_pilot is not None and current_pilot["pilot_passed"] is not True:
         raise ValueError("current pair-repair pilot has not passed; historical failed pilots are accounting-only")
+    if repair is None:
+        current_target = directory / current_namespace
+        if (current_target / "pilot-manifest.json").exists():
+            current_report = current_target / "pilot-report.json"
+            if not current_report.exists() or _verified(current_report, "report_hash").get("passed") is not True:
+                raise ValueError("current pair-repair pilot has not passed before fitting")
+            raise ValueError("current hybrid repair requires its verified derived dataset before fitting")
+        previous_v2 = concurrent["pilots"].get("rerank-grounded-pair-repair-v2")
+        if previous_v2 is not None and previous_v2["pilot_passed"] is not True:
+            raise ValueError("failed v2 pilot requires a verified passed current hybrid repair before fitting")
     effective_after = after if repair is None else repair[1]["ledger_after"]
     if cohort_report.get("ledger_before") != before or cohort_report.get("attempts") != attempts or ledger != effective_after:
         raise ValueError("completed provider ledger/attempt receipt changed")
@@ -810,13 +893,15 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
         repair_report, adapter = repair[1], repair[2]
         closure = _verified(directory / adapter.VERSION / "closure-observation.json", "observation_hash")
         budget = repair_report["budget"]
-        pilot_in_base = (budget["pilot_initial"] + budget["pilot_retry"]
-                         if closure["global_ledger"]["pair"] <= after["pair"] else 0)
-        expected_additional = sum(budget.values()) - pilot_in_base
+        expected_additional = sum(budget.values())
         if (repair_report.get("pilot_closure_observation_hash") != closure["observation_hash"]
+                or repair_report.get("ledger_before_pilot") != after
+                or closure.get("base_dataset_existed") is not True or closure.get("base_completed_families") != 60
+                or not 8 <= budget["pilot_initial"] + budget["pilot_retry"] <= 16
+                or budget["pilot_initial"] != 8
                 or effective_after["pair"] - after["pair"] != expected_additional):
             raise ValueError("derived global ledger does not reconcile exact post-base repair charges")
-        repair_accounting = {"total_repair_reservations": sum(budget.values()), "pilot_charges_already_in_base": pilot_in_base,
+        repair_accounting = {"total_repair_reservations": sum(budget.values()), "pilot_charges_already_in_base": 0,
                              "additional_charged_pair_attempts": expected_additional,
                              "closure_observation_hash": closure["observation_hash"]}
     first = directory / "rerank-grounded-cohort-v1/manifest.json"
@@ -945,6 +1030,8 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
                        "code_hash": digest(Path(adapter.__file__).read_bytes().hex()),
                        "base_quality": base_quality, "effective_quality": quality,
                        "charge_reconciliation": repair_accounting,
+                       "source_metrics": review_dataset["source_metrics"],
+                       "oracle_code_hash": review_dataset["oracle_code_hash"],
                        "new_policy_review_required": True, "original_blind_nomination_is_evaluation": False}
     assistant = _review_gate(directory, cohort_id, manifest, sources, review_dataset, assistant_review_file,
                              adjudication_file, review_directory=review_directory, expected_packet=expected_packet)
@@ -973,6 +1060,10 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
               "frozen_code_hashes": manifest["code_hashes"], "adapter_code_hashes": adapter_code,
               "feature_schema_hash": schema.schema_hash, "current_policy_hash": policy_hash(ScoringPolicy())}
     pinned["pair_repair"] = repair_pins
+    pinned["label_provenance"] = _label_provenance(directory, review_dataset, repair)
+    pinned["label_provenance"]["family_source_interpretation"] = (
+        "Raw effective family label origin before separately pinned blind-review adjudication corrections")
+    pinned["label_provenance"]["manual_correction_pair_ids"] = [row["pair_id"] for row in assistant["corrections"]]
     pinned["base_reservation_accounting"] = base_charges
     pinned["concurrent_pair_attempts"] = concurrent
     effective_rows = {family["manifest"]["family_id"]: family for family in review_dataset["families"]}
@@ -1101,19 +1192,26 @@ def run_test_only_training(directory: Path, cohort_id: str = DEFAULT_COHORT, *,
         calibration = [family for family in families if family.split == "calibration"]
         fixed_scores = {family.family_id: [sum(value * coefficient for value, coefficient in zip(
             scaled_features(vector, portable), portable.coefficients, strict=True)) for vector in family.vectors]
-            for family in families if family.split != "train"}
+            for family in families}
         scope_metrics = {}
         scope_map = pinned["policy_evaluation"]["pair_policy_scope_by_family"]
         for scope in sorted(set(scope_map.values())):
             scope_metrics[scope] = {split: evaluate([family for family in families
                 if family.split == split and scope_map[family.family_id] == scope], fixed_scores)
                 for split in ("validation", "calibration", "golden")}
+        source_map = pinned["label_provenance"]["by_family"]
+        source_metrics = {source: {split: evaluate([family for family in families
+            if family.split == split and source_map[family.family_id] == source], fixed_scores)
+            for split in SPLITS} for source in sorted(set(source_map.values()))}
         report = {"version": ADAPTER_VERSION, "cohort_id": cohort_id, "namespace": namespace, "state": "completed_test_only",
                   "request_hash": request["request_hash"], "pinned": pinned, "artifact_hash": artifact["content_hash"],
                   "test_only": True, "activation_allowed": False, "activation_eligible": False,
                   "independent_human_evaluation": False, "source_allocation_validated": True,
                   "protocol_valid": artifact["gate"]["protocol_valid"], "fit_runs": 1,
                   "raw_teacher_quality": pinned["base_teacher_quality"], "effective_teacher_quality": pinned["quality"],
+                  "effective_label_quality": pinned["quality"],
+                  "effective_quality_has_mixed_label_sources": pinned["pair_repair"] is not None,
+                  "label_provenance": pinned["label_provenance"], "label_source_metrics": source_metrics,
                   "pair_repair": pinned["pair_repair"], "correction_receipt_hash": corrections["correction_hash"],
                   "concurrent_pair_attempts": pinned["concurrent_pair_attempts"],
                   "policy_evaluation": pinned["policy_evaluation"], "policy_scope_metrics": scope_metrics,
