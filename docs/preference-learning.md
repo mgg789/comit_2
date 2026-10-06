@@ -197,3 +197,28 @@ Owner-scoped HTTP операции проксируются штатным emplo
 альтернативных показов и проверка на настоящих реакциях. Delayed recruitment
 outcomes и Harrier здесь не переобучаются. Обновление серверного контура и
 production deployment в эту реализацию не входят.
+
+## Приёмка фонового контура
+
+[Отчёт](../data/validation/live-preference-acceptance.json) фиксирует отдельную
+синтетическую PostgreSQL БД:48 профилей с реальным Harrier (640 координат),
+40 явных реакций, отдельный постоянно работающий learner, автоматическую
+постановку задания, обучение24/8/8 и фактическую перестановку оставшегося хвоста.
+На validation/audit синтетического примера pair accuracy улучшилась на0.625,
+NDCG@10 — на0.32336. Это проверка механики, не измерение качества для работодателей.
+Отзыв source consent вернул R₀ до matching projection и удалил коэффициенты;
+reset исключил прежние реакции. Исходный private receipt сохраняется по хешу.
+
+Воспроизведение: после сборки API задать `LIVE_PREFERENCE_ACCEPTANCE_DATABASE_URL`
+для новой пустой loopback БД с префиксом `comit_live_preferences_` и выполнить
+`PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python tests/live_preference_acceptance.py`.
+Нужны PostgreSQL/pgvector и установленный snapshot Harrier. Скрипт оставляет БД
+и приватный отчёт в `tests/artifacts/live-preferences/`, останавливает свой worker.
+Данные/признаки/модель не подменяются тестовыми реализациями; действия объявлены
+синтетическими, внешние LLM не вызываются.
+
+Полный Python/PG прогон:1128 passed без skips. После финальных изменений clocks
+и метаданных доставки —28 affected tests passed; дополнительный тест ловит lease,
+истёкший во время fit. API:44 passed,1 skip внешнего QGramm сервиса; typecheck,
+build, scoped Ruff и `make smoke` (12/12) зелёные. Harrier E2E применил001–009;
+010 затем применена в той же БД и проверена финальными PG тестами и smoke.
