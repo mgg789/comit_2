@@ -25,7 +25,7 @@ GRADES = ("intern", "junior", "middle", "senior")
 LABELS = ("A", "B", "tie", "insufficient")
 PAIR_REASON_CODES = ("prefer_known_facts", "comparable_fit", "insufficient_source_facts")
 PROMPT_VERSIONS = {
-    "generation": "rerank-uniform-cohort-generation-v1",
+    "generation": "rerank-uniform-cohort-generation-v2",
     "pair": "rerank-uniform-cohort-pair-v2",
     "grade": "rerank-uniform-cohort-suitability-v2",
 }
@@ -347,14 +347,26 @@ class CohortProviders(SystemOneProviders):
         schema = _object({"profiles": {"type": "array", "minItems": count, "maxItems": count,
                                       "items": _candidate_schema(keys)}})
         instruction = (
-            "Create the requested number of diverse synthetic IT candidate profiles in Russian. JSON only. "
+            "Create the requested number of diverse synthetic IT candidate profiles in Russian. "
+            "Return one compact JSON object only: no indentation, formatting whitespace, newlines, markdown, "
+            "or trailing whitespace. Stop immediately after the final closing brace. "
             "No names, contacts, labels, scores or hiring judgments. Every profile must contain exactly the "
             "schema fields. levels and skill_statuses contain exactly required_keys, never pad other skills. "
             "Vary independent grade, salary, skill levels and evidence tradeoffs; no universally dominant profile. "
             "Every evidence state is independent and may be confirmed/partial/self_reported/pending/rejected. "
-            "structured_facts_available=false requires duration_months, production_support and role=null, "
-            "project_domains and project_stacks=[]; null facts require null respective fact statuses. "
-            "Non-null duration, production and role require independent evidence5 status, including false/zero. "
+            "Maintain these three exact value/status pairs independently: "
+            "duration_months -> duration_status; production_support -> production_status; role -> role_status. "
+            "If duration_months is non-null (including 0), duration_status must be exactly one of "
+            "confirmed/partial/self_reported/pending/rejected, never null. "
+            "If production_support is non-null (including false), production_status must be exactly one of "
+            "confirmed/partial/self_reported/pending/rejected, never null. "
+            "If role is non-null, role_status must be exactly one of "
+            "confirmed/partial/self_reported/pending/rejected, never null. "
+            "If a paired value is null, its own status must also be null. "
+            "Every non-null fact requires an independent evidence status, including false/zero. "
+            "structured_facts_available=false requires duration_months=null, duration_status=null, "
+            "production_support=null, production_status=null, role=null, role_status=null, "
+            "project_domains=[] and project_stacks=[]. "
             "Registered project references carry their own statuses and correct group keys. "
             "description is Russian text 1..180 characters; it never substitutes structured facts. "
             "Use genuinely varied descriptions across profiles and family IDs: different concrete project "

@@ -195,7 +195,7 @@ def test_identity_separates_kind_cohort_repair_and_preserves_defaults(tmp_path):
     assert teacher_identity(provider.cohort_id) == provider.teacher_identity()
     assert provider.teacher_identity("grade") != provider.teacher_identity("pair")
     assert legacy_teacher_identity()["prompt_version"] == "rerank-systemone-v1"
-    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v1"
+    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v2"
     assert PROMPT_VERSIONS["pair"] == "rerank-uniform-cohort-pair-v2"
     assert PROMPT_VERSIONS["grade"] == "rerank-uniform-cohort-suitability-v2"
     assert generation_identity()["prompt_version"] == "rerank-sverk-generation-v2"
@@ -233,6 +233,55 @@ def test_generation_approved_qwen_and_sparse_registry(tmp_path, monkeypatch):
             provider.generation_payload("backend", "backend-01", keys)
     with pytest.raises(ValueError):
         _provider(tmp_path, generator_model="unauthorized")
+
+
+def test_generation_v2_instructs_exact_nullable_pairs_and_compact_output(tmp_path):
+    provider = _provider(tmp_path, generator_model=GENERATION_MODEL)
+    payload = provider.generation_payload("fullstack", "fullstack-01", KEYS)
+    instructions = payload["messages"][0]["content"]
+    assert "compact JSON object only" in instructions
+    assert "no indentation, formatting whitespace, newlines, markdown" in instructions
+    assert "Stop immediately after the final closing brace" in instructions
+    for value, status in (("duration_months", "duration_status"),
+                          ("production_support", "production_status"), ("role", "role_status")):
+        assert f"{value} -> {status}" in instructions
+        assert f"{status} must be exactly one of confirmed/partial/self_reported/pending/rejected, never null" in instructions
+        assert f"{value}=null, {status}=null" in instructions
+    assert "including 0" in instructions and "including false" in instructions
+    assert "If a paired value is null, its own status must also be null" in instructions
+    assert "independent evidence status" in instructions and "evidence5" not in instructions
+    assert "uniqueItems" not in json.dumps(payload["response_format"])
+    assert provider._identity("/v1/chat/completions", payload, "generation")["prompt_version"] == (
+        "rerank-uniform-cohort-generation-v2")
+
+
+def test_generation_accepts_valid_compact_qwen_receipt_with_zero_false_and_null(tmp_path, monkeypatch):
+    provider = _provider(tmp_path, generator_model=GENERATION_MODEL)
+    profiles = []
+    for index in range(7):
+        profile = deepcopy(A)
+        profile["description"] = f"Задача проекта: разработка API, этап {index + 1}."
+        if index % 2:
+            profile.update(structured_facts_available=False, duration_months=None, duration_status=None,
+                           production_support=None, production_status=None, role=None, role_status=None,
+                           project_domains=[], project_stacks=[])
+        profiles.append(profile)
+    compact = json.dumps({"profiles": profiles}, ensure_ascii=False, separators=(",", ":"))
+    response = _response({})
+    response["choices"][0]["message"]["content"] = compact
+    calls = []
+
+    def request(path, payload, kind):
+        calls.append((path, payload, kind))
+        return response
+
+    monkeypatch.setattr(provider, "request", request)
+    assert provider.generate_family("fullstack", "fullstack-01", KEYS) == profiles
+    assert len(calls) == 1 and calls[0][2] == "generation"
+    assert calls[0][1]["max_tokens"] == 8192
+    assert profiles[0]["duration_months"] == 0 and profiles[0]["duration_status"] == "self_reported"
+    assert profiles[0]["production_support"] is False and profiles[0]["production_status"] == "partial"
+    assert profiles[1]["duration_months"] is None and profiles[1]["duration_status"] is None
 
 
 def test_valid_pair_and_independent_grade(tmp_path, monkeypatch):

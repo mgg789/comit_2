@@ -14,20 +14,25 @@ from matching_engine.rerank_cohort_features import (
     candidate_profile,
     legacy_traits,
 )
-from matching_engine.rerank_cohort_provider import CohortProviders, validate_candidate
+from matching_engine.rerank_cohort_provider import (
+    CohortProviders,
+    _parse,
+    validate_candidate,
+)
 from matching_engine.rerank_diagnostics import REVERSE, _read, _seal
 from matching_engine.rerank_experiment import _parallel, family_manifest
 from matching_engine.rerank_hash import digest
 from matching_engine.rerank_protocol import DIRECTIONS
 from matching_engine.rerank_providers import (
-    GEMMA_GENERATION_MODEL,
+    GENERATION_MODEL,
     LIMITS,
     _atomic_write,
 )
 from matching_engine.rerank_sample_probe import _cycles, _ordering_ceiling
 from matching_engine.strict import INITIAL_GROUPS
 
-VERSION = "rerank-grounded-cohort-v2"
+VERSION = "rerank-grounded-cohort-v3"
+PRIOR_VERSION = "rerank-grounded-cohort-v2"
 CORE_KEYS = {
     "backend": ("python", "node", "go", "sql", "rest_api", "architecture_thinking", "teamwork"),
     "frontend": ("react", "vue", "html_css_jquery", "tailwind", "ux_userflow", "rest_api", "teamwork"),
@@ -100,11 +105,22 @@ def cohort_manifest(directory: Path) -> dict:
             item["reuse"] = {"record_hash": record["record_hash"], "indices": [*range(6), len(record["traits"]) - 1]}
         else:
             item["reuse"] = None
+        prior_path = directory / PRIOR_VERSION / "sources" / f'{item["family_id"]}.json'
+        item["prior_source"] = None
+        if prior_path.exists() and item["reuse"] is None:
+            prior = _read(prior_path)
+            comparable = {k:v for k,v in prior["manifest"].items() if k not in ("cohort_id", "prior_source")}
+            if comparable != {k:v for k,v in item.items() if k not in ("cohort_id", "prior_source")}:
+                raise ValueError("prior source ancestry or requirements changed")
+            item["prior_source"] = {"path":str(prior_path.relative_to(directory)),"record_hash":prior["record_hash"]}
         rows.append(item)
     before = _read(directory / "provider-cache/usage.json")
-    limits = {"generation": min(LIMITS["generation"] - before["generation"], (600 - before["generation"] * 5) // 7),
+    first_path = directory / "rerank-grounded-cohort-v1" / "manifest.json"
+    historical_generation = _read(first_path)["ledger_before"]["generation"] if first_path.exists() else before["generation"]
+    spent_profile_bound = historical_generation * 5 + (before["generation"] - historical_generation) * 7
+    limits = {"generation": min(LIMITS["generation"] - before["generation"], (600 - spent_profile_bound) // 7),
               "pair": LIMITS["pair"] - before["pair"], "grade": LIMITS["grade"] - before["grade"]}
-    normal = {"generation": sum(r["reuse"] is None for r in rows), "pair": 60 * (21 + 3) + 20, "grade": 420 + 10}
+    normal = {"generation": sum(r["reuse"] is None and r["prior_source"] is None for r in rows), "pair": 60 * (21 + 3) + 20, "grade": 420 + 10}
     if any(normal[k] > limits[k] for k in limits):
         raise ValueError("new cohort does not fit the unchanged cumulative budgets")
     manifest = {"version": VERSION, "families": rows, "ledger_before": before, "attempt_limits": limits,
@@ -114,12 +130,14 @@ def cohort_manifest(directory: Path) -> dict:
                 "pair_audits": "21 unordered pairs plus exactly three reverse orientations per family",
                 "deduplication": "Exact facts across independent families; normalized descriptions across splits. Same-split template reuse reported separately",
                 "model_scope": "Global baseline prior, not employer-policy-conditioned ranking",
-                "activation_allowed": False, "generator": GEMMA_GENERATION_MODEL,
+                "activation_allowed": False, "generator": GENERATION_MODEL,
+                "generation_spent_profile_bound":spent_profile_bound,
                 "seed_hash": digest((Path(__file__).resolve().parents[4] / "data/seed/candidate-pipeline.json").read_bytes().hex()),
                 "protected_source_hashes": {str(path.relative_to(directory)):digest(path.read_bytes().hex()) for path in
                     [*(directory / "families").glob("*.json"),
                      *(p for p in (directory / "provider-cache").glob("*.json") if p.name != "usage.json"),
-                     directory / "semantic-cache.json"]},
+                     directory / "semantic-cache.json",
+                     *(directory / PRIOR_VERSION).rglob("*.json")]},
                 "code_hashes": {name: digest((Path(__file__).parent / name).read_bytes().hex()) for name in
                                 ("rerank_cohort.py", "rerank_cohort_provider.py", "rerank_cohort_features.py",
                                  "rerank_features.py", "combine_scoring.py", "models.py", "embeddings.py",
@@ -272,7 +290,8 @@ def _check_sources(records: list[dict]) -> dict:
 
 def generate_sources(directory: Path, manifest: dict) -> list[dict]:
     """Persist seven raw profiles per frozen family; keep old sources and labels untouched."""
-    provider = CohortProviders(directory / "provider-cache", cohort_id=VERSION)
+    provider = CohortProviders(directory / "provider-cache", cohort_id=VERSION,
+                               generator_model=manifest["generator"])
     target = directory / VERSION / "sources";target.mkdir(parents=True,exist_ok=True)
     def generate(item):
         path = target / f'{item["family_id"]}.json'
@@ -286,6 +305,20 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
             if old["record_hash"] != item["reuse"]["record_hash"]:
                 raise ValueError("historical source changed")
             traits = legacy_traits(directory,old,item["reuse"]["indices"])
+        elif item["prior_source"]:
+            prior = _read(directory / item["prior_source"]["path"])
+            if prior["record_hash"] != item["prior_source"]["record_hash"] or prior["record_hash"] != digest({k:v for k,v in prior.items() if k != "record_hash"}):
+                raise ValueError("prior accepted source changed")
+            receipts = [_read(path) for path in (directory / PRIOR_VERSION / "jobs").glob(f'generate-{item["family_id"]}-*.json')]
+            matching = [receipt for receipt in receipts if receipt["state"] == "passed" and receipt["answer"] == prior["traits"] and receipt["answer_hash"] == digest(prior["traits"])]
+            if len(matching) != 1:
+                raise ValueError("prior source lacks exact accepted generation receipt")
+            raw = _read(provider.directory / f'{matching[0]["request_hash"]}.json')
+            if raw["request_hash"] != matching[0]["request_hash"] or raw["response_hash"] != digest(raw["response"]) or digest(raw["request"]) != raw["request_hash"]:
+                raise ValueError("prior raw generation receipt changed")
+            if _parse(raw["response"],raw["request"]["model"]) != {"profiles":prior["traits"]}:
+                raise ValueError("prior parsed source differs from raw generation")
+            traits = prior["traits"]
         else:
             if saved and not any((directory / VERSION / "jobs" / f'generate-{item["family_id"]}-{i}.json').exists() for i in (0,1)):
                 raise ValueError("generated source has no pinned job receipt")
@@ -300,10 +333,13 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
             if traits != saved["traits"]:
                 raise ValueError("source traits differ from pinned generation receipt")
             return saved
-        record = {"manifest": item, "traits": traits, "source_receipts": item["reuse"] or f'generate-{item["family_id"]}'}
+        record = {"manifest": item, "traits": traits, "source_receipts": item["reuse"] or item["prior_source"] or f'generate-{item["family_id"]}'}
         record["record_hash"] = digest(record);_seal(path,record)
         print(json.dumps({"phase":"sources","family":item["family_id"],"profiles":7}),flush=True)
         return record
+    first_new = next((item for item in manifest["families"] if item["reuse"] is None and item["prior_source"] is None),None)
+    if first_new is not None:
+        generate(first_new)  # Validate one Qwen batch before allowing five concurrent generation jobs.
     records = _parallel(generate,manifest["families"])
     owners = {};texts = {};repair = set()
     for record in records:
@@ -315,8 +351,8 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
             other = texts.setdefault(text,record)
             for collision in (previous,other if other["manifest"]["split"] != record["manifest"]["split"] else record):
                 if collision["manifest"]["family_id"] != family:
-                    selected = record if record["manifest"]["reuse"] is None else collision
-                    if selected["manifest"]["reuse"] is not None:
+                    selected = record if record["manifest"]["reuse"] is None and record["manifest"]["prior_source"] is None else collision
+                    if selected["manifest"]["reuse"] is not None or selected["manifest"]["prior_source"] is not None:
                         raise ValueError("historical reused sources collide; do not rewrite original facts")
                     repair.add(selected["manifest"]["family_id"])
     for index,record in enumerate(records):

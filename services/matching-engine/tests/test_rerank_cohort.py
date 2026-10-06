@@ -44,6 +44,40 @@ def test_existing_family_cannot_move_to_another_split(directory):
         cohort.cohort_manifest(directory)
 
 
+def test_recovery_preserves_accepted_sources_and_seven_profile_attempt_cost(directory):
+    first=directory/'rerank-grounded-cohort-v1';first.mkdir()
+    (first/'manifest.json').write_text('{"ledger_before":{"generation":28}}')
+    prior=directory/cohort.PRIOR_VERSION/'sources';prior.mkdir(parents=True)
+    item={**cohort.family_manifest()[12],"cohort_id":cohort.PRIOR_VERSION}
+    # Build the exact previous manifest requirements using a separate fixture ledger.
+    frozen=cohort.cohort_manifest(directory)
+    current=next(row for row in frozen['families'] if row['family_id']==item['family_id'])
+    old={k:v for k,v in current.items() if k!='prior_source'};old['cohort_id']=cohort.PRIOR_VERSION
+    record={'manifest':old,'traits':[{}]*7};record['record_hash']=digest(record)
+    (prior/f"{item['family_id']}.json").write_text(json.dumps(record))
+    (directory/'provider-cache/usage.json').write_text('{"generation":41,"pair":771,"grade":129}')
+    # Different directory to avoid replacing a frozen manifest.
+    (directory/cohort.VERSION/'manifest.json').unlink()
+    recovered=cohort.cohort_manifest(directory)
+    row=next(row for row in recovered['families'] if row['family_id']==item['family_id'])
+    assert row['prior_source']['record_hash']==record['record_hash']
+    assert recovered['generation_spent_profile_bound']==231
+    assert recovered['attempt_limits']['generation']==52
+    assert recovered['normal_attempts']['generation']==47
+
+
+def test_recovery_rejects_source_fold_or_requirement_changes(directory):
+    frozen=cohort.cohort_manifest(directory)
+    row=next(row for row in frozen['families'] if row['reuse'] is None)
+    old={k:v for k,v in row.items() if k!='prior_source'};old['cohort_id']=cohort.PRIOR_VERSION
+    old['split']='golden' if old['split']!='golden' else 'train'
+    prior=directory/cohort.PRIOR_VERSION/'sources';prior.mkdir(parents=True)
+    record={'manifest':old,'traits':[{}]*7};record['record_hash']=digest(record)
+    (prior/f"{row['family_id']}.json").write_text(json.dumps(record))
+    with pytest.raises(ValueError,match='prior source ancestry'):
+        cohort.cohort_manifest(directory)
+
+
 def test_pilot_covers_directions_tie_unknown_and_rejected_without_model_scores():
     cases=cohort.pilot_cases()
     assert len(cases)==10 and {case["case_id"] for case in cases[:8]}==set(cohort.DIRECTIONS)
