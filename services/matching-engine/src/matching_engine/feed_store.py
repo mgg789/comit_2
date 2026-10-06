@@ -13,6 +13,7 @@ from psycopg.types.json import Jsonb
 from matching_engine import feed_policy
 from matching_engine.combine_models import ScoringPolicy
 from matching_engine.combine_scoring import policy_hash as scoring_policy_hash
+from matching_engine.combine_scoring import select_candidates
 from matching_engine.combine_store import CombineStore, _lock
 from matching_engine.database import connect
 from matching_engine.feed_models import (
@@ -25,6 +26,8 @@ from matching_engine.feed_models import (
     FeedPage,
     FeedRequest,
     SavedCard,
+    ShowcaseLikeReceipt,
+    ShowcaseLikeRequest,
     VisitedCard,
 )
 from matching_engine.learning_store import LearningStore
@@ -112,6 +115,8 @@ class FeedStore:
 
     def _policy_current(self, connection: psycopg.Connection, vacancy_id: UUID, session: dict) -> bool:
         """Compare a session policy with the current worker policy without changing the session."""
+        if session.get("source") == "showcase":
+            return self._policy_snapshot(connection, vacancy_id, {})[1] == session["policy_hash"]
         main = connection.execute("SELECT policy_hash FROM matching_pipeline.runs WHERE run_id=%s", (session["main_run_id"],)).fetchone()
         if main is None:
             return False
@@ -211,15 +216,17 @@ class FeedStore:
         if vacancy["revision"] != session["vacancy_revision"] or vacancy["schema_version"] != session["schema_version"] \
                 or vacancy["schema_hash"] != session["schema_hash"]:
             raise ConflictError("feed vacancy revision is stale")
-        main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (session["main_run_id"],)).fetchone()
-        if main is None:
-            raise ConflictError("feed main snapshot is missing")
-        if (main["policy_hash"] != session["main_policy_hash"]
-                or scoring_policy_hash(ScoringPolicy()) != session["main_policy_hash"]):
+        if scoring_policy_hash(ScoringPolicy()) != session["main_policy_hash"]:
             raise ConflictError("feed main policy is stale")
-        identity = self._active_model_identity(connection, main)
-        if identity != (session["artifact_hash"], session["feature_schema_hash"], session["tail_policy_hash"], session["activation_revision"]):
-            raise ConflictError("feed model identity is stale")
+        if session.get("source", "tinder") != "showcase":
+            main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (session["main_run_id"],)).fetchone()
+            if main is None:
+                raise ConflictError("feed main snapshot is missing")
+            if main["policy_hash"] != session["main_policy_hash"]:
+                raise ConflictError("feed main policy is stale")
+            identity = self._active_model_identity(connection, main)
+            if identity != (session["artifact_hash"], session["feature_schema_hash"], session["tail_policy_hash"], session["activation_revision"]):
+                raise ConflictError("feed model identity is stale")
         if not self._policy_current(connection, session["vacancy_id"], session):
             raise ConflictError("feed policy is stale")
         rows = connection.execute("""SELECT e.exposure_id,e.candidate_id,e.profile_revision,
@@ -290,6 +297,9 @@ class FeedStore:
         versions use existing suffix slots, preserving every issued position
         cursor and keeping recommended/reserve membership unchanged.
         """
+        if session.get("source") == "showcase":
+            # A manual choice must neither impersonate a ranked exposure nor reset its learner.
+            return session
         control = PreferenceStore.ensure(connection, session)
         active = PreferenceStore.active(connection, control)
         model_hash = active["model_hash"] if active else None
@@ -473,87 +483,190 @@ class FeedStore:
         """Apply exactly one served action per exposure with owner-scoped idempotency."""
         with connect(self.database_url) as connection:
             _lock(connection)
-            old = connection.execute("""SELECT * FROM feed_pipeline.decisions
-                WHERE owner_id=%s AND vacancy_id=%s AND idempotency_key=%s FOR UPDATE""", (owner_id, vacancy_id, request.idempotency_key)).fetchone()
-            if old is not None:
-                if old["exposure_id"] != request.exposure_id or old["action"] != request.action:
-                    raise ConflictError("idempotency key conflicts with an existing decision")
-                return FeedDecision(receipt_id=old["receipt_id"], exposure_id=old["exposure_id"], vacancy_id=old["vacancy_id"],
-                    candidate_id=old["candidate_id"], action=old["action"], idempotency_key=old["idempotency_key"],
-                    saved=old["action"] == "like", visited=old["action"] == "dislike", replayed=True,
-                    history_badges=list(old["history_badges"] or []))
-            row = connection.execute("""SELECT e.*,s.*,d.action AS existing_action,
-                    COALESCE(v.history_badges,'[]'::jsonb) AS old_badges
-                FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions s ON s.session_id=e.session_id
-                LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id
-                LEFT JOIN feed_pipeline.visited v ON v.owner_id=e.owner_id AND v.vacancy_id=e.vacancy_id
-                    AND v.candidate_id=e.candidate_id
-                WHERE e.exposure_id=%s AND e.owner_id=%s AND e.vacancy_id=%s FOR UPDATE OF e,s""", (request.exposure_id, owner_id, vacancy_id)).fetchone()
-            if row is None:
-                raise NotFoundError("feed exposure not found")
-            if row["existing_action"] is not None:
-                raise ConflictError("feed exposure already has a decision")
-            if row["served_at"] is None:
-                raise ConflictError("feed exposure has not been served")
-            self._validate_session(connection, row)
-            vacancy = self._owner_vacancy(connection, owner_id, row["vacancy_id"])
-            if not self._candidate_ready(connection, vacancy, row["candidate_id"], row["profile_revision"]):
-                raise ConflictError("candidate source is stale or withdrawn")
-            badges = list(row["old_badges"] or [])
-            if "previously_visited" not in badges and row["old_badges"]:
-                badges.append("previously_visited")
-            baseline = self._profile_snapshot(connection, row["candidate_id"], row["profile_revision"])
-            main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (row["main_run_id"],)).fetchone()
-            if main is None:
-                raise ConflictError("feed main snapshot is missing")
-            if (main["policy_hash"] != row["main_policy_hash"]
-                    or scoring_policy_hash(ScoringPolicy()) != row["main_policy_hash"]):
-                raise ConflictError("feed main policy is stale")
-            policy, policy_digest = self._policy_snapshot(connection, row["vacancy_id"], main)
-            receipt_id = uuid4()
-            connection.execute("""INSERT INTO feed_pipeline.decisions
-                (receipt_id,owner_id,vacancy_id,exposure_id,candidate_id,idempotency_key,action,profile_revision,
-                 baseline,baseline_origin,frozen_policy,frozen_policy_hash,history_badges)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'exposure',%s,%s,%s)""", (
-                    receipt_id, owner_id, row["vacancy_id"], request.exposure_id, row["candidate_id"], request.idempotency_key,
-                    request.action, row["profile_revision"], Jsonb(baseline), Jsonb(policy), policy_digest, Jsonb(badges),
-            ))
-            LearningStore.event(connection, row, request.action, request.idempotency_key)
+            return self._decision_locked(connection, owner_id, vacancy_id, request)
+
+    def _decision_locked(self, connection: psycopg.Connection, owner_id: UUID, vacancy_id: UUID,
+                         request: FeedDecisionRequest) -> FeedDecision:
+        """Share one atomic decision transition between ranked and manual exposures."""
+        old = connection.execute("""SELECT * FROM feed_pipeline.decisions
+            WHERE owner_id=%s AND vacancy_id=%s AND idempotency_key=%s FOR UPDATE""", (owner_id, vacancy_id, request.idempotency_key)).fetchone()
+        if old is not None:
+            if old["exposure_id"] != request.exposure_id or old["action"] != request.action:
+                raise ConflictError("idempotency key conflicts with an existing decision")
+            return FeedDecision(receipt_id=old["receipt_id"], exposure_id=old["exposure_id"], vacancy_id=old["vacancy_id"],
+                candidate_id=old["candidate_id"], action=old["action"], idempotency_key=old["idempotency_key"],
+                saved=old["action"] == "like", visited=old["action"] == "dislike", replayed=True,
+                history_badges=list(old["history_badges"] or []))
+        row = connection.execute("""SELECT e.*,s.*,d.action AS existing_action,
+                COALESCE(v.history_badges,'[]'::jsonb) AS old_badges
+            FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions s ON s.session_id=e.session_id
+            LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id
+            LEFT JOIN feed_pipeline.visited v ON v.owner_id=e.owner_id AND v.vacancy_id=e.vacancy_id
+                AND v.candidate_id=e.candidate_id
+            WHERE e.exposure_id=%s AND e.owner_id=%s AND e.vacancy_id=%s FOR UPDATE OF e,s""", (request.exposure_id, owner_id, vacancy_id)).fetchone()
+        if row is None:
+            raise NotFoundError("feed exposure not found")
+        if row["existing_action"] is not None:
+            raise ConflictError("feed exposure already has a decision")
+        if row["served_at"] is None:
+            raise ConflictError("feed exposure has not been served")
+        self._validate_session(connection, row)
+        vacancy = self._owner_vacancy(connection, owner_id, row["vacancy_id"])
+        if not self._candidate_ready(connection, vacancy, row["candidate_id"], row["profile_revision"]):
+            raise ConflictError("candidate source is stale or withdrawn")
+        badges = list(row["old_badges"] or [])
+        if "previously_visited" not in badges and row["old_badges"]:
+            badges.append("previously_visited")
+        baseline = self._profile_snapshot(connection, row["candidate_id"], row["profile_revision"])
+        main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (row["main_run_id"],)).fetchone()
+        if main is None and row.get("source") != "showcase":
+            raise ConflictError("feed main snapshot is missing")
+        if ((main is not None and main["policy_hash"] != row["main_policy_hash"])
+                or scoring_policy_hash(ScoringPolicy()) != row["main_policy_hash"]):
+            raise ConflictError("feed main policy is stale")
+        policy, policy_digest = self._policy_snapshot(connection, row["vacancy_id"], main or {})
+        receipt_id = uuid4()
+        connection.execute("""INSERT INTO feed_pipeline.decisions
+            (receipt_id,owner_id,vacancy_id,exposure_id,candidate_id,idempotency_key,action,profile_revision,
+             baseline,baseline_origin,frozen_policy,frozen_policy_hash,history_badges)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'exposure',%s,%s,%s)""", (
+                receipt_id, owner_id, row["vacancy_id"], request.exposure_id, row["candidate_id"], request.idempotency_key,
+                request.action, row["profile_revision"], Jsonb(baseline), Jsonb(policy), policy_digest, Jsonb(badges),
+        ))
+        LearningStore.event(connection, row, request.action, request.idempotency_key)
+        if row.get("source", "tinder") != "showcase":
             PreferenceStore.enqueue(connection, row)
-            if request.action == "like":
-                connection.execute("""INSERT INTO feed_pipeline.saved(owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,card)
-                    VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET
-                    profile_revision=EXCLUDED.profile_revision,exposure_id=EXCLUDED.exposure_id,card=EXCLUDED.card,saved_at=now()""",
-                    (owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], request.exposure_id, Jsonb(row["card"])))
-                state = "attractive"
-            else:
-                connection.execute("""INSERT INTO feed_pipeline.visited
-                    (owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,baseline_origin,baseline,frozen_policy,evaluated_revision,last_assessment,history_badges,visited_at)
-                    VALUES (%s,%s,%s,%s,%s,'exposure',%s,%s,%s,%s,%s,now())
-                    ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET profile_revision=EXCLUDED.profile_revision,
-                    exposure_id=EXCLUDED.exposure_id,baseline_origin='exposure',baseline=EXCLUDED.baseline,
-                    frozen_policy=EXCLUDED.frozen_policy,
-                    evaluated_revision=EXCLUDED.evaluated_revision,last_assessment=EXCLUDED.last_assessment,
-                    history_badges=EXCLUDED.history_badges,visited_at=now(),updated_at=now()""",
-                    (owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], request.exposure_id,
-                     Jsonb(baseline), Jsonb(policy), row["profile_revision"], Jsonb({"event": "dislike", "refresh": False}), Jsonb(badges)))
-                connection.execute("""INSERT INTO feed_pipeline.visited_history
-                    (owner_id,vacancy_id,candidate_id,baseline_revision,evaluated_revision,baseline,frozen_policy,assessment,event_type)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'dislike')""", (
-                    owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], row["profile_revision"],
-                    Jsonb(baseline), Jsonb(policy), Jsonb({"event": "dislike", "refresh": False}),
-                ))
-                state = "visited"
-            connection.execute("""INSERT INTO matching_pipeline.selection_states(vacancy_id,candidate_id,state)
-                VALUES (%s,%s,%s) ON CONFLICT(vacancy_id,candidate_id) DO UPDATE SET state=EXCLUDED.state,updated_at=now()""",
-                (row["vacancy_id"], row["candidate_id"], state))
-            connection.execute("""INSERT INTO matching_pipeline.controls(vacancy_id) VALUES (%s)
-                ON CONFLICT DO NOTHING""", (row["vacancy_id"],))
-            connection.execute("UPDATE matching_pipeline.controls SET revision=revision+1 WHERE vacancy_id=%s", (row["vacancy_id"],))
-            CombineStore(self.database_url)._queue(connection, row["vacancy_id"])
-            return FeedDecision(receipt_id=receipt_id, exposure_id=request.exposure_id, vacancy_id=row["vacancy_id"],
-                candidate_id=row["candidate_id"], action=request.action, idempotency_key=request.idempotency_key,
-                saved=request.action == "like", visited=request.action == "dislike", history_badges=badges)
+        if request.action == "like":
+            connection.execute("""INSERT INTO feed_pipeline.saved(owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,card)
+                VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET
+                profile_revision=EXCLUDED.profile_revision,exposure_id=EXCLUDED.exposure_id,card=EXCLUDED.card,saved_at=now()""",
+                (owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], request.exposure_id, Jsonb(row["card"])))
+            state = "attractive"
+        else:
+            connection.execute("""INSERT INTO feed_pipeline.visited
+                (owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,baseline_origin,baseline,frozen_policy,evaluated_revision,last_assessment,history_badges,visited_at)
+                VALUES (%s,%s,%s,%s,%s,'exposure',%s,%s,%s,%s,%s,now())
+                ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET profile_revision=EXCLUDED.profile_revision,
+                exposure_id=EXCLUDED.exposure_id,baseline_origin='exposure',baseline=EXCLUDED.baseline,
+                frozen_policy=EXCLUDED.frozen_policy,
+                evaluated_revision=EXCLUDED.evaluated_revision,last_assessment=EXCLUDED.last_assessment,
+                history_badges=EXCLUDED.history_badges,visited_at=now(),updated_at=now()""",
+                (owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], request.exposure_id,
+                 Jsonb(baseline), Jsonb(policy), row["profile_revision"], Jsonb({"event": "dislike", "refresh": False}), Jsonb(badges)))
+            connection.execute("""INSERT INTO feed_pipeline.visited_history
+                (owner_id,vacancy_id,candidate_id,baseline_revision,evaluated_revision,baseline,frozen_policy,assessment,event_type)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'dislike')""", (
+                owner_id, row["vacancy_id"], row["candidate_id"], row["profile_revision"], row["profile_revision"],
+                Jsonb(baseline), Jsonb(policy), Jsonb({"event": "dislike", "refresh": False}),
+            ))
+            state = "visited"
+        connection.execute("""INSERT INTO matching_pipeline.selection_states(vacancy_id,candidate_id,state)
+            VALUES (%s,%s,%s) ON CONFLICT(vacancy_id,candidate_id) DO UPDATE SET state=EXCLUDED.state,updated_at=now()""",
+            (row["vacancy_id"], row["candidate_id"], state))
+        connection.execute("""INSERT INTO matching_pipeline.controls(vacancy_id) VALUES (%s)
+            ON CONFLICT DO NOTHING""", (row["vacancy_id"],))
+        connection.execute("UPDATE matching_pipeline.controls SET revision=revision+1 WHERE vacancy_id=%s", (row["vacancy_id"],))
+        CombineStore(self.database_url)._queue(connection, row["vacancy_id"])
+        return FeedDecision(receipt_id=receipt_id, exposure_id=request.exposure_id, vacancy_id=row["vacancy_id"],
+            candidate_id=row["candidate_id"], action=request.action, idempotency_key=request.idempotency_key,
+            saved=request.action == "like", visited=request.action == "dislike", history_badges=badges)
+
+    @staticmethod
+    def _showcase_receipt_locked(connection: psycopg.Connection, owner_id: UUID, vacancy_id: UUID,
+                                 key: UUID) -> ShowcaseLikeReceipt | None:
+        """Read only a manual-like receipt; a shared key cannot change operation origin."""
+        row = connection.execute("""SELECT d.*,e.kind FROM feed_pipeline.decisions d
+            JOIN feed_pipeline.exposures e USING(exposure_id)
+            WHERE d.owner_id=%s AND d.vacancy_id=%s AND d.idempotency_key=%s""",
+            (owner_id, vacancy_id, key)).fetchone()
+        if row is None:
+            return None
+        if row["kind"] != "showcase" or row["action"] != "like":
+            raise ConflictError("idempotency key belongs to another decision source")
+        return ShowcaseLikeReceipt(receipt_id=row["receipt_id"], exposure_id=row["exposure_id"],
+            vacancy_id=row["vacancy_id"], candidate_id=row["candidate_id"], action="like",
+            idempotency_key=key, saved=True, visited=False, replayed=True,
+            history_badges=row["history_badges"], profile_revision=row["profile_revision"])
+
+    def showcase_receipt(self, owner_id: UUID, vacancy_id: UUID, key: UUID) -> ShowcaseLikeReceipt:
+        """Read an immutable owned receipt even after source withdrawal or vacancy closure."""
+        with connect(self.database_url) as connection:
+            result = self._showcase_receipt_locked(connection, owner_id, vacancy_id, key)
+            if result is None:
+                raise NotFoundError("showcase like receipt not found")
+            return result
+
+    @staticmethod
+    def _showcase_authority(connection: psycopg.Connection, candidate_id: UUID, revision: int) -> None:
+        """Hold known API source consent/ACK locks until the manual decision commits.
+
+        Legacy pipeline-only profiles retain the existing feed compatibility rule.
+        The public gateway independently checks authoritative source watermarks.
+        """
+        if not connection.execute("SELECT to_regclass('public.candidate_profiles') IS NOT NULL AS ready").fetchone()["ready"]:
+            return
+        profile = connection.execute("""SELECT revision,processing_consent,pool_consent
+            FROM public.candidate_profiles WHERE candidate_id=%s FOR SHARE""", (candidate_id,)).fetchone()
+        if profile is None:
+            return
+        ack = connection.execute("""SELECT source_revision,projected_revision,state
+            FROM public.candidate_profile_outbox WHERE candidate_id=%s
+            ORDER BY source_revision DESC,created_at DESC LIMIT 1 FOR SHARE""", (candidate_id,)).fetchone()
+        if not (profile["processing_consent"] and profile["pool_consent"] and ack
+                and ack["state"] == "delivered" and ack["source_revision"] == profile["revision"]
+                and ack["projected_revision"] == revision):
+            raise ConflictError("showcase candidate source is stale or withdrawn")
+
+    def showcase_like(self, owner_id: UUID, vacancy_id: UUID, request: ShowcaseLikeRequest) -> ShowcaseLikeReceipt:
+        """Atomically allocate one manual exposure and reuse the ordinary like transition.
+
+        No main/rerank run is fabricated. Strict vacancy filters and visited/pending
+        blocking apply; an exact retry returns its old receipt before freshness checks.
+        """
+        with connect(self.database_url) as connection:
+            # Keep the established pipeline lock order while bounding contention.
+            connection.execute("SET LOCAL lock_timeout = '5s'")
+            connection.execute("SET LOCAL statement_timeout = '10s'")
+            _lock(connection)
+            prior = self._showcase_receipt_locked(connection, owner_id, vacancy_id, request.idempotency_key)
+            if prior is not None:
+                if prior.candidate_id != request.candidate_id or prior.profile_revision != request.profile_revision:
+                    raise ConflictError("showcase like idempotency key conflicts with its source")
+                return prior
+            vacancy = self._owner_vacancy(connection, owner_id, vacancy_id)
+            self._showcase_authority(connection, request.candidate_id, request.profile_revision)
+            if not self._candidate_ready(connection, vacancy, request.candidate_id, request.profile_revision):
+                raise ConflictError("showcase candidate is stale, withdrawn or already blocked for this vacancy")
+            self._profile_snapshot(connection, request.candidate_id, request.profile_revision)
+            ready = CombineStore._vacancy(connection, vacancy_id)
+            candidates = CombineStore._candidates(connection, request.candidate_id)
+            selection = select_candidates(ready, candidates, ScoringPolicy(), top_k=1)
+            if not selection.items:
+                raise ConflictError("showcase candidate does not pass strict vacancy filters")
+            card = selection.items[0].model_dump(mode="json")
+            card.update(main_position=1, rerank_position=None, mode="manual", rerank_score=None,
+                        artifact_hash=None, rerank_contributions={})
+            session_id, exposure_id = uuid4(), uuid4()
+            policy_digest = self._policy_snapshot(connection, vacancy_id, {})[1]
+            generation = connection.execute("SELECT pool_generation FROM matching_pipeline.settings WHERE singleton").fetchone()["pool_generation"]
+            manual_identity = digest({"source": "showcase", "version": 1, "ranking": "manual"})
+            connection.execute("""INSERT INTO feed_pipeline.sessions
+                (session_id,owner_id,vacancy_id,vacancy_revision,schema_version,schema_hash,pool_generation,
+                 main_run_id,rerank_run_id,main_policy_hash,policy_hash,feature_schema_hash,tail_policy_hash,
+                 artifact_hash,include_reserve,expires_at,source)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,NULL,NULL,%s,%s,%s,%s,NULL,false,now()+interval '24 hours','showcase')""",
+                (session_id, owner_id, vacancy_id, vacancy["revision"], vacancy["schema_version"], vacancy["schema_hash"],
+                 generation, scoring_policy_hash(ScoringPolicy()), policy_digest, manual_identity, manual_identity))
+            connection.execute("""INSERT INTO feed_pipeline.exposures
+                (exposure_id,session_id,owner_id,vacancy_id,candidate_id,profile_revision,position,kind,card,served_at)
+                VALUES (%s,%s,%s,%s,%s,%s,1,'showcase',%s,now())""",
+                (exposure_id, session_id, owner_id, vacancy_id, request.candidate_id, request.profile_revision, Jsonb(card)))
+            exposure = {"exposure_id": exposure_id, "owner_id": owner_id, "vacancy_id": vacancy_id}
+            LearningStore.event(connection, exposure, "allocated")
+            LearningStore.event(connection, exposure, "delivered")
+            result = self._decision_locked(connection, owner_id, vacancy_id,
+                FeedDecisionRequest(exposure_id=exposure_id, action="like", idempotency_key=request.idempotency_key))
+            return ShowcaseLikeReceipt(**result.model_dump(), profile_revision=request.profile_revision)
 
     def saved(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0,
               candidate_id: UUID | None = None) -> FeedListPage[SavedCard]:

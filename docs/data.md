@@ -321,3 +321,10 @@ Feed sessions получают preference revision/model hash и order revision.
 unserved suffix. Delivered позиции и card payloads фиксированы. Export сохраняет
 preference identity/order/score и исходный R₀; propensity остаётся неизвестной.
 Политика и команды: [обучение предпочтений](preference-learning.md).
+
+Миграция `011_candidate_showcase.sql`: GIN публичной проекции, query-embedding
+cache 640D, источник feed-сессии tinder/showcase и manual exposure kind.
+Предыдущие сессии сохраняют обязательные main/rerank ID; ручные сессии имеют
+NULL ID. Мигратор backfill пересобирает расширенный allowlist public_profile
+из точной исходной ревизии. Saved, decisions и selection_states общие для
+обоих источников. [Хранение и границы](candidate-showcase.md).

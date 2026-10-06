@@ -80,7 +80,8 @@ class CombineStore:
         return VacancyStore._entry(row)
 
     @staticmethod
-    def _candidates(connection: psycopg.Connection) -> list[MatchCandidate]:
+    def _candidates(connection: psycopg.Connection, candidate_id: UUID | None = None) -> list[MatchCandidate]:
+        """Read all ready candidates or one candidate after computing global class ranks."""
         # Window functions cover the entire ready class before any strict filter.
         # Preferences are individually projected; private text/contacts never enter a run.
         rows = connection.execute("""
@@ -100,8 +101,9 @@ class CombineStore:
                     AND c.revision=p.revision AND c.state='ready'
                 JOIN candidate_pipeline.settings s ON s.active_schema_version=p.schema_version
                 JOIN candidate_pipeline.strict_schemas sc ON sc.version=p.schema_version AND sc.schema_hash=p.schema_hash
-            ) SELECT *,semantic_vector::text AS vector FROM ready ORDER BY specialization,rank
-        """).fetchall()
+            ) SELECT *,semantic_vector::text AS vector FROM ready
+              WHERE (%s::uuid IS NULL OR candidate_id=%s) ORDER BY specialization,rank
+        """, (candidate_id, candidate_id)).fetchall()
         return [MatchCandidate(
             candidate_id=row["candidate_id"], profile_revision=row["revision"],
             display_name=row["public_profile"]["display_name"], city=row["public_profile"]["city"],

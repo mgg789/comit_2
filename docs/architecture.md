@@ -115,3 +115,9 @@ QGramm подключается отдельным opt-in образом BASIC +
 QGramm endpoints; api-core проверяет сессию, приглашение и текущее согласие
 под DB-locks на каждый вызов. Постоянные сообщения/файлы принадлежат SQLite
 QGramm, а решения найма — PostgreSQL API. [Контракт и ключи](chat.md).
+
+Общая витрина использует matching-engine для независимых lexical/Harrier
+каналов и фильтров актуального пула. Api-core выводит owner из сессии,
+проверяет source consent/revision и закрывает частный PDF. Ручной лайк
+транзакционно использует FeedStore и существующий recruitment; отдельный
+сервис или ML-запуск для него не создаётся. [Контракт](candidate-showcase.md).

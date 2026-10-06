@@ -18,8 +18,10 @@ from matching_engine.models import (
     category_for,
     confirmed_strength,
 )
-from matching_engine.privacy import sanitize_public_text
 from matching_engine.resume import render_resume
+from matching_engine.showcase_projection import (
+    public_profile as showcase_public_profile,
+)
 from matching_engine.store import Store
 from matching_engine.strict import build_strict_vector
 from matching_engine.strict_evidence import build_strict_evidence
@@ -98,11 +100,7 @@ class Worker:
             if not public_pdf.startswith(b"%PDF-") or not owner_pdf.startswith(b"%PDF-"):
                 raise ValueError("renderer did not produce PDF artifacts")
             assert job.profile.salary is not None
-            public_profile = {
-                "display_name": f"Candidate {job.candidate_id}",
-                "city": sanitize_public_text(job.profile.city, job.profile),
-                "salary": job.profile.salary.model_dump(),
-            }
+            public_profile = showcase_public_profile(job.profile, job.candidate_id)
             self.store.publish(
                 job, category, confirmed_strength(job.profile), strict, semantic,
                 self.encoder.model_version, public_profile, public_pdf, owner_pdf,

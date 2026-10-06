@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Annotated
 from uuid import UUID
 
+import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from matching_engine.feed_models import (
@@ -16,6 +17,8 @@ from matching_engine.feed_models import (
     FeedPage,
     FeedRequest,
     SavedCard,
+    ShowcaseLikeReceipt,
+    ShowcaseLikeRequest,
     VisitedCard,
 )
 from matching_engine.feed_store import FeedStore
@@ -33,6 +36,24 @@ def feed_router(repository: FeedStore | None, require_internal: Callable) -> API
         if repository is None:
             raise HTTPException(status_code=503, detail="feed database is not configured")
         return repository, x_owner_id
+
+    @router.post("/internal/vacancies/{vacancy_id}/showcase-likes", response_model=ShowcaseLikeReceipt)
+    def showcase_like(vacancy_id: UUID, payload: ShowcaseLikeRequest,
+                      services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> ShowcaseLikeReceipt:
+        """Like one explicit public candidate for an owned open vacancy without a ranked feed."""
+        store, owner_id = services
+        try:
+            return store.showcase_like(owner_id, vacancy_id, payload)
+        except (psycopg.errors.LockNotAvailable, psycopg.errors.QueryCanceled) as error:
+            raise HTTPException(status_code=503, detail="showcase temporarily busy; retry the same key",
+                                headers={"Retry-After": "1"}) from error
+
+    @router.get("/internal/vacancies/{vacancy_id}/showcase-likes/{idempotency_key}", response_model=ShowcaseLikeReceipt)
+    def showcase_receipt(vacancy_id: UUID, idempotency_key: UUID,
+                         services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> ShowcaseLikeReceipt:
+        """Read a manual like receipt before checking fresh candidate data."""
+        store, owner_id = services
+        return store.showcase_receipt(owner_id, vacancy_id, idempotency_key)
 
     @router.post("/internal/vacancies/{vacancy_id}/feed", response_model=FeedPage)
     def open_feed(vacancy_id: UUID, payload: FeedRequest,

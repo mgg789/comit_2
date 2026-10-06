@@ -432,3 +432,11 @@ FeedCard дополнен preference revision/model hash/score/adjustment/contri
 preference position/state и delivery order revision; FeedPage содержит текущий
 order_revision. Shared, generated engine OpenAPI, gateway и api-client обновлены
 синхронно. [Доставка и управление](preference-learning.md#доставка-и-управление).
+
+Общая витрина работодателя добавляет POST `/employer/candidates/search`,
+GET `/employer/candidates/:candidate_id`, публичный PDF точной ревизии и
+POST `/employer/vacancy-drafts/:draft_id/showcase-likes`. Поиск доступен без
+вакансии; лайк требует собственной ready/open вакансии и строгих фильтров.
+SearchRequest/Page, PublicCandidateDetail и ShowcaseLikeRequest/Receipt
+синхронизированы в Pydantic, generated OpenAPI, shared и api-client.
+[Поля, фильтры, cursor, повторы и выбор вакансии](candidate-showcase.md).

@@ -492,3 +492,9 @@ source consent. Сам CLI остаётся теневым; дополнител
 quality gate, source consent locks и отдельный реестр не меняют базовый комбайн.
 Применение переставляет только unserved suffix и сохраняет delivered receipts.
 Rollback/reset доступны владельцу вакансии. [Правила](preference-learning.md).
+
+Общая [витрина кандидатов](candidate-showcase.md) объединяет PostgreSQL
+full-text и независимый Harrier query RRF60, с фильтрами и явным lexical
+fallback. Лайк для выбранной ready/open вакансии проходит строгий фильтр и
+создаёт обычные saved/attractive/exclusions. Источник manual не включается
+в обучение learned-cohort и не меняет активный preference control.
