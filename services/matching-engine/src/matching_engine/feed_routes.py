@@ -10,6 +10,8 @@ from matching_engine.feed_models import (
     FeedCard,
     FeedDecision,
     FeedDecisionRequest,
+    FeedImpression,
+    FeedImpressionRequest,
     FeedListPage,
     FeedPage,
     FeedRequest,
@@ -55,6 +57,20 @@ def feed_router(repository: FeedStore | None, require_internal: Callable) -> API
         """Read a prior receipt before a source freshness precheck."""
         store, owner_id = services
         return store.receipt(owner_id, vacancy_id, idempotency_key)
+
+    @router.post("/internal/vacancies/{vacancy_id}/feed/impressions", response_model=FeedImpression)
+    def impression(vacancy_id: UUID, payload: FeedImpressionRequest,
+                   services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> FeedImpression:
+        """Acknowledge client visibility separately from server delivery and explicit feedback."""
+        store, owner_id = services
+        return store.impression(owner_id, vacancy_id, payload)
+
+    @router.get("/internal/vacancies/{vacancy_id}/feed/impressions/{idempotency_key}", response_model=FeedImpression)
+    def impression_receipt(vacancy_id: UUID, idempotency_key: UUID,
+                           services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> FeedImpression:
+        """Read this owner's prior acknowledgement before checking current source freshness."""
+        store, owner_id = services
+        return store.impression_receipt(owner_id, vacancy_id, idempotency_key)
 
     @router.get("/internal/vacancies/{vacancy_id}/feed/exposures/{exposure_id}", response_model=FeedCard)
     def read_exposure(vacancy_id: UUID, exposure_id: UUID,

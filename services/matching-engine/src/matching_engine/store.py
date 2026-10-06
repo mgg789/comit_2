@@ -129,6 +129,9 @@ class Store:
                     updated_at=now()
             """, (candidate_id, revision, profile.source_revision, digest,
                   Jsonb(serialized), state, Jsonb(missing)))
+            if not profile.consents.processing or not profile.consents.pool:
+                from matching_engine.learning_store import LearningStore
+                LearningStore.withdraw(connection, candidate_id)
             connection.execute("""
                 UPDATE candidate_pipeline.jobs SET state='obsolete',lease_token=NULL,lease_until=NULL
                 WHERE candidate_id=%s AND state IN ('queued','processing','retrying','failed')

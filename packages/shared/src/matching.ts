@@ -100,6 +100,9 @@ export interface SelectionState {
 export interface RerankRequest { idempotency_key?: string | null; }
 /** Versioned baseline top-k result; reserve never implies the full pool is exhausted. */
 export interface RerankStatus {
+  activation_revision?: number;
+  approval_receipt_hash?: string | null;
+  activation_kind?: "gated" | "manual_override" | "none";
   run_id: string;
   main_run_id: string;
   vacancy_id: string;
@@ -120,6 +123,9 @@ export interface RerankStatus {
 }
 /** Main factors are preserved with explicit scalar R0 score and feature contributions. */
 export interface RerankCard extends CandidateCard {
+  activation_revision?: number;
+  approval_receipt_hash?: string | null;
+  activation_kind?: "gated" | "manual_override" | "none";
   main_position: number;
   rerank_position: number | null;
   mode: "learned" | "main_fallback";
@@ -163,6 +169,11 @@ export interface FeedPage {
 }
 /** One reaction per served exposure; UUID key is scoped to employer and vacancy. */
 export interface FeedDecisionRequest { exposure_id: string; action: "like" | "dislike"; idempotency_key: string; }
+
+/** Client visibility acknowledgement; server delivery alone is not a human view. */
+export interface FeedImpressionRequest { exposure_id: string; idempotency_key: string; }
+/** First visible-impression receipt with owner-scoped idempotency. */
+export interface FeedImpression { event_id: string; exposure_id: string; recorded_at: string; replayed: boolean; }
 /** Immutable action identity; duplicate requests return this receipt with replayed=true. */
 export interface FeedDecision {
   receipt_id: string;

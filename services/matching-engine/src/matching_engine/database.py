@@ -45,7 +45,7 @@ def migrate(database_url: str) -> list[str]:
                 if existing["checksum"] != checksum:
                     raise RuntimeError(f"applied migration changed: {migration_file.name}")
                 continue
-            if migration_file.name == "007_employer_feed.sql":
+            if migration_file.name in ("007_employer_feed.sql", "008_real_card_learning.sql"):
                 # Match intake/feedback lock order before taking migration table locks.
                 connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
             connection.execute(sql)

@@ -4,7 +4,7 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedListPage, SavedCard, VisitedCard,
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile } from "@comit/shared";
 
@@ -53,6 +53,8 @@ export interface ApiClient {
   getFeed(draftId: string, sessionId: string, cursor?: string, limit?: number): Promise<FeedPage>;
   /** Record a reaction using a UUID idempotency key. */
   decideFeed(draftId: string, body: FeedDecisionRequest): Promise<FeedDecision>;
+  /** Acknowledge the visible card once; retries must reuse the same UUID key. */
+  acknowledgeFeedImpression(draftId: string, body: FeedImpressionRequest): Promise<FeedImpression>;
   /** Read the saved membership scoped to this draft's vacancy. */
   getSaved(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<SavedCard>>;
   /** Read retained visited history, including nonblocking updated entries. */
@@ -121,6 +123,7 @@ export function createApiClient({
     openFeed: (draftId, body = {}) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed`, body),
     getFeed: (draftId, sessionId, cursor, limit = 50) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
     decideFeed: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/decisions`, body),
+    acknowledgeFeedImpression: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/impressions`, body),
     getSaved: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/saved?limit=${limit}&offset=${offset}`),
     getVisited: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/visited?limit=${limit}&offset=${offset}`),
     inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),

@@ -1,5 +1,13 @@
 # Данные — Comit
 
+Миграция matching `008_real_card_learning.sql` добавляет append-only activation
+receipts/events, revision активной модели и learning_pipeline cohorts/samples/events.
+Признаки всех main top-k сохраняются до реакций; issued/delivered/impression/action
+различаются. Отзыв согласия очищает feature payload, historical hash остаётся
+аудитом. Operational export требует согласия authoritative candidate_profiles
+и matching, псевдонимизирует IDs и не запускает обучение.
+[Подробный контракт хранения и экспорта](real-card-learning.md).
+
 > Статус: backend первого цикла. Auth-схема API-core уже имеет явную миграцию;
 > остальные доменные таблицы появляются по своим миграциям. Доменная модель — `context/30-domain-model.md`.
 

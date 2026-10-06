@@ -1,6 +1,7 @@
 """Explicit serve/migrate/worker entry points; serving never mutates the schema."""
 
 import argparse
+import logging
 import os
 import signal
 import threading
@@ -42,7 +43,16 @@ def main() -> None:
         "retry_base_seconds": int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30")),
     }
     if args.mode == "rerank-worker":
-        worker = RerankWorker(RerankStore(database_url), **options)
+        reranks = RerankStore(database_url)
+        from matching_engine.rerank_activation import bootstrap_packaged
+        from matching_engine.store import ConflictError
+        try:
+            bootstrap_packaged(reranks)
+        except (ConflictError, ValueError, OSError):
+            # The reviewed initial rollout never overrides an operator rollback.
+            # Corrupt/incompatible packaged inputs leave explicit main fallback.
+            logging.getLogger(__name__).warning("reviewed rerank bootstrap unavailable; preserving registry state")
+        worker = RerankWorker(reranks, **options)
     elif args.mode == "combine-worker":
         worker = CombineWorker(CombineStore(database_url), **options)
     elif args.mode == "vacancy-worker":

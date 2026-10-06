@@ -24,3 +24,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Real-card exports and their private pseudonym keys
+/data/learning/

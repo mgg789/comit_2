@@ -30,7 +30,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-matching_engine = ["migrations/*.sql", "fonts/*.ttf", "fonts/LICENSE.txt"]
+matching_engine = ["migrations/*.sql", "fonts/*.ttf", "fonts/LICENSE.txt", "artifacts/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

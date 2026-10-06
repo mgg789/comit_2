@@ -177,9 +177,9 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
             const resolved = suffix.replace(/\{([^}]+)\}/g, (_full, key: string) => encodeURIComponent(request.params[key]!));
             const upstream = new URL(`/internal/vacancies/${draft.vacancy_id}${resolved}`, matchingUrl);
             upstream.search = new URL(request.url, "http://gateway.invalid").search;
-            if (method === "post" && suffix === "/feed/decisions") {
+            if (method === "post" && (suffix === "/feed/decisions" || suffix === "/feed/impressions")) {
               const body = request.body as { exposure_id: string; idempotency_key: string };
-              const receipt = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}/feed/decisions/${encodeURIComponent(body.idempotency_key)}`, matchingUrl), {
+              const receipt = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}${suffix}/${encodeURIComponent(body.idempotency_key)}`, matchingUrl), {
                 headers, signal: AbortSignal.timeout(10000), redirect: "error" });
               if (receipt.status === 404) {
                 const exposure = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}/feed/exposures/${encodeURIComponent(body.exposure_id)}`, matchingUrl), {

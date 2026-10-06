@@ -565,3 +565,27 @@ Cumulative ledger — 99 generation / 2423 pair / 579 grade, профильны�
 не может подтвердить требуемые +0.02. Порог хвоста также не валидирован:
 41 calibration relevant, tail gap отсутствует. Golden не используется для tuning.
 [Фактическая приёмка и ограничения](../docs/rerank-grounded-cohort-acceptance.md).
+
+### Явное решение пользователя: ручной rollout и реальные наблюдения
+
+После failed synthetic gate пользователь поручил включить текущий R₀ в основной
+пайплайн и собирать датасет реальных карточек. Это отдельное ручное sort-only
+решение, не успешная автоматическая promotion: artifact/test_only/gate/reviews
+остаются неизменными. Immutable DB receipt закрепляет hash, actor/reason и
+признанные ограничения; activation_revision инвалидирует старые runs/sessions
+даже при повторном включении того же hash. Startup применяет упакованное решение
+только на ещё не активированной БД; ручное отключение переживает restart.
+Строгие фильтры и состав main top-k фиксированы, tail не отсекается.
+
+Learning snapshots всех main top-k содержат pre-feedback φ/availability/schema,
+main position/score и identities. Allocated, server-delivered, client-confirmed
+impression и explicit like/dislike разделены; no-action всегда unlabeled.
+Невыданные карточки и кандидаты вне top-k не получают вымышленных меток.
+Operational и synthetic provenance различаются явно; selection deterministic,
+propensity неизвестна. Для export используются HMAC групп owner/vacancy/candidate
+и актуальное согласие source API+matching; withdrawal очищает feature payload.
+Обучение и разбиение реальной выборки автоматически не запускаются: нужен
+последующий заранее фиксированный group/temporal split и независимый holdout.
+Текущий backend не реализует viewport event в будущем Tinder UI и не заменяет
+поведенческую реакцию delayed recruitment outcome.
+[Активация](../docs/rerank-activation.md), [сбор датасета](../docs/real-card-learning.md).

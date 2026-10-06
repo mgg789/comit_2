@@ -20,7 +20,7 @@ export type {
   CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
   ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
   RerankCard, RerankPage, RerankRequest, RerankStatus,
-  FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, SavedCard, VisitedCard, FeedListPage,
+  FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
 } from "./matching.js";
 
 export type Role = "candidate" | "employer";

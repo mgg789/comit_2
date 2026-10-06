@@ -40,7 +40,8 @@ class RerankWorker:
         heartbeat = threading.Thread(target=renew, daemon=True)
         heartbeat.start()
         try:
-            result = rerank_cards(job.vacancy, job.candidates, job.cards, job.policy, job.artifact, job.schema)
+            result = rerank_cards(job.vacancy, job.candidates, job.cards, job.policy, job.artifact, job.schema,
+                                  manual_approval=job.manual_approval, approval_error=job.approval_error)
             self.store.publish(job, result)
         except Exception:  # noqa: BLE001 - persist only a safe stable error code.
             self.store.fail(job, "baseline_rerank_failed", self.max_attempts, self.retry_base_seconds)

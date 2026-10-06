@@ -75,5 +75,19 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  rerank-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "rerank-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
 volumes:
   harrier_cache:

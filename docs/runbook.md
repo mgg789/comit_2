@@ -1,5 +1,17 @@
 # Runbook — типовые операции
 
+Candidate-pipeline overlay теперь запускает `rerank-worker`. На ещё не активированной
+БД worker применяет упакованное hash-pinned ручное решение пользователя для R₀;
+последующее отключение не отменяется restart. Нужна миграция008 до запуска нового
+кода. Несовместимость модели оставляет явный fallback без отсечения.
+[Операторская активация/откат](rerank-activation.md).
+
+Сбор real-card snapshots и событий включён транзакционно; counters и локальный
+экспорт доступны через `python -m matching_engine.learning_export status|export`.
+Operational export требует authoritative source consent в общей БД, private HMAC
+key и новый каталог. Не отправляйте raw exports во внешние сервисы и не включайте
+их в Git. [Данные, события, метки и ограничения](real-card-learning.md).
+
 ## Auth API-core: явная миграция и mail worker
 
 Auth не использует пароль и не создаёт аккаунт до успешного OTP. Один

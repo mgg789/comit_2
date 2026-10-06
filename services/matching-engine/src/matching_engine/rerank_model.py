@@ -157,7 +157,8 @@ class RerankOutcome:
 
 
 def rerank_cards(vacancy: VacancyReady, candidates: list[MatchCandidate], cards: list[CandidateCard],
-                 policy: ScoringPolicy, artifact: dict | None, schema: StrictSchema) -> RerankOutcome:
+                 policy: ScoringPolicy, artifact: dict | None, schema: StrictSchema, *,
+                 manual_approval: object | None = None, approval_error: str | None = None) -> RerankOutcome:
     """Score only selected main cards; exact compatibility failures explicitly preserve main order."""
     current = feature_schema(schema)
     reason = None
@@ -167,7 +168,15 @@ def rerank_cards(vacancy: VacancyReady, candidates: list[MatchCandidate], cards:
     else:
         try:
             model = RerankArtifact.model_validate(artifact)
-            if not promotion_eligible(artifact):
+            from matching_engine.rerank_activation import DbManualApproval
+            manual = (isinstance(manual_approval, DbManualApproval)
+                      and manual_approval.artifact_hash == model.content_hash
+                      and model.content_hash == artifact_hash(artifact) and model.tail_gap is None)
+            if approval_error:
+                reason = approval_error
+            elif manual_approval is not None and not manual:
+                reason = "manual_approval_invalid"
+            elif not manual and not promotion_eligible(artifact):
                 reason = "artifact_unapproved"
             elif model.strict_schema_hash != schema.schema_hash or model.feature_schema_hash != current.schema_hash:
                 reason = "feature_schema_mismatch"

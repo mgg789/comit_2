@@ -348,6 +348,8 @@ class CombineStore:
                 WHERE run_id=%s""", (result.scanned_count, result.passed_count, len(result.items), Jsonb(result.filter_counts), job.run_id))
             from matching_engine.rerank_store import RerankStore
             published = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (job.run_id,)).fetchone()
+            from matching_engine.learning_store import LearningStore
+            LearningStore.capture_main(connection, published)
             RerankStore.queue(connection, published)
             return True
 

@@ -1939,6 +1939,166 @@
         }
       }
     },
+    "/internal/vacancies/{vacancy_id}/feed/impressions": {
+      "post": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Impression",
+        "description": "Acknowledge client visibility separately from server delivery and explicit feedback.",
+        "operationId": "impression_internal_vacancies__vacancy_id__feed_impressions_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedImpressionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedImpression"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/feed/impressions/{idempotency_key}": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Impression Receipt",
+        "description": "Read this owner's prior acknowledgement before checking current source freshness.",
+        "operationId": "impression_receipt_internal_vacancies__vacancy_id__feed_impressions__idempotency_key__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency Key"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedImpression"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/vacancies/{vacancy_id}/feed/exposures/{exposure_id}": {
       "get": {
         "tags": [
@@ -3300,6 +3460,32 @@
             ],
             "title": "Artifact Hash"
           },
+          "activation_revision": {
+            "type": "integer",
+            "title": "Activation Revision",
+            "default": 0
+          },
+          "approval_receipt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Receipt Hash"
+          },
+          "activation_kind": {
+            "type": "string",
+            "enum": [
+              "gated",
+              "manual_override",
+              "none"
+            ],
+            "title": "Activation Kind",
+            "default": "none"
+          },
           "served_at": {
             "anyOf": [
               {
@@ -3474,6 +3660,61 @@
         ],
         "title": "FeedDecisionRequest",
         "description": "One explicit action bound to a served exposure and caller idempotency key."
+      },
+      "FeedImpression": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Event Id"
+          },
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Recorded At"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "exposure_id",
+          "recorded_at"
+        ],
+        "title": "FeedImpression",
+        "description": "Owner-scoped first visible-impression receipt, without candidate feature payloads."
+      },
+      "FeedImpressionRequest": {
+        "properties": {
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "exposure_id",
+          "idempotency_key"
+        ],
+        "title": "FeedImpressionRequest",
+        "description": "Client acknowledgement of a visible card; delivery alone does not prove a view."
       },
       "FeedListPage_SavedCard_": {
         "properties": {
@@ -4293,6 +4534,33 @@
               }
             ],
             "title": "Artifact Hash"
+          },
+          "activation_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Activation Revision",
+            "default": 0
+          },
+          "approval_receipt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Receipt Hash"
+          },
+          "activation_kind": {
+            "type": "string",
+            "enum": [
+              "gated",
+              "manual_override",
+              "none"
+            ],
+            "title": "Activation Kind",
+            "default": "none"
           }
         },
         "additionalProperties": false,
@@ -4407,6 +4675,33 @@
               }
             ],
             "title": "Artifact Hash"
+          },
+          "activation_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Activation Revision",
+            "default": 0
+          },
+          "approval_receipt_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Receipt Hash"
+          },
+          "activation_kind": {
+            "type": "string",
+            "enum": [
+              "gated",
+              "manual_override",
+              "none"
+            ],
+            "title": "Activation Kind",
+            "default": "none"
           },
           "feature_schema_hash": {
             "type": "string",

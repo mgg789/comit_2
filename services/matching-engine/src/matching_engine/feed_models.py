@@ -29,6 +29,9 @@ class FeedCard(CandidateCard):
     rerank_score: float | None
     rerank_contributions: dict[str, float] = Field(default_factory=dict)
     artifact_hash: str | None
+    activation_revision: int = 0
+    approval_receipt_hash: str | None = None
+    activation_kind: Literal["gated", "manual_override", "none"] = "none"
     served_at: datetime | None = None
     decision: Literal["like", "dislike"] | None = None
     history_badges: list[str] = Field(default_factory=list)
@@ -55,6 +58,22 @@ class FeedDecisionRequest(Contract):
     exposure_id: UUID
     action: Literal["like", "dislike"]
     idempotency_key: UUID
+
+
+class FeedImpressionRequest(Contract):
+    """Client acknowledgement of a visible card; delivery alone does not prove a view."""
+
+    exposure_id: UUID
+    idempotency_key: UUID
+
+
+class FeedImpression(Contract):
+    """Owner-scoped first visible-impression receipt, without candidate feature payloads."""
+
+    event_id: UUID
+    exposure_id: UUID
+    recorded_at: datetime
+    replayed: bool = False
 
 
 class FeedDecision(Contract):

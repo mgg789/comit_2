@@ -19,12 +19,15 @@ from matching_engine.feed_models import (
     FeedCard,
     FeedDecision,
     FeedDecisionRequest,
+    FeedImpression,
+    FeedImpressionRequest,
     FeedListPage,
     FeedPage,
     FeedRequest,
     SavedCard,
     VisitedCard,
 )
+from matching_engine.learning_store import LearningStore
 from matching_engine.rerank_model import tail_policy_hash
 from matching_engine.rerank_store import _schema
 from matching_engine.store import ConflictError, NotFoundError
@@ -76,7 +79,8 @@ class FeedStore:
                     AND to_regclass('feed_pipeline.exposures') IS NOT NULL
                     AND to_regclass('feed_pipeline.decisions') IS NOT NULL
                     AND to_regclass('feed_pipeline.saved') IS NOT NULL
-                    AND to_regclass('feed_pipeline.visited') IS NOT NULL AS ready""").fetchone()["ready"])
+                    AND to_regclass('feed_pipeline.visited') IS NOT NULL
+                    AND to_regclass('learning_pipeline.events') IS NOT NULL AS ready""").fetchone()["ready"])
         except psycopg.Error:
             return False
 
@@ -111,9 +115,9 @@ class FeedStore:
         return digest == session["policy_hash"]
 
     @staticmethod
-    def _active_model_identity(connection: psycopg.Connection, main: dict) -> tuple[str | None, str, str]:
+    def _active_model_identity(connection: psycopg.Connection, main: dict) -> tuple[str | None, str, str, int]:
         """Read active artifact, feature schema and tail policy identities from the registry."""
-        active = connection.execute("SELECT active_artifact_hash FROM rerank_pipeline.settings WHERE singleton").fetchone()
+        active = connection.execute("SELECT active_artifact_hash,activation_revision FROM rerank_pipeline.settings WHERE singleton").fetchone()
         artifact_hash = active["active_artifact_hash"] if active else None
         artifact = None if artifact_hash is None else connection.execute(
             "SELECT artifact FROM rerank_pipeline.artifacts WHERE artifact_hash=%s", (artifact_hash,)
@@ -123,7 +127,7 @@ class FeedStore:
         feature_hash = __import__("matching_engine.rerank_features", fromlist=["feature_schema"]).feature_schema(
             _schema(connection, main)
         ).schema_hash
-        return artifact_hash, feature_hash, tail_policy_hash(None if artifact is None else artifact["artifact"])
+        return artifact_hash, feature_hash, tail_policy_hash(None if artifact is None else artifact["artifact"]), active["activation_revision"] if active else 0
 
     @staticmethod
     def _candidate_ready(connection: psycopg.Connection, vacancy: dict, candidate_id: UUID, revision: int,
@@ -177,9 +181,9 @@ class FeedStore:
         if row["vacancy_revision"] != vacancy["revision"] or row["schema_version"] != vacancy["schema_version"] \
                 or row["schema_hash"] != vacancy["schema_hash"]:
             raise ConflictError("current rerank selection is stale")
-        artifact_hash, feature_hash, tail_hash = self._active_model_identity(connection, row)
+        artifact_hash, feature_hash, tail_hash, activation_revision = self._active_model_identity(connection, row)
         if row["artifact_hash"] != artifact_hash or row["feature_schema_hash"] != feature_hash \
-                or row["tail_policy_hash"] != tail_hash:
+                or row["tail_policy_hash"] != tail_hash or row["activation_revision"] != activation_revision:
             raise ConflictError("current rerank model is stale")
         main_row = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (row["main_run_id"],)).fetchone()
         if main_row is None or not CombineStore._valid(connection, main_row):
@@ -209,8 +213,8 @@ class FeedStore:
         if (main["policy_hash"] != session["main_policy_hash"]
                 or scoring_policy_hash(ScoringPolicy()) != session["main_policy_hash"]):
             raise ConflictError("feed main policy is stale")
-        artifact_hash, feature_hash, tail_hash = self._active_model_identity(connection, main)
-        if (artifact_hash, feature_hash, tail_hash) != (session["artifact_hash"], session["feature_schema_hash"], session["tail_policy_hash"]):
+        identity = self._active_model_identity(connection, main)
+        if identity != (session["artifact_hash"], session["feature_schema_hash"], session["tail_policy_hash"], session["activation_revision"]):
             raise ConflictError("feed model identity is stale")
         if not self._policy_current(connection, session["vacancy_id"], session):
             raise ConflictError("feed policy is stale")
@@ -246,17 +250,19 @@ class FeedStore:
             if main is None:
                 raise ConflictError("current main selection is not ready")
             rerank = self._current_run(connection, vacancy)
+            main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (rerank["main_run_id"],)).fetchone()
+            LearningStore.capture_main(connection, main)
             session_id = uuid4()
             expires_at = connection.execute("SELECT now()+interval '24 hours' AS value").fetchone()["value"]
             connection.execute("""INSERT INTO feed_pipeline.sessions
                 (session_id,owner_id,vacancy_id,vacancy_revision,schema_version,schema_hash,pool_generation,
                  main_run_id,rerank_run_id,main_policy_hash,policy_hash,feature_schema_hash,tail_policy_hash,artifact_hash,
-                 include_reserve,expires_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+                 include_reserve,expires_at,activation_revision)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
                     session_id, owner_id, selected_vacancy, rerank["vacancy_revision"], rerank["schema_version"],
                     rerank["schema_hash"], rerank["pool_generation"], rerank["main_run_id"], rerank["run_id"],
                     rerank["main_policy_hash"], rerank["feed_policy_hash"], rerank["feature_schema_hash"], rerank["tail_policy_hash"],
-                    rerank["artifact_hash"], request.include_reserve, expires_at,
+                    rerank["artifact_hash"], request.include_reserve, expires_at, rerank["activation_revision"],
             ))
             cards = connection.execute("""SELECT * FROM rerank_pipeline.cards WHERE run_id=%s
                 AND (%s OR kind='recommended') ORDER BY position""", (rerank["run_id"], request.include_reserve)).fetchall()
@@ -268,6 +274,8 @@ class FeedStore:
                         exposure, session_id, owner_id, selected_vacancy, source["candidate_id"], source["profile_revision"],
                         source["position"], source["kind"], Jsonb(source["card"]),
                 ))
+                LearningStore.event(connection, {"exposure_id": exposure, "owner_id": owner_id,
+                                                 "vacancy_id": selected_vacancy}, "allocated")
             return self._page_locked(connection, owner_id, session_id, None, request.limit)
 
     def _page_locked(self, connection: psycopg.Connection, owner_id: UUID, session_id: UUID,
@@ -300,6 +308,7 @@ class FeedStore:
                                ([row["exposure_id"] for row in rows],))
             for row in rows:
                 row["served_at"] = row["served_at"] or connection.execute("SELECT now() AS value").fetchone()["value"]
+                LearningStore.event(connection, row, "delivered")
         items = [self._card(row, badges=list(row["history_badges"] or [])) for row in rows]
         next_cursor = _encode_cursor(rows[-1]["position"]) if rows and has_more else None
         return FeedPage(session_id=session_id, vacancy_id=session["vacancy_id"], vacancy_revision=session["vacancy_revision"],
@@ -359,6 +368,42 @@ class FeedStore:
                 saved=row["action"] == "like", visited=row["action"] == "dislike", replayed=True,
                 history_badges=list(row["history_badges"] or []))
 
+    def impression_receipt(self, owner_id: UUID, vacancy_id: UUID, idempotency_key: UUID) -> FeedImpression:
+        """Read only this owner's prior acknowledgement, even after session invalidation."""
+        with connect(self.database_url) as connection:
+            row = connection.execute("""SELECT * FROM learning_pipeline.events WHERE owner_id=%s
+                AND vacancy_id=%s AND event_type='impression' AND idempotency_key=%s""",
+                (owner_id, vacancy_id, idempotency_key)).fetchone()
+            if row is None:
+                raise NotFoundError("impression receipt not found")
+            return FeedImpression(event_id=row["event_id"], exposure_id=row["exposure_id"],
+                                  recorded_at=row["recorded_at"], replayed=True)
+
+    def impression(self, owner_id: UUID, vacancy_id: UUID, request: FeedImpressionRequest) -> FeedImpression:
+        """Acknowledge one delivered, current card; idempotent replay does not create new views."""
+        with connect(self.database_url) as connection:
+            _lock(connection)
+            previous = connection.execute("""SELECT * FROM learning_pipeline.events WHERE owner_id=%s
+                AND event_type='impression' AND idempotency_key=%s""", (owner_id, request.idempotency_key)).fetchone()
+            if previous:
+                if previous["exposure_id"] != request.exposure_id or previous["vacancy_id"] != vacancy_id:
+                    raise ConflictError("impression idempotency key belongs to another exposure")
+                return FeedImpression(event_id=previous["event_id"], exposure_id=previous["exposure_id"],
+                                      recorded_at=previous["recorded_at"], replayed=True)
+            row = connection.execute("""SELECT e.*,s.* FROM feed_pipeline.exposures e
+                JOIN feed_pipeline.sessions s USING(session_id)
+                WHERE e.exposure_id=%s AND e.owner_id=%s AND e.vacancy_id=%s FOR UPDATE OF e,s""",
+                (request.exposure_id, owner_id, vacancy_id)).fetchone()
+            if row is None:
+                raise NotFoundError("feed exposure not found")
+            if row["served_at"] is None:
+                raise ConflictError("feed exposure has not been delivered")
+            stale = self._validate_session(connection, row, allow_decided=True)
+            if row["candidate_id"] in stale:
+                raise ConflictError("impression source is stale or withdrawn")
+            event = LearningStore.event(connection, row, "impression", request.idempotency_key)
+            return FeedImpression(event_id=event["event_id"], exposure_id=event["exposure_id"], recorded_at=event["recorded_at"])
+
     def decision(self, owner_id: UUID, vacancy_id: UUID, request: FeedDecisionRequest) -> FeedDecision:
         """Apply exactly one served action per exposure with owner-scoped idempotency."""
         with connect(self.database_url) as connection:
@@ -408,6 +453,7 @@ class FeedStore:
                     receipt_id, owner_id, row["vacancy_id"], request.exposure_id, row["candidate_id"], request.idempotency_key,
                     request.action, row["profile_revision"], Jsonb(baseline), Jsonb(policy), policy_digest, Jsonb(badges),
             ))
+            LearningStore.event(connection, row, request.action, request.idempotency_key)
             if request.action == "like":
                 connection.execute("""INSERT INTO feed_pipeline.saved(owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,card)
                     VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET

@@ -23,6 +23,9 @@ class RerankStatus(Contract):
     main_run_id: UUID
     vacancy_id: UUID
     artifact_hash: str | None
+    activation_revision: int = Field(default=0, ge=0)
+    approval_receipt_hash: str | None = None
+    activation_kind: Literal["gated", "manual_override", "none"] = "none"
     feature_schema_hash: str
     tail_policy_hash: str
     stage: Literal["baseline_rerank"] = "baseline_rerank"
@@ -48,6 +51,9 @@ class RerankCard(CandidateCard):
     rerank_score: float | None
     rerank_contributions: dict[str, float] = Field(default_factory=dict)
     artifact_hash: str | None
+    activation_revision: int = Field(default=0, ge=0)
+    approval_receipt_hash: str | None = None
+    activation_kind: Literal["gated", "manual_override", "none"] = "none"
 
 
 class RerankPage(Contract):

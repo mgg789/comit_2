@@ -59,6 +59,7 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
         rerank_position: null, mode: "main_fallback", rerank_score: null, rerank_contributions: {}, artifact_hash: null,
         served_at: new Date().toISOString(), decision: null, history_badges: [], change_assessment: null }] };
     let decisionCalls = 0;
+    let impressionCalls = 0;
     let mutateExposureAfterPdf = false, exposureReads = 0;
     const forwarded: Array<{ path: string; owner: string | null }> = [];
     const transport: typeof fetch = async (input, init) => {
@@ -75,6 +76,11 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
         return Response.json(mutateExposureAfterPdf && exposureReads > 1 ? { ...feedPage.items[0], candidate_id: otherCandidate.id } : feedPage.items[0]);
       }
       if (url.pathname.includes("/feed/decisions/")) return Response.json({ detail: "not_found" }, { status: 404 });
+      if (url.pathname.includes("/feed/impressions/")) return Response.json({ detail: "not_found" }, { status: 404 });
+      if (url.pathname.endsWith("/feed/impressions")) {
+        impressionCalls += 1;
+        return Response.json({ event_id: receiptId, exposure_id: exposureId, recorded_at: new Date().toISOString(), replayed: false });
+      }
       if (url.pathname.endsWith("/feed/decisions")) {
         decisionCalls += 1;
         return Response.json({ receipt_id: receiptId, exposure_id: exposureId, vacancy_id: vacancyId, candidate_id: candidate.id,
@@ -135,6 +141,12 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
     const feed = await app.inject({ method: "POST", url: `${path}/feed`, headers: employerHeaders, payload: {} });
     assert.equal(feed.statusCode, 200, feed.body);
     assert.equal(feed.json().items[0].resume_url, `/api${path}/feed/exposures/${exposureId}/resume.pdf`);
+    const impression = await app.inject({ method: "POST", url: `${path}/feed/impressions`, headers: employerHeaders,
+      payload: { exposure_id: exposureId, idempotency_key: randomUUID() } });
+    assert.equal(impression.statusCode, 200, impression.body);
+    assert.equal(impressionCalls, 1);
+    assert.equal((await app.inject({ method: "POST", url: `${path}/feed/impressions`,
+      headers: { authorization: foreignEmployer.authorization }, payload: { exposure_id: exposureId, idempotency_key: randomUUID() } })).statusCode, 404);
     const decision = await app.inject({ method: "POST", url: `${path}/feed/decisions`, headers: employerHeaders,
       payload: { exposure_id: exposureId, action: "like", idempotency_key: decisionKey } });
     assert.equal(decision.statusCode, 200, decision.body);
@@ -159,6 +171,9 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
     assert.equal(staleDecision.statusCode, 409, staleDecision.body);
     assert.equal(decisionCalls, 1);
     assert.equal((await app.inject({ method: "POST", url: `${path}/feed`, headers: employerHeaders, payload: {} })).statusCode, 409);
+    assert.equal((await app.inject({ method: "POST", url: `${path}/feed/impressions`, headers: employerHeaders,
+      payload: { exposure_id: exposureId, idempotency_key: randomUUID() } })).statusCode, 409);
+    assert.equal(impressionCalls, 1);
     assert.equal((await app.inject({ url: `${path}/candidates/${candidate.id}/resume.pdf`, headers: employerHeaders })).statusCode, 409);
   } finally { await app.close(); await pool.end(); }
 });

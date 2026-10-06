@@ -1,5 +1,14 @@
 # API — Comit
 
+Feed поддерживает `POST /api/employer/vacancy-drafts/{draft_id}/feed/impressions`
+(`FeedImpressionRequest`: exposure_id/idempotency_key) и чтение первого receipt
+по `GET .../feed/impressions/{idempotency_key}`. Это клиентское подтверждение
+видимости, отдельно от серверной выдачи. Rerank/Feed cards и RerankStatus добавляют
+activation_revision, approval_receipt_hash и activation_kind; `manual_override`
+явно обозначает исследовательский rollout при сохранённом failed gate.
+Публичной активации, dataset export и обучения нет.
+[Сбор карточек](real-card-learning.md), [активация](rerank-activation.md).
+
 > Правило (ТЗ §3.5): все методы описаны через OpenAPI; эндпоинты документированы — запросы, ответы, коды ошибок.
 
 ## Живые спецификации
