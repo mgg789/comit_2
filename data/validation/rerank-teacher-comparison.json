@@ -1,0 +1,2395 @@
+{
+  "manifest": {
+    "version": "rerank-teacher-comparison-v3",
+    "maximum_attempts": 8,
+    "source_manifest_hash": "a1ed29cb6b48dd090b15f0a534c7db54c7d5c908220a56e0aedba89f2a01b6f4",
+    "source_report_hash": "7fab36f1721f6582e0dd992982ef2fb268d8679efcd4357874d6a409438cba0f",
+    "review_hash": "116a54d51304e34a5630045ebfc3b4c96cffad65ba89177b8c1ba38549d3fcd8",
+    "cases": [
+      {
+        "case_id": "2d9b5951ad2a",
+        "family": "frontend-05",
+        "split": "validation",
+        "a": 0,
+        "b": 1,
+        "state": {
+          "A": {
+            "description": "Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.",
+            "duration_months": null,
+            "grade": "junior",
+            "levels": {
+              "python": 2,
+              "react": 3,
+              "rest_api": 2,
+              "sql": 1,
+              "teamwork": 6
+            },
+            "production_support": null,
+            "salary_min": 50000,
+            "status": "pending",
+            "structured_facts_available": false
+          },
+          "B": {
+            "description": "Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.",
+            "duration_months": 12,
+            "grade": "middle",
+            "levels": {
+              "python": 1,
+              "react": 4,
+              "rest_api": 3,
+              "sql": 2,
+              "teamwork": 5
+            },
+            "production_support": true,
+            "salary_min": 65000,
+            "status": "self_reported",
+            "structured_facts_available": true
+          },
+          "preferences": "Prefer teamwork and economical salary expectations within an acceptable technical fit.",
+          "vacancy": {
+            "bio": "Разработка API и интерфейсов, SQL, взаимодействие в команде",
+            "class": "frontend",
+            "domens": {},
+            "salary": {
+              "max": 200000,
+              "min": 50000
+            },
+            "soft_skills": {},
+            "stacks": {}
+          }
+        },
+        "blind_label": "insufficient"
+      },
+      {
+        "case_id": "e07375f08543",
+        "family": "backend-05",
+        "split": "validation",
+        "a": 5,
+        "b": 3,
+        "state": {
+          "vacancy": {
+            "class": "backend",
+            "domens": {
+              "sql": 4
+            },
+            "stacks": {
+              "python": 5,
+              "react": 3
+            },
+            "soft_skills": {
+              "teamwork": 3
+            },
+            "bio": "",
+            "salary": {
+              "min": 50000,
+              "max": 200000
+            }
+          },
+          "A": {
+            "grade": "middle",
+            "levels": {
+              "python": 6,
+              "react": 2,
+              "sql": 5,
+              "rest_api": 6,
+              "teamwork": 5
+            },
+            "status": "confirmed",
+            "duration_months": 36,
+            "production_support": true,
+            "salary_min": 120000,
+            "description": "Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.",
+            "structured_facts_available": true
+          },
+          "B": {
+            "grade": "intern",
+            "levels": {
+              "python": 3,
+              "react": 2,
+              "sql": 2,
+              "rest_api": 3,
+              "teamwork": 7
+            },
+            "status": "pending",
+            "duration_months": 6,
+            "production_support": false,
+            "salary_min": 55000,
+            "description": "Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.",
+            "structured_facts_available": true
+          },
+          "preferences": "Prefer relevant projects and production support over duration alone."
+        },
+        "blind_label": "A"
+      }
+    ],
+    "requests": [
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "gemma4-vlm",
+        "orientation": "direct",
+        "request_hash": "6a32fd381eb5319c38077cb0e4ceadaefedc51c2072e2fbb3232be3e60ed9feb",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "gemma4-vlm",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"B\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 50000, \"salary_min_B\": 65000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 15000}, \"available_citations\": {\"A\": [\"A.grade[str]=junior\", \"A.status[str]=pending\", \"A.salary_min[int]=50000\", \"A.duration_months[null]=null\", \"A.production_support[null]=null\", \"A.structured_facts_available[bool]=false\", \"A.levels.python[int]=2\", \"A.levels.react[int]=3\", \"A.levels.sql[int]=1\", \"A.levels.rest_api[int]=2\", \"A.levels.teamwork[int]=6\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=self_reported\", \"B.salary_min[int]=65000\", \"B.duration_months[int]=12\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=1\", \"B.levels.react[int]=4\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=5\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=junior",
+                          "A.status[str]=pending",
+                          "A.salary_min[int]=50000",
+                          "A.duration_months[null]=null",
+                          "A.production_support[null]=null",
+                          "A.structured_facts_available[bool]=false",
+                          "A.levels.python[int]=2",
+                          "A.levels.react[int]=3",
+                          "A.levels.sql[int]=1",
+                          "A.levels.rest_api[int]=2",
+                          "A.levels.teamwork[int]=6"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=middle",
+                          "B.status[str]=self_reported",
+                          "B.salary_min[int]=65000",
+                          "B.duration_months[int]=12",
+                          "B.production_support[bool]=true",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=1",
+                          "B.levels.react[int]=4",
+                          "B.levels.sql[int]=2",
+                          "B.levels.rest_api[int]=3",
+                          "B.levels.teamwork[int]=5"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "gemma4-vlm",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "gemma4-vlm",
+        "orientation": "reverse",
+        "request_hash": "eeee472a15c2c6efed35de24e23f2a9058af5f82a360cc6cfba1717016719b17",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "gemma4-vlm",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"B\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"salary_comparison\": {\"salary_min_A\": 65000, \"salary_min_B\": 50000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -15000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=self_reported\", \"A.salary_min[int]=65000\", \"A.duration_months[int]=12\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=1\", \"A.levels.react[int]=4\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=junior\", \"B.status[str]=pending\", \"B.salary_min[int]=50000\", \"B.duration_months[null]=null\", \"B.production_support[null]=null\", \"B.structured_facts_available[bool]=false\", \"B.levels.python[int]=2\", \"B.levels.react[int]=3\", \"B.levels.sql[int]=1\", \"B.levels.rest_api[int]=2\", \"B.levels.teamwork[int]=6\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=middle",
+                          "A.status[str]=self_reported",
+                          "A.salary_min[int]=65000",
+                          "A.duration_months[int]=12",
+                          "A.production_support[bool]=true",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=1",
+                          "A.levels.react[int]=4",
+                          "A.levels.sql[int]=2",
+                          "A.levels.rest_api[int]=3",
+                          "A.levels.teamwork[int]=5"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=junior",
+                          "B.status[str]=pending",
+                          "B.salary_min[int]=50000",
+                          "B.duration_months[null]=null",
+                          "B.production_support[null]=null",
+                          "B.structured_facts_available[bool]=false",
+                          "B.levels.python[int]=2",
+                          "B.levels.react[int]=3",
+                          "B.levels.sql[int]=1",
+                          "B.levels.rest_api[int]=2",
+                          "B.levels.teamwork[int]=6"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "gemma4-vlm",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "qwen3.8-27b",
+        "orientation": "direct",
+        "request_hash": "0f65842f519cfc9a38969a4d9aacc15ac92a146c54d5b6d4f15d46fe988cd5fe",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "qwen3.8-27b",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"B\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 50000, \"salary_min_B\": 65000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 15000}, \"available_citations\": {\"A\": [\"A.grade[str]=junior\", \"A.status[str]=pending\", \"A.salary_min[int]=50000\", \"A.duration_months[null]=null\", \"A.production_support[null]=null\", \"A.structured_facts_available[bool]=false\", \"A.levels.python[int]=2\", \"A.levels.react[int]=3\", \"A.levels.sql[int]=1\", \"A.levels.rest_api[int]=2\", \"A.levels.teamwork[int]=6\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=self_reported\", \"B.salary_min[int]=65000\", \"B.duration_months[int]=12\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=1\", \"B.levels.react[int]=4\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=5\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=junior",
+                          "A.status[str]=pending",
+                          "A.salary_min[int]=50000",
+                          "A.duration_months[null]=null",
+                          "A.production_support[null]=null",
+                          "A.structured_facts_available[bool]=false",
+                          "A.levels.python[int]=2",
+                          "A.levels.react[int]=3",
+                          "A.levels.sql[int]=1",
+                          "A.levels.rest_api[int]=2",
+                          "A.levels.teamwork[int]=6"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=middle",
+                          "B.status[str]=self_reported",
+                          "B.salary_min[int]=65000",
+                          "B.duration_months[int]=12",
+                          "B.production_support[bool]=true",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=1",
+                          "B.levels.react[int]=4",
+                          "B.levels.sql[int]=2",
+                          "B.levels.rest_api[int]=3",
+                          "B.levels.teamwork[int]=5"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "qwen3.8-27b",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "qwen3.8-27b",
+        "orientation": "reverse",
+        "request_hash": "4de462c49ffc23ee1a5a40757c676f33f464f12738ead3a3e2fe4d50c25aaac4",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "qwen3.8-27b",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"B\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"salary_comparison\": {\"salary_min_A\": 65000, \"salary_min_B\": 50000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -15000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=self_reported\", \"A.salary_min[int]=65000\", \"A.duration_months[int]=12\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=1\", \"A.levels.react[int]=4\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=junior\", \"B.status[str]=pending\", \"B.salary_min[int]=50000\", \"B.duration_months[null]=null\", \"B.production_support[null]=null\", \"B.structured_facts_available[bool]=false\", \"B.levels.python[int]=2\", \"B.levels.react[int]=3\", \"B.levels.sql[int]=1\", \"B.levels.rest_api[int]=2\", \"B.levels.teamwork[int]=6\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=middle",
+                          "A.status[str]=self_reported",
+                          "A.salary_min[int]=65000",
+                          "A.duration_months[int]=12",
+                          "A.production_support[bool]=true",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=1",
+                          "A.levels.react[int]=4",
+                          "A.levels.sql[int]=2",
+                          "A.levels.rest_api[int]=3",
+                          "A.levels.teamwork[int]=5"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=junior",
+                          "B.status[str]=pending",
+                          "B.salary_min[int]=50000",
+                          "B.duration_months[null]=null",
+                          "B.production_support[null]=null",
+                          "B.structured_facts_available[bool]=false",
+                          "B.levels.python[int]=2",
+                          "B.levels.react[int]=3",
+                          "B.levels.sql[int]=1",
+                          "B.levels.rest_api[int]=2",
+                          "B.levels.teamwork[int]=6"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "qwen3.8-27b",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "gemma4-vlm",
+        "orientation": "direct",
+        "request_hash": "c6265910426f370790778620234bbd5e1cab5cfc70ffa6c854e948c6913e6d1b",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "gemma4-vlm",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 120000, \"salary_min_B\": 55000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -65000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=confirmed\", \"A.salary_min[int]=120000\", \"A.duration_months[int]=36\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=6\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=5\", \"A.levels.rest_api[int]=6\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=intern\", \"B.status[str]=pending\", \"B.salary_min[int]=55000\", \"B.duration_months[int]=6\", \"B.production_support[bool]=false\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=3\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=7\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=middle",
+                          "A.status[str]=confirmed",
+                          "A.salary_min[int]=120000",
+                          "A.duration_months[int]=36",
+                          "A.production_support[bool]=true",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=6",
+                          "A.levels.react[int]=2",
+                          "A.levels.sql[int]=5",
+                          "A.levels.rest_api[int]=6",
+                          "A.levels.teamwork[int]=5"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=intern",
+                          "B.status[str]=pending",
+                          "B.salary_min[int]=55000",
+                          "B.duration_months[int]=6",
+                          "B.production_support[bool]=false",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=3",
+                          "B.levels.react[int]=2",
+                          "B.levels.sql[int]=2",
+                          "B.levels.rest_api[int]=3",
+                          "B.levels.teamwork[int]=7"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "gemma4-vlm",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "gemma4-vlm",
+        "orientation": "reverse",
+        "request_hash": "251434bd4bdc381129b41f407103d4af13f11f56dfb76d88a25a5f2cc05bafa6",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "gemma4-vlm",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 55000, \"salary_min_B\": 120000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 65000}, \"available_citations\": {\"A\": [\"A.grade[str]=intern\", \"A.status[str]=pending\", \"A.salary_min[int]=55000\", \"A.duration_months[int]=6\", \"A.production_support[bool]=false\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=3\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=7\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=confirmed\", \"B.salary_min[int]=120000\", \"B.duration_months[int]=36\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=6\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=5\", \"B.levels.rest_api[int]=6\", \"B.levels.teamwork[int]=5\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=intern",
+                          "A.status[str]=pending",
+                          "A.salary_min[int]=55000",
+                          "A.duration_months[int]=6",
+                          "A.production_support[bool]=false",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=3",
+                          "A.levels.react[int]=2",
+                          "A.levels.sql[int]=2",
+                          "A.levels.rest_api[int]=3",
+                          "A.levels.teamwork[int]=7"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=middle",
+                          "B.status[str]=confirmed",
+                          "B.salary_min[int]=120000",
+                          "B.duration_months[int]=36",
+                          "B.production_support[bool]=true",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=6",
+                          "B.levels.react[int]=2",
+                          "B.levels.sql[int]=5",
+                          "B.levels.rest_api[int]=6",
+                          "B.levels.teamwork[int]=5"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "gemma4-vlm",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "qwen3.8-27b",
+        "orientation": "direct",
+        "request_hash": "67e7fb402cddb727fdd3a4edf150af9b8173132f80ec854f8488f7bc9106f729",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "qwen3.8-27b",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 120000, \"salary_min_B\": 55000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -65000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=confirmed\", \"A.salary_min[int]=120000\", \"A.duration_months[int]=36\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=6\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=5\", \"A.levels.rest_api[int]=6\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=intern\", \"B.status[str]=pending\", \"B.salary_min[int]=55000\", \"B.duration_months[int]=6\", \"B.production_support[bool]=false\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=3\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=7\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=middle",
+                          "A.status[str]=confirmed",
+                          "A.salary_min[int]=120000",
+                          "A.duration_months[int]=36",
+                          "A.production_support[bool]=true",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=6",
+                          "A.levels.react[int]=2",
+                          "A.levels.sql[int]=5",
+                          "A.levels.rest_api[int]=6",
+                          "A.levels.teamwork[int]=5"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=intern",
+                          "B.status[str]=pending",
+                          "B.salary_min[int]=55000",
+                          "B.duration_months[int]=6",
+                          "B.production_support[bool]=false",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=3",
+                          "B.levels.react[int]=2",
+                          "B.levels.sql[int]=2",
+                          "B.levels.rest_api[int]=3",
+                          "B.levels.teamwork[int]=7"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "qwen3.8-27b",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "qwen3.8-27b",
+        "orientation": "reverse",
+        "request_hash": "7d6ba20acfd30d5382f689d669c965c6db3ae1870fe645256cd00bffcfdd5e20",
+        "request": {
+          "path": "/v1/chat/completions",
+          "payload": {
+            "model": "qwen3.8-27b",
+            "temperature": 0,
+            "max_tokens": 1400,
+            "messages": [
+              {
+                "role": "system",
+                "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+              },
+              {
+                "role": "user",
+                "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 55000, \"salary_min_B\": 120000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 65000}, \"available_citations\": {\"A\": [\"A.grade[str]=intern\", \"A.status[str]=pending\", \"A.salary_min[int]=55000\", \"A.duration_months[int]=6\", \"A.production_support[bool]=false\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=3\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=7\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=confirmed\", \"B.salary_min[int]=120000\", \"B.duration_months[int]=36\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=6\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=5\", \"B.levels.rest_api[int]=6\", \"B.levels.teamwork[int]=5\"]}}"
+              }
+            ],
+            "response_format": {
+              "type": "json_schema",
+              "json_schema": {
+                "name": "synthetic_pair_comparative_v3",
+                "strict": true,
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "label",
+                    "rationale",
+                    "evidence_A",
+                    "evidence_B",
+                    "uncertainties",
+                    "salary_comparison_choice"
+                  ],
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "tie",
+                        "insufficient"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    },
+                    "uncertainties": {
+                      "type": "array",
+                      "maxItems": 3,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 180
+                      }
+                    },
+                    "salary_comparison_choice": {
+                      "type": "string",
+                      "enum": [
+                        "A",
+                        "B",
+                        "equal",
+                        "unknown"
+                      ]
+                    },
+                    "evidence_A": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "A.grade[str]=intern",
+                          "A.status[str]=pending",
+                          "A.salary_min[int]=55000",
+                          "A.duration_months[int]=6",
+                          "A.production_support[bool]=false",
+                          "A.structured_facts_available[bool]=true",
+                          "A.levels.python[int]=3",
+                          "A.levels.react[int]=2",
+                          "A.levels.sql[int]=2",
+                          "A.levels.rest_api[int]=3",
+                          "A.levels.teamwork[int]=7"
+                        ]
+                      }
+                    },
+                    "evidence_B": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 3,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "B.grade[str]=middle",
+                          "B.status[str]=confirmed",
+                          "B.salary_min[int]=120000",
+                          "B.duration_months[int]=36",
+                          "B.production_support[bool]=true",
+                          "B.structured_facts_available[bool]=true",
+                          "B.levels.python[int]=6",
+                          "B.levels.react[int]=2",
+                          "B.levels.sql[int]=5",
+                          "B.levels.rest_api[int]=6",
+                          "B.levels.teamwork[int]=5"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "chat_template_kwargs": {
+              "enable_thinking": false
+            }
+          },
+          "kind": "pair",
+          "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+          "model": "qwen3.8-27b",
+          "prompt_version": "rerank-pair-comparative-v3"
+        }
+      }
+    ],
+    "diagnostic_pair_baseline": 676,
+    "diagnostic_allowance": 20,
+    "selection": "Purposeful reuse: clear and ambiguous cases; prior predictions exposed to selector",
+    "evaluation": "Frozen score-blind assistant review; not independent human evaluation",
+    "gates": {
+      "accepted_per_model": 4,
+      "symmetric_per_model": 2,
+      "blind_agreement_per_model": 2,
+      "unresolved_fact_errors": 0,
+      "prose_review_required": true
+    },
+    "manifest_hash": "0768fece29f99ec94c6bced8379b673dd7ee70a605262b2026a07e4c4ebb5d10"
+  },
+  "report": {
+    "state": "needs_fact_review",
+    "manifest_hash": "0768fece29f99ec94c6bced8379b673dd7ee70a605262b2026a07e4c4ebb5d10",
+    "attempts": [
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "gemma4-vlm",
+        "orientation": "direct",
+        "request_hash": "6a32fd381eb5319c38077cb0e4ceadaefedc51c2072e2fbb3232be3e60ed9feb",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 1.66656675003469,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "gemma4-vlm",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"B\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 50000, \"salary_min_B\": 65000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 15000}, \"available_citations\": {\"A\": [\"A.grade[str]=junior\", \"A.status[str]=pending\", \"A.salary_min[int]=50000\", \"A.duration_months[null]=null\", \"A.production_support[null]=null\", \"A.structured_facts_available[bool]=false\", \"A.levels.python[int]=2\", \"A.levels.react[int]=3\", \"A.levels.sql[int]=1\", \"A.levels.rest_api[int]=2\", \"A.levels.teamwork[int]=6\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=self_reported\", \"B.salary_min[int]=65000\", \"B.duration_months[int]=12\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=1\", \"B.levels.react[int]=4\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=5\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=junior",
+                                "A.status[str]=pending",
+                                "A.salary_min[int]=50000",
+                                "A.duration_months[null]=null",
+                                "A.production_support[null]=null",
+                                "A.structured_facts_available[bool]=false",
+                                "A.levels.python[int]=2",
+                                "A.levels.react[int]=3",
+                                "A.levels.sql[int]=1",
+                                "A.levels.rest_api[int]=2",
+                                "A.levels.teamwork[int]=6"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=middle",
+                                "B.status[str]=self_reported",
+                                "B.salary_min[int]=65000",
+                                "B.duration_months[int]=12",
+                                "B.production_support[bool]=true",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=1",
+                                "B.levels.react[int]=4",
+                                "B.levels.sql[int]=2",
+                                "B.levels.rest_api[int]=3",
+                                "B.levels.teamwork[int]=5"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "gemma4-vlm",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "6a32fd381eb5319c38077cb0e4ceadaefedc51c2072e2fbb3232be3e60ed9feb",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 1.6639076250139624
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "gemma4-vlm",
+        "orientation": "reverse",
+        "request_hash": "eeee472a15c2c6efed35de24e23f2a9058af5f82a360cc6cfba1717016719b17",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 1.6687885420396924,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "gemma4-vlm",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"B\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"salary_comparison\": {\"salary_min_A\": 65000, \"salary_min_B\": 50000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -15000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=self_reported\", \"A.salary_min[int]=65000\", \"A.duration_months[int]=12\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=1\", \"A.levels.react[int]=4\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=junior\", \"B.status[str]=pending\", \"B.salary_min[int]=50000\", \"B.duration_months[null]=null\", \"B.production_support[null]=null\", \"B.structured_facts_available[bool]=false\", \"B.levels.python[int]=2\", \"B.levels.react[int]=3\", \"B.levels.sql[int]=1\", \"B.levels.rest_api[int]=2\", \"B.levels.teamwork[int]=6\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=middle",
+                                "A.status[str]=self_reported",
+                                "A.salary_min[int]=65000",
+                                "A.duration_months[int]=12",
+                                "A.production_support[bool]=true",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=1",
+                                "A.levels.react[int]=4",
+                                "A.levels.sql[int]=2",
+                                "A.levels.rest_api[int]=3",
+                                "A.levels.teamwork[int]=5"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=junior",
+                                "B.status[str]=pending",
+                                "B.salary_min[int]=50000",
+                                "B.duration_months[null]=null",
+                                "B.production_support[null]=null",
+                                "B.structured_facts_available[bool]=false",
+                                "B.levels.python[int]=2",
+                                "B.levels.react[int]=3",
+                                "B.levels.sql[int]=1",
+                                "B.levels.rest_api[int]=2",
+                                "B.levels.teamwork[int]=6"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "gemma4-vlm",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "eeee472a15c2c6efed35de24e23f2a9058af5f82a360cc6cfba1717016719b17",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 1.6657883750740439
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "qwen3.8-27b",
+        "orientation": "direct",
+        "request_hash": "0f65842f519cfc9a38969a4d9aacc15ac92a146c54d5b6d4f15d46fe988cd5fe",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 1.5000658330973238,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "qwen3.8-27b",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"B\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 50000, \"salary_min_B\": 65000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 15000}, \"available_citations\": {\"A\": [\"A.grade[str]=junior\", \"A.status[str]=pending\", \"A.salary_min[int]=50000\", \"A.duration_months[null]=null\", \"A.production_support[null]=null\", \"A.structured_facts_available[bool]=false\", \"A.levels.python[int]=2\", \"A.levels.react[int]=3\", \"A.levels.sql[int]=1\", \"A.levels.rest_api[int]=2\", \"A.levels.teamwork[int]=6\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=self_reported\", \"B.salary_min[int]=65000\", \"B.duration_months[int]=12\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=1\", \"B.levels.react[int]=4\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=5\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=junior",
+                                "A.status[str]=pending",
+                                "A.salary_min[int]=50000",
+                                "A.duration_months[null]=null",
+                                "A.production_support[null]=null",
+                                "A.structured_facts_available[bool]=false",
+                                "A.levels.python[int]=2",
+                                "A.levels.react[int]=3",
+                                "A.levels.sql[int]=1",
+                                "A.levels.rest_api[int]=2",
+                                "A.levels.teamwork[int]=6"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=middle",
+                                "B.status[str]=self_reported",
+                                "B.salary_min[int]=65000",
+                                "B.duration_months[int]=12",
+                                "B.production_support[bool]=true",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=1",
+                                "B.levels.react[int]=4",
+                                "B.levels.sql[int]=2",
+                                "B.levels.rest_api[int]=3",
+                                "B.levels.teamwork[int]=5"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "chat_template_kwargs": {
+                    "enable_thinking": false
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "qwen3.8-27b",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "0f65842f519cfc9a38969a4d9aacc15ac92a146c54d5b6d4f15d46fe988cd5fe",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 1.4972285418771207
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "2d9b5951ad2a",
+        "model": "qwen3.8-27b",
+        "orientation": "reverse",
+        "request_hash": "4de462c49ffc23ee1a5a40757c676f33f464f12738ead3a3e2fe4d50c25aaac4",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 1.502626707777381,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "qwen3.8-27b",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"bio\": \"Разработка API и интерфейсов, SQL, взаимодействие в команде\", \"class\": \"frontend\", \"domens\": {}, \"salary\": {\"max\": 200000, \"min\": 50000}, \"soft_skills\": {}, \"stacks\": {}}, \"preferences\": \"Prefer teamwork and economical salary expectations within an acceptable technical fit.\", \"A\": {\"description\": \"Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.\", \"duration_months\": 12, \"grade\": \"middle\", \"levels\": {\"python\": 1, \"react\": 4, \"rest_api\": 3, \"sql\": 2, \"teamwork\": 5}, \"production_support\": true, \"salary_min\": 65000, \"status\": \"self_reported\", \"structured_facts_available\": true}, \"B\": {\"description\": \"Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.\", \"duration_months\": null, \"grade\": \"junior\", \"levels\": {\"python\": 2, \"react\": 3, \"rest_api\": 2, \"sql\": 1, \"teamwork\": 6}, \"production_support\": null, \"salary_min\": 50000, \"status\": \"pending\", \"structured_facts_available\": false}, \"salary_comparison\": {\"salary_min_A\": 65000, \"salary_min_B\": 50000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -15000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=self_reported\", \"A.salary_min[int]=65000\", \"A.duration_months[int]=12\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=1\", \"A.levels.react[int]=4\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=junior\", \"B.status[str]=pending\", \"B.salary_min[int]=50000\", \"B.duration_months[null]=null\", \"B.production_support[null]=null\", \"B.structured_facts_available[bool]=false\", \"B.levels.python[int]=2\", \"B.levels.react[int]=3\", \"B.levels.sql[int]=1\", \"B.levels.rest_api[int]=2\", \"B.levels.teamwork[int]=6\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=middle",
+                                "A.status[str]=self_reported",
+                                "A.salary_min[int]=65000",
+                                "A.duration_months[int]=12",
+                                "A.production_support[bool]=true",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=1",
+                                "A.levels.react[int]=4",
+                                "A.levels.sql[int]=2",
+                                "A.levels.rest_api[int]=3",
+                                "A.levels.teamwork[int]=5"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=junior",
+                                "B.status[str]=pending",
+                                "B.salary_min[int]=50000",
+                                "B.duration_months[null]=null",
+                                "B.production_support[null]=null",
+                                "B.structured_facts_available[bool]=false",
+                                "B.levels.python[int]=2",
+                                "B.levels.react[int]=3",
+                                "B.levels.sql[int]=1",
+                                "B.levels.rest_api[int]=2",
+                                "B.levels.teamwork[int]=6"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "chat_template_kwargs": {
+                    "enable_thinking": false
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "qwen3.8-27b",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "4de462c49ffc23ee1a5a40757c676f33f464f12738ead3a3e2fe4d50c25aaac4",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 1.5003194999881089
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "gemma4-vlm",
+        "orientation": "direct",
+        "request_hash": "c6265910426f370790778620234bbd5e1cab5cfc70ffa6c854e948c6913e6d1b",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 0.4470390419010073,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "gemma4-vlm",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 120000, \"salary_min_B\": 55000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -65000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=confirmed\", \"A.salary_min[int]=120000\", \"A.duration_months[int]=36\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=6\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=5\", \"A.levels.rest_api[int]=6\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=intern\", \"B.status[str]=pending\", \"B.salary_min[int]=55000\", \"B.duration_months[int]=6\", \"B.production_support[bool]=false\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=3\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=7\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=middle",
+                                "A.status[str]=confirmed",
+                                "A.salary_min[int]=120000",
+                                "A.duration_months[int]=36",
+                                "A.production_support[bool]=true",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=6",
+                                "A.levels.react[int]=2",
+                                "A.levels.sql[int]=5",
+                                "A.levels.rest_api[int]=6",
+                                "A.levels.teamwork[int]=5"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=intern",
+                                "B.status[str]=pending",
+                                "B.salary_min[int]=55000",
+                                "B.duration_months[int]=6",
+                                "B.production_support[bool]=false",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=3",
+                                "B.levels.react[int]=2",
+                                "B.levels.sql[int]=2",
+                                "B.levels.rest_api[int]=3",
+                                "B.levels.teamwork[int]=7"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "gemma4-vlm",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "c6265910426f370790778620234bbd5e1cab5cfc70ffa6c854e948c6913e6d1b",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 0.44416904100216925
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "gemma4-vlm",
+        "orientation": "reverse",
+        "request_hash": "251434bd4bdc381129b41f407103d4af13f11f56dfb76d88a25a5f2cc05bafa6",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 0.347975832875818,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "gemma4-vlm",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 55000, \"salary_min_B\": 120000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 65000}, \"available_citations\": {\"A\": [\"A.grade[str]=intern\", \"A.status[str]=pending\", \"A.salary_min[int]=55000\", \"A.duration_months[int]=6\", \"A.production_support[bool]=false\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=3\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=7\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=confirmed\", \"B.salary_min[int]=120000\", \"B.duration_months[int]=36\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=6\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=5\", \"B.levels.rest_api[int]=6\", \"B.levels.teamwork[int]=5\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=intern",
+                                "A.status[str]=pending",
+                                "A.salary_min[int]=55000",
+                                "A.duration_months[int]=6",
+                                "A.production_support[bool]=false",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=3",
+                                "A.levels.react[int]=2",
+                                "A.levels.sql[int]=2",
+                                "A.levels.rest_api[int]=3",
+                                "A.levels.teamwork[int]=7"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=middle",
+                                "B.status[str]=confirmed",
+                                "B.salary_min[int]=120000",
+                                "B.duration_months[int]=36",
+                                "B.production_support[bool]=true",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=6",
+                                "B.levels.react[int]=2",
+                                "B.levels.sql[int]=5",
+                                "B.levels.rest_api[int]=6",
+                                "B.levels.teamwork[int]=5"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "gemma4-vlm",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "251434bd4bdc381129b41f407103d4af13f11f56dfb76d88a25a5f2cc05bafa6",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 0.3447889999952167
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "qwen3.8-27b",
+        "orientation": "direct",
+        "request_hash": "67e7fb402cddb727fdd3a4edf150af9b8173132f80ec854f8488f7bc9106f729",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 0.4531143750064075,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "qwen3.8-27b",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 120000, \"salary_min_B\": 55000, \"cheaper_side\": \"B\", \"delta_B_minus_A\": -65000}, \"available_citations\": {\"A\": [\"A.grade[str]=middle\", \"A.status[str]=confirmed\", \"A.salary_min[int]=120000\", \"A.duration_months[int]=36\", \"A.production_support[bool]=true\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=6\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=5\", \"A.levels.rest_api[int]=6\", \"A.levels.teamwork[int]=5\"], \"B\": [\"B.grade[str]=intern\", \"B.status[str]=pending\", \"B.salary_min[int]=55000\", \"B.duration_months[int]=6\", \"B.production_support[bool]=false\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=3\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=2\", \"B.levels.rest_api[int]=3\", \"B.levels.teamwork[int]=7\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=middle",
+                                "A.status[str]=confirmed",
+                                "A.salary_min[int]=120000",
+                                "A.duration_months[int]=36",
+                                "A.production_support[bool]=true",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=6",
+                                "A.levels.react[int]=2",
+                                "A.levels.sql[int]=5",
+                                "A.levels.rest_api[int]=6",
+                                "A.levels.teamwork[int]=5"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=intern",
+                                "B.status[str]=pending",
+                                "B.salary_min[int]=55000",
+                                "B.duration_months[int]=6",
+                                "B.production_support[bool]=false",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=3",
+                                "B.levels.react[int]=2",
+                                "B.levels.sql[int]=2",
+                                "B.levels.rest_api[int]=3",
+                                "B.levels.teamwork[int]=7"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "chat_template_kwargs": {
+                    "enable_thinking": false
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "qwen3.8-27b",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "67e7fb402cddb727fdd3a4edf150af9b8173132f80ec854f8488f7bc9106f729",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 0.4504356251563877
+            }
+          ]
+        }
+      },
+      {
+        "case_id": "e07375f08543",
+        "model": "qwen3.8-27b",
+        "orientation": "reverse",
+        "request_hash": "7d6ba20acfd30d5382f689d669c965c6db3ae1870fe645256cd00bffcfdd5e20",
+        "answer": null,
+        "error_type": "RuntimeError",
+        "elapsed_seconds": 0.46517412504181266,
+        "raw_receipt": {
+          "failures": [
+            {
+              "request": {
+                "path": "/v1/chat/completions",
+                "payload": {
+                  "model": "qwen3.8-27b",
+                  "temperature": 0,
+                  "max_tokens": 1400,
+                  "messages": [
+                    {
+                      "role": "system",
+                      "content": "Compare candidate A and candidate B symmetrically for the stated vacancy and employer preferences. Choose A or B only when known facts support a material preference. Skill levels are integers 0..7; compare skill levels separately from evidence reliability. Grade is the formal test result; a role or free-text narrative does not reassign grade. Confirmed, partial, self_reported, and pending are different evidence states: uncertainty reduces certainty without erasing declared skills. Null duration_months and production_support are unknown, never zero months or false. Use only explicit technical requirements; do not invent technical minima. A class-only vacancy has no unstated technical requirements, and missing facts are not a negative qualification. Use salary overlap as an eligibility constraint only when the declared vacancy requires it. Salary affects preference only when the employer explicitly mentions it. Do not invent salary thresholds or a minimum technical fit. Salary economy, when explicitly requested, must be weighed against known technical fit; cheaper does not automatically defeat stronger fit. When unknown tradeoffs prevent a justified preference, use tie for a supported comparable fit or insufficient for uncertainty that prevents comparison. Tie means genuine comparable suitability supported by available facts; insufficient means the facts do not support a comparison. Swapping A and B must swap A/B labels and preserve tie/insufficient. Candidate position must never be a preference factor. Return JSON only with label, rationale, evidence_A, evidence_B, uncertainties, and salary_comparison_choice. Rationale is one short sentence of at most 240 characters. Each evidence_A/evidence_B is a nonempty list of at most three unique exact strings copied from that side's available_citations; never reconstruct, edit, or coerce a citation. Cite both candidates even for tie or insufficient. Use at most three short uncertainties. salary_comparison contains fixed arithmetic facts, not a score, ranking weight, or qualification rule. salary_comparison_choice must exactly copy salary_comparison.cheaper_side; it does not determine label. Rationale may cite salary economy only if the employer explicitly mentions it in preferences. For a class-only vacancy without explicit numeric weights for technical fit versus salary or teamwork, do not invent an acceptable technical minimum, priority, or weight. When there is no justified dominance and tradeoff priorities are missing, insufficient is legitimate. Tie requires supported comparable fit. Formal grade is not overwritten by a role or free biography. Do not report confidence or probabilities."
+                    },
+                    {
+                      "role": "user",
+                      "content": "{\"vacancy\": {\"class\": \"backend\", \"domens\": {\"sql\": 4}, \"stacks\": {\"python\": 5, \"react\": 3}, \"soft_skills\": {\"teamwork\": 3}, \"bio\": \"\", \"salary\": {\"min\": 50000, \"max\": 200000}}, \"preferences\": \"Prefer relevant projects and production support over duration alone.\", \"A\": {\"grade\": \"intern\", \"levels\": {\"python\": 3, \"react\": 2, \"sql\": 2, \"rest_api\": 3, \"teamwork\": 7}, \"status\": \"pending\", \"duration_months\": 6, \"production_support\": false, \"salary_min\": 55000, \"description\": \"Стажер с отличной командной работой и базовыми знаниями Python и REST. Небольшой опыт в учебных проектах, готов к обучению и работе в паре с ментором.\", \"structured_facts_available\": true}, \"B\": {\"grade\": \"middle\", \"levels\": {\"python\": 6, \"react\": 2, \"sql\": 5, \"rest_api\": 6, \"teamwork\": 5}, \"status\": \"confirmed\", \"duration_months\": 36, \"production_support\": true, \"salary_min\": 120000, \"description\": \"Специалист с опытом поддержки высоконагруженных систем. Глубокие знания Python и SQL, но минимальный фронтенд. Стабильная работа в проде, без частой смены мест.\", \"structured_facts_available\": true}, \"salary_comparison\": {\"salary_min_A\": 55000, \"salary_min_B\": 120000, \"cheaper_side\": \"A\", \"delta_B_minus_A\": 65000}, \"available_citations\": {\"A\": [\"A.grade[str]=intern\", \"A.status[str]=pending\", \"A.salary_min[int]=55000\", \"A.duration_months[int]=6\", \"A.production_support[bool]=false\", \"A.structured_facts_available[bool]=true\", \"A.levels.python[int]=3\", \"A.levels.react[int]=2\", \"A.levels.sql[int]=2\", \"A.levels.rest_api[int]=3\", \"A.levels.teamwork[int]=7\"], \"B\": [\"B.grade[str]=middle\", \"B.status[str]=confirmed\", \"B.salary_min[int]=120000\", \"B.duration_months[int]=36\", \"B.production_support[bool]=true\", \"B.structured_facts_available[bool]=true\", \"B.levels.python[int]=6\", \"B.levels.react[int]=2\", \"B.levels.sql[int]=5\", \"B.levels.rest_api[int]=6\", \"B.levels.teamwork[int]=5\"]}}"
+                    }
+                  ],
+                  "response_format": {
+                    "type": "json_schema",
+                    "json_schema": {
+                      "name": "synthetic_pair_comparative_v3",
+                      "strict": true,
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "label",
+                          "rationale",
+                          "evidence_A",
+                          "evidence_B",
+                          "uncertainties",
+                          "salary_comparison_choice"
+                        ],
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "tie",
+                              "insufficient"
+                            ]
+                          },
+                          "rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 240
+                          },
+                          "uncertainties": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 180
+                            }
+                          },
+                          "salary_comparison_choice": {
+                            "type": "string",
+                            "enum": [
+                              "A",
+                              "B",
+                              "equal",
+                              "unknown"
+                            ]
+                          },
+                          "evidence_A": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "A.grade[str]=intern",
+                                "A.status[str]=pending",
+                                "A.salary_min[int]=55000",
+                                "A.duration_months[int]=6",
+                                "A.production_support[bool]=false",
+                                "A.structured_facts_available[bool]=true",
+                                "A.levels.python[int]=3",
+                                "A.levels.react[int]=2",
+                                "A.levels.sql[int]=2",
+                                "A.levels.rest_api[int]=3",
+                                "A.levels.teamwork[int]=7"
+                              ]
+                            }
+                          },
+                          "evidence_B": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 3,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "B.grade[str]=middle",
+                                "B.status[str]=confirmed",
+                                "B.salary_min[int]=120000",
+                                "B.duration_months[int]=36",
+                                "B.production_support[bool]=true",
+                                "B.structured_facts_available[bool]=true",
+                                "B.levels.python[int]=6",
+                                "B.levels.react[int]=2",
+                                "B.levels.sql[int]=5",
+                                "B.levels.rest_api[int]=6",
+                                "B.levels.teamwork[int]=5"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "chat_template_kwargs": {
+                    "enable_thinking": false
+                  }
+                },
+                "kind": "pair",
+                "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+                "model": "qwen3.8-27b",
+                "prompt_version": "rerank-pair-comparative-v3"
+              },
+              "request_hash": "7d6ba20acfd30d5382f689d669c965c6db3ae1870fe645256cd00bffcfdd5e20",
+              "error_type": "HTTPError",
+              "elapsed_seconds": 0.46134112519212067
+            }
+          ]
+        }
+      }
+    ],
+    "models": {
+      "gemma4-vlm": {
+        "accepted": 0,
+        "symmetric": 0,
+        "blind_agreement": 0,
+        "mechanical_gate_passed": false,
+        "comparisons": [
+          {
+            "case_id": "2d9b5951ad2a",
+            "family": "frontend-05",
+            "blind_label": "insufficient",
+            "direct_label": null,
+            "reverse_label": null,
+            "symmetric": false,
+            "agrees_with_blind": false
+          },
+          {
+            "case_id": "e07375f08543",
+            "family": "backend-05",
+            "blind_label": "A",
+            "direct_label": null,
+            "reverse_label": null,
+            "symmetric": false,
+            "agrees_with_blind": false
+          }
+        ],
+        "observed_usage": {
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "total_tokens": 0
+        },
+        "usage_complete": false,
+        "factual_prose_review": "pending",
+        "quality_gate_passed": false
+      },
+      "qwen3.8-27b": {
+        "accepted": 0,
+        "symmetric": 0,
+        "blind_agreement": 0,
+        "mechanical_gate_passed": false,
+        "comparisons": [
+          {
+            "case_id": "2d9b5951ad2a",
+            "family": "frontend-05",
+            "blind_label": "insufficient",
+            "direct_label": null,
+            "reverse_label": null,
+            "symmetric": false,
+            "agrees_with_blind": false
+          },
+          {
+            "case_id": "e07375f08543",
+            "family": "backend-05",
+            "blind_label": "A",
+            "direct_label": null,
+            "reverse_label": null,
+            "symmetric": false,
+            "agrees_with_blind": false
+          }
+        ],
+        "observed_usage": {
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "total_tokens": 0
+        },
+        "usage_complete": false,
+        "factual_prose_review": "pending",
+        "quality_gate_passed": false
+      }
+    },
+    "ledger_before": {
+      "generation": 28,
+      "pair": 683,
+      "grade": 119
+    },
+    "ledger_after": {
+      "generation": 28,
+      "pair": 691,
+      "grade": 119
+    },
+    "budget_preserved": true,
+    "historical_cache_bytes_preserved": true,
+    "elapsed_seconds": 2.170869957888499,
+    "diagnostic_attempts_remaining": 5,
+    "training_started": false,
+    "teacher_promoted": false,
+    "activation_allowed": false,
+    "quality_gate_passed": false,
+    "report_hash": "6c65b0fc8c5089336f3c491395d9a3d9929cbe291cb3155c89c5874affae80ac"
+  },
+  "review": {
+    "reviewer_kind": "assistant_after_outputs",
+    "independent_human_evaluation": false,
+    "report_hash": "6c65b0fc8c5089336f3c491395d9a3d9929cbe291cb3155c89c5874affae80ac",
+    "state": "stopped",
+    "reason": "All eight attempts failed at HTTP transport; no model judgements or prose available.",
+    "factual_prose_review": "unavailable_no_responses",
+    "quality_comparison": "not_evaluated",
+    "unknown_cause": "Historical failure receipts preserve HTTPError type but no status/body; exact rejection reason unavailable.",
+    "read_only_catalog_probe": {
+      "method": "GET",
+      "path": "/v1/models",
+      "http_status": 200,
+      "approved_aliases_present": {
+        "gemma4-vlm": true,
+        "qwen3.8-27b": true
+      },
+      "inference_calls": 0
+    },
+    "usage": {
+      "actual_tokens": null,
+      "cost_estimate": null,
+      "reason": "No usage returned; unknown is not zero"
+    },
+    "cache_only_replay": {
+      "http_calls": 0,
+      "key_reads": 0,
+      "ledger_unchanged": true
+    },
+    "maximum_approved_inference_attempts": 8,
+    "actual_inference_attempts": 8,
+    "retries": 0,
+    "diagnostic_attempts_remaining": 5,
+    "training_started": false,
+    "teacher_promoted": false,
+    "activation_allowed": false,
+    "next_step": "Establish API schema compatibility with a separately budgeted minimal transport probe; no automatic calls or training.",
+    "review_hash": "0c579a9714544f191751534336ec54334fc2d829951239ebdd09635c457d158f"
+  },
+  "artifact_hash": "ba3101b7f34799cdbd2da7e8172827c83e68d5e75d3cdcb59b295f3b426c8848"
+}

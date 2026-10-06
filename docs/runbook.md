@@ -368,6 +368,14 @@ receipts, использует общий pair ledger и партии макси
 ledger28/683/119. Повтор читает сохранённый stopped report без HTTP. Новый prompt,
 массовый quality pilot и training автоматически не запускаются.
 
+Сравнение двух моделей: `python -m matching_engine.rerank_teacher_comparison`
+с тем же PYTHONPATH. Восемь заранее запечатанных запросов, без повторов;
+все8 завершились HTTPError, ledger28/691/119. Завершённый запуск повторяется
+только из кэша. Причина HTTP-отказа не установлена: исторические receipts
+не содержат код/тело; будущие failures сохраняют безопасный HTTP-код.
+Качество не оценено, training/promotion не разрешены; остальные5diagnostic
+attempts автоматически не используются. [Подробности](rerank-teacher-comparison.md).
+
 ### Повтор backend приёмки
 
 При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings
