@@ -90,6 +90,10 @@ PYTHONPATH=src .venv/bin/python -m matching_engine.rerank_cohort_training \
 
 ## Защита от повторного fit
 
+Фактический v4 цикл завершён с C=0.01, 756 features; golden activation gate failed.
+Повторный cache-only replay проверен без fit и без изменения training receipts.
+[Метрики и ограничения](rerank-grounded-cohort-acceptance.md).
+
 До обучения под файловой блокировкой атомарно создаётся неизменяемый `train-request.json` со статусом `started` и полными hashes данных, review, adjudication, frozen code и самого adapter/trainer. После успешного цикла сохраняются `artifact.json`, `report.json` и завершающий `completed.json`.
 
 Повторный запуск при целых completed receipts повторно проверяет источники и возвращает прежний report без fit. `started` без `completed` всегда означает обязательный ручной разбор сбоя; адаптер не повторяет обучение автоматически. Подмена данных, receipt, модели или кода также блокирует replay. Исходный immutable dataset продолжает хранить свой дообучающий `training_started: false`; реальный факт исследовательского цикла записан отдельно в training receipts.

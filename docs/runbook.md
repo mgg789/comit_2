@@ -424,6 +424,13 @@ labels или failed receipts. После завершения и проверк
 receipts, независимые suitability оценки, текущую слепую проверку и adjudication.
 Незавершённый корпус, failed pilot и неразобранные расхождения не допускаются к fit.
 
+Текущий закрытый namespace — `rerank-grounded-pair-repair-v4`: QA-only completion
+прошёл проверку, cumulative ledger 99 generation / 2423 pair / 579 grade.
+Один test-only fit завершён; численный activation gate failed, runtime не изменён.
+Повтор оператора при целых completed receipts — cache-only replay без нового fit.
+Не удалять training receipts и не сбрасывать расход для повторной попытки.
+[Приёмка и ограничения выборки](rerank-grounded-cohort-acceptance.md).
+
 ## Recruitment backend
 
 Перед запуском обновлённого API явно применить003/004 через

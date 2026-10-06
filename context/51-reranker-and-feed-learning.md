@@ -550,3 +550,18 @@ V3 явно отделяет 16 class-only семейств с rule-derived labe
 validation families — class-only; oracle отсутствует в calibration и golden.
 Пилот API только для nonclass прошёл 8/8 valid/correct и 4/4 reverse без retries.
 Исходные independent suitability grades сохранены. [Правило и ограничения](../docs/rerank-class-only-oracle.md).
+
+V4 завершил повторную разметку только qa-06, сохранив исходную nonclass policy:
+8/8 pilot valid/correct, 4/4 reverse; 25 новых API-попыток и 7 точных cache hits.
+Итог 60/420: 129/132 teacher reverse, 48/48 rule reverse, quarantine пуст;
+assistant20 — 20/20 без factual issues и corrections, user20 pending.
+Cumulative ledger — 99 generation / 2423 pair / 579 grade, профильные outputs
+консервативно 595/600. Старые ответы и неудачные попытки сохранены.
+
+Один test-only fixed-grid fit выбрал C=0.01, 756 features. Golden macro NDCG
+0.995890 → 0.998537 (+0.002647), macro pair accuracy 0.918828 → 0.958643 (+0.039815).
+Нижние 95% paired-family bootstrap bounds 0.0 / -0.005291: численный gate failed,
+активации нет. Исходный NDCG допускает максимум +0.004110, поэтому эта golden
+не может подтвердить требуемые +0.02. Порог хвоста также не валидирован:
+41 calibration relevant, tail gap отсутствует. Golden не используется для tuning.
+[Фактическая приёмка и ограничения](../docs/rerank-grounded-cohort-acceptance.md).
