@@ -123,3 +123,33 @@ SQLite/local volume; горизонтальный active-active для этог�
 `CHAT_TEST_SERVICE_URL`, `CHAT_TEST_SERVICE_TOKEN`. Использовать только отдельную
 синтетическую БД: тест очищает accounts cascade. Основной контур matching и
 найма остаётся независимым от чатов.
+
+## Проверено локально 06.10.2026
+
+Отчёт: [chat-acceptance.json](../data/validation/chat-acceptance.json).
+`pnpm typecheck` и `pnpm build` прошли для всего monorepo.
+API-тесты с отдельной PostgreSQL БД и реальным Docker QGramm:
+`pnpm exec tsx --test --test-concurrency=1 tests/*.test.ts` из `apps/api` —
+44 passed, 0 failed, 0 skipped. Все семь `*_TEST_DATABASE_URL` настроены
+на синтетическую БД; chat URL/token передаются через переменные окружения.
+
+В закреплённом модуле QGramm с копией `infra/qgramm/bridge` команды
+`go test -race -tags qg_files ./bridge -timeout 120s` и
+`go vet -tags qg_files ./bridge` прошли. Пять тестов включают перезапуск,
+загрузку/скачивание 8 MiB, несколько чанков, скачивание старого вложения
+после 101 нового сообщения, проверку ciphertext и изоляцию процессов.
+Dockerfile также выполняет тесты адаптера перед сборкой статического бинарника.
+
+`python3 tests/chat-docker-acceptance.py` с `CHAT_TEST_CONTAINER`, chat URL/token
+проверил настоящий restart контейнера с теми же ключами и volume, сохранность
+истории/файла, отсутствие текста и имени файла в копии storage и durable retry.
+Этот тест разрешён только для отдельного `comit-qgramm-chat-*` контейнера.
+Проверены authenticated history через приватную Docker-сеть и readiness.
+Для HTTP-тестов с хоста добавлена отдельная тестовая сеть и loopback-port;
+production overlay порт не публикует.
+
+`WEB_PORT=39788 API_PORT=39780 MATCHING_PORT=39781 TESTING_PORT=39782
+INTEGRATION_PORT=39783 SMOKE_TRIES=1 ./tests/smoke.sh` — все 12 проверок прошли.
+Собранный образ: 13 417 867 байт, user `comit`, read-only rootfs, persistent
+`/data`, лицензии upstream включены. Production deployment, UI и WebSocket
+проверки не выполнялись и в этот проход не входят.
