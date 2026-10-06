@@ -47,6 +47,44 @@ jobs:
           services/integration-engine/tests
           -q
 
+  regression:
+    name: Python regression suite (PostgreSQL)
+    runs-on: [self-hosted, regression]
+    # One regression runner exists; the disposable database must never be shared.
+    container:
+      image: python:3.12-bookworm
+    services:
+      postgres:
+        # pgvector extension is required by matching migrations; same image as the dev/prod stack.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: comit
+          POSTGRES_PASSWORD: comit-regression
+          POSTGRES_DB: matching_test
+        options: >-
+          --health-cmd "pg_isready -U comit -d matching_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Test-only credentials for a database that is destroyed with the job.
+      PIPELINE_TEST_DATABASE_URL: postgresql://comit:comit-regression@postgres:5432/matching_test
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install services with dev deps
+        run: |
+          pip install --no-cache-dir \
+            -e "./services/matching-engine[dev]" \
+            -e "./services/testing-engine[dev]" \
+            -e "./services/integration-engine[dev]"
+      - name: Run full suite against PostgreSQL
+        run: >
+          pytest
+          services/matching-engine/tests
+          services/testing-engine/tests
+          services/integration-engine/tests
+          -q
+
   smoke:
     name: Compose smoke gate
     runs-on: [self-hosted, ci]
