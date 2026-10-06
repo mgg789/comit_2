@@ -280,6 +280,8 @@ def train(families: list[TrainingFamily], schema: FeatureSchema, metadata: dict)
         "training": {"learner": "L2-pairwise-logistic", "C": selected_c, "C_grid": list(C_GRID),
                      "seed": SEED, "intercept": False, "mirror_weight": .5,
                      "independent_training_pairs": len(labels) // 2, "training_rows": len(labels),
+                     "regularization_candidates": [{"C": c, "validation": metrics}
+                                                   for _, c, _, metrics in candidates],
                      "scaling": "train-observed-mean-plus-availability:v1", "sklearn_version": sklearn.__version__,
                      "numpy_version": np.__version__, "split_manifest": split_manifest, "report": report,
                      "test_only": test_only, "label_validation_hash": metadata.get("label_validation_hash"),

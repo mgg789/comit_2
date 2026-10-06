@@ -402,3 +402,11 @@ Harrier, проверяет typed facts/PDFs/durable delivery/backfill. Не з�
 20 попыток, использует до пяти общих remote slots и не увеличивает глобальный
 лимит. Если сохранён started receipt без report, сначала разобрать receipts;
 автоматического повторного запуска нет. [Результаты и ограничения](rerank-grounded-teacher-pilot.md).
+
+Текущая частичная выборка отдельно проверяется командой
+`python -m matching_engine.rerank_sample_probe` из корня с matching-engine в
+PYTHONPATH. Она читает только сохранённые источники и pinned Harrier cache,
+обучает неактивируемый test-only артефакт в собственном namespace и оставляет
+golden закрытым. Повтор завершённого запуска возвращает проверенный отчёт без
+новых HTTP/обучения; изменение контекста или незавершённый запуск явно отклоняется.
+[Метрики и порядок воспроизведения](rerank-current-sample-probe.md).
