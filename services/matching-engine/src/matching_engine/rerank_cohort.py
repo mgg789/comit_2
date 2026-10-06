@@ -4,6 +4,7 @@ import argparse
 import fcntl
 import itertools
 import json
+import re
 from collections import Counter
 from copy import deepcopy
 from dataclasses import asdict
@@ -24,15 +25,15 @@ from matching_engine.rerank_experiment import _parallel, family_manifest
 from matching_engine.rerank_hash import digest
 from matching_engine.rerank_protocol import DIRECTIONS
 from matching_engine.rerank_providers import (
-    GENERATION_MODEL,
+    GEMMA_GENERATION_MODEL,
     LIMITS,
     _atomic_write,
 )
 from matching_engine.rerank_sample_probe import _cycles, _ordering_ceiling
 from matching_engine.strict import INITIAL_GROUPS
 
-VERSION = "rerank-grounded-cohort-v3"
-PRIOR_VERSION = "rerank-grounded-cohort-v2"
+VERSION = "rerank-grounded-cohort-v5"
+PRIOR_VERSION = "rerank-grounded-cohort-v4"
 CORE_KEYS = {
     "backend": ("python", "node", "go", "sql", "rest_api", "architecture_thinking", "teamwork"),
     "frontend": ("react", "vue", "html_css_jquery", "tailwind", "ux_userflow", "rest_api", "teamwork"),
@@ -76,6 +77,44 @@ def _policy(index: int) -> dict:
             "required_measurements": [], "exclusive_criterion": False, "suitability_rubric": RUBRIC}
 
 
+def _profile_output_bound(content: object) -> int:
+    """Count completed outer profile objects plus one started partial object; unknown output costs seven."""
+    if type(content) is not str:
+        return 7
+    match = re.match(r'\s*\{\s*"profiles"\s*:\s*\[',content)
+    if match is None:
+        return 7
+    offset = match.end();count = 0;decoder = json.JSONDecoder()
+    while True:
+        while offset < len(content) and content[offset] in ' \t\r\n,':offset += 1
+        if offset == len(content) or content[offset] == ']':return count
+        if content[offset] != '{':return max(7,count)
+        count += 1
+        try:
+            _value,offset = decoder.raw_decode(content,offset)
+        except json.JSONDecodeError:
+            return count
+
+
+def _spent_profiles(directory: Path, attempts: int, historical: int) -> tuple[int,list[dict]]:
+    """Bind precise completed/truncated output counts to raw hashes; missing HTTP replies cost seven."""
+    receipts = []
+    for path in (directory / 'provider-cache').glob('*.json'):
+        if path.name == 'usage.json':continue
+        raw = _read(path);request = raw.get('request',{})
+        if request.get('kind') != 'generation' or not request.get('cohort_id','').startswith('rerank-grounded-cohort-') or 'response' not in raw:
+            continue
+        if raw['request_hash'] != digest(request) or raw['response_hash'] != digest(raw['response']):
+            raise ValueError('generation output accounting receipt changed')
+        response = raw['response'];choices = response.get('choices',[]) if type(response) is dict else []
+        content = choices[0].get('message',{}).get('content') if len(choices)==1 else None
+        receipts.append({'request_hash':raw['request_hash'],'response_hash':raw['response_hash'],
+                         'profile_upper_bound':_profile_output_bound(content)})
+    remaining = attempts-historical-len(receipts)
+    if remaining < 0:raise ValueError('generation accounting exceeds cumulative attempts')
+    return historical*5 + sum(r['profile_upper_bound'] for r in receipts) + remaining*7,sorted(receipts,key=lambda r:r['request_hash'])
+
+
 def cohort_manifest(directory: Path) -> dict:
     """Freeze ancestry, seven-profile quotas, direction coverage and costs before new HTTP."""
     old = {p.stem: _read(p) for p in (directory / "families").glob("*.json")}
@@ -106,6 +145,8 @@ def cohort_manifest(directory: Path) -> dict:
         else:
             item["reuse"] = None
         prior_path = directory / PRIOR_VERSION / "sources" / f'{item["family_id"]}.json'
+        if not prior_path.exists():
+            prior_path = directory / "rerank-grounded-cohort-v2" / "sources" / f'{item["family_id"]}.json'
         item["prior_source"] = None
         if prior_path.exists() and item["reuse"] is None:
             prior = _read(prior_path)
@@ -117,7 +158,7 @@ def cohort_manifest(directory: Path) -> dict:
     before = _read(directory / "provider-cache/usage.json")
     first_path = directory / "rerank-grounded-cohort-v1" / "manifest.json"
     historical_generation = _read(first_path)["ledger_before"]["generation"] if first_path.exists() else before["generation"]
-    spent_profile_bound = historical_generation * 5 + (before["generation"] - historical_generation) * 7
+    spent_profile_bound, generation_receipts = _spent_profiles(directory,before["generation"],historical_generation)
     limits = {"generation": min(LIMITS["generation"] - before["generation"], (600 - spent_profile_bound) // 7),
               "pair": LIMITS["pair"] - before["pair"], "grade": LIMITS["grade"] - before["grade"]}
     normal = {"generation": sum(r["reuse"] is None and r["prior_source"] is None for r in rows), "pair": 60 * (21 + 3) + 20, "grade": 420 + 10}
@@ -126,18 +167,21 @@ def cohort_manifest(directory: Path) -> dict:
     manifest = {"version": VERSION, "families": rows, "ledger_before": before, "attempt_limits": limits,
                 "normal_attempts": normal, "global_limits": LIMITS, "split_counts": dict(Counter(r["split"] for r in rows)),
                 "profiles": 420, "unique_historical_profiles_preserved": True,
-                "generation_profile_bound": "Historical generation attempts x5 plus every new attempt x7 <=600",
+                "generation_profile_bound": "Historical attempts x5; sealed raw outer-profile counts incl partial; missing responses x7; future attempts x7 <=600",
                 "pair_audits": "21 unordered pairs plus exactly three reverse orientations per family",
                 "deduplication": "Exact facts across independent families; normalized descriptions across splits. Same-split template reuse reported separately",
                 "model_scope": "Global baseline prior, not employer-policy-conditioned ranking",
-                "activation_allowed": False, "generator": GENERATION_MODEL,
+                "activation_allowed": False, "generator": GEMMA_GENERATION_MODEL,
                 "generation_spent_profile_bound":spent_profile_bound,
+                "generation_profile_receipts":generation_receipts,
                 "seed_hash": digest((Path(__file__).resolve().parents[4] / "data/seed/candidate-pipeline.json").read_bytes().hex()),
                 "protected_source_hashes": {str(path.relative_to(directory)):digest(path.read_bytes().hex()) for path in
                     [*(directory / "families").glob("*.json"),
                      *(p for p in (directory / "provider-cache").glob("*.json") if p.name != "usage.json"),
                      directory / "semantic-cache.json",
-                     *(directory / PRIOR_VERSION).rglob("*.json")]},
+                     *(directory / PRIOR_VERSION).rglob("*.json"),
+                     *(directory / "rerank-grounded-cohort-v3").rglob("*.json"),
+                     *(directory / "rerank-grounded-cohort-v2").rglob("*.json")]},
                 "code_hashes": {name: digest((Path(__file__).parent / name).read_bytes().hex()) for name in
                                 ("rerank_cohort.py", "rerank_cohort_provider.py", "rerank_cohort_features.py",
                                  "rerank_features.py", "combine_scoring.py", "models.py", "embeddings.py",
@@ -306,10 +350,22 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
                 raise ValueError("historical source changed")
             traits = legacy_traits(directory,old,item["reuse"]["indices"])
         elif item["prior_source"]:
-            prior = _read(directory / item["prior_source"]["path"])
-            if prior["record_hash"] != item["prior_source"]["record_hash"] or prior["record_hash"] != digest({k:v for k,v in prior.items() if k != "record_hash"}):
-                raise ValueError("prior accepted source changed")
-            receipts = [_read(path) for path in (directory / PRIOR_VERSION / "jobs").glob(f'generate-{item["family_id"]}-*.json')]
+            link = item["prior_source"];seen = set();traits = None
+            while True:
+                prior_path = directory / link["path"]
+                if link["path"] in seen or prior_path.resolve().parent.parent.parent != directory.resolve() or prior_path.parent.name != 'sources':
+                    raise ValueError("invalid prior source lineage")
+                seen.add(link['path']);prior = _read(prior_path)
+                if prior["record_hash"] != link["record_hash"] or prior["record_hash"] != digest({k:v for k,v in prior.items() if k != "record_hash"}):
+                    raise ValueError("prior accepted source changed")
+                if {k:v for k,v in prior['manifest'].items() if k not in ('cohort_id','prior_source')} != {k:v for k,v in item.items() if k not in ('cohort_id','prior_source')}:
+                    raise ValueError("prior source lineage changed ancestry")
+                if traits is not None and prior['traits'] != traits:
+                    raise ValueError("prior source lineage changed facts")
+                traits = prior['traits'];parent = prior.get('source_receipts')
+                if type(parent) is not dict or 'path' not in parent:break
+                link = parent
+            receipts = [_read(path) for path in (prior_path.parent.parent / "jobs").glob(f'generate-{item["family_id"]}-*.json')]
             matching = [receipt for receipt in receipts if receipt["state"] == "passed" and receipt["answer"] == prior["traits"] and receipt["answer_hash"] == digest(prior["traits"])]
             if len(matching) != 1:
                 raise ValueError("prior source lacks exact accepted generation receipt")
@@ -339,7 +395,7 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
         return record
     first_new = next((item for item in manifest["families"] if item["reuse"] is None and item["prior_source"] is None),None)
     if first_new is not None:
-        generate(first_new)  # Validate one Qwen batch before allowing five concurrent generation jobs.
+        generate(first_new)  # Validate one new-generator batch before allowing five concurrent jobs.
     records = _parallel(generate,manifest["families"])
     owners = {};texts = {};repair = set()
     for record in records:

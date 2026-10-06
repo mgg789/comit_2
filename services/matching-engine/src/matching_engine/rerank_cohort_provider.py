@@ -25,7 +25,7 @@ GRADES = ("intern", "junior", "middle", "senior")
 LABELS = ("A", "B", "tie", "insufficient")
 PAIR_REASON_CODES = ("prefer_known_facts", "comparable_fit", "insufficient_source_facts")
 PROMPT_VERSIONS = {
-    "generation": "rerank-uniform-cohort-generation-v2",
+    "generation": "rerank-uniform-cohort-generation-v3",
     "pair": "rerank-uniform-cohort-pair-v2",
     "grade": "rerank-uniform-cohort-suitability-v2",
 }
@@ -35,6 +35,8 @@ CANDIDATE_FIELDS = (
     "production_support", "production_status", "role", "role_status",
     "project_domains", "project_stacks",
 )
+GENERATION_SALARIES = (50000, 60000, 70000, 80000, 90000, 100000, 120000, 140000, 160000, 180000)
+GENERATION_DURATIONS = (None, 0, 6, 12, 24, 36, 48, 60, 96, 120)
 _KNOWN_KEYS = frozenset(key for group in INITIAL_GROUPS.values() for key in group)
 _COMMON_INSTRUCTIONS = (
     "Use only the supplied vacancy, raw typed candidate facts, and explicit employer policy. "
@@ -216,16 +218,16 @@ def _candidate_schema(keys: tuple[str, ...]) -> dict:
         "grade": {"type": "string", "enum": list(GRADES)}, "status": status,
         "levels": _object({key: {"type": "integer", "minimum": 0, "maximum": 7} for key in keys}),
         "skill_statuses": _object(dict.fromkeys(keys, status)),
-        "salary_min": {"type": "integer", "minimum": 50000, "maximum": 180000},
+        "salary_min": {"type": "integer", "enum": list(GENERATION_SALARIES)},
         "description": {"type": "string", "minLength": 1, "maxLength": 180},
         "structured_facts_available": {"type": "boolean"},
-        "duration_months": {"type": ["integer", "null"], "minimum": 0, "maximum": 120},
+        "duration_months": {"type": ["integer", "null"], "enum": list(GENERATION_DURATIONS)},
         "duration_status": nullable_status, "production_support": {"type": ["boolean", "null"]},
         "production_status": nullable_status, "role": {"type": ["string", "null"], "maxLength": 80},
         "role_status": nullable_status,
     }
     for field, group in (("project_domains", "domain"), ("project_stacks", "stack")):
-        fields[field] = {"type": "array", "maxItems": len(INITIAL_GROUPS[group]), "items": _object({
+        fields[field] = {"type": "array", "maxItems": 2, "items": _object({
             "key": {"type": "string", "enum": list(INITIAL_GROUPS[group])}, "status": status})}
     return _object(fields)
 
@@ -354,6 +356,8 @@ class CohortProviders(SystemOneProviders):
             "schema fields. levels and skill_statuses contain exactly required_keys, never pad other skills. "
             "Vary independent grade, salary, skill levels and evidence tradeoffs; no universally dominant profile. "
             "Every evidence state is independent and may be confirmed/partial/self_reported/pending/rejected. "
+            "salary_min must be one of 50000,60000,70000,80000,90000,100000,120000,140000,160000,180000. "
+            "duration_months must be one of null,0,6,12,24,36,48,60,96,120. "
             "Maintain these three exact value/status pairs independently: "
             "duration_months -> duration_status; production_support -> production_status; role -> role_status. "
             "If duration_months is non-null (including 0), duration_status must be exactly one of "
@@ -368,6 +372,8 @@ class CohortProviders(SystemOneProviders):
             "production_support=null, production_status=null, role=null, role_status=null, "
             "project_domains=[] and project_stacks=[]. "
             "Registered project references carry their own statuses and correct group keys. "
+            "project_domains and project_stacks each contain at most 2 references with unique keys; "
+            "never repeat a key within either array. "
             "description is Russian text 1..180 characters; it never substitutes structured facts. "
             "Use genuinely varied descriptions across profiles and family IDs: different concrete project "
             "tasks and responsibilities, no generic identical sentence templates. family_id is diversity context, "

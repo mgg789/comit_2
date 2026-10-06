@@ -37,6 +37,26 @@ def test_budget_cannot_reset_or_expand_to_fit_new_manifest(directory):
         cohort.cohort_manifest(directory)
 
 
+def test_output_profile_bound_counts_outer_objects_not_nested_facts():
+    content=json.dumps({'profiles':[{'grade':'junior','project_stacks':[{'key':'python'}]}, {'grade':'middle'}]})
+    assert cohort._profile_output_bound(content)==2
+    assert cohort._profile_output_bound('{"profiles":[{"grade":"junior"},{"grade":')==2
+    assert cohort._profile_output_bound('{"profiles":[   ')==0
+    assert cohort._profile_output_bound('invalid')==7
+
+
+def test_precise_accounting_keeps_unknown_http_responses_conservative(directory):
+    request={'kind':'generation','cohort_id':'rerank-grounded-cohort-v4'}
+    response={'choices':[{'message':{'content':'{"profiles":[{"grade":"junior"},{"grade":'}}]}
+    raw={'request':request,'request_hash':digest(request),'response':response,'response_hash':digest(response)}
+    path=directory/'provider-cache'/f'{raw["request_hash"]}.json';path.write_text(json.dumps(raw))
+    bound,receipts=cohort._spent_profiles(directory,30,28)
+    assert bound==140+2+7 and receipts[0]['profile_upper_bound']==2
+    raw['response_hash']='changed';path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError,match='accounting receipt'):
+        cohort._spent_profiles(directory,30,28)
+
+
 def test_existing_family_cannot_move_to_another_split(directory):
     path=directory / "families/backend-01.json";record=json.loads(path.read_text())
     record["manifest"]["split"]="golden";path.write_text(json.dumps(record))

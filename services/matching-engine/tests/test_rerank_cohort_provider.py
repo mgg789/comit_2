@@ -8,6 +8,8 @@ import pytest
 
 from matching_engine.rerank_cohort_provider import (
     CANDIDATE_FIELDS,
+    GENERATION_DURATIONS,
+    GENERATION_SALARIES,
     PROMPT_VERSIONS,
     STATUSES,
     CohortProviders,
@@ -195,7 +197,7 @@ def test_identity_separates_kind_cohort_repair_and_preserves_defaults(tmp_path):
     assert teacher_identity(provider.cohort_id) == provider.teacher_identity()
     assert provider.teacher_identity("grade") != provider.teacher_identity("pair")
     assert legacy_teacher_identity()["prompt_version"] == "rerank-systemone-v1"
-    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v2"
+    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v3"
     assert PROMPT_VERSIONS["pair"] == "rerank-uniform-cohort-pair-v2"
     assert PROMPT_VERSIONS["grade"] == "rerank-uniform-cohort-suitability-v2"
     assert generation_identity()["prompt_version"] == "rerank-sverk-generation-v2"
@@ -235,7 +237,7 @@ def test_generation_approved_qwen_and_sparse_registry(tmp_path, monkeypatch):
         _provider(tmp_path, generator_model="unauthorized")
 
 
-def test_generation_v2_instructs_exact_nullable_pairs_and_compact_output(tmp_path):
+def test_generation_v3_instructs_exact_nullable_pairs_and_compact_output(tmp_path):
     provider = _provider(tmp_path, generator_model=GENERATION_MODEL)
     payload = provider.generation_payload("fullstack", "fullstack-01", KEYS)
     instructions = payload["messages"][0]["content"]
@@ -252,7 +254,33 @@ def test_generation_v2_instructs_exact_nullable_pairs_and_compact_output(tmp_pat
     assert "independent evidence status" in instructions and "evidence5" not in instructions
     assert "uniqueItems" not in json.dumps(payload["response_format"])
     assert provider._identity("/v1/chat/completions", payload, "generation")["prompt_version"] == (
-        "rerank-uniform-cohort-generation-v2")
+        "rerank-uniform-cohort-generation-v3")
+
+
+def test_generation_discrete_numbers_and_two_unique_project_references(tmp_path):
+    provider = _provider(tmp_path)
+    payload = provider.generation_payload("backend", "backend-01", KEYS)
+    fields = payload["response_format"]["json_schema"]["schema"]["properties"]["profiles"]["items"]["properties"]
+    assert GENERATION_SALARIES == (50000, 60000, 70000, 80000, 90000, 100000, 120000, 140000, 160000, 180000)
+    assert GENERATION_DURATIONS == (None, 0, 6, 12, 24, 36, 48, 60, 96, 120)
+    assert fields["salary_min"] == {"type": "integer", "enum": list(GENERATION_SALARIES)}
+    assert fields["duration_months"] == {"type": ["integer", "null"], "enum": list(GENERATION_DURATIONS)}
+    assert fields["project_domains"]["maxItems"] == fields["project_stacks"]["maxItems"] == 2
+    instructions = payload["messages"][0]["content"]
+    assert "50000,60000,70000,80000,90000,100000,120000,140000,160000,180000" in instructions
+    assert "null,0,6,12,24,36,48,60,96,120" in instructions
+    assert "at most 2 references with unique keys" in instructions
+    assert "uniqueItems" not in json.dumps(payload["response_format"])
+
+
+def test_legacy_source_validation_keeps_ranges_and_more_than_two_refs():
+    candidate = deepcopy(A)
+    candidate.update(salary_min=87321, duration_months=53,
+                     project_domains=[{"key": key, "status": "partial"}
+                                      for key in ("sql", "rest_api", "algorithms")],
+                     project_stacks=[{"key": key, "status": "self_reported"}
+                                     for key in ("python", "node", "react")])
+    validate_candidate(candidate)
 
 
 def test_generation_accepts_valid_compact_qwen_receipt_with_zero_false_and_null(tmp_path, monkeypatch):
