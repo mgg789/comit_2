@@ -328,6 +328,13 @@ Ledger28/681/119; обучение не возобновлено. Подробн
 Ledger28/691/119, осталось5из исходных20diagnostic attempts.
 [Контракт, ограничения и отчёт](rerank-teacher-comparison.md).
 
+В последующем восстановлении воспроизведён HTTP400 схемы с `uniqueItems`.
+Opt-in wire v4 убирает keyword только из server schema; локальная проверка
+дубликатов остаётся. Все4Gemma/Qwen calls теперь валидны и симметричны,
+но свободные объяснения не прошли фактический gate. Старые20diagnostic calls
+закрыты, глобальный pair ceiling3000 сохранён.
+[Восстановление транспорта](rerank-transport-recovery.md).
+
 Границы активации: golden12/min6 decisive pairs на семью, macro NDCG Δ≥0.02,
 macro accuracy≥0.65/Δ≥0.03 и нижняя95% family-bootstrap граница обоих Δ>0.
 Поддержанные срезы (≥3 семьи) не должны просесть больше0.03.

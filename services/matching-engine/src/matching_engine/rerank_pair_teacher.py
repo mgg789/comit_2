@@ -19,6 +19,7 @@ from matching_engine.rerank_providers import (
 
 COMPARATIVE_MODELS = (GEMMA_GENERATION_MODEL, GENERATION_MODEL)
 COMPARATIVE_PROMPT_VERSION = "rerank-pair-comparative-v3"
+COMPATIBLE_PROMPT_VERSION = "rerank-pair-comparative-v4-wire"
 SALARY_CHOICES = ("A", "B", "equal", "unknown")
 _SALARY_TERMS = re.compile(
     r"\b(?:salary|salaries|pay|paid|compensation|cost\w*|budget\w*|cheap\w*|econom\w*|"
@@ -153,3 +154,23 @@ class ComparativeTeacherProviders(GemmaTeacherProviders):
         for uncertainty in unknown:
             _bounded_text(uncertainty, 180)
         return answer
+
+
+class CompatibleTeacherProviders(ComparativeTeacherProviders):
+    """Send a portable schema while enforcing citation uniqueness locally, preserving v3 replay.
+
+    Only the wire schema loses uniqueItems. Identical facts, instructions and all
+    runtime constraints remain in force; a duplicate reply is still rejected.
+    """
+
+    def _identity(self, path: str, payload: dict, kind: str) -> dict:
+        return {**super()._identity(path, payload, kind), "prompt_version": COMPATIBLE_PROMPT_VERSION}
+
+    def _pair_payload(self, vacancy: dict, a: dict, b: dict, preferences: str) -> dict:
+        """Remove the unsupported wire keyword without modifying original v3 payloads or validators."""
+        payload = super()._pair_payload(vacancy, a, b, preferences)
+        spec = payload["response_format"]["json_schema"]
+        spec["name"] = "synthetic_pair_comparative_v4_wire"
+        for side in ("A", "B"):
+            spec["schema"]["properties"][f"evidence_{side}"].pop("uniqueItems")
+        return payload

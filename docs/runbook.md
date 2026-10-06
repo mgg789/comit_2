@@ -376,6 +376,11 @@ ledger28/683/119. Повтор читает сохранённый stopped repor
 Качество не оценено, training/promotion не разрешены; остальные5diagnostic
 attempts автоматически не используются. [Подробности](rerank-teacher-comparison.md).
 
+Транспорт восстановлен отдельно: `python -m matching_engine.rerank_transport_recovery`
+воспроизводит1исходный запрос, `--recover` проверяет4wire-compatible calls.
+Старый этап завершён, обе команды повторяются cache-only. Wire v4 сохраняет
+runtime uniqueness и все citation/salary guards. [Разбор и ограничения](rerank-transport-recovery.md).
+
 ### Повтор backend приёмки
 
 При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings

@@ -447,3 +447,13 @@ Read-only каталог API200 содержит оба aliases; это не п�
 teachers/default/cohort сохранены. Повторы/training/promotion/activation не выполнены.
 [Сравнение и следующий ограниченный шаг](../docs/rerank-teacher-comparison.md),
 [отдельный hashed report](../data/validation/rerank-teacher-comparison.json).
+
+После запроса Mike продолжить поиск решения восстановлен transport: один
+v3wire probe воспроизвёл HTTP400 JSON-схемы с упоминанием `uniqueItems`,
+wire v4 удаляет этот атрибут только на сервере и сохраняет локальный duplicate
+guard. Все4Gemma/Qwen calls валидны и симметричны, но фактическая проверка
+свободных объяснений не пройдена. На конце этого этапа ledger28/696/119,
+старые20diagnostic attempts закрыты; общий pair3000 и остальные ceilings
+не увеличены. Последующие свежие bounded diagnostics потребляют оставшийся
+общий бюджет без переписывания старых receipts/labels.
+[Исправление API и доказательства](../docs/rerank-transport-recovery.md).

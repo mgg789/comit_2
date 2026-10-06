@@ -8,7 +8,8 @@ import re
 import tempfile
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
+from http.client import HTTPException
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urlparse
@@ -40,6 +41,54 @@ GENERATION_PROMPT_VERSIONS = {
     GEMMA_GENERATION_MODEL: "rerank-sverk-generation-gemma4-v1",
 }
 REMOTE_CONCURRENCY = 5
+HTTP_ERROR_BODY_LIMIT = 32 * 1024
+HTTP_SCHEMA_KEYWORDS = (
+    "uniqueItems", "additionalProperties", "minItems", "maxItems", "minLength", "maxLength",
+    "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "pattern",
+    "format", "enum", "const", "anyOf", "allOf", "oneOf", "not", "required", "properties",
+    "items", "type", "$ref", "$defs",
+)
+
+
+def classify_http_error(error: HTTPError) -> dict:
+    """Read at most 32 KiB and close an HTTP error; return only fixed diagnostic codes.
+
+    Schema keywords report literal allowlisted mentions, not proven compiler causes.
+    Body text, exception messages, headers, credentials, and URLs never enter the result.
+    Unreadable or already closed bodies degrade to status-only classification.
+    """
+    body = ""
+    try:
+        with suppress(OSError, ValueError, HTTPException):
+            raw = error.read(HTTP_ERROR_BODY_LIMIT)
+            if isinstance(raw, bytes):
+                body = raw[:HTTP_ERROR_BODY_LIMIT].decode("utf-8", errors="replace")
+    finally:
+        with suppress(OSError, ValueError, HTTPException):
+            error.close()
+    if error.code in (401, 403):
+        return {"code": "auth_failed"}
+    if error.code == 429:
+        return {"code": "rate_limited"}
+    if 500 <= error.code <= 599:
+        return {"code": "server_error"}
+    if error.code in (400, 422):
+        keywords = [keyword for keyword in HTTP_SCHEMA_KEYWORDS
+                    if re.search(r"(?<![\w$])" + re.escape(keyword) + r"(?!\w)", body, re.IGNORECASE)
+                    and (keyword not in {"minimum", "maximum", "pattern", "format", "enum", "const",
+                                         "not", "required", "properties", "items", "type"}
+                         or re.search(r"[\"'`]" + re.escape(keyword) + r"[\"'`]|\bkeyword\s*:?\s*"
+                                      + re.escape(keyword) + r"\b", body, re.IGNORECASE))]
+        unsupported = re.search(r"\b(?:unsupported|not\s+(?:(?:yet|currently)\s+)?supported|"
+                                r"does\s+not\s+support)\b", body, re.IGNORECASE)
+        if keywords and unsupported:
+            return {"code": "schema_keyword_unsupported", "schema_keywords": keywords}
+        if keywords or re.search(r"\b(?:schema|json_schema|jsonschema|xgrammar)\b", body, re.IGNORECASE):
+            result = {"code": "schema_rejected"}
+            if keywords:
+                result["schema_keywords"] = keywords
+            return result
+    return {"code": "http_error"}
 
 
 def generation_identity(model: str = GENERATION_MODEL) -> dict[str, str]:
@@ -123,9 +172,8 @@ class LocalProviders:
                 error = {"request": identity, "request_hash": key,
                          "error_type": type(exc).__name__, "elapsed_seconds": time.monotonic() - start}
                 if isinstance(exc, HTTPError):
-                    # Status alone is safe; HTTP bodies, URLs and headers may contain credentials.
                     error["http_status"] = exc.code
-                    exc.close()
+                    error["http_error_classification"] = classify_http_error(exc)
                 _atomic_write(self.directory / f"{key}.failure-{attempt}.json", error)
                 # Remote errors may echo headers or request details; never propagate them.
                 if remote:
