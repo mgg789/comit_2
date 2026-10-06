@@ -435,3 +435,15 @@ Format улучшен лишь на этой паре, quality не пройде
 actual1966input+200outputtokens; семьиз20diagnosticcalls,13неиспользованы.
 Дополнительных запросов/обучения/promotion нет. Фактическое замечание не закрыто.
 [Отдельный hashed report](../data/validation/rerank-gemma-format-probe.json).
+
+Следующий разрешённый diagnostic сравнил Gemma и Qwen на2фиксированных
+validation парах, direct/reverse,8attempts. Prompt `rerank-pair-comparative-v3`
+требует точные ссылки обеих сторон и копирование зарплатной арифметики из кода.
+Все8получили HTTPError без model replies; качество/симметрия/согласие не оценены.
+Точная причина неизвестна: старые failure receipts не сохраняли HTTP-код.
+Read-only каталог API200 содержит оба aliases; это не проверка structured payload.
+Будущие failures сохраняют код без чувствительного тела/headers. Ledger28/691/119,
+15из20diagnosticcalls использованы,5остались; usage неизвестен. Старыеcache bytes,
+teachers/default/cohort сохранены. Повторы/training/promotion/activation не выполнены.
+[Сравнение и следующий ограниченный шаг](../docs/rerank-teacher-comparison.md),
+[отдельный hashed report](../data/validation/rerank-teacher-comparison.json).

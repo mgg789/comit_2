@@ -10,6 +10,7 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
@@ -121,6 +122,10 @@ class LocalProviders:
             except Exception as exc:
                 error = {"request": identity, "request_hash": key,
                          "error_type": type(exc).__name__, "elapsed_seconds": time.monotonic() - start}
+                if isinstance(exc, HTTPError):
+                    # Status alone is safe; HTTP bodies, URLs and headers may contain credentials.
+                    error["http_status"] = exc.code
+                    exc.close()
                 _atomic_write(self.directory / f"{key}.failure-{attempt}.json", error)
                 # Remote errors may echo headers or request details; never propagate them.
                 if remote:
