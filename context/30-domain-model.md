@@ -60,7 +60,8 @@ Candidate-in-category: Registered → Tested(category assigned) → InPool
 
 Selection (кандидат в вакансии):
   InPool → Selected (top-k после реранкера)
-         → Visited (rejected в тиндре; НЕ возвращается в пул этой вакансии никогда)
+         → Visited (dislike; блокирует до структурного N>K)
+         → VisitedUpdated (история сохраняется; разрешён повторный подбор)
          → Attractive (лайк; пул одобренных)
          → Invited (отправлено приглашение)
   Отклонённый → возврат в InPool при превышении личного порога изменения профиля
@@ -70,6 +71,16 @@ Invitation: Sent → Viewed → Accepted | Declined
 
 Application (доп): Sent → Viewed → Accepted | Declined (статусы видят обе стороны)
 ```
+
+Уточнение Mike от06.10: после приглашения соискателю доступны предложение и
+будущий внутренний чат до принятия; контакты остаются скрытыми. В текущем
+backend-проходе чата нет. Принятие сразу открывает контакты, необязательные
+собеседования (максимум1technical+1general проведённые), оффер или отказ.
+API-owned RecruitmentState: sent/viewed→accepted→offer_sent→hired/offer_declined;
+declined/rejected/withdrawn завершают процесс. После истечения оффера →accepted.
+Отказ до приглашения employer-only; окончание hiring-процесса не равно visited
+из тиндера и автоматически по N>K не открывается. Контракты и выбранные
+правила первого прохода: [backend после like](../docs/recruitment.md).
 
 Уточнение Mike от 05.10 заменяет прежние Active/HasCandidates/Suspended/Archived.
 Техническая готовность отдельна от бизнес-статуса; только open допускает ready.

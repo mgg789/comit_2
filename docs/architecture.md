@@ -99,3 +99,13 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 | postgres | 5433→5432 | `POSTGRES_PORT` |
 
 В prod (`infra/docker-compose.prod.yml`) наружу публикуется только web; api и engines доступны лишь на `127.0.0.1` сервера (отладка и smoke), БД — только внутренняя сеть.
+
+## Hiring aggregate после подбора
+
+RecruitmentStore в api-core владеет lifecycle и транзакциями обеих ролей;
+authDomain инжектирует тот же API Pool/AuthStore/ProfileStore. Нового сервиса
+или внешнего SDK не требуется. Matching владеет saved/grant/exclusions, agents
+— опубликованной вакансией; API читает их через service-auth и сохраняет
+условия предложения. Контакты берутся только из текущего API source profile
+после принятия. Durable participant events отделены от будущих SMTP/chat
+потребителей. [Контур и границы](recruitment.md).

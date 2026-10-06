@@ -4,7 +4,8 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedListPage, SavedCard, VisitedCard } from "@comit/shared";
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedListPage, SavedCard, VisitedCard,
+  InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -55,6 +56,22 @@ export interface ApiClient {
   getSaved(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<SavedCard>>;
   /** Read retained visited history, including nonblocking updated entries. */
   getVisited(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<VisitedCard>>;
+  /** Invite an eligible candidate using immutable vacancy terms and a UUID retry key. */
+  inviteCandidate(draftId: string, body: InviteRequest): Promise<RecruitmentView>;
+  /** Close a saved shortlist entry before inviting; this decision is employer-only. */
+  rejectSavedCandidate(draftId: string, body: RejectSavedRequest): Promise<RecruitmentView>;
+  /** Read all process states belonging to an owned vacancy draft. */
+  getEmployerRecruitment(draftId: string, limit?: number, offset?: number): Promise<RecruitmentPage>;
+  /** Read only processes addressed to the authenticated candidate. */
+  getCandidateRecruitment(limit?: number, offset?: number): Promise<RecruitmentPage>;
+  /** Read a contact-free process snapshot as an authorized participant. */
+  getRecruitment(role: AccountRole, processId: string): Promise<RecruitmentView>;
+  /** Apply a role-authorized CAS mutation; exact retry keys are safe to replay. */
+  actOnRecruitment(role: AccountRole, processId: string, body: RecruitmentAction): Promise<RecruitmentView>;
+  /** Read contacts through a process-specific employer permission check. */
+  getRecruitmentContacts(processId: string): Promise<ContactsView>;
+  /** Poll durable participant events after the last acknowledged sequence. */
+  getRecruitmentEvents(role: AccountRole, afterSequence?: number, limit?: number): Promise<RecruitmentEventPage>;
 }
 
 /** Create a same-origin API client; optional Bearer credentials override session cookies server-side. */
@@ -97,5 +114,13 @@ export function createApiClient({
     decideFeed: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/decisions`, body),
     getSaved: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/saved?limit=${limit}&offset=${offset}`),
     getVisited: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/visited?limit=${limit}&offset=${offset}`),
+    inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),
+    rejectSavedCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment/reject`, body),
+    getEmployerRecruitment: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment?limit=${limit}&offset=${offset}`),
+    getCandidateRecruitment: (limit = 50, offset = 0) => request("GET", `/candidate/recruitment?limit=${limit}&offset=${offset}`),
+    getRecruitment: (role, processId) => request("GET", `/${role}/recruitment/${encodeURIComponent(processId)}`),
+    actOnRecruitment: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/actions`, body),
+    getRecruitmentContacts: processId => request("GET", `/employer/recruitment/${encodeURIComponent(processId)}/contacts`),
+    getRecruitmentEvents: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment-events?after_sequence=${afterSequence}&limit=${limit}`),
   };
 }

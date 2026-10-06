@@ -370,3 +370,30 @@ gateway routes and CRUD опубликованной вакансии остаю
 при актуальной ревизии, наличии в пуле и согласии кандидата. При обновлении или
 отзыве профиля запись остаётся в наборе, но устаревшая карточка возвращается
 как `card:null`, а PDF блокируется. Сохранение не открывает контакты кандидата.
+
+## Backend после like
+
+Контракт и state/consent matrix: [recruitment](recruitment.md). Все маршруты
+под `/api`, с существующим role-bound JWT/cookie, ownership из сессии.
+
+| Метод / маршрут | Request → Response |
+|---|---|
+| POST `/employer/vacancy-drafts/{draft_id}/invitations` | InviteRequest → RecruitmentView |
+| POST `/employer/vacancy-drafts/{draft_id}/recruitment/reject` | RejectSavedRequest → employer-only RecruitmentView |
+| GET `/employer/vacancy-drafts/{draft_id}/recruitment` | limit/offset → RecruitmentPage |
+| GET `/candidate/recruitment` | limit/offset → own RecruitmentPage |
+| GET `/{role}/recruitment/{id}` | own RecruitmentView |
+| POST `/{role}/recruitment/{id}/actions` | RecruitmentAction → RecruitmentView |
+| GET `/employer/recruitment/{id}/contacts` | accepted/current consent → ContactsView |
+| GET `/{role}/recruitment-events` | after_sequence/limit → RecruitmentEventPage |
+
+Action union: view/accept/decline/withdraw/reject, interview_propose/accept/decline/
+cancel/complete, offer_send/accept/decline. CAS expected_revision и UUID key
+обязательны, 409 на stale revision/conflicting key/state. Receipt повтора
+не содержит контактов и не обещает текущее состояние. Контакты читаются отдельно
+с no-store, до принятия403, чужой процесс404, нетprocessingconsent409.
+Saved-членство для invitation/rejection читается через приватный matching
+`GET /internal/vacancies/{vacancy_id}/saved/{candidate_id}` с token+serverowner;
+он возвращает SavedCard, при stale источнике card:null, без удаления истории.
+Чат отсутствует, chat_available:false. Схемы всех маршрутов включены в Fastify
+OpenAPI; DTO живут в packages/shared/recruitment.ts и используются api-client.

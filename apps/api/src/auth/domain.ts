@@ -8,6 +8,8 @@ import { authRoutes } from "../routes/auth.js";
 import { accountRoutes } from "../routes/accounts.js";
 import { candidateProfileRoutes } from "../routes/candidate-profile.js";
 import { ProfileStore } from "../profiles/store.js";
+import { RecruitmentStore } from "../recruitment/store.js";
+import { recruitmentRoutes } from "../routes/recruitment.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
 export async function authDomain(app: FastifyInstance): Promise<void> {
@@ -37,4 +39,5 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
   await app.register(accountRoutes, options);
+  await app.register(recruitmentRoutes, { ...options, recruitment: new RecruitmentStore(pool) });
 }

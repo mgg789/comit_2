@@ -443,7 +443,8 @@ class FeedStore:
                 candidate_id=row["candidate_id"], action=request.action, idempotency_key=request.idempotency_key,
                 saved=request.action == "like", visited=request.action == "dislike", history_badges=badges)
 
-    def saved(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0) -> FeedListPage[SavedCard]:
+    def saved(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0,
+              candidate_id: UUID | None = None) -> FeedListPage[SavedCard]:
         """List saved candidates with immutable exposure cards and bounded offset pagination."""
         if not 1 <= limit <= 100 or offset < 0:
             raise ValueError("invalid saved pagination")
@@ -462,7 +463,8 @@ class FeedStore:
                     d.action FROM feed_pipeline.saved s JOIN feed_pipeline.exposures e ON e.exposure_id=s.exposure_id
                     LEFT JOIN feed_pipeline.visited v ON v.owner_id=s.owner_id AND v.vacancy_id=s.vacancy_id AND v.candidate_id=s.candidate_id
                     LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id WHERE s.owner_id=%s AND s.vacancy_id=%s
-                    ORDER BY s.saved_at DESC,s.candidate_id LIMIT %s OFFSET %s""", (owner_id, vacancy_id, limit + 1, offset)).fetchall()
+                    AND (%s::uuid IS NULL OR s.candidate_id=%s)
+                    ORDER BY s.saved_at DESC,s.candidate_id LIMIT %s OFFSET %s""", (owner_id, vacancy_id, candidate_id, candidate_id, limit + 1, offset)).fetchall()
             has_more = len(rows) > limit
             items = []
             for row in rows[:limit]:
@@ -470,6 +472,13 @@ class FeedStore:
                 items.append(SavedCard(vacancy_id=row["vacancy_id"], candidate_id=row["candidate_id"], profile_revision=row["profile_revision"],
                     exposure_id=row["exposure_id"], saved_at=row["saved_at"], card=self._card(row, row["action"], list(row["history_badges"] or [])) if live else None))
             return FeedListPage[SavedCard](items=items, limit=limit, offset=offset, has_more=has_more)
+
+    def saved_candidate(self, owner_id: UUID, vacancy_id: UUID, candidate_id: UUID) -> SavedCard:
+        """Read one durable saved membership for the recruitment service without scanning the shortlist."""
+        page = self.saved(owner_id, vacancy_id, limit=1, candidate_id=candidate_id)
+        if not page.items:
+            raise NotFoundError("saved candidate not found")
+        return page.items[0]
 
     def visited(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0) -> FeedListPage[VisitedCard]:
         """List visited structural baselines, including legacy migration and update badges."""

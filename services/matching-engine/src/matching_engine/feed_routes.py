@@ -89,4 +89,11 @@ def feed_router(repository: FeedStore | None, require_internal: Callable) -> API
         store, owner_id = services
         return store.visited(owner_id, vacancy_id, limit, offset)
 
+    @router.get("/internal/vacancies/{vacancy_id}/saved/{candidate_id}", response_model=SavedCard)
+    def saved_candidate(vacancy_id: UUID, candidate_id: UUID,
+                        services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> SavedCard:
+        """Expose one owned saved membership as the post-selection handoff contract."""
+        store, owner_id = services
+        return store.saved_candidate(owner_id, vacancy_id, candidate_id)
+
     return router
