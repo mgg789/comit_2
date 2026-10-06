@@ -496,3 +496,10 @@ Rollback/reset доступны владельцу вакансии. [Прави
 ## Проверка локальных гипотез
 
 [Matched-pair exploration](hypothesis-learning.md) подключена к feed delivery после preference refresh:2 research cards на18 обычных unique deliveries, сохраняемые вероятности выбора/порядка, full snapshot eligibility и bounded сравнения. H1–H8/H10 проверяются по доступным фактам, H9 не имеет таксономии. Frozen20 decisive batch сообщает локальные свидетельства; learner получает исходные explicit actions один раз, новые обязательные фильтры не создаются. Основное пополнение/исчерпание §6 отдельно.
+
+Общая [витрина кандидатов](candidate-showcase.md) объединяет PostgreSQL
+full-text и независимый Harrier query RRF60, с фильтрами и явным lexical
+fallback. Лайк для выбранной ready/open вакансии проверяет строгий фильтр;
+несоответствие требует явного подтверждения предупреждения, после которого
+создаёт обычные saved/attractive/exclusions. Источник manual не включается
+в обучение learned-cohort и не меняет активный preference control.

@@ -37,7 +37,7 @@ MIN_PRIORITY = .000001
 
 def allocation_hash() -> str:
     """Bind candidate caps, credit rate and the exact probability construction."""
-    return digest({"comparison_policy": policy_hash(), "version": "paired-allocation-v1", "scan_cap": MAX_SCAN,
+    return digest({"comparison_policy": policy_hash(), "version": "paired-allocation-v1", "session_source": "tinder", "scan_cap": MAX_SCAN,
         "comparison_cap": MAX_COMPARISON_POOL, "ordinary_per_pair": ORDINARY_PER_PAIR,
         "min_priority": MIN_PRIORITY, "order_probability": .5, "scope": "conditional_feasible_pair_at_budget_opportunity"})
 
@@ -52,6 +52,8 @@ class HypothesisStore:
     @staticmethod
     def ensure(connection: psycopg.Connection, session: dict) -> dict:
         """Bind experiments to exact vacancy/baseline context and preference reset epoch."""
+        if session.get("source", "tinder") != "tinder":
+            raise ConflictError("hypotheses require a ranked feed session")
         preference = PreferenceStore.ensure(connection, session)
         context_hash = digest({"identity": preference["identity"], "preference_epoch": preference["epoch"],
                                "hypothesis_policy": allocation_hash()})
@@ -189,6 +191,8 @@ class HypothesisStore:
         Probabilities are conditional on a feasible pair and credited opportunity,
         not propensities for the entire hiring pool.
         """
+        if session.get("source", "tinder") != "tinder":
+            return session
         from matching_engine.feed_store import FeedStore
         control = HypothesisStore.ensure(connection, session)
         vacancy = FeedStore._owner_vacancy(connection, session["owner_id"], session["vacancy_id"])
@@ -217,7 +221,8 @@ class HypothesisStore:
             return session
         counts = connection.execute("""SELECT count(DISTINCT e.candidate_id) AS ordinary FROM feed_pipeline.exposures e
             JOIN learning_pipeline.events d ON d.exposure_id=e.exposure_id AND d.event_type='delivered'
-            WHERE e.owner_id=%s AND e.vacancy_id=%s AND d.recorded_at>=%s AND e.card->>'hypothesis_pair_id' IS NULL""",
+            JOIN feed_pipeline.sessions s USING(session_id)
+            WHERE s.source='tinder' AND e.owner_id=%s AND e.vacancy_id=%s AND d.recorded_at>=%s AND e.card->>'hypothesis_pair_id' IS NULL""",
             (session["owner_id"], session["vacancy_id"], control["budget_start"])).fetchone()
         block = counts["ordinary"] // ORDINARY_PER_PAIR
         pairs_used = connection.execute("SELECT count(*) AS count FROM hypothesis_pipeline.pairs WHERE vacancy_id=%s AND epoch=%s AND context_hash=%s",
@@ -313,7 +318,7 @@ class HypothesisStore:
         with connect(self.database_url) as connection:
             _lock(connection)
             vacancy = FeedStore._owner_vacancy(connection, owner_id, vacancy_id)
-            session = connection.execute("SELECT * FROM feed_pipeline.sessions WHERE owner_id=%s AND vacancy_id=%s ORDER BY created_at DESC LIMIT 1", (owner_id, vacancy_id)).fetchone()
+            session = connection.execute("SELECT * FROM feed_pipeline.sessions WHERE owner_id=%s AND vacancy_id=%s AND source='tinder' ORDER BY created_at DESC LIMIT 1", (owner_id, vacancy_id)).fetchone()
             if session is None:
                 return {"vacancy_id": vacancy_id, "revision": 0, "enabled": True, "context_hash": None,
                         "policy_hash": policy_hash(), "hypotheses": summarize([]), "search_report": {}, "pairs": 0}
@@ -330,6 +335,8 @@ class HypothesisStore:
     @staticmethod
     def seal(connection: psycopg.Connection, session: dict, vacancy: dict) -> None:
         """Seal the first decisive batch in the reaction transaction, independent of status polling."""
+        if session.get("source", "tinder") != "tinder":
+            return
         if connection.execute("""SELECT 1 FROM hypothesis_pipeline.pairs WHERE vacancy_id=%s
             AND invalidated_at IS NULL AND (test_exposure=%s OR control_exposure=%s)""",
             (session["vacancy_id"], session["exposure_id"], session["exposure_id"])).fetchone():

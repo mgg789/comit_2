@@ -324,4 +324,11 @@ preference identity/order/score и исходный R₀; propensity остаё�
 
 ## Журнал сопоставимых гипотез
 
-Новая миграция011 добавляет `hypothesis_pipeline.controls/pairs/batches/commands`: owner/context/epoch, policy и comparison hashes, immutable allocation draw/probabilities, ссылки двух exposures, контраст и frozen first20 decisive batch. Отзыв consent/ревизии удаляет parameters/report payloads, оставляет audit/hash и invalidated marker. `feed_pipeline.exposures.exploration_suppressed` скрывает отменённые не доставленные добавления; served cards не меняются. `learning_pipeline.samples.sample_scope=main_top_k|exploration` отличает исходные selections от явно выбранных вне top-k research inputs; cohort counts main не переписываются. HMAC экспорт псевдонимизирует pair IDs, условные вероятности идут отдельно от null global propensity. [Подробности](hypothesis-learning.md).
+Миграция `011_hypothesis_exploration.sql` добавляет `hypothesis_pipeline.controls/pairs/batches/commands`: owner/context/epoch, policy и comparison hashes, immutable allocation draw/probabilities, ссылки двух exposures, контраст и frozen first20 decisive batch. Отзыв consent/ревизии удаляет parameters/report payloads, оставляет audit/hash и invalidated marker. `feed_pipeline.exposures.exploration_suppressed` скрывает отменённые не доставленные добавления; served cards не меняются. `learning_pipeline.samples.sample_scope=main_top_k|exploration` отличает исходные selections от явно выбранных вне top-k research inputs; cohort counts main не переписываются. HMAC экспорт псевдонимизирует pair IDs, условные вероятности идут отдельно от null global propensity. [Подробности](hypothesis-learning.md).
+
+Миграция `011_candidate_showcase.sql`: GIN публичной проекции, query-embedding
+cache 640D, источник feed-сессии tinder/showcase и manual exposure kind.
+Предыдущие сессии сохраняют обязательные main/rerank ID; ручные сессии имеют
+NULL ID. Мигратор backfill пересобирает расширенный allowlist public_profile
+из точной исходной ревизии. Saved, decisions и selection_states общие для
+обоих источников. [Хранение и границы](candidate-showcase.md).

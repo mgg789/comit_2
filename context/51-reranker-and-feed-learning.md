@@ -637,3 +637,9 @@ Harrier, R₀, строгие фильтры, tail и top-k граница пр�
 H1–H8/H10 используют явные признаки/факты; H9 disabled до adjacency taxonomy. First20 decisive batch + approximate Wilson/Bonferroni10 фиксируется, поздние данные не перезапускают проверку. Неразмеченные/одинаковые реакции не решающие. Отзыв инвалидирует batch и очищает производные параметры без подстановки поздних примеров. Вывод локальный descriptive, не causal preference proof; learner получает исходные действия без двойного веса. Delivered positions/receipts неизменны, partial pair pinned, pause/resume/reset ownerCAS. Global propensity остаётся null при известных conditional pair/order probabilities.
 
 §6 normal buffer refill/exhaustion, frontend viewport/Tinder и server deployment отдельно. Контракты и команды: [docs/hypothesis-learning.md](../docs/hypothesis-learning.md).
+
+Совместимость с manual showcase: гипотезы, бюджет18 ordinary и выбор текущего
+контекста работают только с `source=tinder`. Ручная сессия без main/rerank ID
+не сбрасывает learner и не участвует в эксперименте. Сохранены исходные имена
+и checksum обеих миграций011; фиксация batch остаётся в общей атомарной decision
+транзакции. [Проверка объединения](../data/validation/hypothesis-showcase-integration.json).

@@ -6,7 +6,8 @@
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
-  ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile } from "@comit/shared";
+  ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
+  AgentsDraftView, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -43,6 +44,14 @@ export interface ApiClient {
   retryCandidateProjection(): Promise<CandidateProfileView>;
   /** Read readiness only for a draft owned by the employer account. */
   getVacancyReady(draftId: string): Promise<VacancyReady>;
+  /** Browse own editorial drafts; only created/accepted drafts with getVacancyReady success can receive a like. */
+  getVacancyDrafts(limit?: number, offset?: number): Promise<AgentsDraftView[]>;
+  /** Discover public candidates without requiring any vacancy. */
+  searchCandidates(body?: SearchRequest): Promise<SearchPage>;
+  /** Read the current anonymous public profile and authorized public PDF URL. */
+  getPublicCandidate(candidateId: string): Promise<PublicCandidateDetail>;
+  /** Save a displayed revision into an owned open vacancy using normal shortlist semantics. */
+  likeShowcaseCandidate(draftId: string, body: ShowcaseLikeRequest): Promise<ShowcaseLikeReceipt>;
   /** Queue main top-k selection for an owned published vacancy draft. */
   requestSelection(draftId: string, body: CombineRequest): Promise<CombineStatus>;
   /** Return the current contact-free selection page and public authorised PDF links. */
@@ -134,6 +143,10 @@ export function createApiClient({
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
     retryCandidateProjection: () => request("POST", "/candidate/profile/projection/retry", {}),
     getVacancyReady: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/ready`),
+    getVacancyDrafts: (limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts?limit=${limit}&offset=${offset}`),
+    searchCandidates: (body = {}) => request("POST", "/employer/candidates/search", body),
+    getPublicCandidate: candidateId => request("GET", `/employer/candidates/${encodeURIComponent(candidateId)}`),
+    likeShowcaseCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/showcase-likes`, body),
     requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),
     getSelection: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/selections?limit=${limit}&offset=${offset}`),
     openFeed: (draftId, body = {}) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed`, body),

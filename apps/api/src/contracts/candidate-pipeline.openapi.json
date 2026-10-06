@@ -480,6 +480,146 @@
         }
       }
     },
+    "/internal/employer/candidates/search": {
+      "post": {
+        "tags": [
+          "employer-showcase"
+        ],
+        "summary": "Search",
+        "description": "Search the consented public pool with explicit bounded filters.",
+        "operationId": "search_internal_employer_candidates_search_post",
+        "parameters": [
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/employer/candidates/{candidate_id}": {
+      "get": {
+        "tags": [
+          "employer-showcase"
+        ],
+        "summary": "Profile",
+        "description": "Read one current public profile without candidate contact access.",
+        "operationId": "profile_internal_employer_candidates__candidate_id__get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicCandidateDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -2156,6 +2296,176 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RerankPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/showcase-likes": {
+      "post": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Showcase Like",
+        "description": "Like one explicit public candidate for an owned open vacancy without a ranked feed.",
+        "operationId": "showcase_like_internal_vacancies__vacancy_id__showcase_likes_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShowcaseLikeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowcaseLikeReceipt"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowcaseLikeConflict"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/showcase-likes/{idempotency_key}": {
+      "get": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Showcase Receipt",
+        "description": "Read a manual like receipt before checking fresh candidate data.",
+        "operationId": "showcase_receipt_internal_vacancies__vacancy_id__showcase_likes__idempotency_key__get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "idempotency_key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Idempotency Key"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowcaseLikeReceipt"
                 }
               }
             }
@@ -3878,7 +4188,8 @@
             "type": "string",
             "enum": [
               "recommended",
-              "reserve"
+              "reserve",
+              "showcase"
             ],
             "title": "Kind"
           },
@@ -3901,7 +4212,8 @@
             "type": "string",
             "enum": [
               "learned",
-              "main_fallback"
+              "main_fallback",
+              "manual"
             ],
             "title": "Mode"
           },
@@ -3933,6 +4245,24 @@
               }
             ],
             "title": "Artifact Hash"
+          },
+          "strict_filter_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strict Filter Warnings"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
           },
           "activation_revision": {
             "type": "integer",
@@ -5383,6 +5713,446 @@
         "title": "PreferenceStatus",
         "description": "Operational state without coefficients, personal feature payloads or participant identifiers."
       },
+      "PublicCandidateCard": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          },
+          "search_factors": {
+            "$ref": "#/components/schemas/SearchFactors"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "resume_url"
+        ],
+        "title": "PublicCandidateCard",
+        "description": "Public identity-free card with global class rank and protected PDF URL."
+      },
+      "PublicCandidateDetail": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "confirmed_strength": {
+            "type": "integer",
+            "title": "Confirmed Strength"
+          },
+          "resume_url": {
+            "type": "string",
+            "title": "Resume Url"
+          },
+          "search_factors": {
+            "$ref": "#/components/schemas/SearchFactors"
+          },
+          "public_profile": {
+            "$ref": "#/components/schemas/PublicProfile"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "display_name",
+          "city",
+          "salary",
+          "category",
+          "rank",
+          "confirmed_strength",
+          "resume_url",
+          "public_profile"
+        ],
+        "title": "PublicCandidateDetail",
+        "description": "Current published revision and its safe allowlisted profile."
+      },
+      "PublicFacts": {
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/PublicReference"
+            },
+            "type": "array",
+            "title": "Domains"
+          },
+          "stacks": {
+            "items": {
+              "$ref": "#/components/schemas/PublicReference"
+            },
+            "type": "array",
+            "title": "Stacks"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicScalar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicScalar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "production_support": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicScalar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PublicFacts",
+        "description": "Allowlisted narrative facts; arbitrary evidence never crosses this boundary."
+      },
+      "PublicNarrative": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicFacts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "description",
+          "status"
+        ],
+        "title": "PublicNarrative",
+        "description": "Sanitized public text and typed facts only."
+      },
+      "PublicProfile": {
+        "properties": {
+          "projection_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Projection Version",
+            "default": 1
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "city": {
+            "type": "string",
+            "title": "City"
+          },
+          "salary": {
+            "$ref": "#/components/schemas/SalaryRange"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          },
+          "work_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "onsite",
+                    "remote",
+                    "hybrid"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Types"
+          },
+          "relocation_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relocation Ready"
+          },
+          "relocation_cities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relocation Cities"
+          },
+          "preferences": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preferences"
+          },
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSkill"
+            },
+            "type": "array",
+            "title": "Domains"
+          },
+          "stacks": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSkill"
+            },
+            "type": "array",
+            "title": "Stacks"
+          },
+          "soft_skills": {
+            "items": {
+              "$ref": "#/components/schemas/PublicSkill"
+            },
+            "type": "array",
+            "title": "Soft Skills"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNarrative"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "experience": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNarrative"
+            },
+            "type": "array",
+            "title": "Experience"
+          },
+          "achievements": {
+            "items": {
+              "$ref": "#/components/schemas/PublicNarrative"
+            },
+            "type": "array",
+            "title": "Achievements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "display_name",
+          "city",
+          "salary"
+        ],
+        "title": "PublicProfile",
+        "description": "Versioned, stable public projection without identity or contact fields."
+      },
+      "PublicReference": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "status"
+        ],
+        "title": "PublicReference",
+        "description": "Typed narrative coordinate without private provenance."
+      },
+      "PublicScalar": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "string",
+                "enum": [
+                  "developer",
+                  "lead",
+                  "architect",
+                  "analyst",
+                  "designer",
+                  "researcher",
+                  "qa",
+                  "devops",
+                  "other"
+                ]
+              }
+            ],
+            "title": "Value"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "value",
+          "status"
+        ],
+        "title": "PublicScalar",
+        "description": "One published typed scalar with its independently supplied status."
+      },
+      "PublicSkill": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "level": {
+            "type": "integer",
+            "title": "Level"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "level",
+          "status"
+        ],
+        "title": "PublicSkill",
+        "description": "Published skill declaration with no evidence or provenance strings."
+      },
       "RerankCard": {
         "properties": {
           "candidate_id": {
@@ -5944,6 +6714,229 @@
         "title": "ScoreBreakdown",
         "description": "Available-channel weights and reproducible score with raw rating provenance.\n\n``rating_score`` is the raw class percentile. ``rating_contribution`` applies\nthe grade-status confidence from the immutable policy snapshot, so a declared\ngrade cannot look like a tested grade while remaining eligible for the pool."
       },
+      "SearchFactors": {
+        "properties": {
+          "lexical_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lexical Rank"
+          },
+          "semantic_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Semantic Rank"
+          },
+          "rrf_score": {
+            "type": "number",
+            "title": "Rrf Score",
+            "default": 0.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SearchFactors",
+        "description": "Transparent reciprocal-rank fusion channel contributions (k=60)."
+      },
+      "SearchFilters": {
+        "properties": {
+          "classes": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "backend",
+                "frontend",
+                "fullstack",
+                "mobile",
+                "devops",
+                "data",
+                "qa",
+                "ml"
+              ]
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Classes"
+          },
+          "grades": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "intern",
+                "junior",
+                "middle",
+                "senior"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Grades"
+          },
+          "cities": {
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Cities"
+          },
+          "salary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SalaryRange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "work_types": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "onsite",
+                "remote",
+                "hybrid"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Work Types"
+          },
+          "relocation_ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relocation Ready"
+          },
+          "groups": {
+            "$ref": "#/components/schemas/SkillGroups"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SearchFilters",
+        "description": "Explicit public-profile filters; salary overlap includes both endpoints."
+      },
+      "SearchPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PublicCandidateCard"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "browse",
+              "lexical",
+              "hybrid"
+            ],
+            "title": "Mode"
+          },
+          "fallback_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "has_more",
+          "mode"
+        ],
+        "title": "SearchPage",
+        "description": "Bounded search result with explicit degradation and freshness-aware pagination."
+      },
+      "SearchRequest": {
+        "properties": {
+          "q": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Q",
+            "default": ""
+          },
+          "filters": {
+            "$ref": "#/components/schemas/SearchFilters"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "default": 50
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SearchRequest",
+        "description": "Bounded independent employer query with an opaque continuation cursor."
+      },
       "SelectionPage": {
         "properties": {
           "run": {
@@ -6031,6 +7024,213 @@
         "title": "SelectionStateInput",
         "description": "Trusted handoff cannot manually release visited; feed policy owns structural release."
       },
+      "ShowcaseLikeConflict": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/ShowcaseMismatchWarning"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ShowcaseLikeConflict",
+        "description": "A hard conflict string or an overrideable structured suitability warning."
+      },
+      "ShowcaseLikeReceipt": {
+        "properties": {
+          "receipt_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Receipt Id"
+          },
+          "exposure_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Exposure Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "like",
+              "dislike"
+            ],
+            "title": "Action"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          },
+          "saved": {
+            "type": "boolean",
+            "title": "Saved"
+          },
+          "visited": {
+            "type": "boolean",
+            "title": "Visited"
+          },
+          "replayed": {
+            "type": "boolean",
+            "title": "Replayed",
+            "default": false
+          },
+          "history_badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "History Badges"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "selection_source": {
+            "type": "string",
+            "const": "showcase",
+            "title": "Selection Source",
+            "default": "showcase"
+          },
+          "strict_filter_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strict Filter Warnings"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "receipt_id",
+          "exposure_id",
+          "vacancy_id",
+          "candidate_id",
+          "action",
+          "idempotency_key",
+          "saved",
+          "visited",
+          "profile_revision"
+        ],
+        "title": "ShowcaseLikeReceipt",
+        "description": "Like receipt records the exact public revision selected outside the ranked feed."
+      },
+      "ShowcaseLikeRequest": {
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Profile Revision"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "idempotency_key"
+        ],
+        "title": "ShowcaseLikeRequest",
+        "description": "Manual like binds the explicitly viewed candidate revision to one vacancy."
+      },
+      "ShowcaseMismatchWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "strict_filter_confirmation_required",
+            "title": "Code",
+            "default": "strict_filter_confirmation_required"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "vacancy_revision": {
+            "type": "integer",
+            "title": "Vacancy Revision"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "mismatch_token": {
+            "type": "string",
+            "title": "Mismatch Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "vacancy_revision",
+          "warnings",
+          "mismatch_token"
+        ],
+        "title": "ShowcaseMismatchWarning",
+        "description": "Modal-ready confirmation bound to current candidate and vacancy revisions."
+      },
       "Skill": {
         "properties": {
           "key": {
@@ -6077,6 +7277,79 @@
         ],
         "title": "Skill",
         "description": "A registry key and ordinal level, retaining confirmation and provenance."
+      },
+      "SkillFilter": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9_-]*$",
+            "title": "Key"
+          },
+          "min_level": {
+            "type": "integer",
+            "maximum": 7.0,
+            "minimum": 0.0,
+            "title": "Min Level",
+            "default": 0
+          },
+          "statuses": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "confirmed",
+                "partial",
+                "self_reported",
+                "pending",
+                "rejected"
+              ]
+            },
+            "type": "array",
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Statuses"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SkillFilter",
+        "description": "Require one coordinate, a minimum declared level and allowed evidence states."
+      },
+      "SkillGroups": {
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/SkillFilter"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Domains"
+          },
+          "stacks": {
+            "items": {
+              "$ref": "#/components/schemas/SkillFilter"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Stacks"
+          },
+          "soft_skills": {
+            "items": {
+              "$ref": "#/components/schemas/SkillFilter"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Soft Skills"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SkillGroups",
+        "description": "Conjunctive coordinate requirements within each independent registry group."
       },
       "StrictSchema": {
         "properties": {

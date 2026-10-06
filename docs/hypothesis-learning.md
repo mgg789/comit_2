@@ -116,7 +116,7 @@ pnpm --filter @comit/api build
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python tests/hypothesis_acceptance.py
 ```
 
-Финальный Python/PostgreSQL прогон:1155 passed,0 skipped; новые policy+PG и
+До объединения с витриной Python/PostgreSQL прогон:1155 passed,0 skipped; новые policy+PG и
 legacy consent regression:27 passed. API запускается последовательно:
 `pnpm --filter @comit/api exec tsx --test --test-concurrency=1 'tests/*.test.ts'`
 —45 passed, один пропуск внешнего QGramm. Новые API-тесты используют отдельную
@@ -130,3 +130,21 @@ legacy consent regression:27 passed. API запускается последов
 Фиксация20 пар проверена отдельными PostgreSQL fixtures до любого GET статуса;
 21-я реакция обновляет только диагностику. Эти fixtures не заменяют независимую
 разметку или живой эксперимент. Обычный буфер, Tinder и production не проверялись.
+
+## Совместимость с витриной
+
+При интеграции параллельных коммитов витрины `73ef0ec`/`a7deefe` сохранены оба
+набора маршрутов и карточных контрактов. Гипотезы и18 ordinary credits относятся
+только к `source=tinder`. Новая manual/showcase сессия не создаёт и не сбрасывает
+контекст learner/гипотез, её действия не запускают learner. Фиксация партии
+сохранена внутри общей `_decision_locked` транзакции для ranked reactions.
+Source входит в хеш политики назначения.
+
+Миграции `011_candidate_showcase.sql` и `011_hypothesis_exploration.sql` сохранены
+с исходными checksum; мигратор учитывает полные имена, одинаковый числовой
+префикс не заменяет одну миграцию другой. [Отдельный отчёт объединения](../data/validation/hypothesis-showcase-integration.json)
+содержит дополнительный свежий22-profile Harrier прогон с обеими миграциями,
+37 PostgreSQL тестов смежных модулей и46 API тестов (один внешний QGramm skip),
+typecheck/build, scoped Ruff и smoke12/12. Общий прогон объединённой версии:
+1180 passed,0 skipped. Исходные отчёты приёмки сохраняются;
+всего186 синтетических профилей в приёмочных попытках, внешних LLM вызовов0.

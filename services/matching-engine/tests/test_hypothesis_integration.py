@@ -7,7 +7,11 @@ from fastapi.testclient import TestClient
 from matching_engine.combine_models import CombineRequest
 from matching_engine.combine_store import CombineStore
 from matching_engine.database import connect
-from matching_engine.feed_models import FeedDecisionRequest, FeedRequest
+from matching_engine.feed_models import (
+    FeedDecisionRequest,
+    FeedRequest,
+    ShowcaseLikeRequest,
+)
 from matching_engine.feed_store import FeedStore
 from matching_engine.hypothesis_store import HypothesisStore
 from matching_engine.learning_store import LearningStore
@@ -31,7 +35,7 @@ from test_vacancy_integration import run
 pytestmark = pytest.mark.integration
 
 
-def exploration_feed(store, *, top_k=18, sparse=False, count=22):
+def exploration_feed(store, *, top_k=18, sparse=False, count=22, ordinary_limit=18):
     """Publish 18 strong ordinary and four contrasting middle profiles with declared synthetic source."""
     with connect(store.database_url) as connection:
         connection.execute("UPDATE learning_pipeline.settings SET source='synthetic'")
@@ -57,8 +61,8 @@ def exploration_feed(store, *, top_k=18, sparse=False, count=22):
     bootstrap_packaged(reranks)
     assert RerankWorker(reranks).process_once()
     feed = FeedStore(store.database_url)
-    page = feed.open(owner_id, FeedRequest(limit=18), vacancy_id)
-    assert len(page.items)==18 and all(item.hypothesis_pair_id is None for item in page.items)
+    page = feed.open(owner_id, FeedRequest(limit=ordinary_limit), vacancy_id)
+    assert len(page.items)==ordinary_limit and all(item.hypothesis_pair_id is None for item in page.items)
     return feed, owner_id, vacancy_id, page
 
 
@@ -128,6 +132,42 @@ def test_missing_class_only_is_not_testable(store):
     status=HypothesisStore(store.database_url).status(owner,vacancy)
     assert status["pairs"]==0 and all(x["status"]=="not_testable" for x in status["hypotheses"])
     assert status["search_report"]["feasible_pairs"]==0
+
+
+def test_showcase_only_does_not_create_hypothesis_or_preference_context(store):
+    """A manual session without ML runs remains outside hypothesis control and learner identity."""
+    from test_showcase_likes_integration import manual_pool, request
+    feed, _, owner, vacancy, candidates = manual_pool(store)
+    feed.showcase_like(owner, vacancy, request(candidates[0]))
+    status = HypothesisStore(store.database_url).status(owner, vacancy)
+    assert status["context_hash"] is None and status["pairs"] == 0
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT count(*) AS n FROM preference_pipeline.controls").fetchone()["n"] == 0
+        assert connection.execute("SELECT count(*) AS n FROM hypothesis_pipeline.controls").fetchone()["n"] == 0
+
+
+def test_showcase_session_does_not_reset_ranked_context_or_credit_research(store):
+    """Newer manual sessions cannot replace the ranked context or contribute ordinary credits."""
+    feed, owner, vacancy, prefix = exploration_feed(store, ordinary_limit=17)
+    hypotheses = HypothesisStore(store.database_url)
+    before = hypotheses.status(owner, vacancy)
+    with connect(store.database_url) as connection:
+        preference = connection.execute("SELECT * FROM preference_pipeline.controls").fetchone()
+        jobs = connection.execute("SELECT count(*) AS n FROM preference_pipeline.jobs").fetchone()["n"]
+    feed.showcase_like(owner, vacancy, ShowcaseLikeRequest(candidate_id=UUID(int=19),
+        profile_revision=1, idempotency_key=uuid4()))
+    after = hypotheses.status(owner, vacancy)
+    assert after["context_hash"] == before["context_hash"] and after["pairs"] == 0
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT * FROM preference_pipeline.controls").fetchone() == preference
+        assert connection.execute("SELECT count(*) AS n FROM preference_pipeline.jobs").fetchone()["n"] == jobs
+        manual = connection.execute("SELECT * FROM feed_pipeline.sessions WHERE source='showcase'").fetchone()
+    assert feed.page(owner, vacancy, manual["session_id"], None, 1).items == []
+    ordinary = feed.page(owner, vacancy, prefix.session_id, prefix.next_cursor, 1)
+    assert ordinary.items[0].candidate_id == UUID(int=18) and ordinary.items[0].hypothesis_pair_id is None
+    # Only the eighteenth ranked delivery unlocks the first research pair.
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT count(*) AS n FROM hypothesis_pipeline.pairs").fetchone()["n"] == 1
 
 
 def test_pending_pair_is_pinned_across_preference_refresh_and_pause(store):

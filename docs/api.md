@@ -436,3 +436,14 @@ order_revision. Shared, generated engine OpenAPI, gateway и api-client обно
 ## Проверка гипотез вакансии
 
 GET `/api/employer/vacancy-drafts/{draft_id}/hypotheses` и POST `.../hypotheses/{pause|resume|reset}` проксируют owner-scoped matching контракты; тело команд — `PreferenceCommand` (UUID/CAS). `HypothesisStatus` содержит10 `HypothesisSummary`, context/policy/revision и bounded search report без участников/фактов. `FeedCard` дополнен optional pair/family/role/parameters, conditional pair selection/order probabilities, scope и exploration_added. Старые карточки имеют null/default значения. Вероятности не называются global propensity. [Семантика](hypothesis-learning.md).
+
+Общая витрина работодателя добавляет POST `/employer/candidates/search`,
+GET `/employer/candidates/:candidate_id`, публичный PDF точной ревизии и
+POST `/employer/vacancy-drafts/:draft_id/showcase-likes`. Поиск доступен без
+вакансии; лайк требует собственной ready/open вакансии. Несоответствия
+строгим условиям возвращают структурированное предупреждение409; повтор с
+source-bound mismatch_token разрешает ручной выбор. Source/ownership guards
+не допускают override.
+SearchRequest/Page, PublicCandidateDetail и ShowcaseLikeRequest/Receipt
+синхронизированы в Pydantic, generated OpenAPI, shared и api-client.
+[Поля, фильтры, cursor, повторы и выбор вакансии](candidate-showcase.md).

@@ -147,7 +147,13 @@ export interface RerankPage {
 /** Open a 24-hour portion from a current ready rerank; reserve is explicitly opt-in. */
 export interface FeedRequest { include_reserve?: boolean; limit?: number; }
 /** An immutable reranked card occurrence, bound to one served exposure. */
-export interface FeedCard extends RerankCard {
+export interface FeedCard extends Omit<RerankCard, "kind" | "mode"> {
+  /** A manually acknowledged suitability mismatch never claims strict eligibility. */
+  strict_filter_warnings?: string[];
+  mismatch_token?: string | null;
+  /** Manual showcase exposures do not impersonate a trained reranker result. */
+  kind: "recommended" | "reserve" | "showcase";
+  mode: "learned" | "main_fallback" | "manual";
   exposure_id: string;
   session_id: string;
   served_at: string | null;

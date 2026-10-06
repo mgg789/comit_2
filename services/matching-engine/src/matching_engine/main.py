@@ -27,6 +27,8 @@ from matching_engine.preference_routes import preference_router
 from matching_engine.preference_store import PreferenceStore
 from matching_engine.rerank_routes import rerank_router
 from matching_engine.rerank_store import RerankStore
+from matching_engine.showcase_routes import showcase_router
+from matching_engine.showcase_store import ShowcaseStore
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.vacancy_routes import vacancy_router
 from matching_engine.vacancy_store import VacancyStore
@@ -37,7 +39,8 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                vacancy_store: VacancyStore | None = None,
                combine_store: CombineStore | None = None,
                rerank_store: RerankStore | None = None,
-               feed_store: FeedStore | None = None) -> FastAPI:
+               feed_store: FeedStore | None = None,
+               showcase_store: ShowcaseStore | None = None) -> FastAPI:
     """Build routes without DB/model side effects; injected dependencies support tests only."""
     database_url = os.environ.get("DATABASE_URL")
     pipeline_store = store if store is not None else (Store(database_url) if database_url else None)
@@ -52,6 +55,9 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     )
     feed_repository = feed_store if feed_store is not None else (
         FeedStore(pipeline_store.database_url) if pipeline_store is not None else None
+    )
+    showcase_repository = showcase_store if showcase_store is not None else (
+        ShowcaseStore(pipeline_store.database_url) if pipeline_store is not None else None
     )
     token = internal_token if internal_token is not None else os.environ.get("CANDIDATE_PIPELINE_TOKEN")
     app = FastAPI(
@@ -73,6 +79,8 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                                          require_internal))
     app.include_router(hypothesis_router(HypothesisStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
+
+    app.include_router(showcase_router(showcase_repository, require_internal))
 
     @app.exception_handler(ConflictError)
     async def conflict_handler(_request: Request, exception: ConflictError) -> JSONResponse:
@@ -107,6 +115,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
             "matching_database": combine_repository is not None and combine_repository.ready(),
             "rerank_database": rerank_repository is not None and rerank_repository.ready(),
             "feed_database": feed_repository is not None and feed_repository.ready(),
+            "showcase_database": showcase_repository is not None and showcase_repository.ready(),
         }
         available = all(checks.values())
         if not available:
