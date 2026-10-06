@@ -18,7 +18,8 @@ test("candidate source profile CAS preserves unchanged evidence and queues exact
   const pool = new Pool({ connectionString: databaseUrl });
   try {
     await pool.query(await readFile(new URL("../migrations/001_accounts.sql", import.meta.url), "utf8"));
-    await pool.query(await readFile(new URL("../migrations/002_candidate_profiles.sql", import.meta.url), "utf8"));
+    const { migrate } = await import("../src/auth/migrate.js");
+    await migrate(pool);
     await pool.query("TRUNCATE candidate_profile_outbox, candidate_profile_evidence, candidate_profiles, accounts CASCADE");
     await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "candidate-profile@example.test"]);
     const store = new CandidateProfileStore(pool);
@@ -79,6 +80,40 @@ test("candidate source profile CAS preserves unchanged evidence and queues exact
     await assert.rejects(() => store.save(candidateId, { expected_revision: 4, fields: {
       projects: [{ id: "00000000-0000-4000-8000-000000000099", title: "Foreign narrative" }],
     } }), (error: unknown) => error instanceof ProfileError && error.code === "unknown_narrative_id");
+  } finally {
+    await pool.end();
+  }
+});
+
+
+test("training consent is optional, versioned, preserved on field edits and independently revocable", { skip: !databaseUrl }, async () => {
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    const { migrate } = await import("../src/auth/migrate.js");
+    await migrate(pool);
+    await pool.query("TRUNCATE candidate_profiles, accounts CASCADE");
+    await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "training-consent@example.test"]);
+    const store = new CandidateProfileStore(pool);
+    let view = await store.save(candidateId, { expected_revision: 0, fields: {}, consent: { processing: true, pool: true, version: "profile-v1" } });
+    assert.equal(view.consents.training, false);
+    assert.equal(view.consents.training_accepted_at, null);
+    await assert.rejects(pool.query("UPDATE candidate_profiles SET training_consent=true,training_consent_accepted_at=now() WHERE candidate_id=$1", [candidateId]));
+    await assert.rejects(() => store.save(candidateId, { expected_revision: 1, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: true } }),
+      (error: unknown) => error instanceof ProfileError && error.code === "invalid_training_consent");
+    view = await store.save(candidateId, { expected_revision: 1, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: true, training_version: "training-v1" } });
+    assert.equal(view.consents.training, true);
+    const stamp = view.consents.training_accepted_at;
+    assert.ok(stamp);
+    view = await store.save(candidateId, { expected_revision: 2, fields: { city: "Москва" } });
+    assert.equal(view.consents.training_accepted_at, stamp);
+    view = await store.save(candidateId, { expected_revision: 3, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: false } });
+    assert.equal(view.consents.training, false);
+    assert.equal(view.consents.processing, true);
+    assert.equal(view.consents.pool, true);
+    assert.equal(view.consents.training_version, null);
+    const payload = (await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=4", [candidateId])).rows[0]?.payload;
+    assert.equal(payload.consents.training, false);
+    assert.equal(payload.consents.training_accepted_at, null);
   } finally {
     await pool.end();
   }

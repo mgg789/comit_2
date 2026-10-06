@@ -223,15 +223,16 @@ def test_followup_fit_requires_sixteen_new_unique_candidates(store):
         assert len(fresh) == 16 and not original.intersection(fresh)
 
 
-def test_source_only_revocation_and_fit_lock(store, monkeypatch):
+@pytest.mark.parametrize("purpose", ["pool_consent", "training_consent"])
+def test_source_only_revocation_and_fit_lock(store, monkeypatch, purpose):
     """Source updates cannot race fit/publication; later source-only revocation suppresses immediately."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 44)
     react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
     candidate_id = rows[0]["candidate_id"]
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT to_regclass('public.candidate_profiles') AS name").fetchone()["name"] is None
-        connection.execute("CREATE TABLE public.candidate_profiles(candidate_id uuid PRIMARY KEY,processing_consent boolean NOT NULL,pool_consent boolean NOT NULL)")
-        connection.execute("INSERT INTO public.candidate_profiles SELECT candidate_id,true,true FROM candidate_pipeline.candidates")
+        connection.execute("CREATE TABLE public.candidate_profiles(candidate_id uuid PRIMARY KEY,processing_consent boolean NOT NULL,pool_consent boolean NOT NULL,training_consent boolean NOT NULL)")
+        connection.execute("INSERT INTO public.candidate_profiles SELECT candidate_id,true,true,true FROM candidate_pipeline.candidates")
     try:
         import matching_engine.preference_store as module
         original_evaluate = module.evaluate
@@ -240,7 +241,7 @@ def test_source_only_revocation_and_fit_lock(store, monkeypatch):
             def revoke_attempt():
                 with connect(store.database_url) as other:
                     other.execute("SET LOCAL lock_timeout='150ms'")
-                    other.execute("UPDATE public.candidate_profiles SET pool_consent=false WHERE candidate_id=%s", (candidate_id,))
+                    other.execute(f"UPDATE public.candidate_profiles SET {purpose}=false WHERE candidate_id=%s", (candidate_id,))
             with ThreadPoolExecutor(max_workers=1) as executor, pytest.raises(psycopg.errors.LockNotAvailable):
                 executor.submit(revoke_attempt).result(timeout=3)
             return original_evaluate(*args, **kwargs)
@@ -252,7 +253,7 @@ def test_source_only_revocation_and_fit_lock(store, monkeypatch):
         page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(40), 1)
         assert page.items[0].preference_state == "personalized"
         with connect(store.database_url) as connection:
-            connection.execute("UPDATE public.candidate_profiles SET pool_consent=false WHERE candidate_id=%s", (candidate_id,))
+            connection.execute(f"UPDATE public.candidate_profiles SET {purpose}=false WHERE candidate_id=%s", (candidate_id,))
             assert connection.execute("SELECT (profile->'consents'->>'pool')::boolean AS consent FROM candidate_pipeline.candidates WHERE candidate_id=%s", (candidate_id,)).fetchone()["consent"]
         assert preferences.status(owner_id, vacancy_id)["active_model_hash"] is None
         assert feed.page(owner_id, vacancy_id, session_id, _encode_cursor(41), 1).items[0].preference_state == "baseline"

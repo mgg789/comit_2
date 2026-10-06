@@ -84,6 +84,8 @@ def test_full_pool_pair_probability_replay_and_actions(store, tmp_path):
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT count(*) AS count FROM hypothesis_pipeline.pairs").fetchone()["count"]==1
         pair=connection.execute("SELECT * FROM hypothesis_pipeline.pairs").fetchone()
+        stamps=connection.execute("SELECT consent_version,consent_accepted_at FROM learning_pipeline.samples WHERE sample_scope='exploration'").fetchall()
+        assert stamps and all(row["consent_version"]=="training-v1" and row["consent_accepted_at"] for row in stamps)
         support=pair["parameters"]["support"]
         assert sum(row["probability"] for row in support)==pytest.approx(1.)
         selected=pair["parameters"]["selected_index"]
@@ -230,8 +232,8 @@ def test_source_only_withdrawal_before_projection(store):
     page=feed.page(owner,vacancy,prefix.session_id,prefix.next_cursor,1)
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT to_regclass('public.candidate_profiles') AS name").fetchone()["name"] is None
-        connection.execute("CREATE TABLE public.candidate_profiles(candidate_id uuid PRIMARY KEY,processing_consent boolean,pool_consent boolean)")
-        connection.execute("INSERT INTO public.candidate_profiles SELECT candidate_id,true,true FROM candidate_pipeline.candidates")
+        connection.execute("CREATE TABLE public.candidate_profiles(candidate_id uuid PRIMARY KEY,processing_consent boolean,pool_consent boolean,training_consent boolean)")
+        connection.execute("INSERT INTO public.candidate_profiles SELECT candidate_id,true,true,true FROM candidate_pipeline.candidates")
         candidate=connection.execute("SELECT candidate_id FROM feed_pipeline.exposures WHERE served_at IS NULL").fetchone()["candidate_id"]
         connection.execute("UPDATE public.candidate_profiles SET pool_consent=false WHERE candidate_id=%s",(candidate,))
     try:

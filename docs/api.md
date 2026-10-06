@@ -447,3 +447,17 @@ source-bound mismatch_token разрешает ручной выбор. Source/o
 SearchRequest/Page, PublicCandidateDetail и ShowcaseLikeRequest/Receipt
 синхронизированы в Pydantic, generated OpenAPI, shared и api-client.
 [Поля, фильтры, cursor, повторы и выбор вакансии](candidate-showcase.md).
+
+## Отдельное согласие на обучение (2026-10-07)
+
+CandidateProfileMutation.consent дополняется optional `training:boolean` и
+`training_version:"training-v1"`. Разрешение не подразумевается из pool/processing;
+старый клиент без новых полей не включает обучение. True без правильной версии
+или processing/pool отклоняется с 400. False передаётся без training_version.
+CandidateProfileView.consents возвращает training, training_version/null и
+training_accepted_at/null. Internal Consent содержит эти же поля; устаревшие
+снимки получают training=false. OpenAPI gateway перегенерирован из FastAPI.
+Отказ не исключает кандидата из подбора; source watermark по текущей ревизии
+применяется при каждом изменении профиля, как и прежде.
+
+[Документы для тестового контура](legal/README.md).

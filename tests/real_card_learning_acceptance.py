@@ -8,8 +8,6 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from psycopg.conninfo import conninfo_to_dict
-
 from matching_engine.combine_models import CombineRequest
 from matching_engine.combine_store import CombineStore
 from matching_engine.combine_worker import CombineWorker
@@ -27,6 +25,7 @@ from matching_engine.vacancy_models import VacancyInput
 from matching_engine.vacancy_store import VacancyStore
 from matching_engine.vacancy_worker import VacancyWorker
 from matching_engine.worker import Worker
+from psycopg.conninfo import conninfo_to_dict
 
 
 def drain(runner, limit: int = 30) -> None:
@@ -61,6 +60,7 @@ def main() -> None:
         candidate_id = uuid4()
         candidates.append(candidate_id)
         profile = json.loads(json.dumps(seed))
+        profile["consents"].update(training=True, training_version="training-v1", training_accepted_at=profile["consents"]["accepted_at"])
         profile.update(source_revision=1, work_types=["remote"], city="Москва", primary_direction="backend",
                        description="Синтетический профиль: эксплуатация Python API, SQL и командная работа.",
                        salary={"from_rub": 500000 if index == 4 else 80000 + 30000 * index,
@@ -71,7 +71,7 @@ def main() -> None:
             connection.execute("INSERT INTO accounts(id,email,role,email_verified) VALUES(%s,%s,'candidate',true)",
                                (candidate_id, f"learning-{index}@example.invalid"))
             connection.execute("""INSERT INTO candidate_profiles(candidate_id,revision,processing_consent,
-                pool_consent,consent_version,consent_accepted_at) VALUES(%s,1,true,true,'synthetic-learning-v1',now())""",
+                pool_consent,consent_version,consent_accepted_at,training_consent,training_consent_version,training_consent_accepted_at) VALUES(%s,1,true,true,'synthetic-learning-v1',now(),true,'training-v1',now())""",
                 (candidate_id,))
     candidate_worker, vacancy_worker = Worker(store), VacancyWorker(vacancies)
     drain(candidate_worker)
@@ -115,7 +115,7 @@ def main() -> None:
     operational = exporter.export(output / "simulated-operational", key)
     assert operational["rows"] == 3 and operational["consent_scope"] == "authoritative_api_and_matching"
     with connect(database_url) as connection:
-        connection.execute("UPDATE candidate_profiles SET pool_consent=false,revision=revision+1 WHERE candidate_id=%s", (first.candidate_id,))
+        connection.execute("UPDATE candidate_profiles SET pool_consent=false,training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL,revision=revision+1 WHERE candidate_id=%s", (first.candidate_id,))
         assert connection.execute("SELECT (profile->'consents'->>'pool')::boolean AS enabled FROM candidate_pipeline.candidates WHERE candidate_id=%s", (first.candidate_id,)).fetchone()["enabled"]
     revoked = exporter.export(output / "source-revoked", key)
     assert revoked["rows"] == 2

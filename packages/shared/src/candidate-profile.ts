@@ -45,7 +45,15 @@ export interface CandidateProfileFields {
 }
 
 /** Explicit profile consent, separate from registration consent; timestamps are server-owned. */
-export interface CandidateProfileConsentInput { processing: boolean; pool: boolean; version: string }
+export interface CandidateProfileConsentInput {
+  processing: boolean;
+  pool: boolean;
+  version: string;
+  /** Optional, never inferred from processing/pool; omitted in a consent write means false. */
+  training?: boolean;
+  /** Required only for an explicit training opt-in. */
+  training_version?: "training-v1";
+}
 
 /** Compare-and-swap profile mutation; revision zero creates the first profile. */
 export interface CandidateProfileMutation {
@@ -78,7 +86,12 @@ export interface CandidateProfileView {
   revision: number;
   fields: CandidateProfileFields;
   evidence: Record<string, CandidateClaimEvidence>;
-  consents: CandidateProfileConsentInput & { accepted_at: string | null };
+  consents: Omit<CandidateProfileConsentInput, "training_version"> & {
+    accepted_at: string | null;
+    training: boolean;
+    training_version: "training-v1" | null;
+    training_accepted_at: string | null;
+  };
   projection: CandidateProjectionDelivery;
   updated_at: string;
 }

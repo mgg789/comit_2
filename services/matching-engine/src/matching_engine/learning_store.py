@@ -50,7 +50,7 @@ class LearningStore:
 
     @staticmethod
     def capture_main(connection: psycopg.Connection, main: dict) -> None:
-        """Freeze every main top-k feature vector, including cards never served.
+        """Freeze consented main top-k features, retaining audit counts for other cards.
 
         Features exclude names, prose, contacts and PDF paths. Existing snapshots
         are never recomputed after feedback or model changes. Beyond-top-k counts
@@ -86,7 +86,8 @@ class LearningStore:
             current = connection.execute("SELECT revision,profile FROM candidate_pipeline.candidates WHERE candidate_id=%s",
                                          (card.candidate_id,)).fetchone()
             consent = current["profile"]["consents"]
-            withdrawn = not (consent.get("processing") and consent.get("pool"))
+            from matching_engine.preference_store import PreferenceStore
+            withdrawn = not PreferenceStore._consent(connection, [card.candidate_id], source, lock=True)
             stamp = consent if current["revision"] == card.profile_revision else {}
             connection.execute("""INSERT INTO learning_pipeline.samples
                 (main_run_id,candidate_id,profile_revision,main_position,main_score,features,
@@ -94,7 +95,7 @@ class LearningStore:
                 VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,CASE WHEN %s THEN now() END)""", (
                     main["run_id"], card.candidate_id, card.profile_revision, card.position,
                     card.explanation.score, Jsonb(features) if not withdrawn else None,
-                    digest(features), stamp.get("version"), stamp.get("accepted_at"), withdrawn,
+                    digest(features), stamp.get("training_version"), stamp.get("training_accepted_at"), withdrawn,
                 ))
 
     @staticmethod
@@ -155,8 +156,8 @@ class LearningStore:
             if authority:
                 connection.execute("""UPDATE learning_pipeline.samples s SET features=NULL,withdrawn_at=now()
                     FROM public.candidate_profiles p WHERE s.candidate_id=p.candidate_id AND s.withdrawn_at IS NULL
-                    AND (NOT p.processing_consent OR NOT p.pool_consent)""")
-            consent_join = "JOIN public.candidate_profiles p ON p.candidate_id=s.candidate_id AND p.processing_consent AND p.pool_consent" if source == "operational" else ""
+                    AND (NOT p.processing_consent OR NOT p.pool_consent OR NOT p.training_consent)""")
+            consent_join = "JOIN public.candidate_profiles p ON p.candidate_id=s.candidate_id AND p.processing_consent AND p.pool_consent AND p.training_consent" if source == "operational" else ""
             # API consent writes use their own transaction rather than PIPELINE_LOCK.
             # Row locks retain valid authoritative consent until export commits.
             consent_lock = "FOR SHARE OF p" if source == "operational" else ""
@@ -168,6 +169,7 @@ class LearningStore:
                 WHERE c.source=%s AND s.withdrawn_at IS NULL AND s.features IS NOT NULL
                   AND (live.profile->'consents'->>'processing')::boolean IS TRUE
                   AND (live.profile->'consents'->>'pool')::boolean IS TRUE
+                  AND (live.profile->'consents'->>'training')::boolean IS TRUE
                 ORDER BY c.published_at,s.main_run_id,s.candidate_id LIMIT %s {consent_lock}""", (source, limit + 1))
             truncated = False
             row_count = 0

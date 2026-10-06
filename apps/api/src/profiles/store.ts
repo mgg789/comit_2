@@ -53,6 +53,9 @@ interface ProfileRow extends QueryResultRow {
   fields: CandidateProfileFields;
   processing_consent: boolean;
   pool_consent: boolean;
+  training_consent: boolean;
+  training_consent_version: "training-v1" | null;
+  training_consent_accepted_at: Date | string | null;
   consent_version: string;
   consent_accepted_at: Date | string | null;
   updated_at: Date | string;
@@ -215,12 +218,14 @@ function validateFields(value: unknown): asserts value is CandidateProfileFields
   }
 }
 
-function validateConsent(value: unknown): asserts value is { processing: boolean; pool: boolean; version: string } {
-  if (!jsonObject(value) || Object.keys(value).some(key => !["processing", "pool", "version"].includes(key))
+function validateConsent(value: unknown): asserts value is NonNullable<CandidateProfileMutation["consent"]> {
+  if (!jsonObject(value) || Object.keys(value).some(key => !["processing", "pool", "version", "training", "training_version"].includes(key))
     || typeof value.processing !== "boolean" || typeof value.pool !== "boolean"
     || typeof value.version !== "string" || value.version !== PROFILE_CONSENT_VERSION
     || "accepted_at" in value) throw invalid("invalid_profile_consent");
   if (value.pool && !value.processing) throw invalid("processing_consent_required");
+  if (value.training !== undefined && typeof value.training !== "boolean") throw invalid("invalid_training_consent");
+  if (value.training ? (!value.processing || !value.pool || value.training_version !== "training-v1") : value.training_version !== undefined) throw invalid("invalid_training_consent");
 }
 
 function evidenceValueRows(fields: CandidateProfileFields): Array<{ key: string; value: unknown }> {
@@ -280,7 +285,7 @@ async function accountFor(client: PoolClient, accountId: string, lock = true): P
 
 async function profileRow(client: PoolClient, accountId: string, lock = false): Promise<ProfileRow | null> {
   const result = await client.query<ProfileRow>(
-    `SELECT candidate_id, revision, fields, processing_consent, pool_consent, consent_version,
+    `SELECT candidate_id, revision, fields, processing_consent, pool_consent, training_consent, training_consent_version, training_consent_accepted_at, consent_version,
             consent_accepted_at, updated_at
        FROM candidate_profiles WHERE candidate_id = $1${lock ? " FOR UPDATE" : ""}`,
     [accountId],
@@ -333,6 +338,9 @@ async function viewInTransaction(client: PoolClient, accountId: string, account:
     consents: {
       processing: profile.processing_consent,
       pool: profile.pool_consent,
+      training: profile.training_consent,
+      training_version: profile.training_consent_version,
+      training_accepted_at: timestamp(profile.training_consent_accepted_at),
       version: profile.consent_version,
       accepted_at: timestamp(profile.consent_accepted_at),
     },
@@ -344,6 +352,8 @@ async function viewInTransaction(client: PoolClient, accountId: string, account:
 async function enqueue(client: PoolClient, account: AccountRow, profile: ProfileRow, evidence: EvidenceDbRow[]): Promise<void> {
   const consent: ProjectionConsent = {
     processing: profile.processing_consent, pool: profile.pool_consent,
+    training: profile.training_consent, training_version: profile.training_consent_version,
+    training_accepted_at: profile.training_consent_accepted_at,
     version: profile.consent_version, accepted_at: profile.consent_accepted_at,
   };
   const payload = projectCandidateIntake(account, profile.fields, evidence, Number(profile.revision), consent);
@@ -383,9 +393,11 @@ export class CandidateProfileStore {
       const rawFields = replace || !current ? mutation.fields : { ...current.fields, ...mutation.fields };
       const fields = normalizeNarratives(rawFields, current?.fields ?? null);
       validateFields(fields);
-      const consent: { processing: boolean; pool: boolean; version: string } = hasConsent ? mutation.consent! : {
+      const consent: NonNullable<CandidateProfileMutation["consent"]> = hasConsent ? mutation.consent! : {
         processing: current?.processing_consent ?? false,
         pool: current?.pool_consent ?? false,
+        training: current?.training_consent ?? false,
+        ...(current?.training_consent_version ? { training_version: current.training_consent_version } : {}),
         version: current?.consent_version ?? PROFILE_CONSENT_VERSION,
       };
       if (consent.version !== PROFILE_CONSENT_VERSION) throw invalid("invalid_profile_consent");
@@ -393,17 +405,21 @@ export class CandidateProfileStore {
       const acceptedAt = hasConsent
         ? (consent.processing ? new Date() : null)
         : (current?.consent_accepted_at ?? null);
+      const training = consent.training ?? false;
+      const trainingAt = training ? (hasConsent ? new Date() : current?.training_consent_accepted_at ?? null) : null;
       const revision = currentRevision + 1;
       const inserted = await client.query<ProfileRow>(
         `INSERT INTO candidate_profiles
-          (candidate_id, revision, fields, processing_consent, pool_consent, consent_version, consent_accepted_at)
-         VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7)
+          (candidate_id, revision, fields, processing_consent, pool_consent, training_consent, training_consent_version, training_consent_accepted_at, consent_version, consent_accepted_at)
+         VALUES ($1, $2, $3::jsonb, $4, $5, $8, $9, $10, $6, $7)
          ON CONFLICT (candidate_id) DO UPDATE SET revision=EXCLUDED.revision, fields=EXCLUDED.fields,
            processing_consent=EXCLUDED.processing_consent, pool_consent=EXCLUDED.pool_consent,
+           training_consent=EXCLUDED.training_consent, training_consent_version=EXCLUDED.training_consent_version,
+           training_consent_accepted_at=EXCLUDED.training_consent_accepted_at,
            consent_version=EXCLUDED.consent_version, consent_accepted_at=EXCLUDED.consent_accepted_at, updated_at=now()
-         RETURNING candidate_id, revision, fields, processing_consent, pool_consent, consent_version,
+         RETURNING candidate_id, revision, fields, processing_consent, pool_consent, training_consent, training_consent_version, training_consent_accepted_at, consent_version,
                    consent_accepted_at, updated_at`,
-        [accountId, revision, JSON.stringify(fields), consent.processing, consent.pool, consent.version, acceptedAt],
+        [accountId, revision, JSON.stringify(fields), consent.processing, consent.pool, consent.version, acceptedAt, training, training ? "training-v1" : null, trainingAt],
       );
       const profile = inserted.rows[0];
       if (!profile) throw new Error("profile insert returned no row");

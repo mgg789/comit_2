@@ -203,12 +203,13 @@ class PreferenceStore:
             return False
         valid = connection.execute("""SELECT candidate_id FROM candidate_pipeline.candidates
             WHERE candidate_id=ANY(%s::uuid[]) AND (profile->'consents'->>'processing')::boolean IS TRUE
-            AND (profile->'consents'->>'pool')::boolean IS TRUE""", (candidates,)).fetchall()
+            AND (profile->'consents'->>'pool')::boolean IS TRUE
+                  AND (profile->'consents'->>'training')::boolean IS TRUE""", (candidates,)).fetchall()
         if len(valid) != len(set(candidates)):
             return False
         if authority:
             clause = " FOR SHARE" if lock else ""
-            valid = connection.execute("SELECT candidate_id FROM public.candidate_profiles WHERE candidate_id=ANY(%s::uuid[]) AND processing_consent AND pool_consent" + clause, (candidates,)).fetchall()
+            valid = connection.execute("SELECT candidate_id FROM public.candidate_profiles WHERE candidate_id=ANY(%s::uuid[]) AND processing_consent AND pool_consent AND training_consent" + clause, (candidates,)).fetchall()
             return len(valid) == len(set(candidates))
         return source == "synthetic"
 
@@ -385,14 +386,17 @@ class PreferenceStore:
             _lock(connection)
             authority = connection.execute("SELECT to_regclass('public.candidate_profiles') IS NOT NULL AS ready").fetchone()["ready"]
             clause = "LEFT JOIN public.candidate_profiles p USING(candidate_id)" if authority else ""
-            revoked = " OR p.candidate_id IS NULL OR NOT p.processing_consent OR NOT p.pool_consent" if authority else ""
+            revoked = " OR p.candidate_id IS NULL OR NOT p.processing_consent OR NOT p.pool_consent OR NOT p.training_consent" if authority else ""
             rows = connection.execute(f"""SELECT DISTINCT t.candidate_id FROM learning_pipeline.samples t
                 JOIN candidate_pipeline.candidates c USING(candidate_id) {clause}
                 WHERE (c.profile->'consents'->>'processing')::boolean IS NOT TRUE
-                   OR (c.profile->'consents'->>'pool')::boolean IS NOT TRUE {revoked}""").fetchall()
+                   OR (c.profile->'consents'->>'pool')::boolean IS NOT TRUE
+                   OR (c.profile->'consents'->>'training')::boolean IS NOT TRUE {revoked}""").fetchall()
             for row in rows:
                 connection.execute("UPDATE learning_pipeline.samples SET features=NULL,withdrawn_at=now() WHERE candidate_id=%s AND withdrawn_at IS NULL", (row["candidate_id"],))
                 self.withdraw(connection, row["candidate_id"])
+                from matching_engine.hypothesis_store import HypothesisStore
+                HypothesisStore.withdraw(connection, row["candidate_id"])
             for control in connection.execute("SELECT * FROM preference_pipeline.controls").fetchall():
                 if not self._current(connection, control):
                     connection.execute("UPDATE preference_pipeline.jobs SET state='stale',lease_token=NULL,lease_until=NULL,error_code='context_changed',completed_at=now() WHERE vacancy_id=%s AND state IN ('queued','running')", (control["vacancy_id"],))

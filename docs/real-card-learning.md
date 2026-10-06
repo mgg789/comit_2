@@ -131,3 +131,15 @@ events требуют вызова клиентского контракта, о
 ## Исследовательские пары
 
 [Hypothesis policy](hypothesis-learning.md) сохраняет pair ID/role/контраст, условные selection/order probabilities до показа. Экспорт HMAC-псевдонимизирует pair ID и показывает sample_scope для новых outside-top-k samples. Global propensity остаётся null; известные условные вероятности не дают поддержки всех альтернативных действий в полном пуле. Like/dislike учат существующий learner; no-action без метки.
+
+## Разрешение на обучение
+
+С 2026-10-07 processing/pool недостаточно: требуется отдельное training=true
+с версией training-v1 и серверным временем. capture_main не сохраняет учебный
+feature payload без текущих разрешений; operational capture/export сверяется
+также с public.candidate_profiles под source row lock. Main top-k и Like/Dislike
+как сервисные операции сохраняются и без разрешения на обучение. Export,
+shadow fit, live fit/activation и hypothesis comparisons учитывают training;
+source-only отзыв немедленно блокирует применение персональной модели.
+При доставке или reconciliation очищаются features и затронутые model/pair
+payloads. [Согласие](legal/training-consent.md), [миграция](data.md).

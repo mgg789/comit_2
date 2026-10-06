@@ -6,8 +6,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from test_feed_integration import ready_feed
-
 from matching_engine.database import connect
 from matching_engine.feed_models import (
     FeedDecisionRequest,
@@ -17,6 +15,7 @@ from matching_engine.feed_models import (
 from matching_engine.learning_store import LearningStore, pseudonym
 from matching_engine.models import CandidateProfile
 from matching_engine.store import ConflictError, NotFoundError, Store
+from test_feed_integration import ready_feed
 
 pytestmark = pytest.mark.integration
 pytest_plugins = ["test_pipeline_integration"]
@@ -137,3 +136,24 @@ def test_pseudonym_is_domain_separated_and_private_key_required() -> None:
     assert pseudonym(KEY, "candidate", "1") != pseudonym(KEY, "owner", "1")
     with pytest.raises(ValueError):
         pseudonym(b"short", "candidate", "1")
+
+
+def test_training_withdrawal_preserves_pool_but_purges_learning_features(store: Store, tmp_path: Path) -> None:
+    """Opting out of learning does not withdraw a candidate from recruitment."""
+    feed, vacancy_id, owner_id = ready_feed(store, 3)
+    page = feed.open(owner_id, FeedRequest(limit=1), vacancy_id)
+    candidate_id = page.items[0].candidate_id
+    with connect(store.database_url) as connection:
+        profile = CandidateProfile.model_validate(connection.execute(
+            "SELECT profile FROM candidate_pipeline.candidates WHERE candidate_id=%s", (candidate_id,)).fetchone()["profile"])
+    profile.source_revision += 1
+    profile.consents.training = False
+    profile.consents.training_version = None
+    profile.consents.training_accepted_at = None
+    assert profile.consents.processing and profile.consents.pool
+    store.intake(candidate_id, profile)
+    with connect(store.database_url) as connection:
+        row = connection.execute("SELECT features,withdrawn_at FROM learning_pipeline.samples WHERE candidate_id=%s", (candidate_id,)).fetchone()
+        assert row["features"] is None and row["withdrawn_at"] is not None
+        assert connection.execute("SELECT missing_requirements FROM candidate_pipeline.candidates WHERE candidate_id=%s", (candidate_id,)).fetchone()["missing_requirements"] == []
+    assert LearningStore(store.database_url).export(tmp_path / "export", KEY, source="synthetic")["rows"] == 2

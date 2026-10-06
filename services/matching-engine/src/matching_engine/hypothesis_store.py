@@ -272,11 +272,15 @@ class HypothesisStore:
             if row["served_at"] is not None or row["position"] <= high:
                 raise ConflictError("hypothesis source position is no longer unserved")
             if item["outside_top_k"]:
+                consent = connection.execute("SELECT profile->'consents' AS consent FROM candidate_pipeline.candidates WHERE candidate_id=%s",
+                                             (UUID(item["candidate_id"]),)).fetchone()["consent"]
                 connection.execute("""INSERT INTO learning_pipeline.samples(main_run_id,candidate_id,profile_revision,
-                    main_position,main_score,features,feature_hash,sample_scope) VALUES(%s,%s,%s,%s,%s,%s,%s,'exploration')
+                    main_position,main_score,features,feature_hash,consent_version,consent_accepted_at,sample_scope)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,'exploration')
                     ON CONFLICT(main_run_id,candidate_id) DO NOTHING""", (session["main_run_id"], UUID(item["candidate_id"]),
                         item["card"]["profile_revision"], item["card"]["main_position"], item["card"]["explanation"]["score"],
-                        Jsonb(item["features"]), digest(item["features"])))
+                        Jsonb(item["features"]), digest(item["features"]),
+                        consent.get("training_version"), consent.get("training_accepted_at")))
             card = dict(row["card"])
             card.update(hypothesis_pair_id=str(pair_id), hypothesis_id=pair["hypothesis_id"], hypothesis_role=role,
                 hypothesis_policy_hash=allocation_hash(), selection_probability=probability, order_probability=.5,

@@ -129,7 +129,7 @@ class Store:
                     updated_at=now()
             """, (candidate_id, revision, profile.source_revision, digest,
                   Jsonb(serialized), state, Jsonb(missing)))
-            if not profile.consents.processing or not profile.consents.pool:
+            if not profile.consents.processing or not profile.consents.pool or not profile.consents.training:
                 from matching_engine.learning_store import LearningStore
                 LearningStore.withdraw(connection, candidate_id)
             connection.execute("""

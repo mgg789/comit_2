@@ -28,6 +28,9 @@ export interface ProjectionAccount {
 export interface ProjectionConsent {
   processing: boolean;
   pool: boolean;
+  training?: boolean;
+  training_version?: "training-v1" | null;
+  training_accepted_at?: Date | string | null;
   version: string;
   accepted_at: Date | string | null;
 }
@@ -164,6 +167,9 @@ export function projectCandidateIntake(
     consents: {
       processing: consent.processing,
       pool: consent.pool,
+      training: consent.training ?? false,
+      training_version: consent.training_version ?? null,
+      training_accepted_at: projectionTimestamp(consent.training_accepted_at ?? null),
       version: consent.version,
       accepted_at: projectionTimestamp(consent.accepted_at),
     },

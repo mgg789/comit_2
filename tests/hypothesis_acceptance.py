@@ -56,6 +56,7 @@ def main() -> None:
     ids = [uuid4() for _ in range(22)]
     for index,candidate in enumerate(ids):
         profile = json.loads(json.dumps(seed))
+        profile["consents"].update(training=True, training_version="training-v1", training_accepted_at=profile["consents"]["accepted_at"])
         profile.update(source_revision=1, primary_direction="backend", city="Москва", work_types=["remote"],
                        salary={"from_rub":100000,"to_rub":150000}, description="Synthetic Python API backend services.")
         profile["grade_result"]["grade"]="senior" if index<18 else "middle"
@@ -66,7 +67,7 @@ def main() -> None:
             connection.execute("INSERT INTO accounts(id,email,role,email_verified) VALUES(%s,%s,'candidate',true)",
                                (candidate,f'hypothesis-{index}@example.invalid'))
             connection.execute("""INSERT INTO candidate_profiles(candidate_id,revision,processing_consent,pool_consent,
-                consent_version,consent_accepted_at) VALUES(%s,1,true,true,'synthetic-hypothesis-v1',now())""",(candidate,))
+                consent_version,consent_accepted_at,training_consent,training_consent_version,training_consent_accepted_at) VALUES(%s,1,true,true,'synthetic-hypothesis-v1',now(),true,'training-v1',now())""",(candidate,))
     drain(Worker(store))
     assert all(store.status(candidate).state=='ready' for candidate in ids)
     owner,vacancy=uuid4(),uuid4()
@@ -107,7 +108,7 @@ def main() -> None:
         assert connection.execute("SELECT exposure_id,position,card FROM feed_pipeline.exposures WHERE exposure_id=ANY(%s::uuid[]) ORDER BY position",
                                   ([row['exposure_id'] for row in delivered_before],)).fetchall()==delivered_before
         dimensions=connection.execute("SELECT vector_dims(semantic_vector) AS dims FROM candidate_pipeline.pool LIMIT 1").fetchone()['dims']
-        connection.execute("UPDATE candidate_profiles SET pool_consent=false,revision=revision+1 WHERE candidate_id=%s",(card.candidate_id,))
+        connection.execute("UPDATE candidate_profiles SET pool_consent=false,training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL,revision=revision+1 WHERE candidate_id=%s",(card.candidate_id,))
     assert hypotheses.status(owner,vacancy)['pairs']==0
     with connect(url) as connection:
         assert connection.execute("SELECT parameters FROM hypothesis_pipeline.pairs").fetchone()['parameters'] is None

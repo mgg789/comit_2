@@ -38,3 +38,10 @@ the separate unit, PostgreSQL, real-model and smoke verification contours.
   `profile_auth_mailbox.mjs` is an IPC-only synthetic mailbox, never an SMTP
   service or public endpoint. See `docs/candidate-profile.md` for setup and
   environment contracts; reports under `artifacts/` never include credentials.
+
+- `candidate_privacy_acceptance.py` — extends the completed candidate profile
+  fixture on the same isolated PROFILE_ACCEPTANCE_* stack. Checks actual owner
+  PDF/role isolation, no training features without opt-in, separate version/time,
+  source-only training revocation/export and continued top-2 participation.
+  Run immediately after `candidate_profile_acceptance.py`; uses the synthetic
+  encrypted mailbox and never prints credentials or profile contents.

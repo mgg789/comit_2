@@ -63,6 +63,7 @@ def main() -> None:
     supports = {}
     for index, candidate_id in enumerate(ids):
         profile = json.loads(json.dumps(seed))
+        profile["consents"].update(training=True, training_version="training-v1", training_accepted_at=profile["consents"]["accepted_at"])
         supported = index % 2 == 1
         supports[candidate_id] = supported
         profile.update(source_revision=1, city="Москва", primary_direction="backend", work_types=["remote"],
@@ -75,7 +76,7 @@ def main() -> None:
         with connect(url) as connection:
             connection.execute("INSERT INTO accounts(id,email,role,email_verified) VALUES(%s,%s,'candidate',true)", (candidate_id, f"live-preference-{index}@example.invalid"))
             connection.execute("""INSERT INTO candidate_profiles(candidate_id,revision,processing_consent,pool_consent,
-                consent_version,consent_accepted_at) VALUES(%s,1,true,true,'synthetic-live-v1',now())""", (candidate_id,))
+                consent_version,consent_accepted_at,training_consent,training_consent_version,training_consent_accepted_at) VALUES(%s,1,true,true,'synthetic-live-v1',now(),true,'training-v1',now())""", (candidate_id,))
     candidate_worker = Worker(store)
     drain(candidate_worker)
     assert all(store.status(candidate).state == "ready" for candidate in ids)
@@ -129,7 +130,7 @@ def main() -> None:
             # Source-only withdrawal invalidates runtime before the matching projection.
             participant = UUID(job["plan"]["splits"]["train"][0]["candidate_key"])
             with connect(url) as connection:
-                connection.execute("UPDATE candidate_profiles SET pool_consent=false,revision=revision+1 WHERE candidate_id=%s", (participant,))
+                connection.execute("UPDATE candidate_profiles SET pool_consent=false,training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL,revision=revision+1 WHERE candidate_id=%s", (participant,))
             fallback = feed.page(owner_id, vacancy_id, session_id, page.next_cursor, 1)
             assert fallback.items[0].preference_state == "baseline" and fallback.order_revision > personal_order_revision
             preferences.reconcile()

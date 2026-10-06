@@ -3913,6 +3913,35 @@
             "title": "Pool",
             "default": false
           },
+          "training": {
+            "type": "boolean",
+            "title": "Training",
+            "default": false
+          },
+          "training_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "training-v1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Training Version"
+          },
+          "training_accepted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Training Accepted At"
+          },
           "accepted_at": {
             "anyOf": [
               {

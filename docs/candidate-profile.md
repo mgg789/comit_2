@@ -140,3 +140,24 @@ PYTHONPATH=services/matching-engine/src:services/agents-service/src \
 подключение к evidence/outbox остаются отдельным контуром. UI, production deploy,
 реальная доставка email в этом прогоне и качество обученного ML-реранкера здесь
 не проверяются.
+
+## Добровольное обучение моделей
+
+`consent.training` отделено от `processing` и `pool`. По умолчанию false, включая
+прежние профили. Opt-in требует `training=true, training_version="training-v1"`
+при действующих processing/pool. Сервер сохраняет отдельное training_accepted_at.
+В GET возвращаются training, training_version (или null), training_accepted_at
+(или null). Обычная правка fields без consent сохраняет выбор и время; передача
+consent без training безопасно отключает обучение. Для отзыва передайте
+`{processing:true,pool:true,version:"profile-v1",training:false}` без training_version.
+
+В пуле, витрине и обычном main/rerank обучение не является условием допуска.
+Учебные features, выгрузка, shadow/live preference fit, активная модель и research
+hypothesis pairs требуют отдельного разрешения. Авторитетная source-запись
+проверяется до доставки в matching; source locks удерживаются при export/fit.
+Отзыв удаляет feature/model/hypothesis payload при доставке или preference
+reconciliation, а повторное согласие не восстанавливает отозванные исторические
+features. Копии экспортов контролирует оператор.
+
+Тексты: [тестовые документы](legal/README.md), [согласие](legal/processing-consent.md),
+[добровольное обучение](legal/training-consent.md). UI в этот проход не входит.

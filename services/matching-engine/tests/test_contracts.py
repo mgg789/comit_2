@@ -34,7 +34,8 @@ def eligible_profile(**overrides) -> CandidateProfile:
         "grade_result": {"grade": "middle", "status": "approved",
                          "test_session_id": str(uuid4()), "approved_at": datetime.now(UTC)},
         "consents": {"processing": True, "pool": True, "accepted_at": datetime.now(UTC),
-                     "version": "privacy-v1"},
+                     "version": "privacy-v1", "training": True, "training_version": "training-v1",
+                     "training_accepted_at": datetime.now(UTC)},
         "domains": [{"key": "algorithms", "level": 7, "status": "confirmed",
                      "provenance": ["synthetic-test"]}],
         "stacks": [{"key": "python", "level": 4, "status": "partial"}],
@@ -148,3 +149,13 @@ def test_registry_exactly_matches_context_35() -> None:
     assert len([c for c in schema.coordinates if c.group == "domain"]) == 15
     assert len([c for c in schema.coordinates if c.group == "stack"]) == 16
     assert len([c for c in schema.coordinates if c.group == "soft_skill"]) == 6
+
+
+def test_training_is_optional_for_pool_and_needs_its_own_acceptance() -> None:
+    """Legacy consent admits a candidate without granting a training purpose."""
+    profile = eligible_profile(consents={"processing": True, "pool": True,
+                                       "version": "profile-v1", "accepted_at": datetime.now(UTC)})
+    assert missing_requirements(profile) == []
+    assert profile.consents.training is False
+    with pytest.raises(ValidationError, match="explicit versioned consent"):
+        eligible_profile(consents={"processing": True, "pool": True, "training": True})

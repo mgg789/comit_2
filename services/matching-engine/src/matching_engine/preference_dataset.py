@@ -182,9 +182,10 @@ def current_consent(examples: list[dict], summary: dict, database_url: str | Non
         with connection.cursor(name="preference_consent_guard") as cursor:
             cursor.execute("""SELECT c.candidate_id FROM candidate_pipeline.candidates c
                 JOIN public.candidate_profiles p USING(candidate_id)
-                WHERE p.processing_consent AND p.pool_consent
+                WHERE p.processing_consent AND p.pool_consent AND p.training_consent
                   AND (c.profile->'consents'->>'processing')::boolean IS TRUE
-                  AND (c.profile->'consents'->>'pool')::boolean IS TRUE FOR SHARE OF p""")
+                  AND (c.profile->'consents'->>'pool')::boolean IS TRUE
+                  AND (c.profile->'consents'->>'training')::boolean IS TRUE FOR SHARE OF p""")
             for row in cursor:
                 eligible.add(pseudonym(key, "candidate", row["candidate_id"]))
                 if len(eligible) > MAX_ROWS:

@@ -332,3 +332,23 @@ cache 640D, источник feed-сессии tinder/showcase и manual exposur
 NULL ID. Мигратор backfill пересобирает расширенный allowlist public_profile
 из точной исходной ревизии. Saved, decisions и selection_states общие для
 обоих источников. [Хранение и границы](candidate-showcase.md).
+
+## API миграция 005: отдельное обучение
+
+`005_training_consent.sql` добавляет candidate_profiles.training_consent
+(NOT NULL DEFAULT false), training_consent_version и training_consent_accepted_at.
+CHECK требует отдельную версию training-v1 и timestamp при true, действующие
+processing/pool; при false оба поля null. Прежние записи не получают разрешение.
+Версии account-v1/profile-v1 сохранены; обучение имеет отдельный training-v1.
+Exact outbox snapshots сохраняют все разрешения и серверные времена по ревизии.
+
+Применять API миграции до запуска нового API/matching/preference worker.
+Затем запустить preference-worker: reconcile удалит старые учебные features
+и параметры затронутых моделей/гипотез без отдельного разрешения. Даже до очистки
+активная preference-модель и новые операционные export/fit проверяют source
+training_consent и не используют прежнее согласие как разрешение на обучение.
+Экспортированные файлы требуют отдельного контроля оператора; массовое удаление
+профилей/архивов не входит в эту миграцию. [Тексты и ограничения](legal/README.md).
+
+Новые learning samples фиксируют именно training-v1 и training_accepted_at в
+consent_version/consent_accepted_at, а не подменяют их временем profile consent.
