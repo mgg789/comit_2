@@ -461,3 +461,5 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 применяется при каждом изменении профиля, как и прежде.
 
 [Документы для тестового контура](legal/README.md).
+
+[Проверка кандидатского backend и воспроизведение результатов](candidate-backend-audit.md).
