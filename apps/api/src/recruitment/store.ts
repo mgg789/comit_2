@@ -43,7 +43,7 @@ export interface InvitationGrant {
 
 /** Persist process-level CAS, actor-scoped receipts and immutable ordered events atomically. */
 export class RecruitmentStore {
-  public constructor(private readonly pool: Pool) {}
+  public constructor(private readonly pool: Pool, private readonly chatConfigured = false) {}
 
   /** Read an already committed receipt before remote prechecks; conflicting reuse is rejected. */
   public async receipt(actorId: string, key: string, fingerprint: string): Promise<RecruitmentView | null> {
@@ -132,7 +132,8 @@ export class RecruitmentStore {
     if (!consent?.processing_consent) actions = actions.filter(action => ["reject", "decline", "withdraw", "view", "interview_cancel", "interview_decline", "offer_decline"].includes(action));
     return { id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, vacancy_id: row.vacancy_id, draft_id: row.draft_id,
       profile_revision: Number(row.profile_revision), revision: Number(row.revision), state: row.state, terms: row.terms,
-      interviews, offers: mappedOffers, allowed_actions: actions, chat_available: false,
+      interviews, offers: mappedOffers, allowed_actions: actions,
+      chat_available: this.chatConfigured && row.invited_at !== null && !!consent?.processing_consent,
       invited_at: row.invited_at === null ? null : timestamp(row.invited_at), closure: row.closure,
       created_at: timestamp(row.created_at), updated_at: timestamp(row.updated_at) };
   }
@@ -225,6 +226,18 @@ export class RecruitmentStore {
       const source = await this.profile(client, row.candidate_id);
       return { candidate_id: row.candidate_id, display_name: source.fields.display_name ?? "", email: source.email,
         phone: source.fields.phone ?? null, profile_revision: Number(source.revision) };
+    });
+  }
+
+  /** Hold participant/process and consent locks through bounded chat I/O so closure or withdrawal cannot race delivery. */
+  public async withChatGrant<T>(role: AccountRole, actorId: string, id: string, write: boolean,
+    operation: (grant: { process_id: string; owner_id: string; candidate_id: string; actor_id: string }) => Promise<T>): Promise<T> {
+    return transaction(this.pool, async client => {
+      const row = await this.process(client, role, actorId, id);
+      if (!row.invited_at) return fail(404, "chat_not_found");
+      await this.profile(client, row.candidate_id);
+      if (write && terminal.has(row.state)) return fail(409, "chat_read_only");
+      return operation({ process_id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, actor_id: actorId });
     });
   }
 

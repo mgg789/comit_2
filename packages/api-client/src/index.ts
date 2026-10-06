@@ -5,7 +5,8 @@
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedListPage, SavedCard, VisitedCard,
-  InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage } from "@comit/shared";
+  InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
+  ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -72,6 +73,14 @@ export interface ApiClient {
   getRecruitmentContacts(processId: string): Promise<ContactsView>;
   /** Poll durable participant events after the last acknowledged sequence. */
   getRecruitmentEvents(role: AccountRole, afterSequence?: number, limit?: number): Promise<RecruitmentEventPage>;
+  /** Poll ascending messages after the last processed cursor in a participant's invitation. */
+  getChatMessages(role: AccountRole, processId: string, afterSequence?: number, limit?: number): Promise<ChatPage>;
+  /** Send text and already uploaded files using a stable UUID retry key. */
+  sendChatMessage(role: AccountRole, processId: string, body: SendChatMessage): Promise<ChatMessage>;
+  /** Upload up to 8 MiB; publication occurs when the returned metadata is attached to a message. */
+  uploadChatFile(role: AccountRole, processId: string, body: UploadChatFile): Promise<ChatFile>;
+  /** Download an attachment published in this participant-owned invitation. */
+  downloadChatFile(role: AccountRole, processId: string, fileId: string): Promise<DownloadChatFile>;
 }
 
 /** Create a same-origin API client; optional Bearer credentials override session cookies server-side. */
@@ -122,5 +131,9 @@ export function createApiClient({
     actOnRecruitment: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/actions`, body),
     getRecruitmentContacts: processId => request("GET", `/employer/recruitment/${encodeURIComponent(processId)}/contacts`),
     getRecruitmentEvents: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment-events?after_sequence=${afterSequence}&limit=${limit}`),
+    getChatMessages: (role, processId, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/messages?after_sequence=${afterSequence}&limit=${limit}`),
+    sendChatMessage: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/messages`, body),
+    uploadChatFile: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/files`, body),
+    downloadChatFile: (role, processId, fileId) => request("GET", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/files/${encodeURIComponent(fileId)}`),
   };
 }

@@ -395,5 +395,15 @@ cancel/complete, offer_send/accept/decline. CAS expected_revision и UUID key
 Saved-членство для invitation/rejection читается через приватный matching
 `GET /internal/vacancies/{vacancy_id}/saved/{candidate_id}` с token+serverowner;
 он возвращает SavedCard, при stale источнике card:null, без удаления истории.
-Чат отсутствует, chat_available:false. Схемы всех маршрутов включены в Fastify
+Без настройки чата chat_available:false. Схемы всех маршрутов включены в Fastify
 OpenAPI; DTO живут в packages/shared/recruitment.ts и используются api-client.
+
+## QGramm chat backend
+
+Симметричные role-auth маршруты `/{role}/recruitment/{id}/chat/messages`
+(GET history, POST SendChatMessage), `/files` (POST UploadChatFile) и
+`/files/{file_id}` (GET DownloadChatFile) описаны в Fastify OpenAPI.
+DTO в `packages/shared/chat.ts`, типизированные методы в api-client.
+Участники и комната определяются API из приглашения, не из body/header клиента.
+Чат доступен до accept, контакты — по прежнему правилу после accept.
+[Лимиты, ошибки, курсор и протокол публикации файлов](chat.md).

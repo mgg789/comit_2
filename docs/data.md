@@ -274,3 +274,13 @@ actor/key, fingerprint command включает endpoint. Event sequence сер�
 до commit и привязан к process revision, payload minimal, polling only participants.
 Хранение историческое без auto deletion; ни001/002, ни engine migrations
 не переписаны. [Подробные переходы и ограничения](recruitment.md).
+
+## QGramm chat storage
+
+Отдельный volume `chat-data` содержит SQLite QGramm и зашифрованные chunks.
+Комната/серверные устройства детерминированы по приглашению; текст и имена
+вложений остаются в зашифрованном QGramm payload, не в PostgreSQL.
+Новая API SQL-миграция не требуется: lazy provisioning опирается на уже
+существующий process UUID и неизменяемую пару участников. Метаданные и
+секреты восстанавливаются вместе с volume; смена derivation key не является
+безопасной ротацией. [Хранение и backup boundary](chat.md).

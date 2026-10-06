@@ -428,5 +428,13 @@ CASCADE только в явно выделенной тестовой БД. HTT
 и предварительно собранный API; реальные worker вызовы используют локальный
 Harrier cache. Нельзя направлять harness или test env на production.
 После offer expiry GET обновляет revision и event; при CAS409 перечитать процесс.
-Email delivery/chat не включены: новые события читаются participant polling.
+Email delivery не включён: новые события читаются participant polling.
 [Контракт](recruitment.md).
+
+Чат включается отдельным `infra/docker-compose.chat.yml`, постоянными
+секретами и volume `chat-data`; см. [запуск и ограничения](chat.md).
+Без конфигурации приглашения работают, а chat routes возвращают503.
+После503 повторить тот же UUID команды; provisioning восстанавливается при
+следующем обращении. Нельзя удалять volume/генерировать новые crypto keys
+для исправления ошибки старта. Сначала проверить readiness, права на `/data`,
+совпадение секретов с backup и версии закреплённого образа.

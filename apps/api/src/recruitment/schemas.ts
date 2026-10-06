@@ -63,7 +63,7 @@ export const recruitmentViewSchema = object({
   closure: nullable(object({ reason: nonempty(10000), actor: enumeration(["candidate", "employer"]), at: timestamp })),
   interviews: { type: "array", items: interview }, offers: { type: "array", items: offer },
   allowed_actions: { type: "array", items: enumeration(actions), uniqueItems: true },
-  chat_available: { type: "boolean", const: false }, created_at: timestamp, updated_at: timestamp,
+  chat_available: { type: "boolean" }, created_at: timestamp, updated_at: timestamp,
 });
 
 /** Participant-scoped list response with explicit pagination bounds. */

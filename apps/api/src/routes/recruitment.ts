@@ -1,4 +1,4 @@
-/** Participant-authenticated post-selection endpoints; the chat implementation is intentionally absent. */
+/** Participant-authenticated post-selection endpoints; chat routes share this domain's invitation grants. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard } from "@comit/shared";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
