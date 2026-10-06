@@ -1,190 +1,143 @@
-# Ограниченная ревизия парных правил R₀
+# Ограниченная гибридная ревизия парных правил R₀
 
-`matching_engine.rerank_cohort_pair_repair` создаёт отдельную версию
-`rerank-grounded-pair-repair-v2` для завершённой выборки
-`rerank-grounded-cohort-v9`. Это явное изменение правил сравнения, а не
-автоматическое исправление прежней «истины». Старые dataset, источники,
-raw receipts, признаки, main scores и независимые оценки пригодности сохраняются.
-Генерация профилей и grade API этим оператором запрещены.
+`matching_engine.rerank_cohort_pair_repair` создаёт отдельный namespace
+`rerank-grounded-pair-repair-v3` для завершённой `rerank-grounded-cohort-v9`.
+Исходные 60 источников, 420 профилей, raw receipts, признаки, main scores и
+независимые grades сохраняются. Генерация и grade API запрещены. Это явная
+ревизия синтетических правил сравнения; она не даёт права на активацию.
 
-## Правила и заранее выбранный объём
+Все исходные 16 class-only семейств (01/train и 05/validation по восьми
+направлениям) получают `class-only-policy-v1` и вычисляются чистым
+[class-only oracle](rerank-class-only-oracle.md). Их пары и receipts помечены
+`rule_derived_class_only`, `oracle_version`, policy/input/source hashes,
+фактическим `oracle_code_hash` и false для human evaluation. Локальные 21 пары
+и три обратных сравнения не создают API cache/jobs и не расходуют ledger.
+Локальный proof отличается от LLM формата: decisive grade имеет одну own
+цитату; production/duration — три. Essential unknown получает per-side
+`absence_evidence` с точным path и state absent/null/excluded_prose; primitive
+цитаты могут быть пустыми. Present rejected измерение не считается missing
+для essential gate; последующий optional own-fact step его пропускает.
+Oracle запрещён во всех 12 golden и в calibration. Формальный grade не зависит
+от родительского статуса; nullable собственные факты сравниваются только когда
+известны у обеих сторон и nonrejected. Essential unknown проверяется первым.
 
-Все 16 class-only семейств получают `class-only-policy-v1`:
+Nonclass policy и её hash сохраняются дословно. Qwen `qwen3.8-27b` получает
+`rerank-uniform-cohort-pair-v5`: явно запрошенные coverage/declared fit/depth
+предшествуют лишь явно вторичному confirmation. Собственный статус навыка
+не заменяется статусом профиля. Stacks означает только vacancy.stacks,
+domains — только vacancy.domens; generic stated requirements включает все
+три группы. Пустой неэксклюзивный group пропускается без подстановки другого.
+Если применимых различий нет, tie; отсутствие явно обязательного exclusive
+измерения у любой стороны требует insufficient первым шагом. Весов, уровней
+и технических требований учитель не придумывает.
 
-1. Принятый формальный грейд: senior > middle > junior > intern. Исходный статус
-   профиля, включая rejected, не аннулирует отдельный формальный результат теста.
-2. При равном грейде production сравнивается только при двух известных фактах
-   с собственными статусами, отличными от rejected: true > false; затем
-   confirmed > partial > self_reported > pending для этого факта.
-3. Длительность сравнивается только при двух известных фактах с собственными
-   статусами, отличными от rejected. Большее значение предпочтительнее.
-4. Неизвестный неэксклюзивный сигнал пропускается. Если применимых различий нет,
-   результат tie. Insufficient допускается при явно обязательном эксклюзивном
-   измерении, отсутствующем хотя бы у одной стороны.
+Response schema содержит четыре **полных объекта** anyOf: A/B допускают только
+reason `prefer_known_facts`, tie — `comparable_fit`, insufficient —
+`insufficient_source_facts`. Это ограничение протокола не выбирает победителя.
+Сохраняются семь wire fields, точные собственные статусы и 2–4 собственных
+типизированных цитаты. Raw labels не нормализуются и не заменяются автоматически.
 
-Зарплата, biography, широта навыков и выдуманные требования не участвуют
-в class-only сравнении. Арифметическое поле salary comparison остаётся
-проверяемой копией исходных сумм и не определяет метку.
-Для технических вакансий v4 prompt уточняет сравнение coverage и заявленной
-глубины по общим явно запрошенным координатам. Confirmation используется
-только как явно заданный вторичный критерий; статус родителя не подтверждает
-навык или факт. Неизвестный уровень не превращается в ноль. Исходная nonclass
-policy и её hash сохраняются дословно; class-only rubric её не заменяет.
+## Фиксация пилота, состава и бюджета
 
-После завершения sealed v9 dataset, **до первого family HTTP**, фиксируются
-все 16 class-only семейства и объединение всех quarantined non-class семейств
-со всеми nonclass семействами, где метка исходного учителя расходится с исходной
-слепой assistant проверкой заранее выбранных 20 пар. Проверяются hash исходного
-пакета, ровно 20 уникальных pair IDs и полный review. Это только номинация
-целого семейства: manual labels не передаются новому учителю. Лимит объединения —
-девять nonclass семейств. Если их больше, оператор публикует
-`selection-blocked-report.json` и останавливается. Нельзя выбрать удобные
-случаи по метрикам модели или исключить неудачные семейства из результата.
-Для каждого выбранного семейства записаны исходный record hash, причина,
-старый и новый policy hashes, фактическая policy, `policy_scope`, `policy_id`,
-а также packet/review/source hashes исходной слепой номинации.
+До HTTP закрепляются четыре исходных declared fixtures v1 и восемь ориентаций.
+Ожидание A вручную выведено из raw level5 > level4 и explicit declared-fit/depth
+policy; оно не получено от учителя или oracle и не передаётся в request.
+Проход требует 8/8 валидных, 8/8 ожидаемых меток и 4/4 reverse comparisons.
+Class-only в LLM пилоте отсутствует; ветви его правила проверяются отдельно.
 
-## Пилот и бюджеты
+До первого family HTTP после sealed base фиксируются все 16 class-only и
+объединение **всех** quarantined nonclass с **всеми** nonclass семействами,
+номинированными расхождением исходного учителя с original blind20 review.
+Проверяются точный canonical packet hash, 20 unique IDs и полный review.
+Manual labels служат только номинацией целого семейства и не входят в prompt.
+Лимит объединения — девять nonclass: превышение останавливает проход без
+усечения. В manifest закрепляются причины, source/base/policy hashes,
+`policy_scope`, `label_source` и оригинальные packet/review hashes.
 
-До HTTP замораживаются десять fixtures и 20 направленных сравнений:
-пять class-only случаев, четыре преимущества заявленного уровня над
-confirmation и один неизвестный обязательный exclusive signal.
-Пилот проверяет tie, пропуск неизвестного неэксклюзивного факта, исходный
-rejected статус без аннулирования формального грейда и собственные статусы.
-Для продолжения обязательны 20/20 валидных ответов, 20/20 ожидаемых меток
-и 10/10 корректных swaps. Цитаты проверяются по точным типизированным исходным
-полям; class-only не может ссылаться на зарплату или несуществующие требования.
+Глобальные ceilings остаются generation120 / pair3000 / grade600. V3 проверяет
+обе неизменные предыдущие попытки: v1 24 attempts, checkpoint `7585ee7`, и
+v2 28 attempts, checkpoint `6d41798`; все 52 raw receipts и closure pins
+сохраняются. Неизвестный prior namespace, изменённый receipt или usage блокирует
+запуск. Новый максимум **264**: pilot8 initial+8 retry, девять nonclass×24=216
+family initial и32 общих family retry. План 2268+52+264=2584≤3000.
+Перед каждым HTTP actual ledger резервирует оставшиеся обычные base calls и
+оставшийся repair allowance. Сброса ledger и автоматического увеличения cap нет.
 
-Общие ceilings остаются generation 120 / pair 3000 / grade 600. Оператор
-использует только shared pair ledger, тот же cache, пять remote slots и lazy
-credential read. Перед пилотом v2 проверяется план 2268 + 24 + 672 = 2964 ≤ 3000:
-24 уже потраченных v1 attempts не сбрасываются. Frozen v1 pilot, все 24 raw
-receipts и его code hash из Git checkpoint `7585ee7` проверяются до v2 HTTP.
-Неизвестное дополнительное prior usage, новый prior namespace или изменённый
-receipt блокируют запуск. V2 manifest фиксирует hashes всей предыдущей попытки.
-Пилот и парные jobs каждого семейства выполняются через существующий
-bounded executor с пятью threads и сохраняют исходный порядок результатов.
-Короткий собственный `.budget.lock` защищает reserve и started receipt;
-per-job locks и общий inference cache сохраняют идемпотентность.
-Перед новым запросом дополнительно резервируется весь оставшийся обычный
-pair объём v9 и оставшийся repair allowance по фактическому ledger.
-Неожиданные дополнительные попытки base уменьшают headroom и могут остановить
-ремонт; сброса ledger нет.
+Remote pilot и nonclass21+3 используют bounded executor с пятью threads,
+общий cache, shared five slots и lazy credential read. Короткий `.budget.lock`
+защищает reserve/started receipt; per-job locks сохраняют идемпотентность.
+Каждому job разрешён лишь attempt0 и один отдельный attempt1. Started без raw
+receipt не пересылается неоднозначно; auth/endpoint/schema HTTP ошибки
+останавливают проход. Семейство принимается только при всех24 валидных ответах;
+при сбое прежние пары сохраняются целиком и остаётся quarantine.
 
-Repair максимум 672 reservations: pilot 20 initial + 20 retry,
-не более 25 × 24 = 600 первых family запросов и 32 дополнительных family
-ответа на весь проход. В любой job разрешены attempt0 и один attempt1
-с отдельной identity. Ошибки учитываются. Started без raw receipt не отправляется
-повторно автоматически. Auth/endpoint/schema HTTP ошибки прекращают проход.
-При отсутствии всех 24 валидных ответов семейство целиком не принимается,
-его прежние пары сохраняются, а результат остаётся quarantined.
+## Артефакты, проверка и запуск
 
-## Запуск и результаты
+Каталог v3 содержит pilot manifest/report, closure observation, selection
+manifest, remote jobs/budget, `oracle-receipts/`, admitted families, полный
+derived dataset и repair report. Source hash oracle закреплён отдельно от
+основного module hash и перепроверяется при replay. `source_metrics` различает
+16 rule-derived families/48 reverse proofs и44 teacher families/132 comparisons;
+`human_review_verified=false`. Original independent grade policy отдельно
+отмечена: NDCG по grades и смешанный synthetic pair prior имеют разные цели.
 
-Из корня репозитория, сначала только пилот:
+Quality требует **≥119/132 teacher reverse comparisons**, каждое nonclass
+семейство≥2/3, отсутствие quarantine, отдельно48/48 oracle proofs и минимум
+шесть decisive pairs **в каждом из 12 nonclass golden семейств**. A/B, tie и
+insufficient включены в reverse denominator. Teacher/oracle gates объединяются
+логическим conjunction, а не выдаются за180 LLM либо human comparisons.
+Попарный пропуск optional сигналов может создавать циклы, даже у чистого
+oracle: production true/duration0 > false/12 > unknown/6 > true/0.
+Policy сохраняется; `cyclic_components` и точный `scalar_order_ceiling`
+публикуются для каждого admitted family. Reverse quality не утверждает
+транзитивность или100% воспроизводимость меток линейной моделью.
+Macro/golden и policy scope reports публикуются отдельно. После каждого
+selected family CLI печатает JSON progress с swaps/decisive/quarantine/admission.
+
+`validate_pair_repair(artifact_root, cohort_id, derived_dataset_path,
+repair_report_path)` возвращает verified dataset/report cache-only: воспроизводит
+восемь pilot answers, nonclass raw jobs и чистые local receipts; проверяет
+base/source/code/policy/ledger/quality pins и неизменность grades/features.
+`verify_repair_dataset(repair_output_dir)` возвращает только dataset.
+Выполнение не обучает, не прогнозирует golden и не активирует prior.
+
+Сначала пилот, только после sealed base dataset/report. Подготовка manifest и
+blind packets может предшествовать closure, но новый v3 HTTP до неё запрещён:
 
 ```bash
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_pair_repair --directory tests/artifacts/reranker --pilot-only
 ```
 
-Пилот разрешён до окончания v9: все 60 принятых источников и уже опубликованные
-base audit hashes фиксируются заранее. Для него нужны подготовленные исходные
-blind review packets v9. Полный проход допустим только после sealed dataset:
+После sealed base и успешного пилота:
 
 ```bash
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_pair_repair --directory tests/artifacts/reranker --original-review-file tests/artifacts/reranker/rerank-grounded-cohort-v9/reviews/assistant-review-canonical.json
 ```
 
-В actual v9 review исходный `packet_hash` был ошибочно записан как SHA256 байтов
-файла пакета. Контракт использует встроенный canonical JSON seal с исключённым
-полем `packet_hash`. Файл `assistant-review-canonical.json` исправляет только
-эти метаданные и сохраняет все 20 строк решений. Исходный review сохранён;
-`review-metadata-repair-receipt.json` фиксирует обе схемы hash, hashes файлов и
-неизменный `labels_hash`. Оператор не подменяет исходный путь автоматически.
+Actual original review ошибочно использовал SHA256 файла вместо canonical seal.
+`assistant-review-canonical.json` исправляет только hash metadata, сохраняя все20
+решений; исходный файл и `review-metadata-repair-receipt.json` сохранены. Путь
+не подменяется автоматически. Новые `reviews/{assistant,user}-packet.{json,md}`
+сохраняют прежние20 IDs/raw/source hashes и меняют только class-only policy,
+добавляя base_packet_hash, pair_repair_pilot_manifest_hash и policy_revision.
+В пакетах нет labels/main/features/predictions. Нужны новые reviews;
+старое adjudication автоматически не переносится. Disagreements отдельно
+от reverse quality; assistant review не является независимым human review.
 
-В отдельном repair каталоге находятся `pilot-manifest.json`, `pilot-report.json`,
-`closure-observation.json` с локальным наблюдением завершения pilot jobs,
-`manifest.json` с полным выбранным составом, `jobs/`, `budget.json`,
-принятые `families/`, `dataset.json` и `repair-report.json`.
-После каждого выбранного семейства CLI печатает JSON progress с family ID,
-swap count, decisive count, quarantine и whole-family admission.
-Prompt пары — `rerank-uniform-cohort-pair-v4`; исходный grade v2 сохраняется.
-Формируется полный derived dataset из 60 семейств. Неизбранные records
-копируются точно; выбранные сохраняют исходные manifest, vacancy, traits,
-source hash, признаки, main scores, lineage и grade answers. Меняются только
-парные ответы, audits, связанные cycle/order diagnostics и pair provenance.
-Смешанная история v4 repaired/v2 preserved пар отмечена явно.
+## Фактические предыдущие пилоты
 
-Quality пересчитывается по **180 teacher reverse comparisons**, а не человеческому
-согласию: ≥162/180, каждое семейство ≥2/3, отсутствие quarantine и минимум
-шесть решающих пар **в каждом из 12 golden семейств**. Отдельно публикуются
-macro reverse accuracy и golden statistics. Обучение, прогнозы на golden
-и активация не выполняются.
-Отдельные группы `by_policy_scope` показывают class-only revision и original
-nonclass policy с IDs. Исходные blind disagreements используются для номинации;
-новые manual disagreements проверяются отдельно и не входят в 180 swaps.
+V1:16/20 valid иcorrect,8/10 reverse,24 attempts. Все ответы двух проблемных
+fixtures завершились stop с корректными model/status/citations, но class-2
+не пропустил rejected/missing дополнительные факты, essential-unknown
+подменил обязательное неизвестное измерение formal grade. Family repair не шёл.
+V2:12/20 valid,11/20 correct,4/10 reverse,28 attempts. Основная ошибка —
+несогласованные label/reason поля; class-only и essential-first также остались
+семантически ненадёжными. Ни одна попытка не меняла исходные v9 family labels.
+V3 сохраняет эти raw artifacts и Git checkpoints, структурно связывает
+label/reason для nonclass и явно отделяет rule-derived class-only источник.
 
-## Blind review и проверка для обучения
-
-`reviews/{assistant,user}-packet.{json,md}` сохраняют исходные заранее выбранные
-20 case IDs, точные профили и source hashes. Только class-only policy заменяется
-новой frozen policy. Добавляются `base_packet_hash`,
-`pair_repair_pilot_manifest_hash` и `policy_revision` с version/hash.
-В пакетах нет меток учителя, main scores, признаков или прогнозов.
-Прежние пакеты и manual reviews не перезаписываются. Для новой семантики нужна
-новая проверка этих policy-corrected пакетов; прежнее adjudication не переносится.
-
-`validate_pair_repair(artifact_root, cohort_id, derived_dataset_path,
-repair_report_path)` возвращает проверенные dataset/report, воспроизводя
-pilot и все принятые whole-family ответы по точным raw cache receipts без HTTP,
-ключей и записи кэша. Проверяются источники, базовые audits, неизменность
-features/grades, фиксированный состав, semantic policy hashes, качество,
-общий ledger и собственный budget. `verify_repair_dataset(repair_output_dir)`
-— сокращённый интерфейс только для dataset. Quality=false не разрешает обучение
-по правилам принятия; даже quality=true не разрешает активацию автоматически.
-
-## Фактический пилот v1
-
-Actual v1 завершился с 16/20 валидных и правильных ответов, 8/10 корректных
-reverse comparisons. Потрачены 24 pair attempts: 20 первых и четыре ограниченных
-retry. Все восемь ответов двух проблемных fixtures завершились `stop`, модель,
-статусы и цитаты соответствовали контракту; это семантический сбой, не HTTP,
-схема или truncation.
-
-В `class-2` модель предпочла сторону с confirmed production и известной duration.
-При одинаковом formal grade обе дополнительные проверки неприменимы: production
-у другой стороны rejected, duration неизвестна. Frozen policy требует tie.
-В `essential-unknown` модель выбрала более высокий grade, проигнорировав отсутствие
-обязательного `uptime_percentage`; контракт требует insufficient до сравнения
-grade. Generic repair-инструкция о JSON-полях не исправила эти нарушения.
-
-Machine gate не пройден. Family repair не запускался; исходные v9 пары и
-независимые grades этим пилотом не менялись. Raw receipts и manifest v1 сохранены.
-
-## Семантический контракт v2 / prompt v4
-
-Те же десять заранее зафиксированных fixtures проходят сначала обязательный
-essential gate. Если exclusive criterion требует отсутствующее или null измерение
-хотя бы одной стороны, сразу insufficient; grade и любые другие признаки
-не подставляются. После этого class-only шаги выполняются строго последовательно:
-formal grade; production value и его собственное confirmation только при двух
-известных nonrejected фактах; duration только при двух известных nonrejected
-фактах; tie, если ни один применимый шаг не дал различия. Отдельного duration
-confirmation tiebreak нет. Rejected исключает применимость, а не становится
-нижним рангом confirmation.
-
-Одинаковый semantic contract присутствует в initial и единственном retry prompt.
-В request добавлена проверяемая таблица `criterion_applicability`: только наличие
-явно обязательных измерений и применимость production/duration; целевая метка,
-manual labels и scores не передаются. V1 source сохранён в Git checkpoint;
-в его каталог и raw cache новый оператор не записывает.
-
-Pilot report фиксирует `ledger_after_pilot` после завершения всех jobs.
-Closure observation содержит `job_receipts_hash` как digest объекта
-`{filename: parsed_job}` по `pilot-*.json`, `raw_response_hashes` по request hash,
-число фактических distinct raw reservations, тот же global counter и снимок
-состояния base. Проверка требует terminal receipts и монотонный counter между
-началом пилота и последующим ledger. Это локальное наблюдение, не доказательство
-времени удалённого ответа. При завершённом base snapshot явно показывает
-`base_dataset_existed=true`; такое наблюдение не заявляет, что пилот завершился
-раньше base closure. Final repair report фиксирует closure observation hash.
+Closure receipt фиксирует terminal pilot jobs, raw hashes,
+`job_receipts_hash=digest({filename:parsed_job})`, distinct reservations,
+`ledger_after_pilot` и наблюдение состояния base. Это локальная фиксация counter,
+а не удалённая аттестация времени. Снимок `base_dataset_existed=true` не заявляет,
+что пилот завершился до base closure.

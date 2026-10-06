@@ -15,7 +15,7 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_pair_teacher import salary_comparison
 from matching_engine.rerank_protocol import expected_families
 
-BASE_LEDGER_PAIR = 2292
+BASE_LEDGER_PAIR = 2320
 
 
 def _write(path, value, field=None):
@@ -45,26 +45,39 @@ def _answer(vacancy, a, b, policy):
             "salary_comparison_choice": salary_comparison(a, b)["cheaper_side"]}
 
 
-def _previous_fixture(directory):
-    target = directory / repair.PREVIOUS_VERSION
-    provider = repair.CohortProviders(directory / "provider-cache", cohort_id=repair.PREVIOUS_VERSION)
-    cases, requests, rows = repair.pilot_cases(), [], []
+def _previous_fixture(directory, version):
+    spec = repair.PRIOR_REPAIRS[version]
+    target = directory / version
+    provider = repair.CohortProviders(directory / "provider-cache", cohort_id=version)
+    cases, requests, rows = repair._legacy_pilot_cases(), [], []
     for case in cases:
         for swapped in (False, True):
             a, b = (case["B"], case["A"]) if swapped else (case["A"], case["B"])
-            invalid = case["case_id"] in ("class-2", "essential-unknown")
+            is_v1 = version == repair.PREVIOUS_VERSION
+            invalid = (case["case_id"] in ("class-2", "essential-unknown")) if is_v1 else (
+                case["case_id"] in ("class-0", "class-3", "essential-unknown") or
+                (not swapped and case["case_id"] in ("class-4", "declared-3")))
             answer = _answer(case["vacancy"], a, b, case["policy"])
-            if invalid:
+            if invalid and is_v1:
                 answer.update(label=("A" if swapped else "B") if case["case_id"] == "class-2" else (
                     "B" if swapped else "A"), reason_code="prefer_known_facts")
+            elif invalid:
+                if case["case_id"] == "class-4":
+                    answer.update(label="B", reason_code="prefer_known_facts")
+                elif case["case_id"] == "essential-unknown":
+                    answer.update(label="B" if swapped else "A", reason_code="comparable_fit")
+                else:
+                    answer["reason_code"] = "comparable_fit"
+            elif not is_v1 and case["case_id"] == "declared-1" and not swapped:
+                answer["label"] = "B"
             for attempt in ((0, 1) if invalid else (0,)):
                 payload = provider.pair_payload(case["vacancy"], a, b, case["policy"], attempt)
                 state = json.loads(payload["messages"][1]["content"])
-                state["request_nonce"]["cohort_id"] = repair.PREVIOUS_VERSION
+                state["request_nonce"]["cohort_id"] = version
                 payload["messages"][1]["content"] = json.dumps(state, ensure_ascii=False, sort_keys=True)
                 identity = provider._identity("/v1/chat/completions", payload, "pair")
-                identity.update(cohort_id=repair.PREVIOUS_VERSION,
-                    prompt_version="rerank-uniform-cohort-pair-v3" + ("-repair1" if attempt else ""))
+                identity.update(cohort_id=version,
+                    prompt_version=spec["prompt_version"] + ("-repair1" if attempt else ""))
                 if attempt == 0:
                     requests.append(identity)
                 key = digest(identity)
@@ -83,18 +96,18 @@ def _previous_fixture(directory):
     sources = {path.stem: _read_json(path)["record_hash"]
                for path in (directory / repair.BASE_COHORT / "sources").glob("*.json")}
     manifest = _write(target / "pilot-manifest.json", {"cases": cases, "requests": requests,
-        "code_hash": repair.PREVIOUS_CODE_HASH, "source_hashes": sources,
+        "code_hash": spec["code_hash"], "source_hashes": sources,
         "base_manifest_hash": _read_json(directory / repair.BASE_COHORT / "manifest.json")["manifest_hash"]}, "manifest_hash")
     report = _write(target / "pilot-report.json", {"pilot_manifest_hash": manifest["manifest_hash"], "rows": rows,
-        "valid": 16, "correct": 16, "swap_correct": 8, "passed": False}, "report_hash")
-    _write(target / "budget.json", {"pilot_initial": 20, "pilot_retry": 4, "family_initial": 0, "family_retry": 0})
+        "valid": spec["valid"], "correct": spec["correct"], "swap_correct": spec["swaps"], "passed": False}, "report_hash")
+    _write(target / "budget.json", {"pilot_initial": 20, "pilot_retry": spec["retry"], "family_initial": 0, "family_retry": 0})
     jobs = {path.name: _read_json(path) for path in sorted((target / "jobs").glob("*.json"))}
     raw = {job["request_hash"]: _read_json(directory / "provider-cache" / f"{job['request_hash']}.json")["response_hash"]
            for job in jobs.values()}
-    _write(target / "closure-observation.json", {"cohort_id": repair.PREVIOUS_VERSION,
+    _write(target / "closure-observation.json", {"cohort_id": version,
         "pilot_manifest_hash": manifest["manifest_hash"], "pilot_report_hash": report["report_hash"],
         "pilot_passed": False, "job_receipts_hash": digest(jobs), "raw_response_hashes": raw,
-        "actual_pair_reservations": 24, "base_dataset_existed": False,
+        "actual_pair_reservations": 20 + spec["retry"], "base_dataset_existed": False,
         "base_manifest_hash": manifest["base_manifest_hash"], "global_ledger": _read_json(directory / "provider-cache/usage.json")},
         "observation_hash")
 
@@ -142,7 +155,8 @@ def directory(tmp_path):
     _write(target / "reviews/assistant-review.json", {"packet_hash": packets["assistant"]["packet_hash"],
         "reviewer_kind": "assistant", "labels": [{"pair_id": case["pair_id"], "label": "A",
         "reason": "Offline original blind review.", "factual_issue": False} for case in packets["assistant"]["cases"]]})
-    _previous_fixture(tmp_path)
+    for version in repair.PRIOR_REPAIRS:
+        _previous_fixture(tmp_path, version)
     return tmp_path
 
 
@@ -181,11 +195,11 @@ def test_class_only_comparator_skips_missing_and_uses_own_status_not_parent():
     assert repair.class_only_label(repair._candidate("senior"), weak, exclusive) == "insufficient"
 
 
-def test_pair_only_identity_and_ten_preregistered_fixtures(tmp_path):
+def test_nonclass_identity_four_frozen_fixtures_and_complete_label_reason_branches(tmp_path):
     provider = repair.PairRepairProviders(tmp_path)
     cases = repair.pilot_cases()
-    assert len(cases) == 10 and len([case for case in cases if case["case_id"].startswith("class-")]) == 5
-    assert len({case["vacancy"]["class"] for case in cases}) == 8
+    assert len(cases) == 4 and all(case["case_id"].startswith("declared-") for case in cases)
+    assert cases == [case for case in repair._legacy_pilot_cases() if case["case_id"].startswith("declared-")]
     for case in cases:
         if repair._class_only(case["vacancy"]):
             assert repair.class_only_label(case["A"], case["B"], case["policy"]) == case["expected"]
@@ -197,17 +211,18 @@ def test_pair_only_identity_and_ten_preregistered_fixtures(tmp_path):
             request = provider.pair_payload(case["vacancy"], case["A"], case["B"], case["policy"], attempt)
             prompt = request["messages"][0]["content"]
             assert prompt.startswith(repair._DECISION_CONTRACT)
-            assert prompt.index("STEP 0") < prompt.index("STEP 1") < prompt.index("STEP 2") < prompt.index("STEP 3")
+            assert prompt.index("FIRST") < prompt.index("Otherwise follow")
             state = json.loads(request["messages"][1]["content"])
             assert "expected" not in state and "label" not in state["criterion_applicability"]
-            if case["case_id"] == "class-2":
-                assert not state["criterion_applicability"]["production_comparison_applicable"]
-                assert not state["criterion_applicability"]["duration_comparison_applicable"]
-                assert "do not reward the other side for being known or confirmed" in prompt
-            if case["case_id"] == "essential-unknown":
-                assert state["criterion_applicability"]["required_measurements"] == [
-                    {"path": "uptime_percentage", "available_A": False, "available_B": False}]
-                assert "Grade, confirmation, production, duration, salary" in prompt
+            assert state["decision_inputs"]["A"]["requested_levels"]["python"] == {
+                "level": 5, "own_status": case["A"]["skill_statuses"]["python"]}
+            branches = request["response_format"]["json_schema"]["schema"]["anyOf"]
+            assert len(branches) == 4
+            assert [(branch["properties"]["label"]["enum"], branch["properties"]["reason_code"]["enum"]) for branch in branches] == [
+                (["A"], ["prefer_known_facts"]), (["B"], ["prefer_known_facts"]),
+                (["tie"], ["comparable_fit"]), (["insufficient"], ["insufficient_source_facts"])]
+            assert all(branch["type"] == "object" and branch["additionalProperties"] is False
+                and set(branch["required"]) == set(branch["properties"]) for branch in branches)
     assert provider.teacher_identity()["prompt_version"] == repair.PAIR_PROMPT_VERSION
     assert provider.teacher_identity(attempt=1)["prompt_version"].endswith("-repair1")
     for kind in ("grade", "generation"):
@@ -217,19 +232,23 @@ def test_pair_only_identity_and_ten_preregistered_fixtures(tmp_path):
         provider.suitability_payload({}, {}, {})
     with pytest.raises(ValueError, match="forbids"):
         provider.generation_payload("backend", "x", ["python"])
+    class_case = repair._legacy_pilot_cases()[0]
+    with pytest.raises(ValueError, match="forbids class-only"):
+        provider.pair_payload(class_case["vacancy"], class_case["A"], class_case["B"], class_case["policy"])
 
 
 def test_pilot_freezes_sources_and_publishes_policy_corrected_blind_packets(directory, remote):
     base = directory / repair.BASE_COHORT
     before = {path: path.read_bytes() for path in base.rglob("*.json")}
-    previous_bytes = {path: path.read_bytes() for path in (directory / repair.PREVIOUS_VERSION).rglob("*.json")}
+    previous_bytes = {path: path.read_bytes() for version in repair.PRIOR_REPAIRS
+                      for path in (directory / version).rglob("*.json")}
     manifest = repair.prepare_pilot(directory)
-    assert not remote and manifest["maximum_attempts"] == 672 and len(manifest["requests"]) == 20
-    assert manifest["previous_repair"]["attempts"] == 24 and manifest["previous_repair"]["source_commit"] == repair.PREVIOUS_COMMIT
+    assert not remote and manifest["maximum_attempts"] == 264 and len(manifest["requests"]) == 8
+    assert manifest["previous_repair"]["attempts"] == 52
     output = repair.run_pair_repair(directory, pilot_only=True)
     assert output["state"] == "pilot_passed"
-    assert output["pilot"]["valid"] == output["pilot"]["correct"] == 20 and output["pilot"]["swap_correct"] == 10
-    assert len(remote) == 20
+    assert output["pilot"]["valid"] == output["pilot"]["correct"] == 8 and output["pilot"]["swap_correct"] == 4
+    assert len(remote) == 8
     assert not (directory / repair.VERSION / "manifest.json").exists()
     for reviewer in ("assistant", "user"):
         old = json.loads((base / "reviews" / f"{reviewer}-packet.json").read_text())
@@ -249,10 +268,11 @@ def test_completed_whole_family_repair_preserves_sources_features_grades_and_rep
     base = repair._verified(directory / repair.BASE_COHORT / "dataset.json", "dataset_hash")
     report = repair.run_pair_repair(directory)
     assert report["state"] == "repaired_quality_passed" and len(report["selected_families"]) == 16
-    assert report["quality"]["swap_correct"] == report["quality"]["swap_total"] == 180
+    assert report["quality"]["swap_correct"] == report["quality"]["swap_total"] == 132
+    assert report["quality"]["oracle_swap_correct"] == report["quality"]["oracle_swap_total"] == 48
     assert report["quality"]["golden_families"] == 12 and report["quality"]["minimum_golden_decisive_pairs"] >= 6
-    assert report["budget"] == {"pilot_initial": 20, "pilot_retry": 0, "family_initial": 384, "family_retry": 0}
-    assert len(remote) == 404
+    assert report["budget"] == {"pilot_initial": 8, "pilot_retry": 0, "family_initial": 0, "family_retry": 0}
+    assert len(remote) == 8
     monkeypatch.setattr(repair.PairRepairProviders, "_open", lambda *_args: pytest.fail("HTTP during completed replay"))
     monkeypatch.setattr(repair.PairRepairProviders, "_api_key", lambda *_args: pytest.fail("key during completed replay"))
     derived, verified = repair.validate_pair_repair(directory)
@@ -264,12 +284,15 @@ def test_completed_whole_family_repair_preserves_sources_features_grades_and_rep
             assert old[field] == new[field]
         if old["manifest"]["family_id"] not in report["selected_families"]:
             assert old == new
+        else:
+            assert new["cyclic_components"] == repair._cycles(7, new["pairs"])
+            assert new["scalar_order_ceiling"] == repair._ordering_ceiling(7, new["pairs"])
 
 
 def test_remaining_base_calls_and_global_budget_are_reserved_before_pilot(directory):
     manifest = repair.prepare_pilot(directory)
-    assert manifest["projected_base_final_pair"] + manifest["projected_prior_pair_attempts"] + manifest["maximum_attempts"] == 2964
-    _write(directory / "provider-cache/usage.json", {"generation": 105, "pair": 2329, "grade": 579})
+    assert manifest["projected_base_final_pair"] + manifest["projected_prior_pair_attempts"] + manifest["maximum_attempts"] == 2584
+    _write(directory / "provider-cache/usage.json", {"generation": 105, "pair": 2737, "grade": 579})
     with pytest.raises(ValueError, match="remaining base calls"):
         repair._budget_check(directory, 0)
     # A completed family reserves no additional ordinary HTTP; an unfinished one reserves all 24.
@@ -278,7 +301,7 @@ def test_remaining_base_calls_and_global_budget_are_reserved_before_pilot(direct
 
 
 @pytest.mark.parametrize("mutation", ["budget", "raw", "code", "unknown_namespace", "extra_job"])
-def test_prior_24_attempts_and_raw_receipts_are_audited_before_any_v2_http(directory, remote, mutation):
+def test_prior_52_attempts_and_raw_receipts_are_audited_before_any_v3_http(directory, remote, mutation):
     target = directory / repair.PREVIOUS_VERSION
     if mutation == "budget":
         path = target / "budget.json"
@@ -318,7 +341,7 @@ def test_started_without_raw_receipt_never_resends_and_one_retry_has_distinct_no
     assert not remote
     _write(path, {"state": "failed", "request_hash": key})
     answer = repair._job(directory, provider, "test", case["vacancy"], case["A"], case["B"], case["policy"], "pilot")
-    assert answer["label"] == "B" and len(remote) == 1
+    assert answer["label"] == "A" and len(remote) == 1
     assert remote[0]["request_nonce"]["attempt"] == 1
     assert _read_json(directory / repair.VERSION / "budget.json")["pilot_retry"] == 1
 
@@ -341,7 +364,7 @@ def test_blind_disagreement_nominates_whole_nonclass_family_without_leaking_targ
     assert nominated["policy_scope"] == "original_nonclass"
     assert nominated["pair_policy"] == case["policy"]
     assert nominated["old_policy_hash"] == nominated["new_policy_hash"]
-    assert len(report["selected_families"]) == 17 and len(remote) == 428
+    assert len(report["selected_families"]) == 17 and len(remote) == 32
     assert all("review_label" not in json.dumps(state) and "nomination" not in json.dumps(state) for state in remote)
     assert report["quality"]["by_policy_scope"]["original_nonclass"]["families"] == 44
     assert report["post_repair_blind_review"]["included_in_reverse_quality"] is False
@@ -408,7 +431,7 @@ def test_transport_timeout_counts_attempt_but_never_resends_ambiguously(director
 
 def test_pilot_raw_response_replayed_before_any_family_http(directory, remote):
     repair.run_pair_repair(directory, pilot_only=True)
-    job = _read_json(directory / repair.VERSION / "jobs/pilot-class-0-0-0.json")
+    job = _read_json(directory / repair.VERSION / "jobs/pilot-declared-0-0-0.json")
     cache_path = directory / "provider-cache" / f"{job['request_hash']}.json"
     receipt = _read_json(cache_path)
     receipt["response"]["choices"][0]["finish_reason"] = "length"
@@ -416,7 +439,7 @@ def test_pilot_raw_response_replayed_before_any_family_http(directory, remote):
     _write(cache_path, receipt)
     with pytest.raises(ValueError):
         repair.run_pair_repair(directory)
-    assert len(remote) == 20 and not (directory / repair.VERSION / "manifest.json").exists()
+    assert len(remote) == 8 and not (directory / repair.VERSION / "manifest.json").exists()
 
 
 def test_pilot_closure_counter_cannot_precede_its_terminal_raw_reservations(directory, remote):
@@ -425,17 +448,17 @@ def test_pilot_closure_counter_cannot_precede_its_terminal_raw_reservations(dire
     manifest = _read_json(target / "pilot-manifest.json")
     report = _read_json(target / "pilot-report.json")
     observation = _read_json(target / "closure-observation.json")
-    assert observation["actual_pair_reservations"] == 20
+    assert observation["actual_pair_reservations"] == 8
     assert observation["global_ledger"] == report["ledger_after_pilot"]
-    assert report["ledger_after_pilot"]["pair"] == manifest["ledger_before_pilot"]["pair"] + 20
-    # Even consistently rehashed metadata cannot pretend that all 20 calls ended at the nineteenth counter.
+    assert report["ledger_after_pilot"]["pair"] == manifest["ledger_before_pilot"]["pair"] + 8
+    # Even consistently rehashed metadata cannot pretend that all 8 calls ended at the seventh counter.
     report["ledger_after_pilot"]["pair"] -= 1
     report = _write(target / "pilot-report.json", report, "report_hash")
     observation.update(global_ledger=report["ledger_after_pilot"], pilot_report_hash=report["report_hash"])
     _write(target / "closure-observation.json", observation, "observation_hash")
     with pytest.raises(ValueError, match="closure"):
         repair.run_pair_repair(directory)
-    assert len(remote) == 20 and not (target / "manifest.json").exists()
+    assert len(remote) == 8 and not (target / "manifest.json").exists()
 
 
 def test_concurrent_reservations_no_lost_updates_duplicate_job_is_idempotent_and_cap_is_hard(directory, remote):
@@ -449,8 +472,8 @@ def test_concurrent_reservations_no_lost_updates_duplicate_job_is_idempotent_and
         answers = list(executor.map(submit, ["duplicate"] * 10))
         assert all(answer == answers[0] for answer in answers)
         assert _read_json(directory / repair.VERSION / "budget.json")["pilot_initial"] == 1
-        list(executor.map(submit, [f"concurrent-{index}" for index in range(19)]))
-    assert _read_json(directory / repair.VERSION / "budget.json")["pilot_initial"] == 20
+        list(executor.map(submit, [f"concurrent-{index}" for index in range(7)]))
+    assert _read_json(directory / repair.VERSION / "budget.json")["pilot_initial"] == 8
     with pytest.raises(ValueError, match="allowance exhausted"):
         submit("over-cap")
     assert len(remote) == 1 and _read_json(directory / "provider-cache/usage.json")["pair"] == BASE_LEDGER_PAIR + 1
@@ -480,23 +503,22 @@ def test_cache_only_validator_rejects_tampered_preserved_grade_or_raw_response(d
         repair.validate_pair_repair(directory)
 
 
-def test_invalid_teacher_class_label_is_rejected_not_overwritten(tmp_path, monkeypatch):
+def test_class_only_never_enters_teacher_transport(tmp_path, monkeypatch):
     provider = repair.PairRepairProviders(tmp_path)
-    case = repair.pilot_cases()[0]
-    answer = _answer(case["vacancy"], case["A"], case["B"], case["policy"])
-    answer.update(label="A", reason_code="prefer_known_facts")
-    monkeypatch.setattr(provider, "request", lambda *_args: {"model": "qwen3.8-27b", "choices": [{
-        "finish_reason": "stop", "message": {"content": json.dumps(answer)}}]})
-    with pytest.raises(ValueError, match="frozen class-only policy"):
+    case = repair._legacy_pilot_cases()[0]
+    monkeypatch.setattr(provider, "request", lambda *_args: pytest.fail("class-only HTTP"))
+    with pytest.raises(ValueError, match="forbids class-only"):
         provider.judge(case["vacancy"], case["A"], case["B"], case["policy"])
 
 
-def test_known_but_inapplicable_salary_evidence_is_rejected_for_class_only(tmp_path, monkeypatch):
+def test_known_but_unrequested_skill_evidence_is_rejected(tmp_path, monkeypatch):
     provider = repair.PairRepairProviders(tmp_path)
-    case = repair.pilot_cases()[0]
+    case = deepcopy(repair.pilot_cases()[0])
+    case["A"]["levels"]["postgres"] = 7
+    case["A"]["skill_statuses"]["postgres"] = "confirmed"
     answer = _answer(case["vacancy"], case["A"], case["B"], case["policy"])
     answer["evidence_A"][0] = next(token for token, fact in source_citations(case["A"], case["B"]).items()
-                                   if fact["candidate"] == "A" and fact["field"] == "salary_min")
+                                   if fact["candidate"] == "A" and fact["field"] == "levels.postgres")
     monkeypatch.setattr(provider, "request", lambda *_args: {"model": "qwen3.8-27b", "choices": [{
         "finish_reason": "stop", "message": {"content": json.dumps(answer)}}]})
     with pytest.raises(ValueError, match="inapplicable"):
@@ -504,24 +526,122 @@ def test_known_but_inapplicable_salary_evidence_is_rejected_for_class_only(tmp_p
 
 
 def test_invalid_family_is_wholly_unadmitted_and_keeps_quarantine(directory, remote, monkeypatch):
+    path = directory / repair.BASE_COHORT / "reviews/assistant-review.json"
+    manual = _read_json(path)
+    packet = _read_json(path.with_name("assistant-packet.json"))
+    case = next(case for case in packet["cases"] if not repair._class_only(case["vacancy"]))
+    family_id = case["family_id"]
+    next(row for row in manual["labels"] if row["pair_id"] == case["pair_id"])["label"] = "B"
+    _write(path, manual)
     opened = repair.PairRepairProviders._open
 
     def fail_one_family(provider, request):
         state = json.loads(json.loads(request.data)["messages"][1]["content"])
-        if state["A"]["description"].startswith("Семья backend-01"):
+        if state["A"]["description"].startswith(f"Семья {family_id}"):
             return io.BytesIO(json.dumps({"model": "qwen3.8-27b", "choices": [{
                 "finish_reason": "length", "message": {"content": "{}"}}]}).encode())
         return opened(provider, request)
 
     monkeypatch.setattr(repair.PairRepairProviders, "_open", fail_one_family)
     report = repair.run_pair_repair(directory)
-    assert report["failed_families"] == ["backend-01"] and not report["quality"]["passed"]
-    assert "backend-01" in report["quality"]["quarantined_families"]
+    assert report["failed_families"] == [family_id] and not report["quality"]["passed"]
+    assert family_id in report["quality"]["quarantined_families"]
     base = repair._verified(directory / repair.BASE_COHORT / "dataset.json", "dataset_hash")
     derived, verified = repair.validate_pair_repair(directory)
     assert verified == report
-    old = next(family for family in base["families"] if family["manifest"]["family_id"] == "backend-01")
-    new = next(family for family in derived["families"] if family["manifest"]["family_id"] == "backend-01")
+    old = next(family for family in base["families"] if family["manifest"]["family_id"] == family_id)
+    new = next(family for family in derived["families"] if family["manifest"]["family_id"] == family_id)
     assert new["pairs"] == old["pairs"] and new["pair_answers"] == old["pair_answers"]
     assert new["quarantined"] is True and "pair_repair" not in new
-    assert not (directory / repair.VERSION / "families/backend-01.json").exists()
+    assert not (directory / repair.VERSION / f"families/{family_id}.json").exists()
+
+
+@pytest.mark.parametrize("mutation", ["leaf_source", "local_receipt"])
+def test_oracle_source_and_local_receipt_are_separately_pinned(directory, remote, monkeypatch, mutation):
+    repair.run_pair_repair(directory)
+    if mutation == "leaf_source":
+        leaf = directory / "altered-oracle.py"
+        leaf.write_bytes(__import__("pathlib").Path(repair.oracle.__file__).read_bytes() + b"\n# changed\n")
+        monkeypatch.setattr(repair.oracle, "__file__", str(leaf))
+    else:
+        path = next((directory / repair.VERSION / "oracle-receipts").glob("*.json"))
+        receipt = _read_json(path)
+        receipt["oracle_code_hash"] = "forged"
+        _write(path, receipt, "record_hash")
+    with pytest.raises(ValueError, match="oracle"):
+        repair.validate_pair_repair(directory)
+
+
+def test_empty_stack_criterion_does_not_substitute_domains_and_keeps_original_policy(tmp_path):
+    provider = repair.PairRepairProviders(tmp_path)
+    case = deepcopy(repair.pilot_cases()[0])
+    case["vacancy"].update(stacks={}, domens={"python": 4})
+    case["policy"]["ordered_priorities"] = ["Prefer matching stacks, then declared depth of those stacks."]
+    payload = provider.pair_payload(case["vacancy"], case["A"], case["B"], case["policy"])
+    state = json.loads(payload["messages"][1]["content"])
+    assert state["policy"] == case["policy"]
+    assert "do not substitute another group" in payload["messages"][0]["content"]
+    assert "stacks means vacancy.stacks ONLY" in payload["messages"][0]["content"]
+
+
+def test_reason_label_mismatch_rejected_without_normalizing_raw_label(tmp_path, monkeypatch):
+    provider = repair.PairRepairProviders(tmp_path)
+    case = repair.pilot_cases()[0]
+    answer = _answer(case["vacancy"], case["A"], case["B"], case["policy"])
+    answer["reason_code"] = "comparable_fit"
+    monkeypatch.setattr(provider, "request", lambda *_args: {"model": "qwen3.8-27b", "choices": [{
+        "finish_reason": "stop", "message": {"content": json.dumps(answer)}}]})
+    with pytest.raises(ValueError):
+        provider.judge(case["vacancy"], case["A"], case["B"], case["policy"])
+    assert answer["label"] == "A" and answer["reason_code"] == "comparable_fit"
+
+
+@pytest.mark.parametrize("missing", ["dataset.json", "report.json"])
+def test_v3_pilot_remote_reservations_require_completed_base_closure(directory, remote, missing):
+    (directory / repair.BASE_COHORT / missing).unlink()
+    with pytest.raises(ValueError, match="requires completed sealed base"):
+        repair.run_pair_repair(directory, pilot_only=True)
+    assert not remote and not (directory / repair.VERSION / "budget.json").exists()
+
+
+def test_quality_separates_teacher132_from_oracle48_and_forbids_oracle_gold(directory, remote):
+    repair.run_pair_repair(directory)
+    dataset, _report = repair.validate_pair_repair(directory)
+    families = deepcopy(dataset["families"])
+    teacher = [family for family in families if not repair._class_only(family["vacancy"])]
+    local = [family for family in families if repair._class_only(family["vacancy"])]
+    assert all(family["manifest"]["split"] in ("train", "validation") for family in local)
+    receipts = list((directory / repair.VERSION / "oracle-receipts").glob("*.json"))
+    assert len(receipts) == 16 * 24 and len(remote) == 8
+    for path in receipts:
+        receipt = _read_json(path)
+        assert receipt["source_hash"] in {
+            family["source_hash"] for family in local}
+        assert receipt["answer"]["label_source"] == "rule_derived_class_only"
+        assert receipt["oracle_code_hash"] == dataset["oracle_code_hash"]
+    for family in teacher[:13]:
+        family["swap_audits"] = [True, True, False]
+    quality = repair._quality(families)
+    assert quality["swap_correct"] == 119 and quality["teacher_passed"] and quality["passed"]
+    teacher[13]["swap_audits"] = [True, True, False]
+    quality = repair._quality(families)
+    assert quality["swap_correct"] == 118 and not quality["teacher_passed"] and quality["oracle_passed"]
+    local[0]["swap_audits"] = [True, True, False]
+    assert not repair._quality(families)["oracle_passed"]
+    local[0]["manifest"]["split"] = "golden"
+    with pytest.raises(ValueError, match="nongolden"):
+        repair._quality(families)
+
+
+def test_rehashed_unaccounted_global_usage_does_not_pass_local_budget_validation(directory, remote):
+    repair.run_pair_repair(directory)
+    usage_path = directory / "provider-cache/usage.json"
+    usage = _read_json(usage_path)
+    usage["pair"] += 1
+    _write(usage_path, usage)
+    report_path = directory / repair.VERSION / "repair-report.json"
+    report = _read_json(report_path)
+    report["ledger_after"] = usage
+    _write(report_path, report, "report_hash")
+    with pytest.raises(ValueError, match="cumulative budget"):
+        repair.validate_pair_repair(directory)

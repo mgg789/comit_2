@@ -9,8 +9,10 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 
+from matching_engine import rerank_class_only_oracle as oracle
 from matching_engine.rerank_cohort_provider import (
     CohortProviders,
+    _evidence,
     _parse,
     source_citations,
     validate_candidate,
@@ -18,60 +20,52 @@ from matching_engine.rerank_cohort_provider import (
 from matching_engine.rerank_cohort_review import _manual, _markdown, _packets
 from matching_engine.rerank_experiment import _parallel
 from matching_engine.rerank_hash import digest
+from matching_engine.rerank_pair_teacher import salary_comparison
 from matching_engine.rerank_protocol import expected_families
 from matching_engine.rerank_providers import LIMITS, _atomic_write
 from matching_engine.rerank_sample_probe import _cycles, _ordering_ceiling
 
-VERSION = "rerank-grounded-pair-repair-v2"
+VERSION = "rerank-grounded-pair-repair-v3"
 PREVIOUS_VERSION = "rerank-grounded-pair-repair-v1"
 PREVIOUS_COMMIT = "7585ee7b382a406cd0e75a852883e36cd2f31790"
 PREVIOUS_CODE_HASH = "6c2e64302e7b11fdc3e373b9b8793f67cd45857e5c4b0566626db38302182f74"
-PREVIOUS_ATTEMPTS = 24
-BASE_COHORT = "rerank-grounded-cohort-v9"
-PAIR_PROMPT_VERSION = "rerank-uniform-cohort-pair-v4"
-MAX_ATTEMPTS = 672
-PROJECTED_BASE_FINAL_PAIR = 2268
-CLASS_ONLY_POLICY = {
-    "id": "class-only-policy-v1", "version": "class-only-policy-v1",
-    "ordered_priorities": [
-        "Compare accepted formal test grade: senior > middle > junior > intern, independently of profile status.",
-        "For equal grade, compare production only when both facts are known and their own statuses are not rejected: true > false.",
-        "For equal production, compare its own confirmation: confirmed > partial > self_reported > pending.",
-        "Then compare duration only when both durations are known and their own statuses are not rejected; greater duration wins.",
-        "Skip inapplicable missing comparisons; if no applicable difference exists, use tie.",
-    ],
-    "instructions": "Do not invent technical requirements for a class-only vacancy. Ignore salary, biography, "
-        "skill breadth and unrelated facts. A rejected parent profile status does not invalidate an accepted formal grade. "
-        "Never infer an individual fact's confirmation from parent status. Missing facts are not zero or false. "
-        "Insufficient is reserved for an explicitly essential exclusive measurement that is unavailable.",
-    "exclusive_criterion": False, "required_measurements": [],
+PRIOR_REPAIRS = {
+    PREVIOUS_VERSION: {"source_commit": PREVIOUS_COMMIT, "code_hash": PREVIOUS_CODE_HASH,
+                      "retry": 4, "valid": 16, "correct": 16, "swaps": 8, "prompt_version": "rerank-uniform-cohort-pair-v3"},
+    "rerank-grounded-pair-repair-v2": {
+        "source_commit": "6d4179889e1f6d9dc42a4dbae7885cad038133e9",
+        "code_hash": "3eff712ceda2179970eaf6598cd49f0e2c3b90d144a9ad1d127a7ebad9a5bc56",
+        "retry": 8, "valid": 12, "correct": 11, "swaps": 4, "prompt_version": "rerank-uniform-cohort-pair-v4"},
 }
+PREVIOUS_ATTEMPTS = 52
+BASE_COHORT = "rerank-grounded-cohort-v9"
+PAIR_PROMPT_VERSION = "rerank-uniform-cohort-pair-v5"
+ATTEMPT_LIMITS = {"pilot_initial": 8, "pilot_retry": 8, "family_initial": 216, "family_retry": 32}
+MAX_ATTEMPTS = sum(ATTEMPT_LIMITS.values())
+PROJECTED_BASE_FINAL_PAIR = 2268
+CLASS_ONLY_POLICY = oracle.CLASS_ONLY_POLICY
 CLASS_ONLY_POLICY_HASH = digest(CLASS_ONLY_POLICY)
 _PAIRS = list(itertools.combinations(range(7), 2))
 _AUDIT_INDICES = (0, 7, 14)
 _REVERSE = {"A": "B", "B": "A", "tie": "tie", "insufficient": "insufficient"}
-_GRADE = {"intern": 0, "junior": 1, "middle": 2, "senior": 3}
-_STATUS = {"pending": 0, "self_reported": 1, "partial": 2, "confirmed": 3}
 _DECISION_CONTRACT = (
-    "PAIR DECISION CONTRACT v4. Execute these checks in order; the essential gate precedes ANY other criterion. "
-    "STEP 0: if exclusive_criterion=true and ANY required_measurements path is absent or null on EITHER side, "
-    "STOP with insufficient and insufficient_source_facts. Grade, confirmation, production, duration, salary "
-    "and prose CANNOT substitute for the missing measurement, even when grades differ. "
-    "For a class-only vacancy ONLY, continue lexicographically: "
-    "STEP 1: compare accepted formal grade senior>middle>junior>intern, regardless of parent status. "
-    "If grades differ, select the higher grade and STOP. Otherwise continue. "
-    "STEP 2 is applicable ONLY when BOTH production values are non-null and BOTH OWN production_status values "
-    "are not rejected. If either side fails this condition, skip BOTH production value and production "
-    "confirmation comparisons completely; do not reward the other side for being known or confirmed. "
-    "If applicable, compare true>false; if values differ STOP. If values are equal, compare OWN production "
-    "confirmed>partial>self_reported>pending; if statuses differ STOP. Otherwise continue. "
-    "STEP 3 is applicable ONLY when BOTH duration values are non-null and BOTH OWN duration_status values "
-    "are not rejected. If either side fails, skip duration completely, without rewarding the known side. "
-    "If applicable, greater duration wins; if values differ STOP. No duration confirmation tiebreak exists. "
-    "STEP 4: if no applicable step established a difference, STOP with tie and comparable_fit. In particular, "
-    "equal formal grades plus inapplicable production and duration MUST be tie regardless of one side's "
-    "known duration or confirmed production. Rejected is an applicability exclusion, not a bottom confirmation rank. "
-    "These same semantic checks apply on the initial request and the single repair request. "
+    "PAIR DECISION CONTRACT v5, nonclass vacancies only. FIRST enforce essential exclusive measurements: "
+    "when any required measurement is missing/null on either side, STOP: label insufficient, reason_code "
+    "insufficient_source_facts. Otherwise follow the ORIGINAL ordered policy lexicographically. "
+    "For a primary declared-coverage/fit/depth priority, compare common explicitly requested keys: "
+    "declared coverage of stated levels first, then greater declared depth BEFORE confirmation. "
+    "Self_reported, pending and partial are still declarations; own rejected claims are not established ability. "
+    "Only after primary criteria are equal may an explicitly secondary confirmation criterion decide. "
+    "Scope criteria literally: stacks means vacancy.stacks ONLY, domains means vacancy.domens ONLY, "
+    "generic stated requirements means all three declared groups. An empty nonexclusive group makes that "
+    "criterion inapplicable: skip it, do not substitute another group. If no further applicable difference "
+    "exists, use tie. Confirmation belongs only to its own explicitly matching fact. Never invent numeric weights. "
+    "Use each field's OWN status in decision_inputs; profile.status is not a substitute for any skill or fact status. "
+    "Keep unspecified/missing requirements unknown; never invent extra requirements or levels. "
+    "At ANY decisive STOP: label A or B MUST use reason_code prefer_known_facts. "
+    "Comparable fit: label tie MUST use comparable_fit. Essential unknown: label insufficient MUST use "
+    "insufficient_source_facts. The response schema enforces these relationships without selecting a winner. "
+    "Apply this same contract on initial and single repair attempts. "
 )
 
 
@@ -134,22 +128,7 @@ def _exclusive_missing(policy: dict, a: dict, b: dict) -> bool:
 
 def class_only_label(a: dict, b: dict, policy: dict) -> str:
     """Apply the frozen class-only comparator without scores or inferred confirmation."""
-    validate_candidate(a)
-    validate_candidate(b)
-    if _exclusive_missing(policy, a, b):
-        return "insufficient"
-    pairs = [(_GRADE[a["grade"]], _GRADE[b["grade"]])]
-    if all(candidate["production_support"] is not None and candidate["production_status"] != "rejected"
-           for candidate in (a, b)):
-        pairs.extend([(int(a["production_support"]), int(b["production_support"])),
-                      (_STATUS[a["production_status"]], _STATUS[b["production_status"]])])
-    if all(candidate["duration_months"] is not None and candidate["duration_status"] != "rejected"
-           for candidate in (a, b)):
-        pairs.append((a["duration_months"], b["duration_months"]))
-    for left, right in pairs:
-        if left != right:
-            return "A" if left > right else "B"
-    return "tie"
+    return oracle.class_only_label(a, b, policy)
 
 
 def _allowed_citations(vacancy: dict, a: dict, b: dict) -> dict[str, list[str]]:
@@ -175,7 +154,7 @@ def _allowed_citations(vacancy: dict, a: dict, b: dict) -> dict[str, list[str]]:
 
 
 class PairRepairProviders(CohortProviders):
-    """Pair-only v4 teacher with inherited cache, five shared slots and lazy credentials."""
+    """Nonclass-only v5 teacher; class-only labels require the separate pure oracle."""
 
     def __init__(self, directory: Path, *, key_file: Path | None = None) -> None:
         """Bind the repair namespace; do not read a credential or reset any shared budget."""
@@ -209,6 +188,8 @@ class PairRepairProviders(CohortProviders):
 
     def pair_payload(self, vacancy: dict, a: dict, b: dict, policy: dict, attempt: int = 0) -> dict:
         """Clarify class-only and declared technical priorities without model/main metrics."""
+        if _class_only(vacancy):
+            raise ValueError("pair repair LLM forbids class-only vacancies")
         payload = super().pair_payload(vacancy, a, b, policy, attempt)
         allowed = _allowed_citations(vacancy, a, b)
         for side in ("A", "B"):
@@ -228,6 +209,15 @@ class PairRepairProviders(CohortProviders):
             "duration_comparison_applicable": all(candidate["duration_months"] is not None
                 and candidate["duration_status"] != "rejected" for candidate in (a, b)),
         }
+        requested = {key for field in ("domens", "stacks", "soft_skills") for key in vacancy.get(field, {})}
+        state["decision_inputs"] = {side: {
+            "requested_levels": {key: {"level": candidate["levels"].get(key),
+                "own_status": candidate["skill_statuses"].get(key)} for key in sorted(requested)},
+            "duration": {"value": candidate["duration_months"], "own_status": candidate["duration_status"]},
+            "production": {"value": candidate["production_support"], "own_status": candidate["production_status"]},
+            "role": {"value": candidate["role"], "own_status": candidate["role_status"]},
+            "project_domains": candidate["project_domains"], "project_stacks": candidate["project_stacks"],
+        } for side, candidate in (("A", a), ("B", b))}
         payload["messages"][1]["content"] = json.dumps(state, ensure_ascii=False, sort_keys=True)
         payload["messages"][0]["content"] = _DECISION_CONTRACT + payload["messages"][0]["content"] + (
             "For technical vacancies preserve the supplied original policy and its ordered priorities verbatim; "
@@ -238,6 +228,15 @@ class PairRepairProviders(CohortProviders):
             "when explicitly named by the policy. Never infer skill/fact status from parent profile status, "
             "and never invent requirements for class-only or unspecified keys. Respect essential exclusive criteria."
         )
+        schema = payload["response_format"]["json_schema"]["schema"]
+        branches = []
+        for label, reason in {"A": "prefer_known_facts", "B": "prefer_known_facts", "tie": "comparable_fit",
+                              "insufficient": "insufficient_source_facts"}.items():
+            branch = deepcopy(schema)
+            branch["properties"]["label"]["enum"] = [label]
+            branch["properties"]["reason_code"]["enum"] = [reason]
+            branches.append(branch)
+        payload["response_format"]["json_schema"]["schema"] = {"type": "object", "anyOf": branches}
         return payload
 
     def judge(self, vacancy: dict, a: dict, b: dict, policy: dict, attempt: int = 0) -> dict:
@@ -246,8 +245,6 @@ class PairRepairProviders(CohortProviders):
         allowed = _allowed_citations(vacancy, a, b)
         if any(token not in allowed[side] for side in ("A", "B") for token in answer[f"evidence_{side}"]):
             raise ValueError("teacher cited an inapplicable or unspecified technical requirement")
-        if _class_only(vacancy) and answer["label"] != class_only_label(a, b, policy):
-            raise ValueError("teacher contradicts frozen class-only policy")
         return answer
 
 
@@ -264,7 +261,7 @@ def _candidate(grade="middle", status="partial", level=4, skill_status="self_rep
     return value
 
 
-def pilot_cases() -> list[dict]:
+def _legacy_pilot_cases() -> list[dict]:
     """Preregister five class-only, four declared-level and one exclusive-unknown fixture."""
     empty = {"domens": {}, "stacks": {}, "soft_skills": {}, "bio": None, "salary": {"min": 50000, "max": 200000}}
     facts = [
@@ -295,6 +292,11 @@ def pilot_cases() -> list[dict]:
     return cases
 
 
+def pilot_cases() -> list[dict]:
+    """Reuse four frozen v1 declared-level fixtures; expected A is hand-derived, not teacher/oracle output."""
+    return [case for case in _legacy_pilot_cases() if case["case_id"].startswith("declared-")]
+
+
 def _sources(directory: Path, base_cohort: str) -> tuple[dict, dict[str, dict]]:
     if base_cohort != BASE_COHORT:
         raise ValueError("this semantic repair is pinned to the v9 cohort")
@@ -317,6 +319,10 @@ def _sources(directory: Path, base_cohort: str) -> tuple[dict, dict[str, dict]]:
         sources[identifier] = source
     if sum(_class_only(source["manifest"]["vacancy"]) for source in sources.values()) != 16:
         raise ValueError("pair repair requires all 16 class-only families")
+    if any(source["manifest"]["split"] not in ("train", "validation")
+           or source["manifest"]["family_id"].rsplit("-", 1)[1] not in ("01", "05")
+           for source in sources.values() if _class_only(source["manifest"]["vacancy"])):
+        raise ValueError("oracle forbidden in golden/calibration; require the same 01 train and 05 validation sources")
     return manifest, sources
 
 
@@ -338,20 +344,43 @@ def _base_remaining(directory: Path) -> int:
     return remaining
 
 
-def _previous_pilot(directory: Path) -> dict:
-    """Audit the frozen v1's 24 raw attempts; unknown prior repair usage blocks v2."""
-    unknown = [path.name for path in directory.glob("rerank-grounded-pair-repair-*")
-               if path.is_dir() and path.name not in (PREVIOUS_VERSION, VERSION)]
-    target = directory / PREVIOUS_VERSION
+def _prior_answer_valid(answer: dict, vacancy: dict, a: dict, b: dict, policy: dict) -> bool:
+    try:
+        if set(answer) != {"label", "reason_code", "status_A", "status_B", "evidence_A", "evidence_B", "salary_comparison_choice"}:
+            return False
+        reasons = {"A": "prefer_known_facts", "B": "prefer_known_facts", "tie": "comparable_fit", "insufficient": "insufficient_source_facts"}
+        if answer["reason_code"] != reasons.get(answer["label"]):
+            return False
+        if _exclusive_missing(policy, a, b) and answer["label"] != "insufficient":
+            return False
+        if _class_only(vacancy) and answer["label"] != class_only_label(a, b, policy):
+            return False
+        if answer["salary_comparison_choice"] != salary_comparison(a, b)["cheaper_side"]:
+            return False
+        citations, allowed = source_citations(a, b), _allowed_citations(vacancy, a, b)
+        for side, candidate in (("A", a), ("B", b)):
+            if answer[f"status_{side}"] != candidate["status"]:
+                return False
+            _evidence(answer, f"evidence_{side}", side, citations)
+            if any(token not in allowed[side] for token in answer[f"evidence_{side}"]):
+                return False
+        return True
+    except (ValueError, TypeError, KeyError):
+        return False
+
+
+def _previous_namespace(directory: Path, version: str, spec: dict) -> dict:
+    target = directory / version
     budget = _read(target / "budget.json")
     manifest = _verified(target / "pilot-manifest.json", "manifest_hash")
     report = _verified(target / "pilot-report.json", "report_hash")
-    if (unknown or budget != {"pilot_initial": 20, "pilot_retry": 4, "family_initial": 0, "family_retry": 0}
-            or manifest["code_hash"] != PREVIOUS_CODE_HASH or manifest["cases"] != pilot_cases() or len(manifest["requests"]) != 20
+    attempts = 20 + spec["retry"]
+    if (budget != {"pilot_initial": 20, "pilot_retry": spec["retry"], "family_initial": 0, "family_retry": 0}
+            or manifest["code_hash"] != spec["code_hash"] or manifest["cases"] != _legacy_pilot_cases() or len(manifest["requests"]) != 20
             or report["pilot_manifest_hash"] != manifest["manifest_hash"]
-            or (report["valid"], report["correct"], report["swap_correct"], report["passed"]) != (16, 16, 8, False)
+            or (report["valid"], report["correct"], report["swap_correct"], report["passed"]) != (spec["valid"], spec["correct"], spec["swaps"], False)
             or (target / "manifest.json").exists() or (target / "dataset.json").exists()):
-        raise ValueError("unknown or changed prior pair repair attempts; v1 must remain exactly 24")
+        raise ValueError("unknown or changed prior pair repair attempts; require exact frozen 24 plus 28")
     rows, hashes, raw_hashes, jobs, expected_jobs = [], {}, {}, {}, set()
     request_index = 0
     for case in manifest["cases"]:
@@ -375,21 +404,21 @@ def _previous_pilot(directory: Path) -> dict:
                         or job.get("state") not in ("passed", "failed") or job.get("fatal_http_statuses")
                         or digest(identity) != job["request_hash"] or receipt["request_hash"] != job["request_hash"]
                         or receipt["response_hash"] != digest(receipt["response"])
-                        or identity["cohort_id"] != PREVIOUS_VERSION or identity["kind"] != "pair"
-                        or identity["prompt_version"] != "rerank-uniform-cohort-pair-v3" + ("-repair1" if attempt else "")
+                        or identity["cohort_id"] != version or identity["kind"] != "pair"
+                        or identity["prompt_version"] != spec["prompt_version"] + ("-repair1" if attempt else "")
                         or identity["attempt"] != attempt or identity["model"] != "qwen3.8-27b"
                         or state["A"] != a or state["B"] != b or state["policy"] != case["policy"]
                         or state["vacancy"] != case["vacancy"] or state["request_nonce"] != {
-                            "attempt": attempt, "cohort_id": PREVIOUS_VERSION, "kind": "pair"}
+                            "attempt": attempt, "cohort_id": version, "kind": "pair"}
                         or (attempt == 0 and identity != manifest["requests"][request_index])):
                     raise ValueError("prior pair repair raw receipt provenance changed")
                 answer = _parse(receipt["response"], "qwen3.8-27b")
                 if job["state"] == "passed":
-                    if (admitted is not None or answer["label"] != expected or job["answer"] != answer
+                    if (admitted is not None or not _prior_answer_valid(answer, case["vacancy"], a, b, case["policy"]) or job["answer"] != answer
                             or job["answer_hash"] != digest(answer)):
                         raise ValueError("prior pair repair admitted answer changed")
                     admitted = answer
-                elif answer["label"] == expected:
+                elif _prior_answer_valid(answer, case["vacancy"], a, b, case["policy"]):
                     raise ValueError("prior semantic failure no longer matches its frozen raw answer")
                 hashes[job_id] = {"job_hash": digest(job), "cache_hash": digest(receipt)}
                 raw_hashes[job["request_hash"]] = receipt["response_hash"]
@@ -398,21 +427,33 @@ def _previous_pilot(directory: Path) -> dict:
                          "error": None if admitted is not None else "pair repair response invalid after one bounded repair"})
             request_index += 1
     if ({path.name for path in (target / "jobs").glob("*.json")} != expected_jobs
-            or len(expected_jobs) != PREVIOUS_ATTEMPTS or report["rows"] != rows):
+            or len(expected_jobs) != attempts or report["rows"] != rows):
         raise ValueError("unknown or changed prior pair repair raw attempt count")
     closure = _verified(target / "closure-observation.json", "observation_hash")
-    if (closure["cohort_id"] != PREVIOUS_VERSION or closure["pilot_manifest_hash"] != manifest["manifest_hash"]
+    if (closure["cohort_id"] != version or closure["pilot_manifest_hash"] != manifest["manifest_hash"]
             or closure["pilot_report_hash"] != report["report_hash"] or closure["pilot_passed"] is not False
             or closure["job_receipts_hash"] != digest(jobs) or closure["raw_response_hashes"] != raw_hashes
-            or closure["actual_pair_reservations"] != PREVIOUS_ATTEMPTS
+            or closure["actual_pair_reservations"] != attempts
             or closure["base_dataset_existed"] is not False
             or closure["base_manifest_hash"] != manifest["base_manifest_hash"]):
         raise ValueError("prior repair closure observation differs from terminal raw receipts")
-    return {"version": PREVIOUS_VERSION, "source_commit": PREVIOUS_COMMIT, "code_hash": PREVIOUS_CODE_HASH,
-            "attempts": PREVIOUS_ATTEMPTS, "pilot_manifest_hash": manifest["manifest_hash"],
+    return {"version": version, "source_commit": spec["source_commit"], "code_hash": spec["code_hash"],
+            "attempts": attempts, "pilot_manifest_hash": manifest["manifest_hash"],
             "pilot_report_hash": report["report_hash"], "budget_hash": digest(budget), "raw_receipt_hashes": hashes,
             "source_hashes": manifest["source_hashes"], "closure_observation_hash": closure["observation_hash"],
             "closure_global_ledger": closure["global_ledger"]}
+
+
+def _previous_pilot(directory: Path) -> dict:
+    """Audit both immutable failed pilots (24+28); neither allowance nor ledger resets."""
+    if any(path.name not in (*PRIOR_REPAIRS, VERSION) for path in directory.glob("rerank-grounded-pair-repair-*") if path.is_dir()):
+        raise ValueError("unknown previous pair repair namespace")
+    versions = {version: _previous_namespace(directory, version, spec) for version, spec in PRIOR_REPAIRS.items()}
+    first, second = versions.values()
+    if first["source_hashes"] != second["source_hashes"] or first["closure_global_ledger"]["pair"] > second["closure_global_ledger"]["pair"]:
+        raise ValueError("previous pair repair source or closure counter changed")
+    return {"versions": versions, "attempts": PREVIOUS_ATTEMPTS, "source_hashes": first["source_hashes"],
+            "closure_global_ledger": second["closure_global_ledger"]}
 
 
 def _budget_check(directory: Path, used: int) -> dict:
@@ -468,7 +509,7 @@ def _job_unlocked(directory: Path, provider: PairRepairProviders, job_id: str, v
                 budget = _read(budget_path) if budget_path.exists() else {"pilot_initial": 0, "pilot_retry": 0,
                                                                        "family_initial": 0, "family_retry": 0}
                 field = f"{category}_{'retry' if attempt else 'initial'}"
-                maximum = {"pilot_initial": 20, "pilot_retry": 20, "family_initial": 600, "family_retry": 32}[field]
+                maximum = ATTEMPT_LIMITS[field]
                 if budget[field] >= maximum:
                     raise ValueError("pair repair bounded response allowance exhausted")
                 _budget_check(directory, sum(budget.values()))
@@ -518,6 +559,7 @@ def prepare_pilot(directory: Path) -> dict:
         if (saved["source_hashes"] != {identifier: source["record_hash"] for identifier, source in sources.items()}
                 or saved["base_manifest_hash"] != base_manifest["manifest_hash"]
                 or saved["previous_repair"] != previous
+                or saved["oracle_code_hash"] != digest(Path(oracle.__file__).read_bytes().hex())
                 or saved["cases"] != cases or saved["requests"] != requests
                 or saved["code_hash"] != digest(Path(__file__).read_bytes().hex())):
             raise ValueError("frozen pair repair pilot inputs changed")
@@ -531,8 +573,11 @@ def prepare_pilot(directory: Path) -> dict:
                        "pinned_base_family_audits": audits, "cases": cases, "requests": requests,
                        "class_only_policy": CLASS_ONLY_POLICY, "class_only_policy_hash": CLASS_ONLY_POLICY_HASH,
                        "previous_repair": previous,
+                       "oracle_version": oracle.VERSION, "oracle_code_hash": digest(Path(oracle.__file__).read_bytes().hex()),
+                       "pilot_expected_source": "Hand-derived frozen v1 fixtures: declared level 5 exceeds 4 under explicit declared-fit/depth-first policy; not teacher/oracle winners",
                        "selection_predicate": "All 16 class-only families plus the union of quarantined non-class families and all non-class families nominated by disagreement in the exact original assistant blind 20; maximum 9 non-class, no truncation or model metrics; manual labels never enter teacher requests",
                        "maximum_selected_families": 25, "maximum_attempts": MAX_ATTEMPTS,
+                       "maximum_remote_families": 9, "attempt_limits": ATTEMPT_LIMITS,
                        "projected_base_final_pair": PROJECTED_BASE_FINAL_PAIR, "projected_prior_pair_attempts": PREVIOUS_ATTEMPTS,
                        "ledger_before_pilot": ledger,
                        "code_hash": digest(Path(__file__).read_bytes().hex()), "teacher": provider.teacher_identity()}, "manifest_hash")
@@ -576,6 +621,14 @@ def _pilot(directory: Path, provider: PairRepairProviders, manifest: dict) -> di
     path = directory / VERSION / "pilot-report.json"
     if path.exists():
         return _verified_pilot(directory, manifest)
+    # V3 begins all new remote reservations after the completed base ledger baseline.
+    if not all((directory / BASE_COHORT / name).exists() for name in ("dataset.json", "report.json")):
+        raise ValueError("v3 pilot HTTP requires completed sealed base dataset and report")
+    base = _base_dataset(directory, manifest)
+    base_report = _verified(directory / BASE_COHORT / "report.json", "report_hash")
+    if (base_report["dataset_hash"] != base["dataset_hash"]
+            or _read(directory / "provider-cache/usage.json")["pair"] < base_report["ledger_after"]["pair"]):
+        raise ValueError("v3 pilot base closure ledger linkage changed")
     def compare(item):
         case, swapped = item
         a, b = (case["B"], case["A"]) if swapped else (case["A"], case["B"])
@@ -595,9 +648,9 @@ def _pilot(directory: Path, provider: PairRepairProviders, manifest: dict) -> di
     correct = sum(row["answer"] is not None and row["answer"]["label"] == row["expected"] for row in rows)
     swaps = sum(rows[index]["answer"] is not None and rows[index + 1]["answer"] is not None
                 and rows[index + 1]["answer"]["label"] == _REVERSE[rows[index]["answer"]["label"]]
-                for index in range(0, 20, 2))
+                for index in range(0, 8, 2))
     report = _hashed({"pilot_manifest_hash": manifest["manifest_hash"], "rows": rows, "valid": valid,
-                      "correct": correct, "swap_correct": swaps, "passed": valid == correct == 20 and swaps == 10,
+                      "correct": correct, "swap_correct": swaps, "passed": valid == correct == 8 and swaps == 4,
                       "ledger_after_pilot": _read(directory / "provider-cache/usage.json"),
                       "grade_calls": 0, "generation_calls": 0, "activation_allowed": False}, "report_hash")
     _seal(path, report)
@@ -616,7 +669,7 @@ def _pilot_raw_snapshot(directory: Path) -> tuple[dict, dict]:
             raise ValueError("pilot closure raw receipt hash differs")
         raw[job["request_hash"]] = receipt["response_hash"]
     budget = _read(directory / VERSION / "budget.json")
-    if len(jobs) != budget["pilot_initial"] + budget["pilot_retry"] or budget["pilot_initial"] != 20 or budget["pilot_retry"] > 20:
+    if len(jobs) != budget["pilot_initial"] + budget["pilot_retry"] or budget["pilot_initial"] != 8 or budget["pilot_retry"] > 8:
         raise ValueError("pilot closure bounded terminal attempts differ")
     return jobs, raw
 
@@ -645,7 +698,10 @@ def _verified_pilot_closure(directory: Path, manifest: dict, report: dict) -> di
             or observation["actual_pair_reservations"] != len(raw)
             or observation["global_ledger"] != report["ledger_after_pilot"]
             or observation["base_manifest_hash"] != manifest["base_manifest_hash"]
-            or type(observation["base_dataset_existed"]) is not bool
+            or observation["base_dataset_existed"] is not True
+            or observation["base_completed_families"] != 60
+            or observation["base_attempt_budget"] != _read(directory / BASE_COHORT / "attempt-budget.json")
+            or report["ledger_after_pilot"]["pair"] != _verified(directory / BASE_COHORT / "report.json", "report_hash")["ledger_after"]["pair"] + len(raw)
             or not manifest["ledger_before_pilot"]["pair"] + len(raw) <= observation["global_ledger"]["pair"]
             <= _read(directory / "provider-cache/usage.json")["pair"]):
         raise ValueError("pilot closure observation differs from raw jobs or cumulative counters")
@@ -657,6 +713,35 @@ def _progress(family: dict, *, admitted: bool) -> None:
                       "swap_correct": sum(family["swap_audits"]), "swap_total": 3,
                       "decisive_pairs": sum(pair[2] in ("A", "B") for pair in family["pairs"]),
                       "quarantined": family["quarantined"], "admitted": admitted}), flush=True)
+
+
+def _oracle_teacher() -> dict:
+    return {"label_source": oracle.LABEL_SOURCE, "oracle_version": oracle.VERSION,
+            "model": None, "human_authorship_verified": False, "independent_human_evaluation": False}
+
+
+def _oracle_receipt(job_id: str, vacancy: dict, a: dict, b: dict, policy: dict, source_hash: str) -> dict:
+    answer = oracle.class_only_answer(vacancy, a, b, policy)
+    return _hashed({"kind": "local_class_only_pair", "job_id": job_id, "label_source": oracle.LABEL_SOURCE,
+                    "oracle_version": oracle.VERSION, "oracle_code_hash": digest(Path(oracle.__file__).read_bytes().hex()),
+                    "policy_hash": answer["policy_hash"], "input_hash": answer["input_hash"],
+                    "source_hash": source_hash, "inputs": {"vacancy": vacancy, "A": a, "B": b, "policy": policy},
+                    "answer": answer, "human_authorship_verified": False, "independent_human_evaluation": False}, "record_hash")
+
+
+def _oracle_job(directory: Path, job_id: str, vacancy: dict, a: dict, b: dict, policy: dict, source_hash: str) -> dict:
+    receipt = _oracle_receipt(job_id, vacancy, a, b, policy, source_hash)
+    if receipt["oracle_code_hash"] != _read(directory / VERSION / "pilot-manifest.json")["oracle_code_hash"]:
+        raise ValueError("frozen oracle source changed before local admission")
+    _seal(directory / VERSION / "oracle-receipts" / f"{job_id}.json", receipt)
+    return receipt["answer"]
+
+
+def _oracle_replay(directory: Path, job_id: str, vacancy: dict, a: dict, b: dict, policy: dict, source_hash: str) -> dict:
+    expected = _oracle_receipt(job_id, vacancy, a, b, policy, source_hash)
+    if _verified(directory / VERSION / "oracle-receipts" / f"{job_id}.json", "record_hash") != expected:
+        raise ValueError("local oracle receipt differs from exact versioned typed rule")
+    return expected["answer"]
 
 
 def _base_dataset(directory: Path, pilot_manifest: dict) -> dict:
@@ -740,6 +825,7 @@ def _selection(directory: Path, dataset: dict, pilot: dict, review_file: Path | 
                    (["original_blind_disagreement"] if identifier in disagreed else []))
         rows.append({"family_id": identifier, "reason": "+".join(reasons), "reasons": reasons,
                      "policy_scope": "class_only_revision" if identifier in class_ids else "original_nonclass",
+                     "label_source": oracle.LABEL_SOURCE if identifier in class_ids else "llm_pair_teacher",
                      "policy_id": new["id"],
                      "original_record_hash": family["record_hash"], "old_policy_hash": digest(old),
                      "new_policy_hash": digest(new), "pair_policy": new})
@@ -759,7 +845,12 @@ def _selection(directory: Path, dataset: dict, pilot: dict, review_file: Path | 
 
 
 def _quality(families: list[dict]) -> dict:
-    correct = sum(sum(family["swap_audits"]) for family in families)
+    teacher = [family for family in families if not _class_only(family["vacancy"])]
+    local = [family for family in families if _class_only(family["vacancy"])]
+    if len(teacher) != 44 or len(local) != 16 or any(family["manifest"]["split"] not in ("train", "validation") for family in local):
+        raise ValueError("hybrid audit requires 44 nonclass teachers and 16 nongolden local sources")
+    correct = sum(sum(family["swap_audits"]) for family in teacher)
+    oracle_correct = sum(sum(family["swap_audits"]) for family in local)
     quarantined = [family["manifest"]["family_id"] for family in families
                    if family["quarantined"] or sum(family["swap_audits"]) < 2]
     golden = [family for family in families if family["manifest"]["split"] == "golden"]
@@ -767,7 +858,7 @@ def _quality(families: list[dict]) -> dict:
     minimum = min(counts[family["manifest"]["family_id"]] for family in golden)
     by_split = {}
     for split in ("train", "validation", "calibration", "golden"):
-        subset = [family for family in families if family["manifest"]["split"] == split]
+        subset = [family for family in teacher if family["manifest"]["split"] == split]
         by_split[split] = {"families": len(subset), "swap_correct": sum(sum(family["swap_audits"]) for family in subset),
                            "swap_total": 3 * len(subset), "decisive_pairs": sum(counts[family["manifest"]["family_id"]] for family in subset)}
     by_policy_scope = {}
@@ -783,13 +874,18 @@ def _quality(families: list[dict]) -> dict:
         group["swap_total"] += 3
         group["family_ids"].append(family["manifest"]["family_id"])
         group["policy_ids"] = sorted(set(group["policy_ids"]) | {policy["id"]})
-    return {"swap_correct": correct, "swap_total": 180, "quarantined_families": quarantined,
+    teacher_passed = correct >= 119 and not [family for family in teacher if family["quarantined"] or sum(family["swap_audits"]) < 2]
+    oracle_passed = oracle_correct == 48 and all(not family["quarantined"] and
+        family.get("pair_repair", {}).get("label_source") == oracle.LABEL_SOURCE for family in local)
+    return {"swap_correct": correct, "swap_total": 132, "quarantined_families": quarantined,
             "golden_families": len(golden), "minimum_golden_decisive_pairs": minimum,
             "decisive_pairs_by_family": counts, "by_split": by_split, "by_policy_scope": by_policy_scope,
-            "macro_reverse_accuracy": correct / 180,
+            "oracle_swap_correct": oracle_correct, "oracle_swap_total": 48, "oracle_passed": oracle_passed,
+            "teacher_passed": teacher_passed, "oracle_metric": "48 exact rule reverse proofs, not LLM or human agreement",
+            "macro_reverse_accuracy": correct / 132,
             "golden_reverse_accuracy": by_split["golden"]["swap_correct"] / by_split["golden"]["swap_total"],
-            "passed": correct >= 162 and not quarantined and len(golden) == 12 and minimum >= 6,
-            "metric": "180 teacher reverse-orientation comparisons, not human agreement"}
+            "passed": teacher_passed and oracle_passed and not quarantined and len(golden) == 12 and minimum >= 6,
+            "metric": "132 teacher reverse-orientation comparisons; all A/B/tie/insufficient included; not human agreement"}
 
 
 def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_review_file: Path | None = None) -> dict:
@@ -830,15 +926,20 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
                 _progress(saved_family, admitted=True)
                 continue
             traits = original["traits"]
+            is_local = _class_only(original["vacancy"])
 
-            def compare(pair, identifier=identifier, vacancy=original["vacancy"], traits=traits, policy=row["pair_policy"]):
+            def compare(pair, identifier=identifier, vacancy=original["vacancy"], traits=traits, policy=row["pair_policy"],
+                        is_local=is_local, source_hash=original["source_hash"]):
                 a, b = pair
+                if is_local:
+                    return _oracle_job(directory, f"{identifier}-pair-{a}-{b}", vacancy, traits[a], traits[b], policy, source_hash)
                 return _job(directory, provider, f"{identifier}-pair-{a}-{b}", vacancy,
                             traits[a], traits[b], policy, "family")
 
             try:
-                answers = _parallel(compare, _PAIRS)
-                reverse = _parallel(compare, [tuple(reversed(_PAIRS[index])) for index in _AUDIT_INDICES])
+                answers = [compare(pair) for pair in _PAIRS] if is_local else _parallel(compare, _PAIRS)
+                reverse_pairs = [tuple(reversed(_PAIRS[index])) for index in _AUDIT_INDICES]
+                reverse = [compare(pair) for pair in reverse_pairs] if is_local else _parallel(compare, reverse_pairs)
             except ValueError as error:
                 if str(error).startswith(("fatal pair repair", "ambiguous started")):
                     raise
@@ -853,7 +954,7 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
             pairs = [[a, b, answer["label"]] for (a, b), answer in zip(_PAIRS, answers, strict=True)]
             audits = [reverse[position]["label"] == _REVERSE[answers[index]["label"]]
                       for position, index in enumerate(_AUDIT_INDICES)]
-            repaired = {**deepcopy(original), "teacher": provider.teacher_identity(), "pairs": pairs,
+            repaired = {**deepcopy(original), "teacher": _oracle_teacher() if is_local else provider.teacher_identity(), "pairs": pairs,
                         "pair_answers": answers, "swap_answers": reverse, "swap_audits": audits,
                         "quarantined": sum(audits) < 2, "cyclic_components": _cycles(7, pairs),
                         "scalar_order_ceiling": _ordering_ceiling(7, pairs), "pair_repair": row,
@@ -869,7 +970,12 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
                            "derived_from": {"cohort_id": BASE_COHORT, "dataset_hash": base["dataset_hash"],
                                             "manifest_hash": base["manifest_hash"]},
                            "pair_repair_manifest_hash": selection["manifest_hash"], "pair_repair_teacher": provider.teacher_identity(),
-                           "pair_provenance": "Selected v4 pair repairs plus preserved unselected v2 pairs; all suitability v2 unchanged",
+                           "pair_provenance": "16 rule-derived class-only sources plus 44 LLM nonclass sources (selected v5, unselected v2); all suitability v2 unchanged",
+                           "source_metrics": {"rule_derived_class_only": {"families": 16, "reverse_proofs": 48, "oracle_version": oracle.VERSION},
+                                              "llm_pair_teacher": {"families": 44, "reverse_comparisons": 132}, "human_review_verified": False},
+                           "pair_repair_sources": {"class_only": _oracle_teacher(), "nonclass": provider.teacher_identity()},
+                           "oracle_code_hash": pilot_manifest["oracle_code_hash"],
+                           "independent_grade_policy": "Original v2 independent suitability grades preserved; mixed synthetic pair prior is a distinct target",
                            "activation_allowed": False, "training_started": False}
         derived.pop("dataset_hash")
         derived["dataset_hash"] = digest(derived)
@@ -881,6 +987,8 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
                           "pilot_hash": pilot["report_hash"], "base_dataset_hash": base["dataset_hash"],
                           "base_report_hash": base_report["report_hash"], "dataset_hash": derived["dataset_hash"],
                           "selected_families": list(selected), "failed_families": failed, "quality": quality,
+                          "source_metrics": derived["source_metrics"],
+                          "oracle_code_hash": pilot_manifest["oracle_code_hash"],
                           "original_blind_nomination": selection["original_blind_nomination"],
                           "post_repair_blind_review": {"state": "requires_new_policy_corrected_review",
                                                        "included_in_reverse_quality": False},
@@ -943,8 +1051,8 @@ def _verified_pilot(directory: Path, manifest: dict) -> dict:
                 raise ValueError("repair pilot machine gate failed")
             rows.append({"case_id": case["case_id"], "swapped": swapped, "answer": answer, "expected": expected, "error": None})
     if (report["rows"] != rows or report["pilot_manifest_hash"] != manifest["manifest_hash"]
-            or not report["passed"] or report["valid"] != 20 or report["correct"] != 20 or report["swap_correct"] != 10):
-        raise ValueError("repair pilot report differs from exact 20 orientations")
+            or not report["passed"] or report["valid"] != 8 or report["correct"] != 8 or report["swap_correct"] != 4):
+        raise ValueError("repair pilot report differs from exact 8 nonclass orientations")
     _verified_pilot_closure(directory, manifest, report)
     return report
 
@@ -974,11 +1082,13 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
             or pilot_manifest["source_hashes"] != {identifier: source["record_hash"] for identifier, source in sources.items()}
             or pilot_manifest["class_only_policy"] != CLASS_ONLY_POLICY):
         raise ValueError("repair pilot provenance changed")
+    if pilot_manifest["oracle_code_hash"] != digest(Path(oracle.__file__).read_bytes().hex()) or pilot_manifest["oracle_version"] != oracle.VERSION:
+        raise ValueError("pure class-only oracle version or source changed")
     previous = _previous_pilot(directory)
     if (pilot_manifest["previous_repair"] != previous
             or previous["source_hashes"] != pilot_manifest["source_hashes"]
             or pilot_manifest["projected_prior_pair_attempts"] != PREVIOUS_ATTEMPTS):
-        raise ValueError("repair previous 24 attempts provenance changed")
+        raise ValueError("repair previous 52 attempts provenance changed")
     provider = _CacheOnlyRepair(directory / "provider-cache")
     expected_cases, expected_requests = pilot_cases(), []
     for case in expected_cases:
@@ -1024,6 +1134,7 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
                    (["original_blind_disagreement"] if identifier in nomination["nonclass_disagreement_family_ids"] else []))
         expected_row = {"family_id": identifier, "reason": "+".join(reasons), "reasons": reasons,
                         "policy_scope": "class_only_revision" if is_class else "original_nonclass",
+                        "label_source": oracle.LABEL_SOURCE if is_class else "llm_pair_teacher",
                         "policy_id": policy["id"], "original_record_hash": original["record_hash"],
                         "old_policy_hash": digest(original["manifest"]["policy"]),
                         "new_policy_hash": digest(policy), "pair_policy": policy}
@@ -1036,13 +1147,18 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
             expected_families_out.append(_hashed(retained, "record_hash"))
             continue
         traits = original["traits"]
-        answers = [_replay_job(directory, provider, f"{identifier}-pair-{a}-{b}", original["vacancy"],
-                               traits[a], traits[b], policy, "family") for a, b in _PAIRS]
-        reverse = [_replay_job(directory, provider, f"{identifier}-pair-{b}-{a}", original["vacancy"],
-                               traits[b], traits[a], policy, "family") for a, b in (_PAIRS[index] for index in _AUDIT_INDICES)]
+        def replay(pair, identifier=identifier, original=original, traits=traits, policy=policy, is_class=is_class):
+            a, b = pair
+            if is_class:
+                return _oracle_replay(directory, f"{identifier}-pair-{a}-{b}", original["vacancy"],
+                                      traits[a], traits[b], policy, original["source_hash"])
+            return _replay_job(directory, provider, f"{identifier}-pair-{a}-{b}", original["vacancy"],
+                               traits[a], traits[b], policy, "family")
+        answers = [replay(pair) for pair in _PAIRS]
+        reverse = [replay(tuple(reversed(_PAIRS[index]))) for index in _AUDIT_INDICES]
         pairs = [[a, b, answer["label"]] for (a, b), answer in zip(_PAIRS, answers, strict=True)]
         audits = [reverse[position]["label"] == _REVERSE[answers[index]["label"]] for position, index in enumerate(_AUDIT_INDICES)]
-        repaired = {**deepcopy(original), "teacher": provider.teacher_identity(), "pairs": pairs, "pair_answers": answers,
+        repaired = {**deepcopy(original), "teacher": _oracle_teacher() if is_class else provider.teacher_identity(), "pairs": pairs, "pair_answers": answers,
                     "swap_answers": reverse, "swap_audits": audits, "quarantined": sum(audits) < 2,
                     "cyclic_components": _cycles(7, pairs), "scalar_order_ceiling": _ordering_ceiling(7, pairs),
                     "pair_repair": row, "original_teacher": original["teacher"], "suitability_receipts_preserved": True}
@@ -1062,16 +1178,24 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
             raise ValueError("repair budget job category or nonce differs")
         observed[f"{category}_{'retry' if attempt else 'initial'}"] += 1
     current_ledger = _read(directory / "provider-cache/usage.json")
+    raw_reservations = {_read(path)["request_hash"] for path in (target / "jobs").glob("*.json")}
+    expected_ledger = {**base_report["ledger_after"],
+                       "pair": base_report["ledger_after"]["pair"] + len(raw_reservations)}
+    source_metrics = {"rule_derived_class_only": {"families": 16, "reverse_proofs": 48, "oracle_version": oracle.VERSION},
+                      "llm_pair_teacher": {"families": 44, "reverse_comparisons": 132}, "human_review_verified": False}
     if (dataset["quality"] != quality or report["quality"] != quality
+            or dataset["source_metrics"] != source_metrics or report["source_metrics"] != source_metrics
+            or dataset["oracle_code_hash"] != pilot_manifest["oracle_code_hash"]
+            or report["oracle_code_hash"] != pilot_manifest["oracle_code_hash"]
+            or dataset["pair_repair_sources"] != {"class_only": _oracle_teacher(), "nonclass": provider.teacher_identity()}
             or report["previous_repair"] != previous or report["prior_pair_attempts"] != PREVIOUS_ATTEMPTS
             or report["pilot_closure_observation_hash"] != _verified_pilot_closure(directory, pilot_manifest, pilot)["observation_hash"]
             or report["original_blind_nomination"] != nomination
             or report["post_repair_blind_review"] != {"state": "requires_new_policy_corrected_review", "included_in_reverse_quality": False}
             or report["base_report_hash"] != base_report["report_hash"] or report["ledger_before"] != base_report["ledger_after"]
-            or report["ledger_after"] != current_ledger or report["budget"] != budget
+            or report["ledger_after"] != current_ledger or current_ledger != expected_ledger or report["budget"] != budget
             or budget != observed or sum(budget.values()) > MAX_ATTEMPTS
-            or any(budget[field] > maximum for field, maximum in (
-                ("pilot_initial", 20), ("pilot_retry", 20), ("family_initial", 600), ("family_retry", 32)))
+            or any(budget[field] > maximum for field, maximum in ATTEMPT_LIMITS.items())
             or current_ledger["pair"] > LIMITS["pair"]
             or report["activation_allowed"] or dataset["activation_allowed"]):
         raise ValueError("repair quality, cumulative budget or original ledger pins changed")
