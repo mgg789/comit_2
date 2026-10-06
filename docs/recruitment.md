@@ -112,3 +112,20 @@ RECRUITMENT_ACCEPTANCE_DATABASE_URL и локальными API/MATCHING/AGENTS 
 использует настоящие auth/projection/Harrier/PDF/main/R0/like и обе hiring ветки.
 
 См. [API](api.md), [данные](data.md), [контекст](../context/30-domain-model.md).
+
+## Приёмка 06.10.2026
+
+На свежей loopback БД `tests/recruitment_acceptance.py` прошёл полный HTTP-путь
+трёх synthetic accounts через encrypted email-code mailbox, source projection,
+настоящий локальный pinned Harrier640/PDF, опубликованную вакансию, main top-k3,
+явный R₀ main_fallback и три like. Далее проверены две invitation/accept ветки:
+немедленный оффер→hired и две реально согласованные/проведённые по server clock
+встречи→оффер→declined. Третий saved отклонён до приглашения и невидим кандидату.
+Проверены чужой owner404, contact gate403→200, durable own events, no-chat,
+pool-only withdrawal с сохранением доступа и processing withdrawal с запретом
+контактов409. SMTP и внешние модели не вызывались.
+
+Полный API набор —42 passed с PostgreSQL без пропусков; matching —689 passed с
+PostgreSQL без пропусков. `pnpm typecheck`, `pnpm build`, scoped Ruff, smoke14,
+code review и final inspection зелёные. Результаты и ограничения:
+[recruitment-acceptance.json](../data/validation/recruitment-acceptance.json).
