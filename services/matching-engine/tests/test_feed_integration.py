@@ -69,6 +69,22 @@ def test_owner_and_withdrawn_candidate_guards_are_scoped(store: Store) -> None:
     assert withdrawn not in {item.candidate_id for item in page.items}
 
 
+def test_single_saved_handoff_checks_owner_and_preserves_stale_membership(store: Store) -> None:
+    """Recruitment can fetch only one liked member; withdrawal retains metadata without a card."""
+    feed, vacancy_id, owner_id = ready_feed(store, 1)
+    card = feed.open(owner_id, FeedRequest(), vacancy_id).items[0]
+    with pytest.raises(NotFoundError):
+        feed.saved_candidate(owner_id, vacancy_id, card.candidate_id)
+    feed.decision(owner_id, vacancy_id, FeedDecisionRequest(exposure_id=card.exposure_id, action="like", idempotency_key=uuid4()))
+    assert feed.saved_candidate(owner_id, vacancy_id, card.candidate_id).card is not None
+    with pytest.raises(NotFoundError):
+        feed.saved_candidate(uuid4(), vacancy_id, card.candidate_id)
+    with connect(store.database_url) as connection:
+        connection.execute("DELETE FROM candidate_pipeline.pool WHERE candidate_id=%s", (card.candidate_id,))
+    saved = feed.saved_candidate(owner_id, vacancy_id, card.candidate_id)
+    assert saved.candidate_id == card.candidate_id and saved.card is None
+
+
 def test_legacy_visited_and_reconsider_keep_frozen_baseline(store: Store) -> None:
     """Legacy manual visited rows migrate without historic timestamps and refresh on N>K only."""
     feed, vacancy_id, owner_id = ready_feed(store, 1)

@@ -415,3 +415,18 @@ golden закрытым. Повтор завершённого запуска в
 затем та же команда без флага. Она использует новый namespace и прежний общий
 ledger, не включает обучение или promotion. Нельзя удалять started/failed receipts
 или сбрасывать usage для повторного запуска. [Порядок и квоты](rerank-grounded-cohort.md).
+
+## Recruitment backend
+
+Перед запуском обновлённого API явно применить003/004 через
+`pnpm --filter @comit/api auth:migrate`. Сервер не запускает миграции; missing
+table/DB/upstream возвращаются как503 без сырых PostgreSQL ошибок.
+Для проверки использовать отдельные RECRUITMENT_TEST_DATABASE_URL и
+RECRUITMENT_ROUTE_TEST_DATABASE_URL и serial API tests; эти тесты очищают accounts
+CASCADE только в явно выделенной тестовой БД. HTTP harness
+`python tests/recruitment_acceptance.py` требует пустую loopback acceptance DB
+и предварительно собранный API; реальные worker вызовы используют локальный
+Harrier cache. Нельзя направлять harness или test env на production.
+После offer expiry GET обновляет revision и event; при CAS409 перечитать процесс.
+Email delivery/chat не включены: новые события читаются participant polling.
+[Контракт](recruitment.md).

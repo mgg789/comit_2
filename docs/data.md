@@ -258,3 +258,19 @@ visited содержит последний исходный структурн�
 Старая схема не переписывается:001–006 остаются checksum-compatible.
 Публичный visited не отдаёт private baseline. Saved-членство сохраняется при
 изменении/отзыве профиля, но его старая карточка становится недоступной.
+
+## Recruitment persistence
+
+API миграции003/004 создают recruitment_processes, interviews, offers, receipts
+и events. Process уникален по owner/vacancy/candidate и привязан FK к accounts;
+engine UUID vacancy/draft хранится без прямого доступа к engine таблицам.
+Terms фиксируются при приглашении; employer-only shortlist rejection имеет
+terms/invited_at=null. Closure хранит причину/сторону/дату, видима участникам
+только после реального приглашения. Contacts не копируются в process/receipt/event.
+Interviews имеют partial unique slot по process/kind для proposed/scheduled/completed;
+completed feedback обязателен, outcomes отдельно от решения о найме. Один active
+offer с точной RUB зарплатой, сроком и immutable history. Receipts уникальны
+actor/key, fingerprint command включает endpoint. Event sequence сериализован
+до commit и привязан к process revision, payload minimal, polling only participants.
+Хранение историческое без auto deletion; ни001/002, ни engine migrations
+не переписаны. [Подробные переходы и ограничения](recruitment.md).
