@@ -2,6 +2,7 @@
 
 import json
 from copy import deepcopy
+from typing import get_args
 
 import pytest
 from test_rerank_sample_features import (
@@ -9,10 +10,10 @@ from test_rerank_sample_features import (
 )
 
 import matching_engine.rerank_cohort_features as module
-from matching_engine.combine_models import ScoringPolicy
+from matching_engine.combine_models import ScoringPolicy, project_narrative_facts
 from matching_engine.combine_scoring import policy_hash, score_candidate
 from matching_engine.embeddings import HarrierEncoder, build_semantic_text
-from matching_engine.models import GRADE_RANK, confirmed_strength
+from matching_engine.models import GRADE_RANK, NarrativeRole, confirmed_strength
 from matching_engine.rerank_features import feature_schema
 from matching_engine.rerank_hash import digest
 from matching_engine.strict import build_strict_vector, initial_schema
@@ -90,7 +91,7 @@ def test_unknowns_not_inferred_from_description_and_null_statuses_are_required()
         module.candidate_profile(trait, "backend")
 
 
-@pytest.mark.parametrize("mutation", ["unknown_key", "wrong_skill_group", "mismatched_statuses", "unknown_role"])
+@pytest.mark.parametrize("mutation", ["unknown_key", "wrong_skill_group", "mismatched_statuses", "invalid_role_type"])
 def test_incompatible_traits_fail_before_embedding(mutation):
     trait = _trait()
     if mutation == "unknown_key":
@@ -101,9 +102,45 @@ def test_incompatible_traits_fail_before_embedding(mutation):
     elif mutation == "mismatched_statuses":
         del trait["skill_statuses"]["python"]
     else:
-        trait["role"] = "manager"
+        trait["role"] = 123
     with pytest.raises(ValueError):
         module.candidate_profile(trait, "backend")
+
+
+@pytest.mark.parametrize("status", ["confirmed", "partial", "self_reported", "pending", "rejected"])
+def test_job_title_projects_to_other_with_private_exact_source_and_own_status(status):
+    trait = _trait()
+    trait.update(role="Data Engineer", role_status=status, status="pending")
+    original = deepcopy(trait)
+    profile = module.candidate_profile(trait, "data")
+    role = profile.projects[0].facts.role
+    assert role.value == "other" and role.status == status
+    assert role.provenance == ["source_role_title:Data Engineer"]
+    assert trait == original
+    public = project_narrative_facts({"projects": profile.projects})[0].facts.role
+    assert public.model_dump() == {"value": "other", "status": status}
+    assert "Data Engineer" not in build_semantic_text(profile)
+    assert module.BUILD_VERSION == "grounded-cohort-runtime-features-v2"
+
+
+@pytest.mark.parametrize("role", get_args(NarrativeRole))
+def test_exact_runtime_role_enums_remain_unchanged_without_added_provenance(role):
+    trait = _trait()
+    trait.update(role=role, role_status="partial")
+    fact = module.candidate_profile(trait, "backend").projects[0].facts.role
+    assert fact.value == role and fact.status == "partial" and fact.provenance == []
+
+
+def test_job_title_words_never_infer_enum_roles_or_facts_from_biography(tmp_path, encoder_calls):
+    item, vacancy, traits = _inputs()
+    traits[0].update(role="Lead Developer", role_status="partial")
+    traits[1].update(role=None, role_status=None, description="Ведущий разработчик и архитектор проекта")
+    vectors, _, _, _ = module.build_family_features(item, vacancy, traits, tmp_path / "cache.json", "train")
+    assert _feature(vectors[0], "project.other") == (.8, True)
+    assert _feature(vectors[0], "project.lead") == (0., True)
+    assert _feature(vectors[0], "project.developer") == (0., True)
+    assert _feature(vectors[1], "project.other") == (0., False)
+    assert _feature(vectors[1], "project.lead") == (0., False)
 
 
 def test_builder_uses_real_scores_ranks_and_current_contract(tmp_path, monkeypatch, encoder_calls):

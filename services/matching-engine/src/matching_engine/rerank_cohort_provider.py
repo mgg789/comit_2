@@ -15,6 +15,7 @@ from matching_engine.rerank_protocol import DIRECTIONS
 from matching_engine.rerank_providers import (
     GEMMA_GENERATION_MODEL,
     GENERATION_MODEL,
+    GENERATION_MODELS,
     GENERATION_URL,
     SystemOneProviders,
 )
@@ -25,7 +26,7 @@ GRADES = ("intern", "junior", "middle", "senior")
 LABELS = ("A", "B", "tie", "insufficient")
 PAIR_REASON_CODES = ("prefer_known_facts", "comparable_fit", "insufficient_source_facts")
 PROMPT_VERSIONS = {
-    "generation": "rerank-uniform-cohort-generation-v3",
+    "generation": "rerank-uniform-cohort-generation-v5",
     "pair": "rerank-uniform-cohort-pair-v2",
     "grade": "rerank-uniform-cohort-suitability-v2",
 }
@@ -37,6 +38,17 @@ CANDIDATE_FIELDS = (
 )
 GENERATION_SALARIES = (50000, 60000, 70000, 80000, 90000, 100000, 120000, 140000, 160000, 180000)
 GENERATION_DURATIONS = (None, 0, 6, 12, 24, 36, 48, 60, 96, 120)
+GENERATION_SCENARIOS = {
+    "ml-01": "Выявление мошеннических транзакций.",
+    "ml-02": "Рекомендации товаров в розничной торговле.",
+    "ml-03": "NLP для обращений службы поддержки.",
+    "ml-04": "Обнаружение аномалий в журналах событий.",
+    "ml-05": "Компьютерное зрение для контроля производства.",
+    "ml-06": "Распознавание голосовых команд.",
+    "ml-07": "Прогнозирование потребностей цепочки поставок.",
+    "ml-08": "Классификация документов.",
+    "qa-03": "Нагрузочное тестирование API учётных записей.",
+}
 _KNOWN_KEYS = frozenset(key for group in INITIAL_GROUPS.values() for key in group)
 _COMMON_INSTRUCTIONS = (
     "Use only the supplied vacancy, raw typed candidate facts, and explicit employer policy. "
@@ -211,25 +223,107 @@ def _object(properties: dict) -> dict:
             "properties": properties, "required": list(properties)}
 
 
+def _fact_pair_schema(value_schema: dict) -> dict:
+    return {"anyOf": [
+        _object({"value": {"type": "null"}, "status": {"type": "null"}}),
+        _object({"value": value_schema, "status": {"type": "string", "enum": list(STATUSES)}}),
+    ]}
+
+
+def project_reference_slots(keys: Sequence[str], group: str) -> tuple[str, str]:
+    """Choose two immutable registered reference slots, prioritizing declared skills.
+
+    Sorted matching keys are used first; sorted remaining registry keys fill
+    missing slots. A slot alone is never evidence that the candidate used it.
+    """
+    if group not in ("domain", "stack"):
+        raise ValueError("invalid project reference group")
+    known = set(INITIAL_GROUPS[group])
+    selected = sorted(set(_keys(keys)) & known)[:2]
+    selected.extend(key for key in sorted(known) if key not in selected)
+    return selected[0], selected[1]
+
+
 def _candidate_schema(keys: tuple[str, ...]) -> dict:
     status = {"type": "string", "enum": list(STATUSES)}
-    nullable_status = {"type": ["string", "null"], "enum": [*STATUSES, None]}
     fields = {
         "grade": {"type": "string", "enum": list(GRADES)}, "status": status,
         "levels": _object({key: {"type": "integer", "minimum": 0, "maximum": 7} for key in keys}),
         "skill_statuses": _object(dict.fromkeys(keys, status)),
         "salary_min": {"type": "integer", "enum": list(GENERATION_SALARIES)},
         "description": {"type": "string", "minLength": 1, "maxLength": 180},
-        "structured_facts_available": {"type": "boolean"},
-        "duration_months": {"type": ["integer", "null"], "enum": list(GENERATION_DURATIONS)},
-        "duration_status": nullable_status, "production_support": {"type": ["boolean", "null"]},
-        "production_status": nullable_status, "role": {"type": ["string", "null"], "maxLength": 80},
-        "role_status": nullable_status,
+        "duration": _fact_pair_schema({"type": "integer", "enum": [value for value in GENERATION_DURATIONS
+                                                                   if value is not None]}),
+        "production": _fact_pair_schema({"type": "boolean"}),
+        "role": _fact_pair_schema({"type": "string", "minLength": 1, "maxLength": 80}),
     }
     for field, group in (("project_domains", "domain"), ("project_stacks", "stack")):
-        fields[field] = {"type": "array", "maxItems": 2, "items": _object({
-            "key": {"type": "string", "enum": list(INITIAL_GROUPS[group])}, "status": status})}
+        fields[field] = _object({key: {"type": ["string", "null"], "enum": [None, *STATUSES]}
+                                for key in project_reference_slots(keys, group)})
     return _object(fields)
+
+
+def decode_generation_response(response: dict, model: str, prompt_version: str,
+                               keys: Sequence[str] | None = None) -> list[dict]:
+    """Decode pinned generation receipts without inventing, coercing or repairing facts.
+
+    Versions v1-v3 retain exact flat profiles. V4 retains reference arrays; v5
+    maps its two fixed reference slots to status-bearing canonical arrays, with
+    null slots omitted. Grouped facts are renamed without assigning evidence.
+    Availability follows presence, including false/zero. One repair suffix is
+    accepted per version. Raw response objects are never modified.
+    """
+    versions = {f"rerank-uniform-cohort-generation-v{version}" for version in range(1, 6)}
+    if model not in GENERATION_MODELS:
+        raise ValueError("unapproved generation receipt model")
+    if type(prompt_version) is not str or prompt_version not in versions | {f"{version}-repair1" for version in versions}:
+        raise ValueError("unapproved generation receipt prompt version")
+    answer = _parse(response, model)
+    if type(answer) is not dict or set(answer) != {"profiles"}:
+        raise ValueError("invalid generation envelope")
+    raw_profiles = answer["profiles"]
+    if type(raw_profiles) is not list or not 1 <= len(raw_profiles) <= 7:
+        raise ValueError("wrong generated profile count")
+    if prompt_version.startswith(tuple(f"rerank-uniform-cohort-generation-v{version}" for version in (1, 2, 3))):
+        for profile in raw_profiles:
+            validate_candidate(profile, keys)
+        return raw_profiles
+    flat_fields = {"grade", "status", "levels", "skill_statuses", "salary_min", "description",
+                   "project_domains", "project_stacks"}
+    result = []
+    for raw in raw_profiles:
+        if type(raw) is not dict or set(raw) != flat_fields | {"duration", "production", "role"}:
+            raise ValueError("unexpected grouped generation fields")
+        profile = {field: raw[field] for field in flat_fields}
+        if prompt_version.startswith("rerank-uniform-cohort-generation-v5"):
+            if type(raw["levels"]) is not dict:
+                raise ValueError("grouped generation requires registry-bound levels")
+            for field, group in (("project_domains", "domain"), ("project_stacks", "stack")):
+                slots = project_reference_slots(list(raw["levels"]), group)
+                refs = raw[field]
+                if type(refs) is not dict or set(refs) != set(slots):
+                    raise ValueError("project reference map differs from its two fixed slots")
+                if any(value is not None and (type(value) is not str or value not in STATUSES)
+                       for value in refs.values()):
+                    raise ValueError("project reference map contains invalid evidence status")
+                profile[field] = [{"key": key, "status": refs[key]} for key in slots if refs[key] is not None]
+        for group, value_field, status_field in (("duration", "duration_months", "duration_status"),
+                                                ("production", "production_support", "production_status"),
+                                                ("role", "role", "role_status")):
+            pair = raw[group]
+            if type(pair) is not dict or set(pair) != {"value", "status"}:
+                raise ValueError("grouped fact pair requires exactly value and status")
+            profile[value_field], profile[status_field] = pair["value"], pair["status"]
+        profile["structured_facts_available"] = any(profile[field] is not None for field in (
+            "duration_months", "production_support", "role")) or bool(profile["project_domains"] or profile["project_stacks"])
+        # Validate paired statuses without filling nulls or reassigning any evidence.
+        validate_candidate(profile, list(profile["levels"]) if keys is None and type(profile["levels"]) is dict else keys)
+        if (profile["salary_min"] not in GENERATION_SALARIES
+                or profile["duration_months"] not in GENERATION_DURATIONS
+                or len(profile["project_domains"]) > 2 or len(profile["project_stacks"]) > 2):
+            raise ValueError("grouped generation differs from discrete bounds")
+        result.append(profile)
+    return result
 
 
 def _policy(policy: Mapping) -> None:
@@ -357,44 +451,45 @@ class CohortProviders(SystemOneProviders):
             "Vary independent grade, salary, skill levels and evidence tradeoffs; no universally dominant profile. "
             "Every evidence state is independent and may be confirmed/partial/self_reported/pending/rejected. "
             "salary_min must be one of 50000,60000,70000,80000,90000,100000,120000,140000,160000,180000. "
-            "duration_months must be one of null,0,6,12,24,36,48,60,96,120. "
-            "Maintain these three exact value/status pairs independently: "
-            "duration_months -> duration_status; production_support -> production_status; role -> role_status. "
-            "If duration_months is non-null (including 0), duration_status must be exactly one of "
-            "confirmed/partial/self_reported/pending/rejected, never null. "
-            "If production_support is non-null (including false), production_status must be exactly one of "
-            "confirmed/partial/self_reported/pending/rejected, never null. "
-            "If role is non-null, role_status must be exactly one of "
-            "confirmed/partial/self_reported/pending/rejected, never null. "
-            "If a paired value is null, its own status must also be null. "
-            "Every non-null fact requires an independent evidence status, including false/zero. "
-            "structured_facts_available=false requires duration_months=null, duration_status=null, "
-            "production_support=null, production_status=null, role=null, role_status=null, "
-            "project_domains=[] and project_stacks=[]. "
+            "Output duration, production and role as separate objects, each with exactly value and status. "
+            "duration.value must be one of null,0,6,12,24,36,48,60,96,120. "
+            "production.value is null, true or false. role.value is null or a nonempty string of at most 80 characters. "
+            "For each grouped object independently, either value=null AND status=null, or value is non-null "
+            "AND status is exactly confirmed/partial/self_reported/pending/rejected, never null. "
+            "Zero duration and false production are non-null facts and MUST have an independent evidence status. "
+            "For example production={\"value\":false,\"status\":\"self_reported\"} is valid, "
+            "production={\"value\":false,\"status\":null} is invalid. Unknown is {\"value\":null,\"status\":null}. "
+            "Never output structured_facts_available, duration_months, duration_status, production_support, "
+            "production_status or role_status: the canonical field names are derived locally by exact renaming. "
             "Registered project references carry their own statuses and correct group keys. "
-            "project_domains and project_stacks each contain at most 2 references with unique keys; "
-            "never repeat a key within either array. "
+            "project_domains and project_stacks are typed maps, not arrays: each has exactly the two "
+            "registered keys required by its schema, each appearing once. Each value is null when no explicit "
+            "project reference exists, or exactly confirmed/partial/self_reported/pending/rejected for that "
+            "particular reference. Never infer confirmation from a slot name or a declared skill. "
             "description is Russian text 1..180 characters; it never substitutes structured facts. "
             "Use genuinely varied descriptions across profiles and family IDs: different concrete project "
             "tasks and responsibilities, no generic identical sentence templates. family_id is diversity context, "
             "not text to append mechanically. Descriptions must agree with supplied typed facts; never invent "
-            "skill levels or confirmed evidence to make a description more distinctive."
+            "skill levels or confirmed evidence to make a description more distinctive. "
+            "scenario_hint suggests only a concrete family task; it is not evidence, a skill declaration or "
+            "a required qualification. Even beginner descriptions must mention an applicable task from that "
+            "scenario, without inventing typed facts, experience or confirmation. Avoid generic boilerplate "
+            "shared across families or splits."
         )
         return self._payload("generation", instruction, {"direction": direction, "family_id": family_id,
-                             "required_keys": list(keys), "count": count}, schema, attempt)
+                             "required_keys": list(keys), "count": count,
+                             "scenario_hint": GENERATION_SCENARIOS.get(family_id,
+                                 f"Синтетическая задача направления {direction}, семейство {family_id}.")}, schema, attempt)
 
     def generate_family(self, direction: str, family_id: str, keys: Sequence[str], count: int = 7,
                         attempt: int = 0) -> list[dict]:
         """Generate and validate one family; malformed output raises without internal retry."""
         payload = self.generation_payload(direction, family_id, keys, count, attempt)
-        answer = _parse(self.request(self._endpoint("generation"), payload, "generation"), self.generator_model)
-        if type(answer) is not dict or set(answer) != {"profiles"}:
-            raise ValueError("invalid generation envelope")
-        profiles = answer["profiles"]
-        if type(profiles) is not list or len(profiles) != count:
+        identity = self._identity(self._endpoint("generation"), payload, "generation")
+        profiles = decode_generation_response(self.request(self._endpoint("generation"), payload, "generation"),
+                                              self.generator_model, identity["prompt_version"], keys)
+        if len(profiles) != count:
             raise ValueError("wrong generated profile count")
-        for profile in profiles:
-            validate_candidate(profile, keys)
         return profiles
 
     def pair_payload(self, vacancy: dict, a: dict, b: dict, policy: dict, attempt: int = 0) -> dict:

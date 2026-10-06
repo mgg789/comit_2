@@ -10,9 +10,12 @@ from matching_engine.rerank_cohort_provider import (
     CANDIDATE_FIELDS,
     GENERATION_DURATIONS,
     GENERATION_SALARIES,
+    GENERATION_SCENARIOS,
     PROMPT_VERSIONS,
     STATUSES,
     CohortProviders,
+    decode_generation_response,
+    project_reference_slots,
     source_citations,
     teacher_identity,
     validate_candidate,
@@ -42,6 +45,7 @@ A = {"grade": "junior", "status": "partial", "levels": dict.fromkeys(KEYS, 4),
      "role_status": "pending", "project_domains": [{"key": "rest_api", "status": "confirmed"}],
      "project_stacks": [{"key": "python", "status": "rejected"}]}
 B = {**deepcopy(A), "salary_min": 100000, "status": "self_reported"}
+GEN_A = {**deepcopy(A), "project_domains": [{"key": "sql", "status": "confirmed"}]}
 
 
 def _provider(tmp_path, **kwargs):
@@ -66,6 +70,26 @@ def _grade_answer(candidate=A, grade=3):
     return {"grade": grade, "reason_code": "insufficient" if grade is None else "assessed",
             "status": candidate["status"],
             "evidence": [_ref(candidate, "status"), _ref(candidate, "levels.python")]}
+
+
+def _grouped(candidate):
+    result = {field: deepcopy(candidate[field]) for field in ("grade", "status", "levels", "skill_statuses",
+              "salary_min", "description", "project_domains", "project_stacks")}
+    for group, field, status in (("duration", "duration_months", "duration_status"),
+                                 ("production", "production_support", "production_status"), ("role", "role", "role_status")):
+        result[group] = {"value": candidate[field], "status": candidate[status]}
+    return result
+
+
+def _mapped(candidate):
+    raw = _grouped(candidate)
+    for field, group in (("project_domains", "domain"), ("project_stacks", "stack")):
+        slots = project_reference_slots(list(candidate["levels"]), group)
+        raw[field] = dict.fromkeys(slots)
+        for ref in candidate[field]:
+            assert ref["key"] in slots
+            raw[field][ref["key"]] = ref["status"]
+    return raw
 
 
 def _response(answer, model=GENERATION_MODEL):
@@ -197,7 +221,7 @@ def test_identity_separates_kind_cohort_repair_and_preserves_defaults(tmp_path):
     assert teacher_identity(provider.cohort_id) == provider.teacher_identity()
     assert provider.teacher_identity("grade") != provider.teacher_identity("pair")
     assert legacy_teacher_identity()["prompt_version"] == "rerank-systemone-v1"
-    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v3"
+    assert PROMPT_VERSIONS["generation"] == "rerank-uniform-cohort-generation-v5"
     assert PROMPT_VERSIONS["pair"] == "rerank-uniform-cohort-pair-v2"
     assert PROMPT_VERSIONS["grade"] == "rerank-uniform-cohort-suitability-v2"
     assert generation_identity()["prompt_version"] == "rerank-sverk-generation-v2"
@@ -222,10 +246,10 @@ def test_generation_approved_qwen_and_sparse_registry(tmp_path, monkeypatch):
 
     def request(path, payload, kind):
         calls.append((path, payload, kind))
-        return _response({"profiles": [A]})
+        return _response({"profiles": [_mapped(GEN_A)]})
 
     monkeypatch.setattr(provider, "request", request)
-    assert provider.generate_family("backend", "backend-01", KEYS, 1) == [A]
+    assert provider.generate_family("backend", "backend-01", KEYS, 1) == [GEN_A]
     assert calls[0][0] == "/v1/chat/completions" and calls[0][2] == "generation"
     assert calls[0][1]["chat_template_kwargs"] == {"enable_thinking": False}
     with pytest.raises(ValueError, match="sparse keys"):
@@ -237,39 +261,50 @@ def test_generation_approved_qwen_and_sparse_registry(tmp_path, monkeypatch):
         _provider(tmp_path, generator_model="unauthorized")
 
 
-def test_generation_v3_instructs_exact_nullable_pairs_and_compact_output(tmp_path):
+def test_generation_v5_instructs_grouped_nullable_pairs_and_compact_output(tmp_path):
     provider = _provider(tmp_path, generator_model=GENERATION_MODEL)
     payload = provider.generation_payload("fullstack", "fullstack-01", KEYS)
     instructions = payload["messages"][0]["content"]
     assert "compact JSON object only" in instructions
     assert "no indentation, formatting whitespace, newlines, markdown" in instructions
     assert "Stop immediately after the final closing brace" in instructions
-    for value, status in (("duration_months", "duration_status"),
-                          ("production_support", "production_status"), ("role", "role_status")):
-        assert f"{value} -> {status}" in instructions
-        assert f"{status} must be exactly one of confirmed/partial/self_reported/pending/rejected, never null" in instructions
-        assert f"{value}=null, {status}=null" in instructions
-    assert "including 0" in instructions and "including false" in instructions
-    assert "If a paired value is null, its own status must also be null" in instructions
+    assert "duration, production and role as separate objects" in instructions
+    assert "value=null AND status=null" in instructions
+    assert "Zero duration and false production are non-null facts" in instructions
+    assert 'production={"value":false,"status":null} is invalid' in instructions
+    assert "Never output structured_facts_available" in instructions
     assert "independent evidence status" in instructions and "evidence5" not in instructions
     assert "uniqueItems" not in json.dumps(payload["response_format"])
     assert provider._identity("/v1/chat/completions", payload, "generation")["prompt_version"] == (
-        "rerank-uniform-cohort-generation-v3")
+        "rerank-uniform-cohort-generation-v5")
 
 
-def test_generation_discrete_numbers_and_two_unique_project_references(tmp_path):
+def test_generation_discrete_numbers_and_two_fixed_project_reference_slots(tmp_path):
     provider = _provider(tmp_path)
     payload = provider.generation_payload("backend", "backend-01", KEYS)
     fields = payload["response_format"]["json_schema"]["schema"]["properties"]["profiles"]["items"]["properties"]
     assert GENERATION_SALARIES == (50000, 60000, 70000, 80000, 90000, 100000, 120000, 140000, 160000, 180000)
     assert GENERATION_DURATIONS == (None, 0, 6, 12, 24, 36, 48, 60, 96, 120)
     assert fields["salary_min"] == {"type": "integer", "enum": list(GENERATION_SALARIES)}
-    assert fields["duration_months"] == {"type": ["integer", "null"], "enum": list(GENERATION_DURATIONS)}
-    assert fields["project_domains"]["maxItems"] == fields["project_stacks"]["maxItems"] == 2
+    assert fields["duration"]["anyOf"][1]["properties"]["value"] == {
+        "type": "integer", "enum": [value for value in GENERATION_DURATIONS if value is not None]}
+    for group in ("duration", "production", "role"):
+        unknown, known = fields[group]["anyOf"]
+        assert unknown == {"type": "object", "additionalProperties": False,
+                           "required": ["value", "status"], "properties": {
+                               "value": {"type": "null"}, "status": {"type": "null"}}}
+        assert known["additionalProperties"] is False and known["required"] == ["value", "status"]
+        assert known["properties"]["status"] == {"type": "string", "enum": list(STATUSES)}
+    assert fields["production"]["anyOf"][1]["properties"]["value"] == {"type": "boolean"}
+    assert "structured_facts_available" not in fields and "duration_months" not in fields
+    for field, slots in (("project_domains", ("sql", "ai_agents")), ("project_stacks", ("python", "angular"))):
+        assert fields[field] == {"type": "object", "additionalProperties": False, "required": list(slots),
+                                 "properties": {key: {"type": ["string", "null"], "enum": [None, *STATUSES]}
+                                                for key in slots}}
     instructions = payload["messages"][0]["content"]
     assert "50000,60000,70000,80000,90000,100000,120000,140000,160000,180000" in instructions
     assert "null,0,6,12,24,36,48,60,96,120" in instructions
-    assert "at most 2 references with unique keys" in instructions
+    assert "typed maps, not arrays" in instructions and "each appearing once" in instructions
     assert "uniqueItems" not in json.dumps(payload["response_format"])
 
 
@@ -287,14 +322,14 @@ def test_generation_accepts_valid_compact_qwen_receipt_with_zero_false_and_null(
     provider = _provider(tmp_path, generator_model=GENERATION_MODEL)
     profiles = []
     for index in range(7):
-        profile = deepcopy(A)
+        profile = deepcopy(GEN_A)
         profile["description"] = f"Задача проекта: разработка API, этап {index + 1}."
         if index % 2:
             profile.update(structured_facts_available=False, duration_months=None, duration_status=None,
                            production_support=None, production_status=None, role=None, role_status=None,
                            project_domains=[], project_stacks=[])
         profiles.append(profile)
-    compact = json.dumps({"profiles": profiles}, ensure_ascii=False, separators=(",", ":"))
+    compact = json.dumps({"profiles": [_mapped(profile) for profile in profiles]}, ensure_ascii=False, separators=(",", ":"))
     response = _response({})
     response["choices"][0]["message"]["content"] = compact
     calls = []
@@ -310,6 +345,155 @@ def test_generation_accepts_valid_compact_qwen_receipt_with_zero_false_and_null(
     assert profiles[0]["duration_months"] == 0 and profiles[0]["duration_status"] == "self_reported"
     assert profiles[0]["production_support"] is False and profiles[0]["production_status"] == "partial"
     assert profiles[1]["duration_months"] is None and profiles[1]["duration_status"] is None
+
+
+@pytest.mark.parametrize("version", ["v1", "v2", "v3", "v1-repair1", "v2-repair1", "v3-repair1"])
+def test_decoder_preserves_legacy_flat_receipts_and_historical_ranges(version):
+    candidate = deepcopy(A)
+    candidate.update(salary_min=87321, duration_months=53, description="Old synthetic description preserved.")
+    response = _response({"profiles": [candidate]})
+    before = deepcopy(response)
+    assert decode_generation_response(response, GENERATION_MODEL,
+           f"rerank-uniform-cohort-generation-{version}") == [candidate]
+    assert response == before
+
+
+@pytest.mark.parametrize("fact", ["production", "duration", "role", "project_stacks", None])
+def test_grouped_decoder_derives_presence_including_false_and_zero_without_inference(fact):
+    raw = _grouped(A)
+    raw.update(duration={"value": None, "status": None}, production={"value": None, "status": None},
+               role={"value": None, "status": None}, project_domains=[], project_stacks=[])
+    if fact == "production":
+        raw[fact] = {"value": False, "status": "self_reported"}
+    elif fact == "duration":
+        raw[fact] = {"value": 0, "status": "rejected"}
+    elif fact == "role":
+        raw[fact] = {"value": "Разработчик", "status": "pending"}
+    elif fact == "project_stacks":
+        raw[fact] = [{"key": "python", "status": "partial"}]
+    response = _response({"profiles": [raw]})
+    before = deepcopy(response)
+    canonical = decode_generation_response(response, GENERATION_MODEL, "rerank-uniform-cohort-generation-v4")[0]
+    assert canonical["structured_facts_available"] is (fact is not None)
+    assert canonical["production_support"] == raw["production"]["value"]
+    assert canonical["production_status"] == raw["production"]["status"]
+    assert canonical["duration_months"] == raw["duration"]["value"]
+    assert canonical["duration_status"] == raw["duration"]["status"]
+    assert canonical["role"] == raw["role"]["value"] and canonical["role_status"] == raw["role"]["status"]
+    assert canonical["project_stacks"] == raw["project_stacks"]
+    assert canonical["status"] == raw["status"] and canonical["skill_statuses"] == raw["skill_statuses"]
+    assert response == before
+
+
+@pytest.mark.parametrize("mutation", [
+    lambda raw: raw.update(production={"value": False, "status": None}),
+    lambda raw: raw.update(duration={"value": 0, "status": None}),
+    lambda raw: raw.update(role={"value": "Разработчик", "status": None}),
+    lambda raw: raw.update(production={"value": None, "status": "confirmed"}),
+    lambda raw: raw.update(production={"value": "false", "status": "self_reported"}),
+    lambda raw: raw.update(production={"value": False, "status": "confirmed", "extra": True}),
+    lambda raw: raw.update(production={"value": False}),
+    lambda raw: raw.update(duration={"value": 53, "status": "confirmed"}),
+    lambda raw: raw.update(salary_min=87321),
+    lambda raw: raw.update(structured_facts_available=True),
+    lambda raw: raw.update(project_stacks=[{"key": key, "status": "partial"} for key in ("python", "node", "react")]),
+])
+def test_grouped_decoder_rejects_invalid_pairs_or_schema_bounds_without_coercion(mutation):
+    raw = _grouped(A)
+    mutation(raw)
+    response = _response({"profiles": [raw]})
+    with pytest.raises(ValueError):
+        decode_generation_response(response, GENERATION_MODEL, "rerank-uniform-cohort-generation-v4")
+
+
+def test_decoder_requires_pinned_format_model_and_finished_response():
+    raw = _grouped(A)
+    response = _response({"profiles": [raw]})
+    assert decode_generation_response(response, GENERATION_MODEL, "rerank-uniform-cohort-generation-v4-repair1") == [A]
+    for version in ("unversioned", "rerank-uniform-cohort-generation-v6",
+                    "rerank-uniform-cohort-generation-v4-repair2"):
+        with pytest.raises(ValueError, match="prompt version"):
+            decode_generation_response(response, GENERATION_MODEL, version)
+    with pytest.raises(ValueError, match="grouped generation fields"):
+        decode_generation_response(_response({"profiles": [A]}), GENERATION_MODEL, PROMPT_VERSIONS["generation"])
+    with pytest.raises(ValueError):
+        decode_generation_response(response, GEMMA_GENERATION_MODEL, PROMPT_VERSIONS["generation"])
+    response["choices"][0]["finish_reason"] = "length"
+    with pytest.raises(ValueError, match="unfinished"):
+        decode_generation_response(response, GENERATION_MODEL, PROMPT_VERSIONS["generation"])
+
+
+def test_reference_slots_prioritize_sorted_declared_keys_and_fill_registry():
+    assert project_reference_slots(["python", "teamwork"], "domain") == ("ai_agents", "algorithms")
+    assert project_reference_slots(["python", "teamwork"], "stack") == ("python", "angular")
+    assert project_reference_slots(["rest_api", "sql", "classical_ml", "python"], "domain") == ("classical_ml", "rest_api")
+    assert project_reference_slots(["react", "python", "node"], "stack") == ("node", "python")
+    assert project_reference_slots(list(reversed(KEYS)), "domain") == project_reference_slots(KEYS, "domain")
+
+
+@pytest.mark.parametrize("status", [None, *STATUSES])
+def test_v5_maps_decode_exact_reference_statuses_and_null_means_absence(status):
+    raw = _mapped(GEN_A)
+    raw.update(duration={"value": None, "status": None}, production={"value": None, "status": None},
+               role={"value": None, "status": None})
+    raw["project_domains"] = {"sql": status, "ai_agents": None}
+    raw["project_stacks"] = {"python": None, "angular": None}
+    response = _response({"profiles": [raw]})
+    before = deepcopy(response)
+    canonical = decode_generation_response(response, GENERATION_MODEL, PROMPT_VERSIONS["generation"])[0]
+    assert canonical["project_domains"] == ([] if status is None else [{"key": "sql", "status": status}])
+    assert canonical["project_stacks"] == []
+    assert canonical["structured_facts_available"] is (status is not None)
+    assert canonical["status"] == GEN_A["status"]
+    assert canonical["skill_statuses"] == GEN_A["skill_statuses"]
+    assert response == before
+    assert decode_generation_response(response, GENERATION_MODEL, PROMPT_VERSIONS["generation"] + "-repair1") == [canonical]
+
+
+@pytest.mark.parametrize("bad_refs", [
+    [], [{"key": "sql", "status": "confirmed"}], {}, {"sql": "confirmed"},
+    {"sql": "confirmed", "ai_agents": None, "rest_api": "pending"},
+    {"sql": "confirmed", "algorithms": None}, {"sql": True, "ai_agents": None},
+    {"sql": "unknown", "ai_agents": None}, {"sql": {"status": "partial"}, "ai_agents": None},
+])
+def test_v5_rejects_wrong_reference_format_exact_scope_or_status_type(bad_refs):
+    raw = _mapped(GEN_A)
+    raw["project_domains"] = bad_refs
+    with pytest.raises(ValueError):
+        decode_generation_response(_response({"profiles": [raw]}), GENERATION_MODEL, PROMPT_VERSIONS["generation"])
+
+
+def test_v5_duplicate_key_conflicting_statuses_are_rejected_as_raw_json():
+    response = _response({"profiles": [_mapped(GEN_A)]})
+    content = response["choices"][0]["message"]["content"]
+    response["choices"][0]["message"]["content"] = content.replace('"sql": "confirmed"',
+        '"sql": "confirmed", "sql": "rejected"')
+    with pytest.raises(ValueError, match="duplicate JSON"):
+        decode_generation_response(response, GENERATION_MODEL, PROMPT_VERSIONS["generation"])
+    # Existing accepted grouped-array receipts remain arrays without interpretation.
+    assert decode_generation_response(_response({"profiles": [_grouped(A)]}), GENERATION_MODEL,
+                                     "rerank-uniform-cohort-generation-v4") == [A]
+
+
+def test_remaining_family_scenario_hints_are_stable_distinct_and_fact_neutral(tmp_path):
+    provider = _provider(tmp_path)
+    hints = []
+    for family_id, expected in GENERATION_SCENARIOS.items():
+        direction = family_id.split("-", 1)[0]
+        payload = provider.generation_payload(direction, family_id, KEYS)
+        state = json.loads(payload["messages"][1]["content"])
+        assert state["scenario_hint"] == expected
+        assert state["required_keys"] == list(KEYS)
+        assert "policy" not in state and "scores" not in state
+        assert payload == provider.generation_payload(direction, family_id, KEYS)
+        instructions = payload["messages"][0]["content"]
+        assert "not evidence, a skill declaration" in instructions
+        assert "Even beginner descriptions must mention an applicable task" in instructions
+        assert "not text to append mechanically" in instructions
+        hints.append(state["scenario_hint"])
+    assert len(hints) == len(set(hints)) == 9
+    fallback = json.loads(provider.generation_payload("backend", "backend-01", KEYS)["messages"][1]["content"])
+    assert fallback["scenario_hint"] == "Синтетическая задача направления backend, семейство backend-01."
 
 
 def test_valid_pair_and_independent_grade(tmp_path, monkeypatch):
@@ -439,12 +623,12 @@ def test_shared_cache_ledger_key_laziness_and_all_kind_chat_transport(tmp_path, 
         opened.append(request)
         payload = json.loads(request.data)
         kind = json.loads(payload["messages"][1]["content"])["request_nonce"]["kind"]
-        answer = {"generation": {"profiles": [A]}, "pair": _pair_answer(), "grade": _grade_answer()}[kind]
+        answer = {"generation": {"profiles": [_mapped(GEN_A)]}, "pair": _pair_answer(), "grade": _grade_answer()}[kind]
         return io.BytesIO(json.dumps(_response(answer, payload["model"])).encode())
 
     monkeypatch.setattr(provider, "_open", open_response)
     assert not keys_read
-    assert provider.generate_family("backend", "backend-01", KEYS, 1) == [A]
+    assert provider.generate_family("backend", "backend-01", KEYS, 1) == [GEN_A]
     provider.judge(VACANCY, A, B, POLICY)
     provider.suitability(VACANCY, A, POLICY)
     assert len(opened) == len(keys_read) == 3

@@ -19,7 +19,7 @@ from matching_engine.rerank_protocol import DIRECTIONS, expected_families
 from matching_engine.rerank_providers import _atomic_write
 
 REVIEW_VERSION = "score-blind-cohort-review-v1"
-DEFAULT_COHORT = "rerank-grounded-cohort-v5"
+DEFAULT_COHORT = "rerank-grounded-cohort-v9"
 REVIEWERS = ("assistant", "user")
 _VACANCY_FIELDS = {"class", "domens", "stacks", "soft_skills", "bio", "salary"}
 _POLICY_FIELDS = {"id", "ordered_priorities", "instructions", "required_measurements",

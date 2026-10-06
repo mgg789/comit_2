@@ -11,12 +11,12 @@
 Dataset и признаки при выборе пар не читаются. Разметка остальных данных может
 продолжаться независимо; подготовка пакета не является блокировкой расширения.
 JSON и русскоязычный Markdown записываются неизменяемо в
-`tests/artifacts/reranker/rerank-grounded-cohort-v5/reviews/`.
+`tests/artifacts/reranker/rerank-grounded-cohort-v9/reviews/`.
 
 Из корня репозитория:
 
 ```bash
-PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_review prepare --directory tests/artifacts/reranker --cohort-id rerank-grounded-cohort-v5
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_review prepare --directory tests/artifacts/reranker --cohort-id rerank-grounded-cohort-v9
 ```
 
 Файлы: `assistant-packet.json`, `assistant-packet.md`, `user-packet.json`,
@@ -55,7 +55,7 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 После завершения dataset:
 
 ```bash
-PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_review compare --directory tests/artifacts/reranker --cohort-id rerank-grounded-cohort-v5 --review-file /absolute/path/user-review.json
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine.rerank_cohort_review compare --directory tests/artifacts/reranker --cohort-id rerank-grounded-cohort-v9 --review-file /absolute/path/user-review.json
 ```
 
 Сравнение проверяет sealed dataset и семейства, исходные hashes, точные факты
@@ -69,4 +69,4 @@ decisive_vs_insufficient и tie_vs_insufficient, причины и число н
 [контекста реранкера](../context/51-reranker-and-feed-learning.md).
 
 Модуль не вызывает API, не читает credentials и не обучает модель.
-Существующий v5 manifest/code hash не меняется: это отдельный операторский инструмент.
+Существующий v7 manifest/code hash не меняется: это отдельный операторский инструмент.

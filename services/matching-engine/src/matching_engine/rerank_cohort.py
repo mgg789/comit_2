@@ -17,8 +17,13 @@ from matching_engine.rerank_cohort_features import (
 )
 from matching_engine.rerank_cohort_provider import (
     CohortProviders,
-    _parse,
+    decode_generation_response,
     validate_candidate,
+)
+from matching_engine.rerank_description_repair import (
+    DESCRIPTION_REPAIRS,
+    apply_description_repairs,
+    audit_description_repairs,
 )
 from matching_engine.rerank_diagnostics import REVERSE, _read, _seal
 from matching_engine.rerank_experiment import _parallel, family_manifest
@@ -32,8 +37,8 @@ from matching_engine.rerank_providers import (
 from matching_engine.rerank_sample_probe import _cycles, _ordering_ceiling
 from matching_engine.strict import INITIAL_GROUPS
 
-VERSION = "rerank-grounded-cohort-v5"
-PRIOR_VERSION = "rerank-grounded-cohort-v4"
+VERSION = "rerank-grounded-cohort-v9"
+PRIOR_VERSION = "rerank-grounded-cohort-v7"
 CORE_KEYS = {
     "backend": ("python", "node", "go", "sql", "rest_api", "architecture_thinking", "teamwork"),
     "frontend": ("react", "vue", "html_css_jquery", "tailwind", "ux_userflow", "rest_api", "teamwork"),
@@ -115,6 +120,20 @@ def _spent_profiles(directory: Path, attempts: int, historical: int) -> tuple[in
     return historical*5 + sum(r['profile_upper_bound'] for r in receipts) + remaining*7,sorted(receipts,key=lambda r:r['request_hash'])
 
 
+class _CacheOnlyPilot(CohortProviders):
+    """Revalidate unchanged teacher payloads against exact prior raw responses without HTTP/key reads."""
+
+    def request(self, path: str, payload: dict, kind: str) -> dict:
+        """Require an exact cached identity and verified response; missing entries never call a provider."""
+        identity = self._identity(path,payload,kind);key = digest(identity)
+        file = self.directory / f'{key}.json'
+        if not file.exists():raise ValueError('unchanged pilot payload has no exact cached response')
+        raw = _read(file)
+        if raw['request'] != identity or raw['request_hash'] != key or raw['response_hash'] != digest(raw['response']):
+            raise ValueError('cached pilot response changed')
+        return raw['response']
+
+
 def cohort_manifest(directory: Path) -> dict:
     """Freeze ancestry, seven-profile quotas, direction coverage and costs before new HTTP."""
     old = {p.stem: _read(p) for p in (directory / "families").glob("*.json")}
@@ -144,14 +163,17 @@ def cohort_manifest(directory: Path) -> dict:
             item["reuse"] = {"record_hash": record["record_hash"], "indices": [*range(6), len(record["traits"]) - 1]}
         else:
             item["reuse"] = None
+        item['description_repairs'] = []
         prior_path = directory / PRIOR_VERSION / "sources" / f'{item["family_id"]}.json'
         if not prior_path.exists():
             prior_path = directory / "rerank-grounded-cohort-v2" / "sources" / f'{item["family_id"]}.json'
         item["prior_source"] = None
         if prior_path.exists() and item["reuse"] is None:
+            if prior_path.parent.parent.name == PRIOR_VERSION:
+                item['description_repairs'] = deepcopy(DESCRIPTION_REPAIRS.get(item['family_id'],[]))
             prior = _read(prior_path)
-            comparable = {k:v for k,v in prior["manifest"].items() if k not in ("cohort_id", "prior_source")}
-            if comparable != {k:v for k,v in item.items() if k not in ("cohort_id", "prior_source")}:
+            comparable = {k:v for k,v in prior["manifest"].items() if k not in ("cohort_id", "prior_source", "description_repairs")}
+            if comparable != {k:v for k,v in item.items() if k not in ("cohort_id", "prior_source", "description_repairs")}:
                 raise ValueError("prior source ancestry or requirements changed")
             item["prior_source"] = {"path":str(prior_path.relative_to(directory)),"record_hash":prior["record_hash"]}
         rows.append(item)
@@ -159,6 +181,8 @@ def cohort_manifest(directory: Path) -> dict:
     first_path = directory / "rerank-grounded-cohort-v1" / "manifest.json"
     historical_generation = _read(first_path)["ledger_before"]["generation"] if first_path.exists() else before["generation"]
     spent_profile_bound, generation_receipts = _spent_profiles(directory,before["generation"],historical_generation)
+    manual_variants = sum(len(item['description_repairs']) for item in rows)
+    spent_profile_bound += manual_variants
     limits = {"generation": min(LIMITS["generation"] - before["generation"], (600 - spent_profile_bound) // 7),
               "pair": LIMITS["pair"] - before["pair"], "grade": LIMITS["grade"] - before["grade"]}
     normal = {"generation": sum(r["reuse"] is None and r["prior_source"] is None for r in rows), "pair": 60 * (21 + 3) + 20, "grade": 420 + 10}
@@ -173,17 +197,17 @@ def cohort_manifest(directory: Path) -> dict:
                 "model_scope": "Global baseline prior, not employer-policy-conditioned ranking",
                 "activation_allowed": False, "generator": GEMMA_GENERATION_MODEL,
                 "generation_spent_profile_bound":spent_profile_bound,
+                "manual_description_variants":manual_variants,
                 "generation_profile_receipts":generation_receipts,
                 "seed_hash": digest((Path(__file__).resolve().parents[4] / "data/seed/candidate-pipeline.json").read_bytes().hex()),
                 "protected_source_hashes": {str(path.relative_to(directory)):digest(path.read_bytes().hex()) for path in
                     [*(directory / "families").glob("*.json"),
                      *(p for p in (directory / "provider-cache").glob("*.json") if p.name != "usage.json"),
                      directory / "semantic-cache.json",
-                     *(directory / PRIOR_VERSION).rglob("*.json"),
-                     *(directory / "rerank-grounded-cohort-v3").rglob("*.json"),
-                     *(directory / "rerank-grounded-cohort-v2").rglob("*.json")]},
+                     *(path for version in range(2,9) for path in
+                       (directory / f"rerank-grounded-cohort-v{version}").rglob("*.json"))]},
                 "code_hashes": {name: digest((Path(__file__).parent / name).read_bytes().hex()) for name in
-                                ("rerank_cohort.py", "rerank_cohort_provider.py", "rerank_cohort_features.py",
+                                ("rerank_cohort.py", "rerank_cohort_provider.py", "rerank_cohort_features.py", "rerank_description_repair.py",
                                  "rerank_features.py", "combine_scoring.py", "models.py", "embeddings.py",
                                  "strict.py", "strict_evidence.py", "vacancy_features.py")}}
     manifest["manifest_hash"] = digest(manifest)
@@ -282,6 +306,17 @@ def run_pilot(directory: Path, manifest: dict) -> dict:
     """Check twenty directed pairs and ten independent grades before expanding; no model predictions."""
     provider = CohortProviders(directory / "provider-cache", cohort_id=VERSION)
     cases = pilot_cases()
+    prior_pilot = directory / 'rerank-grounded-cohort-v5'
+    reused = None
+    if (prior_pilot/'pilot-report.json').exists():
+        previous = _read(prior_pilot/'pilot-report.json');packet = _read(prior_pilot/'pilot-packet.json')
+        if (previous['report_hash'] != digest({k:v for k,v in previous.items() if k!='report_hash'})
+                or packet['packet_hash'] != digest({k:v for k,v in packet.items() if k!='packet_hash'})
+                or previous['packet_hash'] != packet['packet_hash']):
+            raise ValueError('prior pilot receipt changed')
+        if previous['passed'] and packet['cases'] == cases:
+            provider = _CacheOnlyPilot(directory/'provider-cache',cohort_id='rerank-grounded-cohort-v5')
+            reused = {'cohort_id':'rerank-grounded-cohort-v5','report_hash':previous['report_hash']}
     target = directory / VERSION
     packet = {"version": VERSION, "cases": cases, "reviewer_kind": "assistant", "independent_human_evaluation": False}
     packet["packet_hash"] = digest(packet)
@@ -308,7 +343,7 @@ def run_pilot(directory: Path, manifest: dict) -> dict:
     grades = _parallel(grade,cases)
     report = {"packet_hash": packet["packet_hash"], "pairs": pairs, "grades": grades,
               "passed": all(r["agrees"] for r in pairs+grades), "http_scope": "synthetic only",
-              "training_started": False, "activation_allowed": False}
+              "training_started": False, "activation_allowed": False,"cache_only_revalidated_pilot":reused}
     report["report_hash"] = digest(report);_seal(target / "pilot-report.json",report)
     return report
 
@@ -358,7 +393,7 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
                 seen.add(link['path']);prior = _read(prior_path)
                 if prior["record_hash"] != link["record_hash"] or prior["record_hash"] != digest({k:v for k,v in prior.items() if k != "record_hash"}):
                     raise ValueError("prior accepted source changed")
-                if {k:v for k,v in prior['manifest'].items() if k not in ('cohort_id','prior_source')} != {k:v for k,v in item.items() if k not in ('cohort_id','prior_source')}:
+                if {k:v for k,v in prior['manifest'].items() if k not in ('cohort_id','prior_source','description_repairs')} != {k:v for k,v in item.items() if k not in ('cohort_id','prior_source','description_repairs')}:
                     raise ValueError("prior source lineage changed ancestry")
                 if traits is not None and prior['traits'] != traits:
                     raise ValueError("prior source lineage changed facts")
@@ -372,7 +407,7 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
             raw = _read(provider.directory / f'{matching[0]["request_hash"]}.json')
             if raw["request_hash"] != matching[0]["request_hash"] or raw["response_hash"] != digest(raw["response"]) or digest(raw["request"]) != raw["request_hash"]:
                 raise ValueError("prior raw generation receipt changed")
-            if _parse(raw["response"],raw["request"]["model"]) != {"profiles":prior["traits"]}:
+            if decode_generation_response(raw["response"],raw["request"]["model"],raw["request"]["prompt_version"]) != prior["traits"]:
                 raise ValueError("prior parsed source differs from raw generation")
             traits = prior["traits"]
         else:
@@ -382,6 +417,7 @@ def generate_sources(directory: Path, manifest: dict) -> list[dict]:
                           lambda attempt: provider.generation_payload(item["direction"],item["family_id"],item["keys"],attempt=attempt),
                           lambda attempt: provider.generate_family(item["direction"],item["family_id"],item["keys"],attempt=attempt),
                           start_attempt=0 if not saved else saved.get("generation_start_attempt",0))
+        traits = apply_description_repairs(traits,item['description_repairs'],item['split'])
         if len(traits) != 7:
             raise ValueError("cohort family must contain seven accepted source profiles")
         for trait in traits:validate_candidate(trait)
@@ -503,6 +539,10 @@ def run_cohort(directory: Path, *, pilot_only: bool = False) -> dict:
         semantic_path = target / "semantic-cache.json"
         if not semantic_path.exists():
             _seal(semantic_path,_read(directory / "semantic-cache.json"))
+        description_audit = None
+        if manifest['manual_description_variants']:
+            old_sources = [_read(directory/PRIOR_VERSION/'sources'/f'{item["family_id"]}.json') for item in manifest['families']]
+            description_audit = audit_description_repairs(directory,VERSION,sources,old_sources)
         pools = {direction:[candidate_profile(trait,direction) for source in sources
                             if source["manifest"]["direction"]==direction for trait in source["traits"]]
                  for direction in DIRECTIONS}
@@ -517,7 +557,7 @@ def run_cohort(directory: Path, *, pilot_only: bool = False) -> dict:
         quality = {"minimum_golden_decisive_pairs":min(decisive[r["manifest"]["family_id"]] for r in families if r["manifest"]["split"]=='golden'),
                    "swap_correct":swaps,"swap_total":180,"quarantined_families":[r["manifest"]["family_id"] for r in families if r["quarantined"]]}
         quality["passed"] = swaps >=162 and not quality["quarantined_families"] and quality["minimum_golden_decisive_pairs"]>=6
-        dataset = {"version":VERSION,"manifest_hash":manifest["manifest_hash"],"families":families,"teacher":families[0]["teacher"],"quality":quality,"pilot_hash":pilot["report_hash"],"training_started":False,"activation_allowed":False}
+        dataset = {"version":VERSION,"manifest_hash":manifest["manifest_hash"],"families":families,"teacher":families[0]["teacher"],"quality":quality,"pilot_hash":pilot["report_hash"],"description_audit":description_audit,"training_started":False,"activation_allowed":False}
         dataset["dataset_hash"] = digest(dataset);_seal(target / "dataset.json",dataset)
         report = {"state":"labeled_quality_passed_needs_review" if quality["passed"] else "labeled_quality_failed_needs_repair",
                   "families":60,"profiles":420,"split_counts":manifest["split_counts"],"directions":dict(Counter(r["manifest"]["direction"] for r in families)),

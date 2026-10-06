@@ -57,6 +57,24 @@ def test_precise_accounting_keeps_unknown_http_responses_conservative(directory)
         cohort._spent_profiles(directory,30,28)
 
 
+def test_prior_pilot_revalidation_requires_exact_raw_cache_without_http(directory,monkeypatch):
+    provider=cohort._CacheOnlyPilot(directory/'provider-cache',cohort_id='rerank-grounded-cohort-v5')
+    case=cohort.pilot_cases()[0]
+    payload=provider.pair_payload(case['vacancy'],case['A'],case['B'],case['policy'])
+    identity=provider._identity('/v1/chat/completions',payload,'pair');key=digest(identity)
+    monkeypatch.setattr(provider,'_open',lambda *_:pytest.fail('HTTP during pilot replay'))
+    monkeypatch.setattr(provider,'_api_key',lambda:pytest.fail('key read during pilot replay'))
+    with pytest.raises(ValueError,match='no exact cached'):
+        provider.request('/v1/chat/completions',payload,'pair')
+    response={'model':'qwen3.8-27b'}
+    raw={'request':identity,'request_hash':key,'response':response,'response_hash':digest(response)}
+    path=directory/'provider-cache'/f'{key}.json';path.write_text(json.dumps(raw))
+    assert provider.request('/v1/chat/completions',payload,'pair')==response
+    raw['response_hash']='changed';path.write_text(json.dumps(raw))
+    with pytest.raises(ValueError,match='response changed'):
+        provider.request('/v1/chat/completions',payload,'pair')
+
+
 def test_existing_family_cannot_move_to_another_split(directory):
     path=directory / "families/backend-01.json";record=json.loads(path.read_text())
     record["manifest"]["split"]="golden";path.write_text(json.dumps(record))

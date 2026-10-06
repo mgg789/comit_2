@@ -8,6 +8,7 @@ import tempfile
 from collections import Counter
 from copy import deepcopy
 from pathlib import Path
+from typing import get_args
 from uuid import NAMESPACE_URL, uuid5
 
 from matching_engine.combine_models import (
@@ -24,6 +25,7 @@ from matching_engine.embeddings import (
 from matching_engine.models import (
     GRADE_RANK,
     CandidateProfile,
+    NarrativeRole,
     category_for,
     confirmed_strength,
 )
@@ -50,7 +52,7 @@ from matching_engine.strict_evidence import build_strict_evidence
 from matching_engine.vacancy_features import build_strict_features, semantic_text
 from matching_engine.vacancy_models import VacancyInput, VacancyReady, build_mode
 
-BUILD_VERSION = "grounded-cohort-runtime-features-v1"
+BUILD_VERSION = "grounded-cohort-runtime-features-v2"
 FAMILY_SIZE = 7
 SEMANTIC_RECEIPT_VERSION = "grounded-semantic-entry-v1"
 
@@ -65,6 +67,8 @@ def candidate_profile(trait: dict, direction: str) -> CandidateProfile:
     Registered skill groups and each fact's own status are retained. Missing scalar
     facts remain absent; prose cannot populate facts. Salaries are RUB and must
     overlap the fixed cohort vacancy. Seed narratives and preferences are removed.
+    Exact NarrativeRole enum values remain unchanged; arbitrary upstream job titles
+    map to other with original text in private provenance, never inferred from prose.
     """
     validate_candidate(trait)
     levels, statuses = trait["levels"], trait["skill_statuses"]
@@ -88,6 +92,9 @@ def candidate_profile(trait: dict, direction: str) -> CandidateProfile:
                                       ("production_support", "production_status"), ("role", "role_status")):
             if trait[value_key] is not None:
                 facts[value_key] = {"value": trait[value_key], "status": trait[status_key]}
+                if value_key == "role" and trait[value_key] not in get_args(NarrativeRole):
+                    facts[value_key]["value"] = "other"
+                    facts[value_key]["provenance"] = [f"source_role_title:{trait[value_key]}"]
         project["facts"] = facts
     elif any(trait[key] is not None for key in ("duration_months", "production_support", "role")) or any(
         trait[key] for key in ("project_domains", "project_stacks")
