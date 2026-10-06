@@ -1,7 +1,7 @@
 # Ограниченная ревизия парных правил R₀
 
 `matching_engine.rerank_cohort_pair_repair` создаёт отдельную версию
-`rerank-grounded-pair-repair-v1` для завершённой выборки
+`rerank-grounded-pair-repair-v2` для завершённой выборки
 `rerank-grounded-cohort-v9`. Это явное изменение правил сравнения, а не
 автоматическое исправление прежней «истины». Старые dataset, источники,
 raw receipts, признаки, main scores и независимые оценки пригодности сохраняются.
@@ -25,7 +25,7 @@ raw receipts, признаки, main scores и независимые оценк
 Зарплата, biography, широта навыков и выдуманные требования не участвуют
 в class-only сравнении. Арифметическое поле salary comparison остаётся
 проверяемой копией исходных сумм и не определяет метку.
-Для технических вакансий v3 prompt уточняет сравнение coverage и заявленной
+Для технических вакансий v4 prompt уточняет сравнение coverage и заявленной
 глубины по общим явно запрошенным координатам. Confirmation используется
 только как явно заданный вторичный критерий; статус родителя не подтверждает
 навык или факт. Неизвестный уровень не превращается в ноль. Исходная nonclass
@@ -57,7 +57,11 @@ rejected статус без аннулирования формального �
 
 Общие ceilings остаются generation 120 / pair 3000 / grade 600. Оператор
 использует только shared pair ledger, тот же cache, пять remote slots и lazy
-credential read. Перед пилотом проверяется план 2268 + 672 = 2940 ≤ 3000.
+credential read. Перед пилотом v2 проверяется план 2268 + 24 + 672 = 2964 ≤ 3000:
+24 уже потраченных v1 attempts не сбрасываются. Frozen v1 pilot, все 24 raw
+receipts и его code hash из Git checkpoint `7585ee7` проверяются до v2 HTTP.
+Неизвестное дополнительное prior usage, новый prior namespace или изменённый
+receipt блокируют запуск. V2 manifest фиксирует hashes всей предыдущей попытки.
 Пилот и парные jobs каждого семейства выполняются через существующий
 bounded executor с пятью threads и сохраняют исходный порядок результатов.
 Короткий собственный `.budget.lock` защищает reserve и started receipt;
@@ -99,16 +103,17 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 неизменный `labels_hash`. Оператор не подменяет исходный путь автоматически.
 
 В отдельном repair каталоге находятся `pilot-manifest.json`, `pilot-report.json`,
+`closure-observation.json` с локальным наблюдением завершения pilot jobs,
 `manifest.json` с полным выбранным составом, `jobs/`, `budget.json`,
 принятые `families/`, `dataset.json` и `repair-report.json`.
 После каждого выбранного семейства CLI печатает JSON progress с family ID,
 swap count, decisive count, quarantine и whole-family admission.
-Prompt пары — `rerank-uniform-cohort-pair-v3`; исходный grade v2 сохраняется.
+Prompt пары — `rerank-uniform-cohort-pair-v4`; исходный grade v2 сохраняется.
 Формируется полный derived dataset из 60 семейств. Неизбранные records
 копируются точно; выбранные сохраняют исходные manifest, vacancy, traits,
 source hash, признаки, main scores, lineage и grade answers. Меняются только
 парные ответы, audits, связанные cycle/order diagnostics и pair provenance.
-Смешанная история v3 repaired/v2 preserved пар отмечена явно.
+Смешанная история v4 repaired/v2 preserved пар отмечена явно.
 
 Quality пересчитывается по **180 teacher reverse comparisons**, а не человеческому
 согласию: ≥162/180, каждое семейство ≥2/3, отсутствие quarantine и минимум
@@ -155,3 +160,31 @@ grade. Generic repair-инструкция о JSON-полях не исправ�
 
 Machine gate не пройден. Family repair не запускался; исходные v9 пары и
 независимые grades этим пилотом не менялись. Raw receipts и manifest v1 сохранены.
+
+## Семантический контракт v2 / prompt v4
+
+Те же десять заранее зафиксированных fixtures проходят сначала обязательный
+essential gate. Если exclusive criterion требует отсутствующее или null измерение
+хотя бы одной стороны, сразу insufficient; grade и любые другие признаки
+не подставляются. После этого class-only шаги выполняются строго последовательно:
+formal grade; production value и его собственное confirmation только при двух
+известных nonrejected фактах; duration только при двух известных nonrejected
+фактах; tie, если ни один применимый шаг не дал различия. Отдельного duration
+confirmation tiebreak нет. Rejected исключает применимость, а не становится
+нижним рангом confirmation.
+
+Одинаковый semantic contract присутствует в initial и единственном retry prompt.
+В request добавлена проверяемая таблица `criterion_applicability`: только наличие
+явно обязательных измерений и применимость production/duration; целевая метка,
+manual labels и scores не передаются. V1 source сохранён в Git checkpoint;
+в его каталог и raw cache новый оператор не записывает.
+
+Pilot report фиксирует `ledger_after_pilot` после завершения всех jobs.
+Closure observation содержит `job_receipts_hash` как digest объекта
+`{filename: parsed_job}` по `pilot-*.json`, `raw_response_hashes` по request hash,
+число фактических distinct raw reservations, тот же global counter и снимок
+состояния base. Проверка требует terminal receipts и монотонный counter между
+началом пилота и последующим ledger. Это локальное наблюдение, не доказательство
+времени удалённого ответа. При завершённом base snapshot явно показывает
+`base_dataset_existed=true`; такое наблюдение не заявляет, что пилот завершился
+раньше base closure. Final repair report фиксирует closure observation hash.

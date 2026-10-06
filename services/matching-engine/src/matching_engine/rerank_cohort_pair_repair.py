@@ -6,10 +6,12 @@ import itertools
 import json
 from collections.abc import Sequence
 from copy import deepcopy
+from datetime import UTC, datetime
 from pathlib import Path
 
 from matching_engine.rerank_cohort_provider import (
     CohortProviders,
+    _parse,
     source_citations,
     validate_candidate,
 )
@@ -20,9 +22,13 @@ from matching_engine.rerank_protocol import expected_families
 from matching_engine.rerank_providers import LIMITS, _atomic_write
 from matching_engine.rerank_sample_probe import _cycles, _ordering_ceiling
 
-VERSION = "rerank-grounded-pair-repair-v1"
+VERSION = "rerank-grounded-pair-repair-v2"
+PREVIOUS_VERSION = "rerank-grounded-pair-repair-v1"
+PREVIOUS_COMMIT = "7585ee7b382a406cd0e75a852883e36cd2f31790"
+PREVIOUS_CODE_HASH = "6c2e64302e7b11fdc3e373b9b8793f67cd45857e5c4b0566626db38302182f74"
+PREVIOUS_ATTEMPTS = 24
 BASE_COHORT = "rerank-grounded-cohort-v9"
-PAIR_PROMPT_VERSION = "rerank-uniform-cohort-pair-v3"
+PAIR_PROMPT_VERSION = "rerank-uniform-cohort-pair-v4"
 MAX_ATTEMPTS = 672
 PROJECTED_BASE_FINAL_PAIR = 2268
 CLASS_ONLY_POLICY = {
@@ -46,6 +52,27 @@ _AUDIT_INDICES = (0, 7, 14)
 _REVERSE = {"A": "B", "B": "A", "tie": "tie", "insufficient": "insufficient"}
 _GRADE = {"intern": 0, "junior": 1, "middle": 2, "senior": 3}
 _STATUS = {"pending": 0, "self_reported": 1, "partial": 2, "confirmed": 3}
+_DECISION_CONTRACT = (
+    "PAIR DECISION CONTRACT v4. Execute these checks in order; the essential gate precedes ANY other criterion. "
+    "STEP 0: if exclusive_criterion=true and ANY required_measurements path is absent or null on EITHER side, "
+    "STOP with insufficient and insufficient_source_facts. Grade, confirmation, production, duration, salary "
+    "and prose CANNOT substitute for the missing measurement, even when grades differ. "
+    "For a class-only vacancy ONLY, continue lexicographically: "
+    "STEP 1: compare accepted formal grade senior>middle>junior>intern, regardless of parent status. "
+    "If grades differ, select the higher grade and STOP. Otherwise continue. "
+    "STEP 2 is applicable ONLY when BOTH production values are non-null and BOTH OWN production_status values "
+    "are not rejected. If either side fails this condition, skip BOTH production value and production "
+    "confirmation comparisons completely; do not reward the other side for being known or confirmed. "
+    "If applicable, compare true>false; if values differ STOP. If values are equal, compare OWN production "
+    "confirmed>partial>self_reported>pending; if statuses differ STOP. Otherwise continue. "
+    "STEP 3 is applicable ONLY when BOTH duration values are non-null and BOTH OWN duration_status values "
+    "are not rejected. If either side fails, skip duration completely, without rewarding the known side. "
+    "If applicable, greater duration wins; if values differ STOP. No duration confirmation tiebreak exists. "
+    "STEP 4: if no applicable step established a difference, STOP with tie and comparable_fit. In particular, "
+    "equal formal grades plus inapplicable production and duration MUST be tie regardless of one side's "
+    "known duration or confirmed production. Rejected is an applicability exclusion, not a bottom confirmation rank. "
+    "These same semantic checks apply on the initial request and the single repair request. "
+)
 
 
 def _read(path: Path) -> dict:
@@ -148,7 +175,7 @@ def _allowed_citations(vacancy: dict, a: dict, b: dict) -> dict[str, list[str]]:
 
 
 class PairRepairProviders(CohortProviders):
-    """Pair-only v3 teacher with inherited cache, five shared slots and lazy credentials."""
+    """Pair-only v4 teacher with inherited cache, five shared slots and lazy credentials."""
 
     def __init__(self, directory: Path, *, key_file: Path | None = None) -> None:
         """Bind the repair namespace; do not read a credential or reset any shared budget."""
@@ -190,15 +217,19 @@ class PairRepairProviders(CohortProviders):
         state["available_citations"] = allowed
         state["source_citations"] = {token: fact for token, fact in state["source_citations"].items()
                                      if token in allowed[fact["candidate"]]}
+        state["criterion_applicability"] = {
+            "exclusive_criterion": policy.get("exclusive_criterion", False),
+            "required_measurements": [{"path": field, "available_A": _measurement(a, field) is not None,
+                                       "available_B": _measurement(b, field) is not None}
+                                      for field in policy.get("required_measurements", [])],
+            "class_only": _class_only(vacancy),
+            "production_comparison_applicable": all(candidate["production_support"] is not None
+                and candidate["production_status"] != "rejected" for candidate in (a, b)),
+            "duration_comparison_applicable": all(candidate["duration_months"] is not None
+                and candidate["duration_status"] != "rejected" for candidate in (a, b)),
+        }
         payload["messages"][1]["content"] = json.dumps(state, ensure_ascii=False, sort_keys=True)
-        payload["messages"][0]["content"] += (
-            " Pair protocol v3: ONLY for class-only vacancies the class-only-policy-v1 priorities are exhaustive and lexicographic. "
-            "Formal grade remains accepted regardless of parent profile status, including rejected. "
-            "For equal grade, compare production true>false only if both are known with their own non-rejected "
-            "statuses; then compare production's own confirmed>partial>self_reported>pending confirmation. "
-            "Then compare duration only if both are known with their own non-rejected statuses. "
-            "Missing nonexclusive signals make that comparison inapplicable; skip them, never substitute zero. "
-            "If no applicable difference remains, tie. Insufficient only for missing explicit essential exclusive facts. "
+        payload["messages"][0]["content"] = _DECISION_CONTRACT + payload["messages"][0]["content"] + (
             "For technical vacancies preserve the supplied original policy and its ordered priorities verbatim; "
             "the class-only rubric never substitutes for it. When coverage/declared-fit/depth is a primary policy priority, compare common explicitly requested "
             "keys, declared level coverage of the stated thresholds, then declared depth BEFORE confirmation. "
@@ -307,9 +338,91 @@ def _base_remaining(directory: Path) -> int:
     return remaining
 
 
+def _previous_pilot(directory: Path) -> dict:
+    """Audit the frozen v1's 24 raw attempts; unknown prior repair usage blocks v2."""
+    unknown = [path.name for path in directory.glob("rerank-grounded-pair-repair-*")
+               if path.is_dir() and path.name not in (PREVIOUS_VERSION, VERSION)]
+    target = directory / PREVIOUS_VERSION
+    budget = _read(target / "budget.json")
+    manifest = _verified(target / "pilot-manifest.json", "manifest_hash")
+    report = _verified(target / "pilot-report.json", "report_hash")
+    if (unknown or budget != {"pilot_initial": 20, "pilot_retry": 4, "family_initial": 0, "family_retry": 0}
+            or manifest["code_hash"] != PREVIOUS_CODE_HASH or manifest["cases"] != pilot_cases() or len(manifest["requests"]) != 20
+            or report["pilot_manifest_hash"] != manifest["manifest_hash"]
+            or (report["valid"], report["correct"], report["swap_correct"], report["passed"]) != (16, 16, 8, False)
+            or (target / "manifest.json").exists() or (target / "dataset.json").exists()):
+        raise ValueError("unknown or changed prior pair repair attempts; v1 must remain exactly 24")
+    rows, hashes, raw_hashes, jobs, expected_jobs = [], {}, {}, {}, set()
+    request_index = 0
+    for case in manifest["cases"]:
+        for swapped in (False, True):
+            expected = _REVERSE[case["expected"]] if swapped else case["expected"]
+            a, b = (case["B"], case["A"]) if swapped else (case["A"], case["B"])
+            admitted = None
+            for attempt in (0, 1):
+                job_id = f"pilot-{case['case_id']}-{int(swapped)}-{attempt}"
+                path = target / "jobs" / f"{job_id}.json"
+                if not path.exists():
+                    if attempt == 0 or admitted is None:
+                        raise ValueError("prior pair repair raw job missing")
+                    continue
+                expected_jobs.add(path.name)
+                job = _read(path)
+                receipt = _read(directory / "provider-cache" / f"{job['request_hash']}.json")
+                identity = receipt["request"]
+                state = json.loads(identity["payload"]["messages"][1]["content"])
+                if (job.get("kind") != "pair" or job.get("category") != "pilot" or job.get("attempt") != attempt
+                        or job.get("state") not in ("passed", "failed") or job.get("fatal_http_statuses")
+                        or digest(identity) != job["request_hash"] or receipt["request_hash"] != job["request_hash"]
+                        or receipt["response_hash"] != digest(receipt["response"])
+                        or identity["cohort_id"] != PREVIOUS_VERSION or identity["kind"] != "pair"
+                        or identity["prompt_version"] != "rerank-uniform-cohort-pair-v3" + ("-repair1" if attempt else "")
+                        or identity["attempt"] != attempt or identity["model"] != "qwen3.8-27b"
+                        or state["A"] != a or state["B"] != b or state["policy"] != case["policy"]
+                        or state["vacancy"] != case["vacancy"] or state["request_nonce"] != {
+                            "attempt": attempt, "cohort_id": PREVIOUS_VERSION, "kind": "pair"}
+                        or (attempt == 0 and identity != manifest["requests"][request_index])):
+                    raise ValueError("prior pair repair raw receipt provenance changed")
+                answer = _parse(receipt["response"], "qwen3.8-27b")
+                if job["state"] == "passed":
+                    if (admitted is not None or answer["label"] != expected or job["answer"] != answer
+                            or job["answer_hash"] != digest(answer)):
+                        raise ValueError("prior pair repair admitted answer changed")
+                    admitted = answer
+                elif answer["label"] == expected:
+                    raise ValueError("prior semantic failure no longer matches its frozen raw answer")
+                hashes[job_id] = {"job_hash": digest(job), "cache_hash": digest(receipt)}
+                raw_hashes[job["request_hash"]] = receipt["response_hash"]
+                jobs[path.name] = job
+            rows.append({"case_id": case["case_id"], "swapped": swapped, "answer": admitted, "expected": expected,
+                         "error": None if admitted is not None else "pair repair response invalid after one bounded repair"})
+            request_index += 1
+    if ({path.name for path in (target / "jobs").glob("*.json")} != expected_jobs
+            or len(expected_jobs) != PREVIOUS_ATTEMPTS or report["rows"] != rows):
+        raise ValueError("unknown or changed prior pair repair raw attempt count")
+    closure = _verified(target / "closure-observation.json", "observation_hash")
+    if (closure["cohort_id"] != PREVIOUS_VERSION or closure["pilot_manifest_hash"] != manifest["manifest_hash"]
+            or closure["pilot_report_hash"] != report["report_hash"] or closure["pilot_passed"] is not False
+            or closure["job_receipts_hash"] != digest(jobs) or closure["raw_response_hashes"] != raw_hashes
+            or closure["actual_pair_reservations"] != PREVIOUS_ATTEMPTS
+            or closure["base_dataset_existed"] is not False
+            or closure["base_manifest_hash"] != manifest["base_manifest_hash"]):
+        raise ValueError("prior repair closure observation differs from terminal raw receipts")
+    return {"version": PREVIOUS_VERSION, "source_commit": PREVIOUS_COMMIT, "code_hash": PREVIOUS_CODE_HASH,
+            "attempts": PREVIOUS_ATTEMPTS, "pilot_manifest_hash": manifest["manifest_hash"],
+            "pilot_report_hash": report["report_hash"], "budget_hash": digest(budget), "raw_receipt_hashes": hashes,
+            "source_hashes": manifest["source_hashes"], "closure_observation_hash": closure["observation_hash"],
+            "closure_global_ledger": closure["global_ledger"]}
+
+
 def _budget_check(directory: Path, used: int) -> dict:
+    previous = _previous_pilot(directory)
+    saved = directory / VERSION / "pilot-manifest.json"
+    if saved.exists() and _verified(saved, "manifest_hash")["previous_repair"] != previous:
+        raise ValueError("frozen previous pair repair provenance changed")
     ledger = _read(directory / "provider-cache/usage.json")
-    if (PROJECTED_BASE_FINAL_PAIR + MAX_ATTEMPTS > LIMITS["pair"]
+    if (PROJECTED_BASE_FINAL_PAIR + previous["attempts"] + MAX_ATTEMPTS > LIMITS["pair"]
+            or ledger["pair"] < previous["closure_global_ledger"]["pair"]
             or ledger["pair"] + _base_remaining(directory) + MAX_ATTEMPTS - used > LIMITS["pair"]):
         raise ValueError("pair repair cannot preserve remaining base calls inside global budget")
     return ledger
@@ -387,6 +500,9 @@ def _job_unlocked(directory: Path, provider: PairRepairProviders, job_id: str, v
 def prepare_pilot(directory: Path) -> dict:
     """Freeze ten fixtures, source/audit hashes and selection predicate before any HTTP."""
     base_manifest, sources = _sources(directory, BASE_COHORT)
+    previous = _previous_pilot(directory)
+    if previous["source_hashes"] != {identifier: source["record_hash"] for identifier, source in sources.items()}:
+        raise ValueError("v2 pair repair sources differ from the frozen v1 pilot")
     provider = PairRepairProviders(directory / "provider-cache")
     cases = pilot_cases()
     requests = []
@@ -401,6 +517,7 @@ def prepare_pilot(directory: Path) -> dict:
         saved = _verified(existing, "manifest_hash")
         if (saved["source_hashes"] != {identifier: source["record_hash"] for identifier, source in sources.items()}
                 or saved["base_manifest_hash"] != base_manifest["manifest_hash"]
+                or saved["previous_repair"] != previous
                 or saved["cases"] != cases or saved["requests"] != requests
                 or saved["code_hash"] != digest(Path(__file__).read_bytes().hex())):
             raise ValueError("frozen pair repair pilot inputs changed")
@@ -413,9 +530,11 @@ def prepare_pilot(directory: Path) -> dict:
                        "source_hashes": {identifier: source["record_hash"] for identifier, source in sources.items()},
                        "pinned_base_family_audits": audits, "cases": cases, "requests": requests,
                        "class_only_policy": CLASS_ONLY_POLICY, "class_only_policy_hash": CLASS_ONLY_POLICY_HASH,
+                       "previous_repair": previous,
                        "selection_predicate": "All 16 class-only families plus the union of quarantined non-class families and all non-class families nominated by disagreement in the exact original assistant blind 20; maximum 9 non-class, no truncation or model metrics; manual labels never enter teacher requests",
                        "maximum_selected_families": 25, "maximum_attempts": MAX_ATTEMPTS,
-                       "projected_base_final_pair": PROJECTED_BASE_FINAL_PAIR, "ledger_before_pilot": ledger,
+                       "projected_base_final_pair": PROJECTED_BASE_FINAL_PAIR, "projected_prior_pair_attempts": PREVIOUS_ATTEMPTS,
+                       "ledger_before_pilot": ledger,
                        "code_hash": digest(Path(__file__).read_bytes().hex()), "teacher": provider.teacher_identity()}, "manifest_hash")
     _seal(existing, manifest)
     return manifest
@@ -479,9 +598,58 @@ def _pilot(directory: Path, provider: PairRepairProviders, manifest: dict) -> di
                 for index in range(0, 20, 2))
     report = _hashed({"pilot_manifest_hash": manifest["manifest_hash"], "rows": rows, "valid": valid,
                       "correct": correct, "swap_correct": swaps, "passed": valid == correct == 20 and swaps == 10,
+                      "ledger_after_pilot": _read(directory / "provider-cache/usage.json"),
                       "grade_calls": 0, "generation_calls": 0, "activation_allowed": False}, "report_hash")
     _seal(path, report)
+    _observe_pilot_closure(directory, manifest, report)
     return report
+
+
+def _pilot_raw_snapshot(directory: Path) -> tuple[dict, dict]:
+    jobs = {path.name: _read(path) for path in sorted((directory / VERSION / "jobs").glob("pilot-*.json"))}
+    raw = {}
+    for job in jobs.values():
+        if job.get("state") not in ("passed", "failed"):
+            raise ValueError("pilot closure requires every raw job to be terminal")
+        receipt = _read(directory / "provider-cache" / f"{job['request_hash']}.json")
+        if receipt["request_hash"] != digest(receipt["request"]) or receipt["response_hash"] != digest(receipt["response"]):
+            raise ValueError("pilot closure raw receipt hash differs")
+        raw[job["request_hash"]] = receipt["response_hash"]
+    budget = _read(directory / VERSION / "budget.json")
+    if len(jobs) != budget["pilot_initial"] + budget["pilot_retry"] or budget["pilot_initial"] != 20 or budget["pilot_retry"] > 20:
+        raise ValueError("pilot closure bounded terminal attempts differ")
+    return jobs, raw
+
+
+def _observe_pilot_closure(directory: Path, manifest: dict, report: dict) -> None:
+    jobs, raw = _pilot_raw_snapshot(directory)
+    base = directory / BASE_COHORT
+    observation = _hashed({"version": "pilot-closure-observation-v1", "observer_kind": "assistant",
+        "observed_at": datetime.now(UTC).isoformat(), "cohort_id": VERSION,
+        "pilot_manifest_hash": manifest["manifest_hash"], "pilot_report_hash": report["report_hash"],
+        "pilot_passed": report["passed"], "job_receipts_hash": digest(jobs), "raw_response_hashes": raw,
+        "actual_pair_reservations": len(raw), "global_ledger": report["ledger_after_pilot"], "base_cohort": BASE_COHORT,
+        "base_manifest_hash": manifest["base_manifest_hash"], "base_attempt_budget": _read(base / "attempt-budget.json"),
+        "base_completed_families": len(list((base / "families").glob("*.json"))),
+        "base_dataset_existed": (base / "dataset.json").exists(),
+        "claim": "Local operator observed terminal pilot receipts at this global counter; this is not a remote timestamp attestation."}, "observation_hash")
+    _seal(directory / VERSION / "closure-observation.json", observation)
+
+
+def _verified_pilot_closure(directory: Path, manifest: dict, report: dict) -> dict:
+    observation = _verified(directory / VERSION / "closure-observation.json", "observation_hash")
+    jobs, raw = _pilot_raw_snapshot(directory)
+    if (observation["cohort_id"] != VERSION or observation["pilot_manifest_hash"] != manifest["manifest_hash"]
+            or observation["pilot_report_hash"] != report["report_hash"] or observation["pilot_passed"] != report["passed"]
+            or observation["job_receipts_hash"] != digest(jobs) or observation["raw_response_hashes"] != raw
+            or observation["actual_pair_reservations"] != len(raw)
+            or observation["global_ledger"] != report["ledger_after_pilot"]
+            or observation["base_manifest_hash"] != manifest["base_manifest_hash"]
+            or type(observation["base_dataset_existed"]) is not bool
+            or not manifest["ledger_before_pilot"]["pair"] + len(raw) <= observation["global_ledger"]["pair"]
+            <= _read(directory / "provider-cache/usage.json")["pair"]):
+        raise ValueError("pilot closure observation differs from raw jobs or cumulative counters")
+    return observation
 
 
 def _progress(family: dict, *, admitted: bool) -> None:
@@ -701,7 +869,7 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
                            "derived_from": {"cohort_id": BASE_COHORT, "dataset_hash": base["dataset_hash"],
                                             "manifest_hash": base["manifest_hash"]},
                            "pair_repair_manifest_hash": selection["manifest_hash"], "pair_repair_teacher": provider.teacher_identity(),
-                           "pair_provenance": "Selected v3 pair repairs plus preserved unselected v2 pairs; all suitability v2 unchanged",
+                           "pair_provenance": "Selected v4 pair repairs plus preserved unselected v2 pairs; all suitability v2 unchanged",
                            "activation_allowed": False, "training_started": False}
         derived.pop("dataset_hash")
         derived["dataset_hash"] = digest(derived)
@@ -716,6 +884,8 @@ def run_pair_repair(directory: Path, *, pilot_only: bool = False, original_revie
                           "original_blind_nomination": selection["original_blind_nomination"],
                           "post_repair_blind_review": {"state": "requires_new_policy_corrected_review",
                                                        "included_in_reverse_quality": False},
+                          "previous_repair": pilot_manifest["previous_repair"], "prior_pair_attempts": PREVIOUS_ATTEMPTS,
+                          "pilot_closure_observation_hash": _verified_pilot_closure(directory, pilot_manifest, pilot)["observation_hash"],
                           "ledger_before": base_report["ledger_after"], "ledger_before_pilot": pilot_manifest["ledger_before_pilot"],
                           "ledger_after": ledger, "budget": _read(target / "budget.json"), "generation_calls": 0, "grade_calls": 0,
                           "golden_model_predictions": 0, "training_started": False, "activation_allowed": False}, "report_hash")
@@ -775,6 +945,7 @@ def _verified_pilot(directory: Path, manifest: dict) -> dict:
     if (report["rows"] != rows or report["pilot_manifest_hash"] != manifest["manifest_hash"]
             or not report["passed"] or report["valid"] != 20 or report["correct"] != 20 or report["swap_correct"] != 10):
         raise ValueError("repair pilot report differs from exact 20 orientations")
+    _verified_pilot_closure(directory, manifest, report)
     return report
 
 
@@ -803,6 +974,11 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
             or pilot_manifest["source_hashes"] != {identifier: source["record_hash"] for identifier, source in sources.items()}
             or pilot_manifest["class_only_policy"] != CLASS_ONLY_POLICY):
         raise ValueError("repair pilot provenance changed")
+    previous = _previous_pilot(directory)
+    if (pilot_manifest["previous_repair"] != previous
+            or previous["source_hashes"] != pilot_manifest["source_hashes"]
+            or pilot_manifest["projected_prior_pair_attempts"] != PREVIOUS_ATTEMPTS):
+        raise ValueError("repair previous 24 attempts provenance changed")
     provider = _CacheOnlyRepair(directory / "provider-cache")
     expected_cases, expected_requests = pilot_cases(), []
     for case in expected_cases:
@@ -887,6 +1063,8 @@ def validate_pair_repair(directory: Path, cohort_id: str = BASE_COHORT,
         observed[f"{category}_{'retry' if attempt else 'initial'}"] += 1
     current_ledger = _read(directory / "provider-cache/usage.json")
     if (dataset["quality"] != quality or report["quality"] != quality
+            or report["previous_repair"] != previous or report["prior_pair_attempts"] != PREVIOUS_ATTEMPTS
+            or report["pilot_closure_observation_hash"] != _verified_pilot_closure(directory, pilot_manifest, pilot)["observation_hash"]
             or report["original_blind_nomination"] != nomination
             or report["post_repair_blind_review"] != {"state": "requires_new_policy_corrected_review", "included_in_reverse_quality": False}
             or report["base_report_hash"] != base_report["report_hash"] or report["ledger_before"] != base_report["ledger_after"]

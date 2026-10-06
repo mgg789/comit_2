@@ -15,6 +15,8 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_pair_teacher import salary_comparison
 from matching_engine.rerank_protocol import expected_families
 
+BASE_LEDGER_PAIR = 2292
+
 
 def _write(path, value, field=None):
     value = deepcopy(value)
@@ -41,6 +43,60 @@ def _answer(vacancy, a, b, policy):
             "tie": "comparable_fit", "insufficient": "insufficient_source_facts"}[label],
             "status_A": a["status"], "status_B": b["status"], "evidence_A": refs["A"], "evidence_B": refs["B"],
             "salary_comparison_choice": salary_comparison(a, b)["cheaper_side"]}
+
+
+def _previous_fixture(directory):
+    target = directory / repair.PREVIOUS_VERSION
+    provider = repair.CohortProviders(directory / "provider-cache", cohort_id=repair.PREVIOUS_VERSION)
+    cases, requests, rows = repair.pilot_cases(), [], []
+    for case in cases:
+        for swapped in (False, True):
+            a, b = (case["B"], case["A"]) if swapped else (case["A"], case["B"])
+            invalid = case["case_id"] in ("class-2", "essential-unknown")
+            answer = _answer(case["vacancy"], a, b, case["policy"])
+            if invalid:
+                answer.update(label=("A" if swapped else "B") if case["case_id"] == "class-2" else (
+                    "B" if swapped else "A"), reason_code="prefer_known_facts")
+            for attempt in ((0, 1) if invalid else (0,)):
+                payload = provider.pair_payload(case["vacancy"], a, b, case["policy"], attempt)
+                state = json.loads(payload["messages"][1]["content"])
+                state["request_nonce"]["cohort_id"] = repair.PREVIOUS_VERSION
+                payload["messages"][1]["content"] = json.dumps(state, ensure_ascii=False, sort_keys=True)
+                identity = provider._identity("/v1/chat/completions", payload, "pair")
+                identity.update(cohort_id=repair.PREVIOUS_VERSION,
+                    prompt_version="rerank-uniform-cohort-pair-v3" + ("-repair1" if attempt else ""))
+                if attempt == 0:
+                    requests.append(identity)
+                key = digest(identity)
+                response = {"model": "qwen3.8-27b", "choices": [{"finish_reason": "stop", "message": {
+                    "content": json.dumps(answer)}}]}
+                _write(directory / "provider-cache" / f"{key}.json", {"request": identity, "request_hash": key,
+                    "response": response, "response_hash": digest(response)})
+                job = {"state": "failed" if invalid else "passed", "request_hash": key, "kind": "pair",
+                    "category": "pilot", "attempt": attempt}
+                if not invalid:
+                    job.update(answer=answer, answer_hash=digest(answer))
+                _write(target / "jobs" / f"pilot-{case['case_id']}-{int(swapped)}-{attempt}.json", job)
+            rows.append({"case_id": case["case_id"], "swapped": swapped, "answer": None if invalid else answer,
+                         "expected": repair._REVERSE[case["expected"]] if swapped else case["expected"],
+                         "error": "pair repair response invalid after one bounded repair" if invalid else None})
+    sources = {path.stem: _read_json(path)["record_hash"]
+               for path in (directory / repair.BASE_COHORT / "sources").glob("*.json")}
+    manifest = _write(target / "pilot-manifest.json", {"cases": cases, "requests": requests,
+        "code_hash": repair.PREVIOUS_CODE_HASH, "source_hashes": sources,
+        "base_manifest_hash": _read_json(directory / repair.BASE_COHORT / "manifest.json")["manifest_hash"]}, "manifest_hash")
+    report = _write(target / "pilot-report.json", {"pilot_manifest_hash": manifest["manifest_hash"], "rows": rows,
+        "valid": 16, "correct": 16, "swap_correct": 8, "passed": False}, "report_hash")
+    _write(target / "budget.json", {"pilot_initial": 20, "pilot_retry": 4, "family_initial": 0, "family_retry": 0})
+    jobs = {path.name: _read_json(path) for path in sorted((target / "jobs").glob("*.json"))}
+    raw = {job["request_hash"]: _read_json(directory / "provider-cache" / f"{job['request_hash']}.json")["response_hash"]
+           for job in jobs.values()}
+    _write(target / "closure-observation.json", {"cohort_id": repair.PREVIOUS_VERSION,
+        "pilot_manifest_hash": manifest["manifest_hash"], "pilot_report_hash": report["report_hash"],
+        "pilot_passed": False, "job_receipts_hash": digest(jobs), "raw_response_hashes": raw,
+        "actual_pair_reservations": 24, "base_dataset_existed": False,
+        "base_manifest_hash": manifest["base_manifest_hash"], "global_ledger": _read_json(directory / "provider-cache/usage.json")},
+        "observation_hash")
 
 
 @pytest.fixture
@@ -78,13 +134,15 @@ def directory(tmp_path):
     dataset = _write(target / "dataset.json", {"version": repair.BASE_COHORT, "manifest_hash": manifest["manifest_hash"],
         "families": families, "teacher": families[0]["teacher"], "quality": {"passed": False},
         "activation_allowed": False, "training_started": False}, "dataset_hash")
-    ledger = {"generation": 105, "pair": 2268, "grade": 579}
+    ledger = {"generation": 105, "pair": BASE_LEDGER_PAIR, "grade": 579}
     _write(tmp_path / "provider-cache/usage.json", ledger)
     _write(target / "report.json", {"dataset_hash": dataset["dataset_hash"], "ledger_after": ledger}, "report_hash")
+    _write(target / "attempt-budget.json", {"generation": 0, "pair": 1440, "grade": 420})
     packets = prepare_reviews(tmp_path, repair.BASE_COHORT)
     _write(target / "reviews/assistant-review.json", {"packet_hash": packets["assistant"]["packet_hash"],
         "reviewer_kind": "assistant", "labels": [{"pair_id": case["pair_id"], "label": "A",
         "reason": "Offline original blind review.", "factual_issue": False} for case in packets["assistant"]["cases"]]})
+    _previous_fixture(tmp_path)
     return tmp_path
 
 
@@ -135,6 +193,21 @@ def test_pair_only_identity_and_ten_preregistered_fixtures(tmp_path):
         assert provider._identity("/v1/chat/completions", payload, "pair")["prompt_version"] == repair.PAIR_PROMPT_VERSION
         assert "BEFORE confirmation" in payload["messages"][0]["content"]
         assert "uniqueItems" not in json.dumps(payload["response_format"])
+        for attempt in (0, 1):
+            request = provider.pair_payload(case["vacancy"], case["A"], case["B"], case["policy"], attempt)
+            prompt = request["messages"][0]["content"]
+            assert prompt.startswith(repair._DECISION_CONTRACT)
+            assert prompt.index("STEP 0") < prompt.index("STEP 1") < prompt.index("STEP 2") < prompt.index("STEP 3")
+            state = json.loads(request["messages"][1]["content"])
+            assert "expected" not in state and "label" not in state["criterion_applicability"]
+            if case["case_id"] == "class-2":
+                assert not state["criterion_applicability"]["production_comparison_applicable"]
+                assert not state["criterion_applicability"]["duration_comparison_applicable"]
+                assert "do not reward the other side for being known or confirmed" in prompt
+            if case["case_id"] == "essential-unknown":
+                assert state["criterion_applicability"]["required_measurements"] == [
+                    {"path": "uptime_percentage", "available_A": False, "available_B": False}]
+                assert "Grade, confirmation, production, duration, salary" in prompt
     assert provider.teacher_identity()["prompt_version"] == repair.PAIR_PROMPT_VERSION
     assert provider.teacher_identity(attempt=1)["prompt_version"].endswith("-repair1")
     for kind in ("grade", "generation"):
@@ -149,8 +222,10 @@ def test_pair_only_identity_and_ten_preregistered_fixtures(tmp_path):
 def test_pilot_freezes_sources_and_publishes_policy_corrected_blind_packets(directory, remote):
     base = directory / repair.BASE_COHORT
     before = {path: path.read_bytes() for path in base.rglob("*.json")}
+    previous_bytes = {path: path.read_bytes() for path in (directory / repair.PREVIOUS_VERSION).rglob("*.json")}
     manifest = repair.prepare_pilot(directory)
     assert not remote and manifest["maximum_attempts"] == 672 and len(manifest["requests"]) == 20
+    assert manifest["previous_repair"]["attempts"] == 24 and manifest["previous_repair"]["source_commit"] == repair.PREVIOUS_COMMIT
     output = repair.run_pair_repair(directory, pilot_only=True)
     assert output["state"] == "pilot_passed"
     assert output["pilot"]["valid"] == output["pilot"]["correct"] == 20 and output["pilot"]["swap_correct"] == 10
@@ -167,6 +242,7 @@ def test_pilot_freezes_sources_and_publishes_policy_corrected_blind_packets(dire
                 key: value for key, value in new_case.items() if key != "policy"}
             assert new_case["policy"] == repair.revised_policy(old_case["vacancy"], old_case["policy"])
     assert all(path.read_bytes() == value for path, value in before.items())
+    assert all(path.read_bytes() == value for path, value in previous_bytes.items())
 
 
 def test_completed_whole_family_repair_preserves_sources_features_grades_and_replays(directory, remote, monkeypatch):
@@ -192,13 +268,42 @@ def test_completed_whole_family_repair_preserves_sources_features_grades_and_rep
 
 def test_remaining_base_calls_and_global_budget_are_reserved_before_pilot(directory):
     manifest = repair.prepare_pilot(directory)
-    assert manifest["projected_base_final_pair"] + manifest["maximum_attempts"] == 2940
+    assert manifest["projected_base_final_pair"] + manifest["projected_prior_pair_attempts"] + manifest["maximum_attempts"] == 2964
     _write(directory / "provider-cache/usage.json", {"generation": 105, "pair": 2329, "grade": 579})
     with pytest.raises(ValueError, match="remaining base calls"):
         repair._budget_check(directory, 0)
     # A completed family reserves no additional ordinary HTTP; an unfinished one reserves all 24.
     (directory / repair.BASE_COHORT / "families/backend-01.json").unlink()
     assert repair._base_remaining(directory) == 24
+
+
+@pytest.mark.parametrize("mutation", ["budget", "raw", "code", "unknown_namespace", "extra_job"])
+def test_prior_24_attempts_and_raw_receipts_are_audited_before_any_v2_http(directory, remote, mutation):
+    target = directory / repair.PREVIOUS_VERSION
+    if mutation == "budget":
+        path = target / "budget.json"
+        budget = _read_json(path)
+        budget["pilot_retry"] += 1
+        _write(path, budget)
+    elif mutation == "raw":
+        job = _read_json(target / "jobs/pilot-class-0-0-0.json")
+        path = directory / "provider-cache" / f"{job['request_hash']}.json"
+        receipt = _read_json(path)
+        receipt["response"]["choices"][0]["finish_reason"] = "length"
+        receipt["response_hash"] = digest(receipt["response"])
+        _write(path, receipt)
+    elif mutation == "code":
+        path = target / "pilot-manifest.json"
+        manifest = _read_json(path)
+        manifest["code_hash"] = "changed"
+        _write(path, manifest, "manifest_hash")
+    elif mutation == "unknown_namespace":
+        (directory / "rerank-grounded-pair-repair-unknown").mkdir()
+    else:
+        _write(target / "jobs/unknown-0.json", {})
+    with pytest.raises(ValueError):
+        repair.run_pair_repair(directory, pilot_only=True)
+    assert not remote and not (directory / repair.VERSION / "pilot-manifest.json").exists()
 
 
 def test_started_without_raw_receipt_never_resends_and_one_retry_has_distinct_nonce(directory, remote):
@@ -297,7 +402,7 @@ def test_transport_timeout_counts_attempt_but_never_resends_ambiguously(director
     for _repeat in range(2):
         with pytest.raises(ValueError, match="ambiguous started"):
             repair._job(directory, provider, "transport", case["vacancy"], case["A"], case["B"], case["policy"], "pilot")
-    assert len(calls) == 1 and _read_json(directory / "provider-cache/usage.json")["pair"] == 2269
+    assert len(calls) == 1 and _read_json(directory / "provider-cache/usage.json")["pair"] == BASE_LEDGER_PAIR + 1
     assert not (directory / repair.VERSION / "jobs/transport-1.json").exists()
 
 
@@ -312,6 +417,25 @@ def test_pilot_raw_response_replayed_before_any_family_http(directory, remote):
     with pytest.raises(ValueError):
         repair.run_pair_repair(directory)
     assert len(remote) == 20 and not (directory / repair.VERSION / "manifest.json").exists()
+
+
+def test_pilot_closure_counter_cannot_precede_its_terminal_raw_reservations(directory, remote):
+    repair.run_pair_repair(directory, pilot_only=True)
+    target = directory / repair.VERSION
+    manifest = _read_json(target / "pilot-manifest.json")
+    report = _read_json(target / "pilot-report.json")
+    observation = _read_json(target / "closure-observation.json")
+    assert observation["actual_pair_reservations"] == 20
+    assert observation["global_ledger"] == report["ledger_after_pilot"]
+    assert report["ledger_after_pilot"]["pair"] == manifest["ledger_before_pilot"]["pair"] + 20
+    # Even consistently rehashed metadata cannot pretend that all 20 calls ended at the nineteenth counter.
+    report["ledger_after_pilot"]["pair"] -= 1
+    report = _write(target / "pilot-report.json", report, "report_hash")
+    observation.update(global_ledger=report["ledger_after_pilot"], pilot_report_hash=report["report_hash"])
+    _write(target / "closure-observation.json", observation, "observation_hash")
+    with pytest.raises(ValueError, match="closure"):
+        repair.run_pair_repair(directory)
+    assert len(remote) == 20 and not (target / "manifest.json").exists()
 
 
 def test_concurrent_reservations_no_lost_updates_duplicate_job_is_idempotent_and_cap_is_hard(directory, remote):
@@ -329,7 +453,7 @@ def test_concurrent_reservations_no_lost_updates_duplicate_job_is_idempotent_and
     assert _read_json(directory / repair.VERSION / "budget.json")["pilot_initial"] == 20
     with pytest.raises(ValueError, match="allowance exhausted"):
         submit("over-cap")
-    assert len(remote) == 1 and _read_json(directory / "provider-cache/usage.json")["pair"] == 2269
+    assert len(remote) == 1 and _read_json(directory / "provider-cache/usage.json")["pair"] == BASE_LEDGER_PAIR + 1
     assert not (directory / repair.VERSION / "jobs/over-cap-0.json").exists()
 
 
