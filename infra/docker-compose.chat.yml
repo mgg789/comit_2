@@ -1,0 +1,38 @@
+# Opt-in QGramm BASIC chats/files. API is the only public authorization boundary.
+services:
+  api:
+    environment:
+      CHAT_SERVICE_URL: http://qgramm-chat:8080
+      CHAT_SERVICE_TOKEN: ${CHAT_SERVICE_TOKEN:?Set a random private chat token of at least 32 characters}
+    networks: [default, chat-private]
+    depends_on:
+      qgramm-chat:
+        condition: service_healthy
+
+  qgramm-chat:
+    build:
+      context: ..
+      dockerfile: infra/qgramm/Dockerfile
+    environment:
+      CHAT_BRIDGE_LISTEN: 0.0.0.0:8080
+      CHAT_SERVICE_TOKEN: ${CHAT_SERVICE_TOKEN:?Set a random private chat token}
+      CHAT_DEVICE_SECRET: ${CHAT_DEVICE_SECRET:?Set a stable base64 32-byte device derivation key}
+      CHAT_SIGNING_KEY: ${CHAT_SIGNING_KEY:?Set a stable base64 32-byte Ed25519 seed}
+      QGRAMM_MANAGEMENT_SECRET: ${QGRAMM_MANAGEMENT_SECRET:?Set a stable private management secret}
+      QGRAMM_MASTER_KEY: ${QGRAMM_MASTER_KEY:?Set a stable base64 32-byte storage key}
+      QGRAMM_HPKE_KEY: ${QGRAMM_HPKE_KEY:?Set a stable base64 32-byte HPKE key}
+    volumes:
+      - chat-data:/data
+    networks: [chat-private]
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    # Intentionally no published ports or direct QGramm protocol access.
+
+networks:
+  chat-private:
+    internal: true
+
+volumes:
+  chat-data:

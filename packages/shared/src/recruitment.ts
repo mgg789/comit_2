@@ -99,7 +99,8 @@ export interface RecruitmentView {
   interviews: InterviewView[];
   offers: OfferView[];
   allowed_actions: RecruitmentAction["action"][];
-  chat_available: false;
+  /** An invited, consented process has a configured chat backend; individual calls may still return 503. */
+  chat_available: boolean;
   created_at: string;
   updated_at: string;
 }

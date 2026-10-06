@@ -107,5 +107,11 @@ authDomain инжектирует тот же API Pool/AuthStore/ProfileStore. �
 или внешнего SDK не требуется. Matching владеет saved/grant/exclusions, agents
 — опубликованной вакансией; API читает их через service-auth и сохраняет
 условия предложения. Контакты берутся только из текущего API source profile
-после принятия. Durable participant events отделены от будущих SMTP/chat
+после принятия. Durable participant events отделены от будущих SMTP
 потребителей. [Контур и границы](recruitment.md).
+
+QGramm подключается отдельным opt-in образом BASIC + files через приватную
+сеть `chat-private`. Go-адаптер использует ядро in-process и не публикует raw
+QGramm endpoints; api-core проверяет сессию, приглашение и текущее согласие
+под DB-locks на каждый вызов. Постоянные сообщения/файлы принадлежат SQLite
+QGramm, а решения найма — PostgreSQL API. [Контракт и ключи](chat.md).

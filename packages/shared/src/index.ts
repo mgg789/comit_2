@@ -27,6 +27,7 @@ export type Role = "candidate" | "employer";
 export type * from "./agents.js";
 export type * from "./auth.js";
 export type * from "./recruitment.js";
+export type * from "./chat.js";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;
 export type Grade = (typeof GRADES)[number];

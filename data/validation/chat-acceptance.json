@@ -1,0 +1,46 @@
+{
+  "checked_at": "2026-10-06",
+  "scope": "backend recruitment invitation chat, BASIC server encryption and files",
+  "base_commit": "60988342975ac331af6eb54398a037e65c254401",
+  "qgramm_commit": "f22de87f369cad0b34d243c97ad876a90eb9d6db",
+  "runtime": {
+    "image_manifest": "sha256:c4a952e1886f5ee94d2f991708c50d68b6fa0168af421e5004a15f56ce060b5a",
+    "image_size_bytes": 13417867,
+    "user": "comit",
+    "enabled_optional_modules": ["files"],
+    "server_encryption": "QGramm BASIC HPKE envelopes and encrypted persistent storage",
+    "e2ee": false,
+    "public_qgramm_listener": false,
+    "synthetic_database": "comit_chat_regression"
+  },
+  "checks": {
+    "monorepo_typecheck": "passed",
+    "monorepo_build": "passed",
+    "api_tests": {"passed": 44, "failed": 0, "skipped": 0, "transport": "real HTTP, PostgreSQL and Docker QGramm"},
+    "bridge_tests": {"passed": 5, "race_detector": "passed", "go_vet": "passed"},
+    "upstream_qgramm_all_package_tests": "passed with race detector and qg_files",
+    "upstream_qgramm_go_vet": "passed",
+    "docker_build": "passed; adapter tests included",
+    "compose_overlay_validation": "passed using synthetic placeholders",
+    "private_network_authenticated_history": "passed",
+    "docker_readiness": "passed",
+    "docker_restart_history_and_file": "passed",
+    "storage_contains_no_test_plaintext_or_filename": "passed",
+    "file_maximum_8_mib_round_trip": "passed",
+    "old_file_after_101_new_messages": "passed",
+    "durable_idempotency_after_operation_cleanup_and_restart": "passed",
+    "participant_role_process_and_session_isolation": "passed",
+    "contacts_hidden_before_invitation_acceptance": "passed",
+    "consent_withdrawal_serializes_with_inflight_chat": "passed",
+    "terminal_process_read_only": "passed",
+    "three_chat_slots_leave_account_requests_available": "passed",
+    "nginx_anonymous_chat": "401",
+    "smoke": {"passed": 12, "failed": 0}
+  },
+  "verification_notes": [
+    "Initial host HTTP run failed because a Docker internal-only network does not publish its port to the host; a separate disposable host-test network was added, and the complete suite then passed.",
+    "Synthetic accounts and fixture invitations are used; invitation eligibility is covered by the existing recruitment tests.",
+    "Upstream source, LCT, SMTP configuration and production services were not modified."
+  ],
+  "not_in_scope": ["UI", "WebSocket push", "SMTP chat notifications", "production deployment", "automatic key rotation", "active-active SQLite"]
+}
