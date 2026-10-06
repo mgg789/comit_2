@@ -73,7 +73,7 @@ from matching_engine.vacancy_features import (
 )
 from matching_engine.vacancy_models import VacancyInput, VacancyReady, build_mode
 
-ADAPTER_VERSION = "sealed-grounded-test-fit-v3"
+ADAPTER_VERSION = "sealed-grounded-test-fit-v4"
 DEFAULT_COHORT = "rerank-grounded-cohort-v9"
 SPLITS = {"train": 32, "validation": 8, "calibration": 8, "golden": 12}
 PAIR_REPAIR_MODULES = {pair_repair.VERSION: pair_repair}
@@ -347,7 +347,7 @@ def _review_metadata_rebind(directory: Path, target: Path, packet: dict, manual:
         return None
     receipt = _verified(path, "receipt_hash")
     previous_packets = []
-    for namespace in HISTORICAL_PILOT_PINS:
+    for namespace in (*HISTORICAL_PILOT_PINS, pair_repair.VERSION):
         previous = directory / namespace / "reviews"
         if (previous / "assistant-packet.json").exists():
             candidate = _verified(previous / "assistant-packet.json", "packet_hash")
@@ -466,6 +466,13 @@ def _review_gate(directory: Path, cohort_id: str, manifest: dict, sources: dict,
 
 
 def _registered_repair(directory: Path, cohort_id: str, derived_dataset_file: Path) -> ModuleType:
+    if derived_dataset_file.parent.name == "rerank-grounded-pair-repair-v4":
+        from matching_engine import rerank_cohort_pair_completion as completion
+
+        if (cohort_id != completion.BASE_COHORT
+                or derived_dataset_file.resolve() != (directory / completion.VERSION / "dataset.json").resolve()):
+            raise ValueError("derived completion registration or base cohort mismatch")
+        return completion
     for namespace, adapter in PAIR_REPAIR_MODULES.items():
         if derived_dataset_file.resolve() == (directory / namespace / "dataset.json").resolve():
             if cohort_id != adapter.BASE_COHORT or namespace != adapter.VERSION:
@@ -742,7 +749,7 @@ def _label_provenance(directory: Path, dataset: dict, repair: tuple | None) -> d
         pairs = list(itertools.combinations(range(7), 2))
         orientations = [*pairs, *((pairs[i][1], pairs[i][0]) for i in (0, 7, 14))]
         expected_names = {f"{identifier}-pair-{a}-{b}.json" for identifier in local_ids for a, b in orientations}
-        folder = directory / adapter.VERSION / "oracle-receipts"
+        folder = directory / getattr(adapter, "ORACLE_RECEIPT_NAMESPACE", adapter.VERSION) / "oracle-receipts"
         if {path.name for path in folder.glob("*.json")} != expected_names:
             raise ValueError("hybrid local receipt set must contain exactly 384 admitted rule decisions")
         receipts = {name: _verified(folder / name, "record_hash")["record_hash"] for name in sorted(expected_names)}
@@ -823,6 +830,77 @@ def compare_test_only_review(directory: Path, assistant_review_file: Path, cohor
     return report
 
 
+def _post_base_repair_accounting(directory: Path, after: dict, effective_after: dict,
+                                 repair_report: dict, adapter: ModuleType) -> dict:
+    """Reconcile current remote charges and the fixed failed v3 parent without resets.
+
+    The registered completion validator independently replays the parent through
+    its sealed ledger view. Here both post-base increments are checked against
+    actual terminal jobs and the final live ledger before a fit can start.
+    """
+    closure = _verified(directory / adapter.VERSION / "closure-observation.json", "observation_hash")
+    budget = repair_report["budget"]
+    fields = {"pilot_initial", "pilot_retry", "family_initial", "family_retry"}
+    if (set(budget) != fields or any(type(value) is not int or value < 0 for value in budget.values())
+            or budget["pilot_initial"] != 8 or not 0 <= budget["pilot_retry"] <= 8):
+        raise ValueError("derived remote attempt budget changed")
+    current_jobs = {path.name: _read(path) for path in (directory / adapter.VERSION / "jobs").glob("*.json")}
+    current_counts = dict.fromkeys(fields, 0)
+    for job in current_jobs.values():
+        if (job.get("state") not in ("passed", "failed") or job.get("kind") != "pair"
+                or job.get("category") not in ("pilot", "family")
+                or type(job.get("attempt")) is not int or job["attempt"] not in (0, 1)):
+            raise ValueError("current completion has ambiguous remote reservations")
+        current_counts[f'{job["category"]}_{"retry" if job["attempt"] else "initial"}'] += 1
+    current_charges = len({job["request_hash"] for job in current_jobs.values()})
+    if current_counts != budget:
+        raise ValueError("current remote job counts differ from bounded attempt budget")
+    parent_charges, parent_hash = 0, None
+    start = after
+    parent_namespace = getattr(adapter, "PARENT_REPAIR_NAMESPACE", None)
+    if parent_namespace is not None:
+        if parent_namespace != pair_repair.VERSION or adapter.VERSION != "rerank-grounded-pair-repair-v4":
+            raise ValueError("unregistered post-base parent lineage")
+        parent = _verified(directory / parent_namespace / "repair-report.json", "report_hash")
+        jobs = {path.name: _read(path) for path in (directory / parent_namespace / "jobs").glob("*.json")}
+        observed = dict.fromkeys(fields, 0)
+        for job in jobs.values():
+            if (job.get("state") not in ("passed", "failed") or job.get("kind") != "pair"
+                    or job.get("category") not in ("pilot", "family")
+                    or type(job.get("attempt")) is not int or job["attempt"] not in (0, 1)):
+                raise ValueError("parent completion has ambiguous remote reservations")
+            observed[f'{job["category"]}_{"retry" if job["attempt"] else "initial"}'] += 1
+        parent_charges = sum(observed.values())
+        info = repair_report.get("parent_repair", {})
+        start = parent["ledger_after"]
+        if (parent.get("ledger_before") != after or parent.get("ledger_before_pilot") != after
+                or parent.get("state") != "repair_incomplete_or_quality_failed"
+                or parent.get("failed_families") != ["qa-06"] or parent.get("budget") != observed
+                or parent_charges != len({job["request_hash"] for job in jobs.values()})
+                or start != {**after, "pair": after["pair"] + parent_charges}
+                or info.get("namespace") != parent_namespace or info.get("report_hash") != parent["report_hash"]
+                or info.get("dataset_hash") != parent["dataset_hash"] or info.get("ledger_after") != start
+                or info.get("actual_pair_reservations") != parent_charges or info.get("raw_jobs_hash") != digest(jobs)
+                or repair_report.get("actual_pair_reservations") != current_charges
+                or repair_report.get("raw_jobs_hash") != digest(current_jobs)
+                or repair_report.get("cached_pair_reservations") != len(current_jobs) - current_charges
+                or sum(budget.values()) > 64):
+            raise ValueError("post-base completion parent charges or frozen lineage changed")
+        parent_hash = parent["report_hash"]
+    additional = parent_charges + current_charges
+    if (repair_report.get("pilot_closure_observation_hash") != closure["observation_hash"]
+            or repair_report.get("ledger_before_pilot") != start
+            or closure.get("base_dataset_existed") is not True or closure.get("base_completed_families") != 60
+            or effective_after != {**after, "pair": after["pair"] + additional}):
+        raise ValueError("derived global ledger does not reconcile exact post-base repair charges")
+    return {"total_repair_reservations": additional, "current_namespace_reservations": current_charges,
+            "current_logical_job_reservations": sum(budget.values()),
+            "current_cached_job_reservations": len(current_jobs) - current_charges,
+            "parent_namespace_reservations": parent_charges, "parent_report_hash": parent_hash,
+            "pilot_charges_already_in_base": 0, "additional_charged_pair_attempts": additional,
+            "closure_observation_hash": closure["observation_hash"]}
+
+
 def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
                adjudication_file: Path | None, derived_dataset_file: Path | None = None) -> tuple[list[TrainingFamily], dict]:
     target = review._target(directory, cohort_id)
@@ -891,19 +969,7 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
     repair_accounting = None
     if repair is not None:
         repair_report, adapter = repair[1], repair[2]
-        closure = _verified(directory / adapter.VERSION / "closure-observation.json", "observation_hash")
-        budget = repair_report["budget"]
-        expected_additional = sum(budget.values())
-        if (repair_report.get("pilot_closure_observation_hash") != closure["observation_hash"]
-                or repair_report.get("ledger_before_pilot") != after
-                or closure.get("base_dataset_existed") is not True or closure.get("base_completed_families") != 60
-                or not 8 <= budget["pilot_initial"] + budget["pilot_retry"] <= 16
-                or budget["pilot_initial"] != 8
-                or effective_after["pair"] - after["pair"] != expected_additional):
-            raise ValueError("derived global ledger does not reconcile exact post-base repair charges")
-        repair_accounting = {"total_repair_reservations": sum(budget.values()), "pilot_charges_already_in_base": 0,
-                             "additional_charged_pair_attempts": expected_additional,
-                             "closure_observation_hash": closure["observation_hash"]}
+        repair_accounting = _post_base_repair_accounting(directory, after, effective_after, repair_report, adapter)
     first = directory / "rerank-grounded-cohort-v1/manifest.json"
     historical = _read(first)["ledger_before"]["generation"] if first.exists() else before["generation"]
     bound, receipts = _spent_profiles(directory, after["generation"], historical)
@@ -1026,6 +1092,7 @@ def _validated(directory: Path, cohort_id: str, assistant_review_file: Path,
                        "pilot_closure_observation_hash": repair_report.get("pilot_closure_observation_hash"),
                        "policy_revision": expected_packet["policy_revision"],
                        "selected_families": repair_report["selected_families"], "budget": repair_report["budget"],
+                       "parent_repair": repair_report.get("parent_repair"),
                        "ledger_before": repair_report["ledger_before"], "ledger_after": repair_report["ledger_after"],
                        "code_hash": digest(Path(adapter.__file__).read_bytes().hex()),
                        "base_quality": base_quality, "effective_quality": quality,

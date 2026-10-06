@@ -522,8 +522,8 @@ like/dislike не уничтожают оставшуюся порцию. На �
 
 ## Уточнение ремонта синтетической разметки — 06.10.2026
 
-Все 60 источников / 420 выбранных профилей подготовлены; единая разметка
-выполняется без увеличения общих квот. Исходный class-only запрос оказался
+Все 60 источников / 420 выбранных профилей подготовлены; исходная единая разметка
+завершена без увеличения общих квот. Исходный class-only запрос оказался
 неоднозначным: учитель мог сравнивать не заданные вакансией навыки. Ремонт
 явно версионирует class-only policy и заменяет пары целого семейства, сохраняя
 исходные профили, main/features и независимые suitability оценки.
@@ -537,3 +537,16 @@ Independent suitability сохраняет исходную rubric; pair accurac
 одинаковой policy без этого ограничения. Подготовленный test-only адаптер
 требует завершённый корпус, raw cache provenance и отдельную слепую проверку;
 он не разрешает runtime activation. [Порядок](../docs/rerank-cohort-training.md).
+
+Исходный v9 дал 172/180 reverse comparisons, но frontend-01 и qa-06 остались
+в quarantine; слепая assistant20 проверка совпала в 16/20 парах. V2 repair тоже
+не прошёл: 12/20 valid, 11/20 correct, 4/10 reverse, 28 попыток. Вместе с v1
+сохранены все 52 попытки, без сброса расхода или изменения raw labels.
+
+V3 явно отделяет 16 class-only семейств с rule-derived labels от 44 семейств
+учителя. Чистое правило сравнивает accepted grade, применимый own production,
+затем известную nonrejected duration; essential unknown проверяется первым.
+Это синтетический prior, не независимая оценка работодателя. Все восемь
+validation families — class-only; oracle отсутствует в calibration и golden.
+Пилот API только для nonclass прошёл 8/8 valid/correct и 4/4 reverse без retries.
+Исходные independent suitability grades сохранены. [Правило и ограничения](../docs/rerank-class-only-oracle.md).

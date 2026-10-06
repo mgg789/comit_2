@@ -7,6 +7,7 @@ import os
 import shutil
 from copy import deepcopy
 from dataclasses import asdict
+from types import ModuleType
 
 import pytest
 from test_rerank_cohort_features import _trait
@@ -762,7 +763,7 @@ def test_concurrent_allowance_rejects_unaccounted_or_unproven_reservations(concu
         _run(concurrent)
 
 
-@pytest.mark.parametrize("previous_namespace", ["rerank-grounded-pair-repair-v1", "rerank-grounded-pair-repair-v2"])
+@pytest.mark.parametrize("previous_namespace", ["rerank-grounded-pair-repair-v1", "rerank-grounded-pair-repair-v2", pair_repair.VERSION])
 def test_metadata_rebind_preserves_exact_decisions_and_policy_context_without_claiming_new_review(repaired, previous_namespace):
     root, target, manual_path = repaired
     packet = json.loads((target / "reviews/assistant-packet.json").read_text())
@@ -819,3 +820,80 @@ def test_historical_failed_v1_pilot_remains_accounting_only(cohort, monkeypatch)
     assert report["pinned"]["concurrent_pair_attempts"] == accounting
     assert report["test_only"] and not report["activation_allowed"]
     assert report["pinned"]["pair_repair"] is None
+
+
+@pytest.fixture
+def completion_accounting(tmp_path):
+    """Model both real post-base charge increments without accepting parent labels."""
+    adapter = ModuleType("registered_completion")
+    adapter.VERSION = "rerank-grounded-pair-repair-v4"
+    adapter.PARENT_REPAIR_NAMESPACE = pair_repair.VERSION
+    base = {"generation": 99, "pair": 2320, "grade": 579}
+    jobs = {}
+    for category, attempt, count in (("pilot", 0, 8), ("family", 0, 69), ("family", 1, 1)):
+        for index in range(count):
+            name = f"{category}-{attempt}-{index}.json"
+            job = {"state": "failed" if attempt else "passed", "kind": "pair", "category": category,
+                   "attempt": attempt, "request_hash": name}
+            _write(tmp_path / pair_repair.VERSION / "jobs" / name, job)
+            jobs[name] = job
+    parent = _write(tmp_path / pair_repair.VERSION / "repair-report.json", {
+        "ledger_before": base, "ledger_before_pilot": base,
+        "ledger_after": {**base, "pair": 2398}, "state": "repair_incomplete_or_quality_failed",
+        "failed_families": ["qa-06"], "dataset_hash": "parent-dataset",
+        "budget": {"pilot_initial": 8, "pilot_retry": 0, "family_initial": 69, "family_retry": 1}}, "report_hash")
+    closure = _write(tmp_path / adapter.VERSION / "closure-observation.json", {
+        "base_dataset_existed": True, "base_completed_families": 60}, "observation_hash")
+    current_jobs = {}
+    for category, count in (("pilot", 8), ("family", 24)):
+        for index in range(count):
+            name = f"{category}-{index}.json"
+            job = {"state": "passed", "kind": "pair", "category": category, "attempt": 0,
+                   "request_hash": f"pilot-{index}.json" if category == "family" and index < 7 else name}
+            _write(tmp_path / adapter.VERSION / "jobs" / name, job)
+            current_jobs[name] = job
+    report = {"pilot_closure_observation_hash": closure["observation_hash"],
+              "ledger_before_pilot": parent["ledger_after"],
+              "actual_pair_reservations": 25, "cached_pair_reservations": 7,
+              "raw_jobs_hash": digest(current_jobs),
+              "budget": {"pilot_initial": 8, "pilot_retry": 0, "family_initial": 24, "family_retry": 0},
+              "parent_repair": {"namespace": pair_repair.VERSION, "report_hash": parent["report_hash"],
+                  "dataset_hash": parent["dataset_hash"], "ledger_after": parent["ledger_after"],
+                  "actual_pair_reservations": 78, "raw_jobs_hash": digest(jobs)}}
+    return tmp_path, base, {**base, "pair": 2423}, report, adapter
+
+
+def test_completion_fit_accounts_failed_parent_and_new_calls_exactly(completion_accounting):
+    result = module._post_base_repair_accounting(*completion_accounting)
+    assert result["total_repair_reservations"] == 103
+    assert result["parent_namespace_reservations"] == 78
+    assert result["current_namespace_reservations"] == 25
+    assert result["current_logical_job_reservations"] == 32
+    assert result["current_cached_job_reservations"] == 7
+    assert result["pilot_charges_already_in_base"] == 0
+
+
+@pytest.mark.parametrize("mutation", ["reset", "extra_call", "grade_change", "parent_hash", "parent_jobs",
+                                        "wrong_parent", "parent_counter", "boolean_budget", "over_limit"])
+def test_completion_fit_rejects_reset_or_unaccounted_parent_charges(completion_accounting, mutation):
+    root, base, final, report, adapter = completion_accounting
+    if mutation == "reset":
+        final["pair"] -= 78
+    elif mutation == "extra_call":
+        final["pair"] += 1
+    elif mutation == "grade_change":
+        final["grade"] += 1
+    elif mutation == "parent_hash":
+        report["parent_repair"]["report_hash"] = "different"
+    elif mutation == "parent_jobs":
+        (root / pair_repair.VERSION / "jobs/family-1-0.json").unlink()
+    elif mutation == "wrong_parent":
+        adapter.PARENT_REPAIR_NAMESPACE = "arbitrary"
+    elif mutation == "parent_counter":
+        report["parent_repair"]["actual_pair_reservations"] = 77
+    elif mutation == "boolean_budget":
+        report["budget"]["pilot_retry"] = False
+    else:
+        report["budget"]["family_retry"] = 33
+    with pytest.raises(ValueError):
+        module._post_base_repair_accounting(root, base, final, report, adapter)
