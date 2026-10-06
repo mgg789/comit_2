@@ -18,7 +18,7 @@
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/healthz` | liveness: `{status, service, version}` |
-| GET | `/ready` | readiness (проверка БД подключается с миграциями) |
+| GET | `/ready` | пока статический ответ `{status, service, version}` без проверки БД |
 
 Аутентификация уже подключена в `apps/api`: пароль не используется. Код на email
 ставится в PostgreSQL outbox, а после успешной проверки создаются собственный HS256
@@ -56,7 +56,8 @@ Editable narrative claims получают стабильный UUID на сер
 а `accepted_at` ставится сервером транзакционно. Account consent и pool consent
 не смешиваются. `POST /candidate/profile/projection/retry` повторяет только
 локальную terminal `failed` projection. `GET /candidate/pipeline` и
-`GET /candidate/resume.pdf` используют account ID из сессии.
+`GET /candidate/resume.pdf` используют account ID из сессии. `GET /candidate/taxonomy`
+отдаёт кандидату текущую strict-schema (`StrictSchema`) из matching-engine.
 
 Browser profile projection выдаёт `self_reported` без выдуманного UUID тестовой
 сессии. Контракт предусматривает будущий trusted producer, который заменит его на
@@ -82,7 +83,7 @@ contribution. Pending/rejected grade остаются блокирующими.
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/fsp/participants/{fsp_id}` | профиль участника ФСП из мок-реестра; **404** = истории нет (обязательный случай по ТЗ — не ошибка платформы) |
-| POST | `/fsp/verify` | сверка заявленного рейтинга с реестром: `{fsp_id, claimed_rating}` → `{verified, actual_rating}` |
+| POST | `/fsp/verify` | сверка заявленного рейтинга с реестром: `{fsp_id, claimed_rating}` → `{fsp_id, verified, actual_rating}`; нет в реестре → `verified=false`, `actual_rating=null` |
 
 ## Правила контрактов
 

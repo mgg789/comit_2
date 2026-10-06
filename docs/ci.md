@@ -15,11 +15,13 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
-| `web-and-api` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
-| `python` | python:3.12-bookworm | `pip install -e services/*[dev]` → `pytest services/*/tests` |
-| `smoke` | хост (нужен docker) | изолированный compose-проект `comit-ci`, порты 18xxx → `./tests/smoke.sh` → `down -v` |
+| `js` | node:22-bookworm | `npm install -g pnpm@9.14.2` → `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
+| `python` | python:3.12-bookworm | `pip install -e` для matching-, testing- и integration-engine `[dev]` → `pytest` по их `tests/` |
+| `smoke` | хост (нужен docker) | chown workspace → изолированный compose-проект `comit-ci`, порты 38xxx → `./tests/smoke.sh` → `down -v` |
 
-- Джобы `web-and-api` и `python` выполняются в контейнерах — хосту не нужны node/python.
+- Джобы `js` и `python` выполняются в контейнерах — хосту не нужны node/python.
+- `services/agents-service` в CI не устанавливается и не тестируется; его проверки — локально (`docs/agents.md`).
+- Новый прогон на той же ref отменяет предыдущий (`concurrency: ci-<ref>`, `cancel-in-progress`).
 - Smoke не может идти параллельно сам с собой (порты): `concurrency: smoke-host`, без cancel.
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 

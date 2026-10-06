@@ -121,7 +121,8 @@ Runtime использует `local_files_only=True`, не требует вне
 кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
 
 Опциональный **локальный** compose-overlay включает миграции перед серверами и
-отдельный worker; базовый `make up` сам по себе worker не запускает:
+отдельные candidate-, vacancy- и combine-worker (rerank-worker в overlay нет — см.
+«Baseline R₀»); базовый `make up` сам по себе worker не запускает:
 
 ```bash
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
@@ -228,7 +229,7 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 | Остановить и снести | `make down` |
 | Пересобрать всё | `make build` |
 | JS typecheck/build | `pnpm -r typecheck && pnpm -r build` |
-| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/*/tests` |
+| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests` (agents-service — см. agents.md) |
 | Dev-сервер одного аппа | `pnpm --filter @comit/web-candidate dev` |
 | OpenAPI api-core | http://localhost:8080/docs (или `/api/docs` через nginx) |
 
