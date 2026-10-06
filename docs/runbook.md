@@ -391,3 +391,13 @@ Harrier, проверяет typed facts/PDFs/durable delivery/backfill. Не з�
 После `pnpm build` выполнить `python tests/rerank_http_acceptance.py`: только
 короткие собственные FastAPI/Fastify процессы на свободных портах, с cleanup.
 Отчёт и service logs сохраняются в ignored artifacts; credentials не печатаются.
+
+### Воспроизведение grounded teacher diagnostics
+
+`python -m matching_engine.rerank_grounded_pilot` читает отдельный завершённый
+пилот исходных предпочтений; `--explicit-policy` — новые сценарии с явными
+критериями и собственной предварительной проверкой вслепую. Завершённые запуски
+воспроизводятся без HTTP и изменения расхода. Свежий запуск фиксирует максимум
+20 попыток, использует до пяти общих remote slots и не увеличивает глобальный
+лимит. Если сохранён started receipt без report, сначала разобрать receipts;
+автоматического повторного запуска нет. [Результаты и ограничения](rerank-grounded-teacher-pilot.md).

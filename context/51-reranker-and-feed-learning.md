@@ -457,3 +457,14 @@ guard. Все4Gemma/Qwen calls валидны и симметричны, но ф
 не увеличены. Последующие свежие bounded diagnostics потребляют оставшийся
 общий бюджет без переписывания старых receipts/labels.
 [Исправление API и доказательства](../docs/rerank-transport-recovery.md).
+
+Opt-in grounded v5 убирает свободное объяснение из ответа teacher: статусы,
+ссылки и зарплатная арифметика проверяются кодом. Два свежих ограниченных пилота
+дали40/40valid replies. Старые неоднозначные предпочтения:6/10agreement,
+10/10symmetry. Новые варианты с явными критериями и собственной предварительной
+score-blind assistant проверкой:9/10agreement,9/10symmetry,6/6decisive agreement.
+Это целевой диагностический результат, не независимая golden оценка. Одна
+ошибка exclusive uptime criterion сохранена и исключена из будущих учебных
+меток. Ledger28/736/119; прежние лимиты, teachers и dataset receipts неизменны.
+Полный60-family cohort требует отдельной версии данных/учителя; training,
+promotion и activation не запускались. [Контракт и результаты](../docs/rerank-grounded-teacher-pilot.md).
