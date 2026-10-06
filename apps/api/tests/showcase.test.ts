@@ -49,7 +49,8 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
         preferences: [], domains: [], stacks: [], soft_skills: [], projects: [], experience: [], achievements: [] },
     };
     let receipt: ShowcaseLikeReceipt | null = null;
-    let malicious = false, changeDuringPdf = false, writes = 0;
+    let malicious = false, changeDuringPdf = false, warn = false, writes = 0;
+    const mismatchToken = "a".repeat(64);
     const calls: Array<{ path: string; owner: string | null }> = [];
     const transport: typeof fetch = async (input, init) => {
       const url = new URL(String(input));
@@ -72,11 +73,14 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
       }
       if (url.pathname.startsWith(`/internal/vacancies/${vacancyId}/showcase-likes/`)) return receipt ? Response.json(receipt) : Response.json({}, { status: 404 });
       if (url.pathname === `/internal/vacancies/${vacancyId}/showcase-likes`) {
-        const body = JSON.parse(String(init?.body)) as { candidate_id: string; profile_revision: number; idempotency_key: string };
+        const body = JSON.parse(String(init?.body)) as { candidate_id: string; profile_revision: number; idempotency_key: string; mismatch_token?: string };
+        if (warn) return Response.json({ detail: { code: "strict_filter_confirmation_required", candidate_id: id,
+          profile_revision: 1, vacancy_revision: 1, warnings: ["salary_disjoint"], mismatch_token: mismatchToken } }, { status: 409 });
         writes++;
         receipt ??= { receipt_id: randomUUID(), exposure_id: randomUUID(), vacancy_id: vacancyId, candidate_id: body.candidate_id,
           profile_revision: body.profile_revision, selection_source: "showcase", action: "like", idempotency_key: body.idempotency_key,
-          saved: true, visited: false, replayed: false, history_badges: [] };
+          saved: true, visited: false, replayed: false, history_badges: [],
+          strict_filter_warnings: body.mismatch_token ? ["salary_disjoint"] : [], mismatch_token: body.mismatch_token ?? null };
         return Response.json({ ...receipt, replayed: writes > 1 });
       }
       return Response.json({}, { status: 404 });
@@ -119,7 +123,23 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
     assert.equal((await app.inject({ method: "POST", url: likePath, headers, payload: { ...body, profile_revision: 2 } })).statusCode, 409);
     assert.equal(writes, 2);
     receipt = null;
-    assert.equal((await app.inject({ method: "POST", url: likePath, headers, payload: { ...body, idempotency_key: randomUUID() } })).statusCode, 409);
+    sourceCurrent = true;
+    warn = true;
+    const warning = await app.inject({ method: "POST", url: likePath, headers, payload: body });
+    assert.equal(warning.statusCode, 409);
+    assert.deepEqual(warning.json().detail.warnings, ["salary_disjoint"]);
+    assert.equal(warning.json().detail.mismatch_token, mismatchToken);
     assert.equal(writes, 2);
+    warn = false;
+    const acknowledged = { ...body, mismatch_token: mismatchToken };
+    const override = await app.inject({ method: "POST", url: likePath, headers, payload: acknowledged });
+    assert.equal(override.statusCode, 200, override.body);
+    assert.deepEqual(override.json().strict_filter_warnings, ["salary_disjoint"]);
+    assert.equal((await app.inject({ method: "POST", url: likePath, headers, payload: body })).statusCode, 409);
+    sourceCurrent = false;
+    assert.equal((await app.inject({ method: "POST", url: likePath, headers, payload: acknowledged })).statusCode, 200);
+    receipt = null;
+    assert.equal((await app.inject({ method: "POST", url: likePath, headers, payload: { ...body, idempotency_key: randomUUID() } })).statusCode, 409);
+    assert.equal(writes, 4);
   } finally { await app.close(); await pool.end(); }
 });

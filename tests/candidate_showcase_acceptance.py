@@ -55,6 +55,7 @@ def main():
         fields[0]["description"] = "Python разработчик серверных API, PostgreSQL и распределенные системы."
         fields[1]["description"] = "Разработка приложений и интеграций на Python."
         fields[2]["description"] = "Системы обработки данных."
+        fields[2].update(city="Казань", primary_direction="frontend", salary={"from_rub": 900000, "to_rub": 1000000})
         for candidate, profile in zip(candidates, fields, strict=True):
             helpers.put_profile(api, candidate, profile)
             helpers.run_profile_projection()
@@ -97,6 +98,20 @@ def main():
         saved = call(api, "GET", base + "/saved", employer)
         assert saved["items"][0]["candidate_id"] == candidate["id"] and saved["items"][0]["card"]["mode"] == "manual"
         checks.append("owned_open_vacancy_manual_like_saved_exact_replay")
+        override_operation = {"candidate_id": candidates[2]["id"], "profile_revision": 1, "idempotency_key": str(uuid4())}
+        warning_response = api.post(base + "/showcase-likes", headers={"Authorization": employer["authorization"]}, json=override_operation)
+        assert warning_response.status_code == 409
+        warning = warning_response.json()["detail"]
+        assert warning["code"] == "strict_filter_confirmation_required"
+        assert {"class_mismatch", "salary_disjoint", "relocation_not_ready"} <= set(warning["warnings"])
+        assert len(call(api, "GET", base + "/saved", employer)["items"]) == 1
+        override_operation["mismatch_token"] = warning["mismatch_token"]
+        override = call(api, "POST", base + "/showcase-likes", employer, json=override_operation)
+        assert override["saved"] and override["strict_filter_warnings"] == warning["warnings"]
+        assert call(api, "POST", base + "/showcase-likes", employer, json=override_operation)["replayed"]
+        assert call(api, "POST", base + "/invitations", employer, json={"candidate_id": candidates[2]["id"],
+            "company_name": "Synthetic company", "description": "Acknowledged manual choice", "idempotency_key": str(uuid4())})["state"] == "sent"
+        checks.append("structured_mismatch_warning_and_explicit_manual_override")
         process = call(api, "POST", base + "/invitations", employer, json={"candidate_id": candidate["id"], "company_name": "Synthetic company", "description": "Backend position", "idempotency_key": str(uuid4())})
         call(api, "GET", f"/employer/recruitment/{process['id']}/contacts", employer, expected=403)
         own = call(api, "GET", f"/candidate/recruitment/{process['id']}", candidate)

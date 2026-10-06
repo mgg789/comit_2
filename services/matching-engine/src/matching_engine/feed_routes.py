@@ -17,11 +17,12 @@ from matching_engine.feed_models import (
     FeedPage,
     FeedRequest,
     SavedCard,
+    ShowcaseLikeConflict,
     ShowcaseLikeReceipt,
     ShowcaseLikeRequest,
     VisitedCard,
 )
-from matching_engine.feed_store import FeedStore
+from matching_engine.feed_store import FeedStore, ShowcaseMismatchError
 
 
 def feed_router(repository: FeedStore | None, require_internal: Callable) -> APIRouter:
@@ -37,13 +38,16 @@ def feed_router(repository: FeedStore | None, require_internal: Callable) -> API
             raise HTTPException(status_code=503, detail="feed database is not configured")
         return repository, x_owner_id
 
-    @router.post("/internal/vacancies/{vacancy_id}/showcase-likes", response_model=ShowcaseLikeReceipt)
+    @router.post("/internal/vacancies/{vacancy_id}/showcase-likes", response_model=ShowcaseLikeReceipt,
+                 responses={409: {"model": ShowcaseLikeConflict}})
     def showcase_like(vacancy_id: UUID, payload: ShowcaseLikeRequest,
                       services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> ShowcaseLikeReceipt:
         """Like one explicit public candidate for an owned open vacancy without a ranked feed."""
         store, owner_id = services
         try:
             return store.showcase_like(owner_id, vacancy_id, payload)
+        except ShowcaseMismatchError as error:
+            raise HTTPException(status_code=409, detail=error.warning.model_dump(mode="json")) from error
         except (psycopg.errors.LockNotAvailable, psycopg.errors.QueryCanceled) as error:
             raise HTTPException(status_code=503, detail="showcase temporarily busy; retry the same key",
                                 headers={"Retry-After": "1"}) from error

@@ -495,6 +495,7 @@ Rollback/reset доступны владельцу вакансии. [Прави
 
 Общая [витрина кандидатов](candidate-showcase.md) объединяет PostgreSQL
 full-text и независимый Harrier query RRF60, с фильтрами и явным lexical
-fallback. Лайк для выбранной ready/open вакансии проходит строгий фильтр и
+fallback. Лайк для выбранной ready/open вакансии проверяет строгий фильтр;
+несоответствие требует явного подтверждения предупреждения, после которого
 создаёт обычные saved/attractive/exclusions. Источник manual не включается
 в обучение learned-cohort и не меняет активный preference control.

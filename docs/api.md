@@ -436,7 +436,10 @@ order_revision. Shared, generated engine OpenAPI, gateway и api-client обно
 Общая витрина работодателя добавляет POST `/employer/candidates/search`,
 GET `/employer/candidates/:candidate_id`, публичный PDF точной ревизии и
 POST `/employer/vacancy-drafts/:draft_id/showcase-likes`. Поиск доступен без
-вакансии; лайк требует собственной ready/open вакансии и строгих фильтров.
+вакансии; лайк требует собственной ready/open вакансии. Несоответствия
+строгим условиям возвращают структурированное предупреждение409; повтор с
+source-bound mismatch_token разрешает ручной выбор. Source/ownership guards
+не допускают override.
 SearchRequest/Page, PublicCandidateDetail и ShowcaseLikeRequest/Receipt
 синхронизированы в Pydantic, generated OpenAPI, shared и api-client.
 [Поля, фильтры, cursor, повторы и выбор вакансии](candidate-showcase.md).

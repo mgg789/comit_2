@@ -162,7 +162,8 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
           ...(queries.length ? { querystring: { type: "object", additionalProperties: false,
             properties: Object.fromEntries(queries.map(value => [value.name, querySchema(value.name, value.schema)])) } } : {}),
           ...(operation.requestBody ? { body: refs(operation.requestBody.content["application/json"].schema, "matching") } : {}),
-          ...(response ? { response: { 200: refs(response, "matching") } } : {}),
+          ...(response ? { response: { 200: refs(response, "matching"),
+            ...(suffix === "/showcase-likes" && method === "post" ? { 409: { $ref: "urn:comit:public:matching:ShowcaseLikeConflict" } } : {}) } } : {}),
         }, onRequest: guard("employer"), handler: async (request, reply) => {
           const identity = identities.get(request);
           if (!identity || !agentsToken || !matchingToken || !options.profiles) return reply.code(503).send({ detail: "feed_unavailable" });
@@ -191,7 +192,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
               } else if (!receipt.ok) return reply.code(receipt.status).send(await receipt.json());
             }
             if (method === "post" && suffix === "/showcase-likes") {
-              const body = request.body as { candidate_id: string; profile_revision: number; idempotency_key: string };
+              const body = request.body as { candidate_id: string; profile_revision: number; idempotency_key: string; mismatch_token?: string | null };
               const receipt = await transport(new URL(`/internal/vacancies/${draft.vacancy_id}/showcase-likes/${encodeURIComponent(body.idempotency_key)}`, matchingUrl), {
                 headers, signal: AbortSignal.timeout(10000), redirect: "error" });
               if (receipt.status === 404) {
@@ -200,7 +201,8 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
                 const prior = await receipt.json() as Record<string, unknown>;
                 if (prior.candidate_id !== body.candidate_id || prior.profile_revision !== body.profile_revision
                   || prior.vacancy_id !== draft.vacancy_id || prior.idempotency_key !== body.idempotency_key
-                  || prior.action !== "like" || prior.selection_source !== "showcase") return reply.code(409).send({ detail: "idempotency_payload_conflict" });
+                  || prior.action !== "like" || prior.selection_source !== "showcase"
+                  || (prior.mismatch_token ?? null) !== (body.mismatch_token ?? null)) return reply.code(409).send({ detail: "idempotency_payload_conflict" });
               } else return reply.code([404, 409].includes(receipt.status) ? receipt.status : 503).send({ detail: "showcase_unavailable" });
             }
             const result = await transport(upstream, { method: method.toUpperCase(), headers,

@@ -11,9 +11,9 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from matching_engine import feed_policy
-from matching_engine.combine_models import ScoringPolicy
+from matching_engine.combine_models import CandidateCard, ScoringPolicy
 from matching_engine.combine_scoring import policy_hash as scoring_policy_hash
-from matching_engine.combine_scoring import select_candidates
+from matching_engine.combine_scoring import score_candidate, strict_filter
 from matching_engine.combine_store import CombineStore, _lock
 from matching_engine.database import connect
 from matching_engine.feed_models import (
@@ -28,6 +28,7 @@ from matching_engine.feed_models import (
     SavedCard,
     ShowcaseLikeReceipt,
     ShowcaseLikeRequest,
+    ShowcaseMismatchWarning,
     VisitedCard,
 )
 from matching_engine.learning_store import LearningStore
@@ -37,6 +38,15 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import tail_policy_hash
 from matching_engine.rerank_store import _schema
 from matching_engine.store import ConflictError, NotFoundError
+
+
+class ShowcaseMismatchError(ConflictError):
+    """An overrideable suitability warning, distinct from mandatory source guards."""
+
+    def __init__(self, warning: ShowcaseMismatchWarning) -> None:
+        """Retain only public machine-readable reasons and source-bound acknowledgement."""
+        super().__init__("strict vacancy filters require explicit acknowledgement")
+        self.warning = warning
 
 
 class FeedPolicyWorker(Protocol):
@@ -575,7 +585,7 @@ class FeedStore:
     def _showcase_receipt_locked(connection: psycopg.Connection, owner_id: UUID, vacancy_id: UUID,
                                  key: UUID) -> ShowcaseLikeReceipt | None:
         """Read only a manual-like receipt; a shared key cannot change operation origin."""
-        row = connection.execute("""SELECT d.*,e.kind FROM feed_pipeline.decisions d
+        row = connection.execute("""SELECT d.*,e.kind,e.card FROM feed_pipeline.decisions d
             JOIN feed_pipeline.exposures e USING(exposure_id)
             WHERE d.owner_id=%s AND d.vacancy_id=%s AND d.idempotency_key=%s""",
             (owner_id, vacancy_id, key)).fetchone()
@@ -586,7 +596,9 @@ class FeedStore:
         return ShowcaseLikeReceipt(receipt_id=row["receipt_id"], exposure_id=row["exposure_id"],
             vacancy_id=row["vacancy_id"], candidate_id=row["candidate_id"], action="like",
             idempotency_key=key, saved=True, visited=False, replayed=True,
-            history_badges=row["history_badges"], profile_revision=row["profile_revision"])
+            history_badges=row["history_badges"], profile_revision=row["profile_revision"],
+            strict_filter_warnings=row["card"].get("strict_filter_warnings", []),
+            mismatch_token=row["card"].get("mismatch_token"))
 
     def showcase_receipt(self, owner_id: UUID, vacancy_id: UUID, key: UUID) -> ShowcaseLikeReceipt:
         """Read an immutable owned receipt even after source withdrawal or vacancy closure."""
@@ -620,8 +632,8 @@ class FeedStore:
     def showcase_like(self, owner_id: UUID, vacancy_id: UUID, request: ShowcaseLikeRequest) -> ShowcaseLikeReceipt:
         """Atomically allocate one manual exposure and reuse the ordinary like transition.
 
-        No main/rerank run is fabricated. Strict vacancy filters and visited/pending
-        blocking apply; an exact retry returns its old receipt before freshness checks.
+        No main/rerank run is fabricated. Suitability mismatches require a source-bound
+        acknowledgement; visited/pending and source guards cannot be overridden.
         """
         with connect(self.database_url) as connection:
             # Keep the established pipeline lock order while bounding contention.
@@ -630,7 +642,8 @@ class FeedStore:
             _lock(connection)
             prior = self._showcase_receipt_locked(connection, owner_id, vacancy_id, request.idempotency_key)
             if prior is not None:
-                if prior.candidate_id != request.candidate_id or prior.profile_revision != request.profile_revision:
+                if (prior.candidate_id != request.candidate_id or prior.profile_revision != request.profile_revision
+                        or prior.mismatch_token != request.mismatch_token):
                     raise ConflictError("showcase like idempotency key conflicts with its source")
                 return prior
             vacancy = self._owner_vacancy(connection, owner_id, vacancy_id)
@@ -640,12 +653,28 @@ class FeedStore:
             self._profile_snapshot(connection, request.candidate_id, request.profile_revision)
             ready = CombineStore._vacancy(connection, vacancy_id)
             candidates = CombineStore._candidates(connection, request.candidate_id)
-            selection = select_candidates(ready, candidates, ScoringPolicy(), top_k=1)
-            if not selection.items:
-                raise ConflictError("showcase candidate does not pass strict vacancy filters")
-            card = selection.items[0].model_dump(mode="json")
+            if not candidates:
+                raise ConflictError("showcase candidate source is missing")
+            candidate = candidates[0]
+            suitability = strict_filter(ready, candidate)
+            token = digest({"owner": str(owner_id), "vacancy": str(vacancy_id),
+                "vacancy_revision": ready.revision, "candidate": str(request.candidate_id),
+                "profile_revision": request.profile_revision, "warnings": suitability.reasons,
+                "policy": scoring_policy_hash(ScoringPolicy())}) if suitability.reasons else None
+            if suitability.reasons and request.mismatch_token != token:
+                raise ShowcaseMismatchError(ShowcaseMismatchWarning(candidate_id=request.candidate_id,
+                    profile_revision=request.profile_revision, vacancy_revision=ready.revision,
+                    warnings=suitability.reasons, mismatch_token=token))
+            if request.mismatch_token != token:
+                raise ConflictError("showcase mismatch acknowledgement is obsolete")
+            card = CandidateCard(candidate_id=candidate.candidate_id, profile_revision=candidate.profile_revision,
+                position=1, display_name=candidate.display_name, city=candidate.city, salary=candidate.salary,
+                category=candidate.category, rank=candidate.rank, confirmed_strength=candidate.confirmed_strength,
+                resume_url=candidate.resume_url, explanation=score_candidate(ready, candidate, ScoringPolicy()),
+                filter_factors=suitability.factors).model_dump(mode="json")
             card.update(main_position=1, rerank_position=None, mode="manual", rerank_score=None,
-                        artifact_hash=None, rerank_contributions={})
+                        artifact_hash=None, rerank_contributions={},
+                        strict_filter_warnings=suitability.reasons, mismatch_token=token)
             session_id, exposure_id = uuid4(), uuid4()
             policy_digest = self._policy_snapshot(connection, vacancy_id, {})[1]
             generation = connection.execute("SELECT pool_generation FROM matching_pipeline.settings WHERE singleton").fetchone()["pool_generation"]
@@ -666,7 +695,8 @@ class FeedStore:
             LearningStore.event(connection, exposure, "delivered")
             result = self._decision_locked(connection, owner_id, vacancy_id,
                 FeedDecisionRequest(exposure_id=exposure_id, action="like", idempotency_key=request.idempotency_key))
-            return ShowcaseLikeReceipt(**result.model_dump(), profile_revision=request.profile_revision)
+            return ShowcaseLikeReceipt(**result.model_dump(), profile_revision=request.profile_revision,
+                                       strict_filter_warnings=suitability.reasons, mismatch_token=token)
 
     def saved(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0,
               candidate_id: UUID | None = None) -> FeedListPage[SavedCard]:

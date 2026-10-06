@@ -2216,6 +2216,16 @@
               }
             }
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowcaseLikeConflict"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4071,6 +4081,24 @@
               }
             ],
             "title": "Artifact Hash"
+          },
+          "strict_filter_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strict Filter Warnings"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
           },
           "activation_revision": {
             "type": "integer",
@@ -6539,6 +6567,28 @@
         "title": "SelectionStateInput",
         "description": "Trusted handoff cannot manually release visited; feed policy owns structural release."
       },
+      "ShowcaseLikeConflict": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/ShowcaseMismatchWarning"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ShowcaseLikeConflict",
+        "description": "A hard conflict string or an overrideable structured suitability warning."
+      },
       "ShowcaseLikeReceipt": {
         "properties": {
           "receipt_id": {
@@ -6603,6 +6653,24 @@
             "const": "showcase",
             "title": "Selection Source",
             "default": "showcase"
+          },
+          "strict_filter_warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Strict Filter Warnings"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
           }
         },
         "additionalProperties": false,
@@ -6637,6 +6705,18 @@
             "type": "string",
             "format": "uuid",
             "title": "Idempotency Key"
+          },
+          "mismatch_token": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mismatch Token"
           }
         },
         "additionalProperties": false,
@@ -6648,6 +6728,51 @@
         ],
         "title": "ShowcaseLikeRequest",
         "description": "Manual like binds the explicitly viewed candidate revision to one vacancy."
+      },
+      "ShowcaseMismatchWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "strict_filter_confirmation_required",
+            "title": "Code",
+            "default": "strict_filter_confirmation_required"
+          },
+          "candidate_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Candidate Id"
+          },
+          "profile_revision": {
+            "type": "integer",
+            "title": "Profile Revision"
+          },
+          "vacancy_revision": {
+            "type": "integer",
+            "title": "Vacancy Revision"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "mismatch_token": {
+            "type": "string",
+            "title": "Mismatch Token"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "profile_revision",
+          "vacancy_revision",
+          "warnings",
+          "mismatch_token"
+        ],
+        "title": "ShowcaseMismatchWarning",
+        "description": "Modal-ready confirmation bound to current candidate and vacancy revisions."
       },
       "Skill": {
         "properties": {

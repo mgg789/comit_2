@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from matching_engine.combine_store import CombineStore
 from matching_engine.database import PIPELINE_LOCK, connect
 from matching_engine.feed_models import FeedRequest, ShowcaseLikeRequest
-from matching_engine.feed_store import FeedStore
+from matching_engine.feed_store import FeedStore, ShowcaseMismatchError
 from matching_engine.main import create_app
 from matching_engine.preference_store import PreferenceStore
 from matching_engine.preference_worker import PreferenceWorker
@@ -168,3 +168,29 @@ def test_lock_contention_is_bounded_retryable_and_atomic(store):
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT count(*) AS n FROM feed_pipeline.exposures").fetchone()["n"] == 0
     assert feed.showcase_like(owner, vacancy, operation).saved
+
+
+def test_warning_override_binds_revisions_and_preserves_saved_replay(store):
+    """Only suitability can be acknowledged; no exposure is written before confirmation."""
+    feed, _, owner, vacancy, candidates = manual_pool(store)
+    with connect(store.database_url) as connection:
+        connection.execute("UPDATE candidate_pipeline.pool SET specialization='frontend' WHERE candidate_id=%s", (candidates[0],))
+    operation = request(candidates[0])
+    with pytest.raises(ShowcaseMismatchError) as warning:
+        feed.showcase_like(owner, vacancy, operation)
+    assert warning.value.warning.warnings == ["class_mismatch"]
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT count(*) AS n FROM feed_pipeline.exposures").fetchone()["n"] == 0
+        connection.execute("UPDATE vacancy_pipeline.ready SET revision=revision+1 WHERE vacancy_id=%s", (vacancy,))
+        connection.execute("UPDATE vacancy_pipeline.vacancies SET revision=revision+1 WHERE vacancy_id=%s", (vacancy,))
+    old_ack = operation.model_copy(update={"mismatch_token": warning.value.warning.mismatch_token})
+    with pytest.raises(ShowcaseMismatchError) as refreshed:
+        feed.showcase_like(owner, vacancy, old_ack)
+    assert refreshed.value.warning.mismatch_token != old_ack.mismatch_token
+    acknowledged = operation.model_copy(update={"mismatch_token": refreshed.value.warning.mismatch_token})
+    liked = feed.showcase_like(owner, vacancy, acknowledged)
+    assert liked.strict_filter_warnings == ["class_mismatch"] and liked.mismatch_token == acknowledged.mismatch_token
+    assert feed.saved_candidate(owner, vacancy, candidates[0]).card.strict_filter_warnings == ["class_mismatch"]
+    assert feed.showcase_like(owner, vacancy, acknowledged).replayed
+    with pytest.raises(ConflictError, match="idempotency"):
+        feed.showcase_like(owner, vacancy, operation)

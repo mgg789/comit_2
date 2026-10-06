@@ -46,6 +46,10 @@ export interface PublicCandidateDetail extends PublicCandidateCard { public_prof
 /** Search degradation is explicit; a changed pool invalidates continuation with HTTP 409. */
 export interface SearchPage { items: PublicCandidateCard[]; total: number; limit: number; has_more: boolean; next_cursor: string | null; mode: "browse" | "lexical" | "hybrid"; fallback_reason: string | null; }
 /** Manual like binds the selected open owned vacancy to the displayed profile revision. */
-export interface ShowcaseLikeRequest { candidate_id: string; profile_revision: number; idempotency_key: string; }
+export interface ShowcaseLikeRequest { candidate_id: string; profile_revision: number; idempotency_key: string; mismatch_token?: string | null; }
+/** HTTP 409 detail for a future modal; send this token to acknowledge these exact revisions. */
+export interface ShowcaseMismatchWarning { code: "strict_filter_confirmation_required"; candidate_id: string; profile_revision: number; vacancy_revision: number; warnings: string[]; mismatch_token: string; }
+/** Hard state conflicts remain strings; only structured suitability warnings permit override. */
+export interface ShowcaseLikeConflict { detail: string | ShowcaseMismatchWarning; }
 /** Manual selection shares the normal saved receipt and preserves its distinct source. */
-export interface ShowcaseLikeReceipt extends FeedDecision { profile_revision: number; selection_source: "showcase"; }
+export interface ShowcaseLikeReceipt extends FeedDecision { profile_revision: number; selection_source: "showcase"; strict_filter_warnings: string[]; mismatch_token: string | null; }
