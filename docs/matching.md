@@ -29,6 +29,29 @@ Trigger (vacancy.ready | candidate.ready/withdrawn | ручной вызов)
 
 Синтетика: 200+ кандидатов, 10 вакансий с эталонной разметкой. Метрики: Precision@5/10 (прямо из критериев ТЗ), MRR, ablation (без вектора / без рейтинга / без ФСП-буста), сходимость тиндер-лупа на работодателе-агенте. Протокол и результаты — в документацию сдачи.
 
+## Регрессия скоринга (golden)
+
+Отдельно от качественной валидации выше работает детерминированная golden-регрессия
+самой механики: `services/matching-engine/tests/test_combine_regression.py` с
+снимком `tests/fixtures/scoring_regression_golden.json`.
+
+- Фиксированный синтетический корпус (22 кандидата × 4 вакансии) покрывает все ветки
+  strict-фильтра (класс, зарплатные границы включительно, форматы работы, города с
+  нормализацией/алиасами, переезд, версия strict-схемы, исключения), все статусы
+  evidence (confirmed/partial/self_reported/pending/rejected/отсутствие), явный
+  target=0, self-reported грейд, semantic-поправку (позитив/негатив/несовместимое
+  пространство/нет bio) и детерминированные tie-break.
+- Снимок хранит полный расклад: решения фильтра по каждому кандидату, агрегаты причин,
+  полный ScoreBreakdown каждого элемента top-k и точный порядок. Floats округляются
+  до 9 знаков; арифметика и так детерминированная.
+- Снимок связан fingerprint'ами: `policy_hash(ScoringPolicy())` и дайджест корпуса.
+  Любое изменение весов, коэффициентов доверия, фильтров или корпуса ломает тест —
+  намеренное изменение требует перегенерации и объяснения диффа в теле коммита (AGENTS §6).
+- Обновление: `UPDATE_GOLDEN=1 pytest services/matching-engine/tests/test_combine_regression.py`
+  или `make regression-golden-update`; ревью диффа обязательно.
+- Тест офлайн (без PG и без модели Harrier) и выполняется в обычной CI-джобе `python`;
+  полный Python-набор с PostgreSQL гоняет отдельная джоба `regression` — [ci.md](ci.md#джоба-regression--полный-python-набор-с-postgresql).
+
 ## Готовая воронка перед комбайном
 
 Intake → eligibility → durable job → strict + Harrier + PDF → атомарный ready pool
