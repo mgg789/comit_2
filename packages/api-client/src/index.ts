@@ -4,7 +4,7 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady } from "@comit/shared";
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedListPage, SavedCard, VisitedCard } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -45,6 +45,16 @@ export interface ApiClient {
   requestSelection(draftId: string, body: CombineRequest): Promise<CombineStatus>;
   /** Return the current contact-free selection page and public authorised PDF links. */
   getSelection(draftId: string, limit?: number, offset?: number): Promise<SelectionPage>;
+  /** Open an owned vacancy portion from current rerank. */
+  openFeed(draftId: string, body?: FeedRequest): Promise<FeedPage>;
+  /** Continue a fixed portion; cursors survive own likes/dislikes. */
+  getFeed(draftId: string, sessionId: string, cursor?: string, limit?: number): Promise<FeedPage>;
+  /** Record a reaction using a UUID idempotency key. */
+  decideFeed(draftId: string, body: FeedDecisionRequest): Promise<FeedDecision>;
+  /** Read the saved membership scoped to this draft's vacancy. */
+  getSaved(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<SavedCard>>;
+  /** Read retained visited history, including nonblocking updated entries. */
+  getVisited(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<VisitedCard>>;
 }
 
 /** Create a same-origin API client; optional Bearer credentials override session cookies server-side. */
@@ -82,5 +92,10 @@ export function createApiClient({
     getVacancyReady: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/ready`),
     requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),
     getSelection: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/selections?limit=${limit}&offset=${offset}`),
+    openFeed: (draftId, body = {}) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed`, body),
+    getFeed: (draftId, sessionId, cursor, limit = 50) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
+    decideFeed: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/decisions`, body),
+    getSaved: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/saved?limit=${limit}&offset=${offset}`),
+    getVisited: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/visited?limit=${limit}&offset=${offset}`),
   };
 }

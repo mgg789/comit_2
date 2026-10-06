@@ -32,7 +32,7 @@ Harrier query из bio совместим с candidate document; пустой bi
 
 ```
 Trigger (актуальная vacancy.ready со status=open | порог изменчивости пула)
-  1. Strict pre-filter  — специализация, грейд (с допусками), формат/локация, отказ от visited/pending/attractive
+  1. Strict pre-filter  — специализация, грейд (с допусками), формат/локация, отказ от блокирующих visited/pending/attractive; visited_updated допускается после N > K
   2. Candidate scoring  — score = w_r·ratingNorm + w_m·matchVec + w_f·fspBoost + w_a·freshness
   3. top-k (k ≈ 20–50)  — берём в лёгкий реранкер
   4. Rerank             — тонкая модель: контекст вакансии, разнообразие, explorable-пробы

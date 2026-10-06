@@ -250,7 +250,7 @@ class CombineStore:
 
     def set_selection_state(self, vacancy_id: UUID, candidate_id: UUID,
                             selection: SelectionStateInput) -> SelectionState:
-        """Persist vacancy exclusion state; visited cannot be released by any later state."""
+        """Persist trusted exclusion handoff; structural feed evaluation alone can release visited."""
         with connect(self.database_url) as connection:
             _lock(connection)
             self._vacancy(connection, vacancy_id)
@@ -264,6 +264,9 @@ class CombineStore:
                 connection.execute("""INSERT INTO matching_pipeline.selection_states(vacancy_id,candidate_id,state)
                     VALUES (%s,%s,%s) ON CONFLICT (vacancy_id,candidate_id) DO UPDATE SET state=EXCLUDED.state,updated_at=now()""",
                     (vacancy_id, candidate_id, selection.state))
+                if selection.state == "visited":
+                    from matching_engine.feed_store import FeedStore
+                    FeedStore(self.database_url).seed_legacy_manualvisited(connection)
                 connection.execute("INSERT INTO matching_pipeline.controls(vacancy_id) VALUES (%s) ON CONFLICT DO NOTHING", (vacancy_id,))
                 connection.execute("UPDATE matching_pipeline.controls SET revision=revision+1 WHERE vacancy_id=%s", (vacancy_id,))
                 self._queue(connection, vacancy_id)
@@ -363,6 +366,9 @@ class CombineStore:
         if connection.execute("SELECT 1 FROM matching_pipeline.inbox WHERE source=%s AND event_id=%s", (source, event["id"])).fetchone():
             return
         if source == "candidate":
+            if event["event_type"] == "candidate.ready":
+                from matching_engine.feed_store import FeedStore
+                FeedStore(self.database_url).reconsider(connection, event["candidate_id"])
             vacancies = connection.execute("""SELECT r.vacancy_id FROM vacancy_pipeline.ready r
                 JOIN vacancy_pipeline.vacancies v ON v.vacancy_id=r.vacancy_id AND v.revision=r.revision
                     AND v.state='ready' AND v.business_status='open'

@@ -85,12 +85,13 @@ export interface DeliveryStatus {
   quarantined_count: number;
   retrying_count: number;
 }
-/** Server handoff from the future Tinder flow; visited may never be released. */
+/** Trusted handoff cannot manually release visited; structural feed evaluation owns that exception. */
 export interface SelectionStateInput {
   state: "eligible" | "visited" | "pending" | "attractive";
 }
 /** Persisted exclusion state survives replacement of disposable main batches. */
-export interface SelectionState extends SelectionStateInput {
+export interface SelectionState {
+  state: SelectionStateInput["state"] | "visited_updated";
   vacancy_id: string;
   candidate_id: string;
 }
@@ -135,3 +136,68 @@ export interface RerankPage {
   limit: number;
   offset: number;
 }
+
+
+/** Open a 24-hour portion from a current ready rerank; reserve is explicitly opt-in. */
+export interface FeedRequest { include_reserve?: boolean; limit?: number; }
+/** An immutable reranked card occurrence, bound to one served exposure. */
+export interface FeedCard extends RerankCard {
+  exposure_id: string;
+  session_id: string;
+  served_at: string | null;
+  decision: "like" | "dislike" | null;
+  history_badges: string[];
+  change_assessment: Record<string, unknown> | null;
+}
+/** Stable opaque position cursor; own feedback does not reorder this portion. */
+export interface FeedPage {
+  session_id: string;
+  vacancy_id: string;
+  vacancy_revision: number;
+  policy_hash: string;
+  expires_at: string;
+  cursor: string | null;
+  next_cursor: string | null;
+  has_more: boolean;
+  items: FeedCard[];
+}
+/** One reaction per served exposure; UUID key is scoped to employer and vacancy. */
+export interface FeedDecisionRequest { exposure_id: string; action: "like" | "dislike"; idempotency_key: string; }
+/** Immutable action identity; duplicate requests return this receipt with replayed=true. */
+export interface FeedDecision {
+  receipt_id: string;
+  exposure_id: string;
+  vacancy_id: string;
+  candidate_id: string;
+  action: "like" | "dislike";
+  idempotency_key: string;
+  saved: boolean;
+  visited: boolean;
+  replayed: boolean;
+  history_badges: string[];
+}
+/** Saved membership remains auditable even when its old card is no longer current. */
+export interface SavedCard {
+  vacancy_id: string;
+  candidate_id: string;
+  profile_revision: number;
+  exposure_id: string;
+  saved_at: string;
+  card: FeedCard | null;
+}
+/** Durable last-dislike baseline and current blocking state for this vacancy. */
+export interface VisitedCard {
+  vacancy_id: string;
+  candidate_id: string;
+  profile_revision: number;
+  exposure_id: string | null;
+  baseline_origin: "exposure" | "legacy_migration";
+  visited_at: string | null;
+  updated_at: string;
+  history_badges: string[];
+  evaluated_revision: number;
+  state: SelectionState["state"];
+  assessment: Record<string, unknown>;
+}
+/** Bounded membership pagination; independent of a current main run. */
+export interface FeedListPage<T> { items: T[]; limit: number; offset: number; has_more: boolean; }

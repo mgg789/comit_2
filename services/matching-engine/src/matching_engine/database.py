@@ -45,7 +45,15 @@ def migrate(database_url: str) -> list[str]:
                 if existing["checksum"] != checksum:
                     raise RuntimeError(f"applied migration changed: {migration_file.name}")
                 continue
+            if migration_file.name == "007_employer_feed.sql":
+                # Match intake/feedback lock order before taking migration table locks.
+                connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
             connection.execute(sql)
+            if migration_file.name == "007_employer_feed.sql":
+                # Capture legacy visited baselines now, before future profile events.
+                # This projection strips prose/contacts and records its transparent origin.
+                from matching_engine.feed_store import FeedStore
+                FeedStore(database_url).seed_legacy_manualvisited(connection)
             connection.execute(
                 "INSERT INTO candidate_pipeline.migrations(name, checksum) VALUES (%s,%s)",
                 (migration_file.name, checksum),

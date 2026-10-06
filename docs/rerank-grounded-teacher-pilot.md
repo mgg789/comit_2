@@ -72,3 +72,9 @@ matching-engine, `pnpm typecheck`, `pnpm build`, `make smoke` — зелёные
 `pnpm --filter @comit/api test`: 27 passed, 4 skipped из-за отдельных ненастроенных
 auth/profile test DB. Production, удалённый CI и полная learned R₀ приёмка
 не проверялись.
+
+После интеграции параллельного employer feed из `dev` (`c0d6b7c`) повторены
+проверки объединённого дерева: 636 Python/PostgreSQL tests passed, scoped Ruff,
+`pnpm typecheck`, `pnpm build`, API 27 passed / 4 skipped, smoke 12 checks passed.
+Конфликты двух дополненных документов разрешены сохранением обоих разделов;
+исходный учитель, frozen diagnostic receipts и код ленты сохранены.
