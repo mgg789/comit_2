@@ -448,6 +448,26 @@ teachers/default/cohort сохранены. Повторы/training/promotion/ac
 [Сравнение и следующий ограниченный шаг](../docs/rerank-teacher-comparison.md),
 [отдельный hashed report](../data/validation/rerank-teacher-comparison.json).
 
+После запроса Mike продолжить поиск решения восстановлен transport: один
+v3wire probe воспроизвёл HTTP400 JSON-схемы с упоминанием `uniqueItems`,
+wire v4 удаляет этот атрибут только на сервере и сохраняет локальный duplicate
+guard. Все4Gemma/Qwen calls валидны и симметричны, но фактическая проверка
+свободных объяснений не пройдена. На конце этого этапа ledger28/696/119,
+старые20diagnostic attempts закрыты; общий pair3000 и остальные ceilings
+не увеличены. Последующие свежие bounded diagnostics потребляют оставшийся
+общий бюджет без переписывания старых receipts/labels.
+[Исправление API и доказательства](../docs/rerank-transport-recovery.md).
+
+Opt-in grounded v5 убирает свободное объяснение из ответа teacher: статусы,
+ссылки и зарплатная арифметика проверяются кодом. Два свежих ограниченных пилота
+дали40/40valid replies. Старые неоднозначные предпочтения:6/10agreement,
+10/10symmetry. Новые варианты с явными критериями и собственной предварительной
+score-blind assistant проверкой:9/10agreement,9/10symmetry,6/6decisive agreement.
+Это целевой диагностический результат, не независимая golden оценка. Одна
+ошибка exclusive uptime criterion сохранена и исключена из будущих учебных
+меток. Ledger28/736/119; прежние лимиты, teachers и dataset receipts неизменны.
+Полный60-family cohort требует отдельной версии данных/учителя; training,
+promotion и activation не запускались. [Контракт и результаты](../docs/rerank-grounded-teacher-pilot.md).
 
 ## Контур выдачи и решений работодателя — уточнение 06.10.2026
 

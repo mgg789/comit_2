@@ -45,6 +45,7 @@ services: matching-engine | testing-engine | integration-engine  (Python/FastAPI
 - **matching-engine** — «комбайн»: строгий фильтр → гибридный скоринг (фичи + эмбеддинг) → top-k → реранкер; тиндер-фидбек обучает вектор вакансии.
 - **testing-engine** — параметризованные blueprint'ы заданий, устойчивые к утечке; адаптивный грейд-тест.
 - **integration-engine** — верификация данных из внешних источников; хостит мок-реестр ФСП (реального API на хакатоне нет).
+- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek), opt-in overlay `infra/docker-compose.agents.yml`.
 
 Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`.
 
@@ -69,16 +70,17 @@ pairwise learner и gates качества/reviews. Пилот Laya дал0% swa
 | `services/matching-engine` | Python/FastAPI: подбор и объяснимость |
 | `services/testing-engine` | Python/FastAPI: тестирование (blueprints/) |
 | `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
+| `services/agents-service` | Python/FastAPI: черновик вакансии, форма + агент |
 | `infra/` | docker-compose (dev/prod), Dockerfiles, nginx, postgres init |
 | `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
-| `tests/` | сквозной smoke-гейт |
+| `tests/` | сквозной smoke-гейт и acceptance-сценарии |
 | `docs/` | живая документация (RU) |
 | `context/` | канон-контекст: ТЗ, исследование hh.ru, видение, механики, план |
 
 ## CI/CD
 
 GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, лейбл `ci`):
-- **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо, pytest Python-сервисов, smoke в изолированном compose-проекте;
+- **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо, pytest matching/testing/integration engines, smoke в изолированном compose-проекте;
 - **Deploy** — на push в `main`: сборка и подъём prod-стека на сервере в `/home/mgg/comit` + health-проверки.
 
 Ветки: работа в `dev`, стабильные состояния — PR в `main` (подробности и правила — `AGENTS.md`).

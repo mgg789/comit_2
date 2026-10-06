@@ -121,7 +121,8 @@ Runtime использует `local_files_only=True`, не требует вне
 кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
 
 Опциональный **локальный** compose-overlay включает миграции перед серверами и
-отдельный worker; базовый `make up` сам по себе worker не запускает:
+отдельные candidate-, vacancy- и combine-worker (rerank-worker в overlay нет — см.
+«Baseline R₀»); базовый `make up` сам по себе worker не запускает:
 
 ```bash
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
@@ -228,7 +229,7 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 | Остановить и снести | `make down` |
 | Пересобрать всё | `make build` |
 | JS typecheck/build | `pnpm -r typecheck && pnpm -r build` |
-| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/*/tests` |
+| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests` (agents-service — см. agents.md) |
 | Dev-сервер одного аппа | `pnpm --filter @comit/web-candidate dev` |
 | OpenAPI api-core | http://localhost:8080/docs (или `/api/docs` через nginx) |
 
@@ -376,6 +377,11 @@ ledger28/683/119. Повтор читает сохранённый stopped repor
 Качество не оценено, training/promotion не разрешены; остальные5diagnostic
 attempts автоматически не используются. [Подробности](rerank-teacher-comparison.md).
 
+Транспорт восстановлен отдельно: `python -m matching_engine.rerank_transport_recovery`
+воспроизводит1исходный запрос, `--recover` проверяет4wire-compatible calls.
+Старый этап завершён, обе команды повторяются cache-only. Wire v4 сохраняет
+runtime uniqueness и все citation/salary guards. [Разбор и ограничения](rerank-transport-recovery.md).
+
 ### Повтор backend приёмки
 
 При настроенном loopback `PIPELINE_TEST_DATABASE_URL`, установленном embeddings
@@ -386,3 +392,13 @@ Harrier, проверяет typed facts/PDFs/durable delivery/backfill. Не з�
 После `pnpm build` выполнить `python tests/rerank_http_acceptance.py`: только
 короткие собственные FastAPI/Fastify процессы на свободных портах, с cleanup.
 Отчёт и service logs сохраняются в ignored artifacts; credentials не печатаются.
+
+### Воспроизведение grounded teacher diagnostics
+
+`python -m matching_engine.rerank_grounded_pilot` читает отдельный завершённый
+пилот исходных предпочтений; `--explicit-policy` — новые сценарии с явными
+критериями и собственной предварительной проверкой вслепую. Завершённые запуски
+воспроизводятся без HTTP и изменения расхода. Свежий запуск фиксирует максимум
+20 попыток, использует до пяти общих remote slots и не увеличивает глобальный
+лимит. Если сохранён started receipt без report, сначала разобрать receipts;
+автоматического повторного запуска нет. [Результаты и ограничения](rerank-grounded-teacher-pilot.md).
