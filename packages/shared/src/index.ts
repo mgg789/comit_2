@@ -21,6 +21,7 @@ export type {
   ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
   RerankCard, RerankPage, RerankRequest, RerankStatus,
   FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
+  PreferenceStatus, PreferenceCommand,
 } from "./matching.js";
 
 export type Role = "candidate" | "employer";

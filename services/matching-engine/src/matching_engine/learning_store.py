@@ -128,6 +128,8 @@ class LearningStore:
         """Purge learning feature payloads on consent withdrawal; hashes remain audit-only."""
         result = connection.execute("""UPDATE learning_pipeline.samples SET features=NULL,withdrawn_at=now()
             WHERE candidate_id=%s AND withdrawn_at IS NULL""", (candidate_id,))
+        from matching_engine.preference_store import PreferenceStore
+        PreferenceStore.withdraw(connection, candidate_id)
         return result.rowcount
 
     def export(self, directory: Path, key: bytes, *, source: str = "operational", limit: int = 10000) -> dict:
@@ -198,11 +200,16 @@ class LearningStore:
                             "artifact_hash": exposure["artifact_hash"], "activation_revision": exposure["activation_revision"],
                             "mode": exposure["card"].get("mode"), "rerank_score": exposure["card"].get("rerank_score"),
                             "approval_receipt_hash": exposure["card"].get("approval_receipt_hash"),
+                            "preference_model_hash": exposure["card"].get("preference_model_hash"),
+                            "preference_revision": exposure["card"].get("preference_revision", 0),
+                            "preference_score": exposure["card"].get("preference_score"),
+                            "order_revision": exposure["card"].get("order_revision", 0),
                             "tail_policy_hash": exposure["tail_policy_hash"], "events": exposure["events"],
                             "action": action, "label": 1 if action == "like" else 0 if action == "dislike" else None,
                             "label_kind": "explicit_behavior" if action else "unlabeled",
                             "censoring": "session_expired" if action is None and exposure["expires_at"] < datetime.now(exposure["expires_at"].tzinfo) else None,
-                            "selection_policy": "deterministic_no_exploration", "propensity": None})
+                            "selection_policy": "deterministic_bounded_preferences" if exposure["card"].get("preference_state") == "personalized" else "deterministic_no_exploration",
+                            "propensity": None})
                     value = {"dataset_version": DATASET_VERSION, "source": row["source"],
                         "main_run_id": pseudonym(key, "main", row["main_run_id"]),
                         "owner_group": pseudonym(key, "owner", row["owner_id"]),

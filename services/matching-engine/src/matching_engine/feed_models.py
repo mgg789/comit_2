@@ -36,6 +36,14 @@ class FeedCard(CandidateCard):
     decision: Literal["like", "dislike"] | None = None
     history_badges: list[str] = Field(default_factory=list)
     change_assessment: dict[str, object] | None = None
+    preference_model_hash: str | None = None
+    preference_revision: int = 0
+    preference_position: int | None = None
+    preference_score: float | None = None
+    preference_adjustment: float = 0.
+    preference_contributions: dict[str, float] = Field(default_factory=dict)
+    preference_state: Literal["baseline", "personalized"] = "baseline"
+    order_revision: int = 0
 
 
 class FeedPage(Contract):
@@ -50,6 +58,7 @@ class FeedPage(Contract):
     next_cursor: str | None
     has_more: bool
     items: list[FeedCard]
+    order_revision: int = 0
 
 
 class FeedDecisionRequest(Contract):

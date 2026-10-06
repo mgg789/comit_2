@@ -6,6 +6,316 @@
     "version": "0.2.0"
   },
   "paths": {
+    "/internal/vacancies/{vacancy_id}/preferences": {
+      "get": {
+        "tags": [
+          "vacancy-preferences"
+        ],
+        "summary": "Status",
+        "description": "Read collection/fit/activation progress for one owned vacancy.",
+        "operationId": "status_internal_vacancies__vacancy_id__preferences_get",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/preferences/reset": {
+      "post": {
+        "tags": [
+          "vacancy-preferences"
+        ],
+        "summary": "Reset",
+        "description": "Return to baseline and restart collection strictly after the reset timestamp.",
+        "operationId": "reset_internal_vacancies__vacancy_id__preferences_reset_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/preferences/rollback": {
+      "post": {
+        "tags": [
+          "vacancy-preferences"
+        ],
+        "summary": "Rollback",
+        "description": "Disable preference learning/application until an explicit reset re-enables it.",
+        "operationId": "rollback_internal_vacancies__vacancy_id__preferences_rollback_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/preferences/retry": {
+      "post": {
+        "tags": [
+          "vacancy-preferences"
+        ],
+        "summary": "Retry",
+        "description": "Retry a bounded failed sealed fit; rejected models require fresh reactions.",
+        "operationId": "retry_internal_vacancies__vacancy_id__preferences_retry_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreferenceCommand"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferenceStatus"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/healthz": {
       "get": {
         "tags": [
@@ -3531,6 +3841,70 @@
               }
             ],
             "title": "Change Assessment"
+          },
+          "preference_model_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference Model Hash"
+          },
+          "preference_revision": {
+            "type": "integer",
+            "title": "Preference Revision",
+            "default": 0
+          },
+          "preference_position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference Position"
+          },
+          "preference_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference Score"
+          },
+          "preference_adjustment": {
+            "type": "number",
+            "title": "Preference Adjustment",
+            "default": 0.0
+          },
+          "preference_contributions": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Preference Contributions"
+          },
+          "preference_state": {
+            "type": "string",
+            "enum": [
+              "baseline",
+              "personalized"
+            ],
+            "title": "Preference State",
+            "default": "baseline"
+          },
+          "order_revision": {
+            "type": "integer",
+            "title": "Order Revision",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -3837,6 +4211,11 @@
             },
             "type": "array",
             "title": "Items"
+          },
+          "order_revision": {
+            "type": "integer",
+            "title": "Order Revision",
+            "default": 0
           }
         },
         "additionalProperties": false,
@@ -4423,6 +4802,129 @@
         ],
         "title": "PoolPage",
         "description": "Bounded pool page; ranks are global within each direction."
+      },
+      "PreferenceCommand": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_revision"
+        ],
+        "title": "PreferenceCommand",
+        "description": "CAS mutation with an owner-scoped replay key; retries never bypass the quality gate."
+      },
+      "PreferenceStatus": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "active_model_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Model Hash"
+          },
+          "eligible_reactions": {
+            "type": "integer",
+            "title": "Eligible Reactions"
+          },
+          "fresh_reactions": {
+            "type": "integer",
+            "title": "Fresh Reactions"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job State"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "selection_bias": {
+            "type": "string",
+            "const": "deterministic_feedback_unknown_propensity",
+            "title": "Selection Bias"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "revision",
+          "enabled",
+          "state",
+          "active_model_hash",
+          "eligible_reactions",
+          "fresh_reactions",
+          "job_id",
+          "job_state",
+          "error_code",
+          "policy_hash",
+          "selection_bias"
+        ],
+        "title": "PreferenceStatus",
+        "description": "Operational state without coefficients, personal feature payloads or participant identifiers."
       },
       "RerankCard": {
         "properties": {

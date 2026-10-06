@@ -154,6 +154,22 @@ export interface FeedCard extends RerankCard {
   decision: "like" | "dislike" | null;
   history_badges: string[];
   change_assessment: Record<string, unknown> | null;
+  /** Live vacancy-local preference model identity; omitted by legacy baseline payloads. */
+  preference_model_hash?: string | null;
+  /** Preference control revision used while serving this card. */
+  preference_revision?: number;
+  /** Position after live preference ordering, or null when baseline ordering is active. */
+  preference_position?: number | null;
+  /** Live preference score, when a personalized model was applied. */
+  preference_score?: number | null;
+  /** Additive live preference adjustment to the baseline score. */
+  preference_adjustment?: number;
+  /** Machine-readable preference feature contributions. */
+  preference_contributions?: Record<string, number>;
+  /** Whether this card uses baseline or personalized ordering. */
+  preference_state?: "baseline" | "personalized";
+  /** Ordering revision frozen when this card was delivered. */
+  order_revision?: number;
 }
 /** Stable opaque position cursor; own feedback does not reorder this portion. */
 export interface FeedPage {
@@ -166,6 +182,30 @@ export interface FeedPage {
   next_cursor: string | null;
   has_more: boolean;
   items: FeedCard[];
+  /** Monotonic session order revision for the session's current card order. */
+  order_revision: number;
+}
+
+/** Current vacancy-local preference control and its durable fitting job state. */
+export interface PreferenceStatus {
+  vacancy_id: string;
+  revision: number;
+  enabled: boolean;
+  state: string;
+  active_model_hash: string | null;
+  eligible_reactions: number;
+  fresh_reactions: number;
+  job_id: string | null;
+  job_state: string | null;
+  error_code: string | null;
+  policy_hash: string;
+  selection_bias: "deterministic_feedback_unknown_propensity";
+}
+
+/** Employer-authorized, revision-checked preference control mutation. */
+export interface PreferenceCommand {
+  idempotency_key: string;
+  expected_revision: number;
 }
 /** One reaction per served exposure; UUID key is scoped to employer and vacancy. */
 export interface FeedDecisionRequest { exposure_id: string; action: "like" | "dislike"; idempotency_key: string; }

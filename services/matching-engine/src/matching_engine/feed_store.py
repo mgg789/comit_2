@@ -28,6 +28,9 @@ from matching_engine.feed_models import (
     VisitedCard,
 )
 from matching_engine.learning_store import LearningStore
+from matching_engine.preference_model import apply as apply_preference
+from matching_engine.preference_store import PreferenceStore
+from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import tail_policy_hash
 from matching_engine.rerank_store import _schema
 from matching_engine.store import ConflictError, NotFoundError
@@ -80,7 +83,8 @@ class FeedStore:
                     AND to_regclass('feed_pipeline.decisions') IS NOT NULL
                     AND to_regclass('feed_pipeline.saved') IS NOT NULL
                     AND to_regclass('feed_pipeline.visited') IS NOT NULL
-                    AND to_regclass('learning_pipeline.events') IS NOT NULL AS ready""").fetchone()["ready"])
+                    AND to_regclass('learning_pipeline.events') IS NOT NULL
+                    AND to_regclass('preference_pipeline.jobs') IS NOT NULL AS ready""").fetchone()["ready"])
         except psycopg.Error:
             return False
 
@@ -278,6 +282,66 @@ class FeedStore:
                                                  "vacancy_id": selected_vacancy}, "allocated")
             return self._page_locked(connection, owner_id, session_id, None, request.limit)
 
+    @staticmethod
+    def _refresh_preferences(connection: psycopg.Connection, session: dict) -> dict:
+        """Permute only unserved positions beyond the delivered high-water mark.
+
+        Delivered cards, receipts and earlier position slots are immutable. New
+        versions use existing suffix slots, preserving every issued position
+        cursor and keeping recommended/reserve membership unchanged.
+        """
+        control = PreferenceStore.ensure(connection, session)
+        active = PreferenceStore.active(connection, control)
+        model_hash = active["model_hash"] if active else None
+        if (session["preference_revision"], session["preference_model_hash"]) == (control["revision"], model_hash):
+            return session
+        rows = connection.execute("""SELECT e.*,r.card AS baseline_card,s.features,s.feature_hash
+            FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions f USING(session_id)
+            JOIN rerank_pipeline.cards r ON r.run_id=f.rerank_run_id AND r.candidate_id=e.candidate_id
+            LEFT JOIN learning_pipeline.samples s ON s.main_run_id=f.main_run_id AND s.candidate_id=e.candidate_id
+            WHERE e.session_id=%s AND e.served_at IS NULL AND e.position>
+                (SELECT COALESCE(max(position),0) FROM feed_pipeline.exposures WHERE session_id=%s AND served_at IS NOT NULL)
+            ORDER BY e.position FOR UPDATE OF e""", (session["session_id"], session["session_id"])).fetchall()
+        artifact = None
+        if active:
+            artifact = connection.execute("SELECT artifact FROM rerank_pipeline.artifacts WHERE artifact_hash=%s", (session["artifact_hash"],)).fetchone()["artifact"]
+        prepared = []
+        try:
+            for row in rows:
+                card = dict(row["baseline_card"])
+                card.update(preference_model_hash=model_hash, preference_revision=control["revision"],
+                            preference_score=None, preference_adjustment=0., preference_contributions={},
+                            preference_state="baseline", order_revision=session["order_revision"] + 1)
+                if active:
+                    if row["features"] is None or digest(row["features"]) != row["feature_hash"]:
+                        raise ValueError("preference feature snapshot unavailable")
+                    result = apply_preference(row["features"], card["rerank_score"], active["model"], artifact)
+                    card.update(preference_score=result["score"], preference_adjustment=result["adjustment"],
+                                preference_contributions=result["contributions"], preference_state="personalized")
+                prepared.append((row, card))
+        except (ValueError, TypeError, KeyError):
+            # Corrupt/incompatible optional models never prevent safe baseline delivery.
+            model_hash = None
+            prepared = [(row, {**row["baseline_card"], "preference_model_hash": None,
+                         "preference_revision": control["revision"], "preference_score": None,
+                         "preference_adjustment": 0., "preference_contributions": {}, "preference_state": "baseline",
+                         "order_revision": session["order_revision"] + 1}) for row in rows]
+        connection.execute("SET CONSTRAINTS feed_pipeline.exposures_session_id_position_key DEFERRED")
+        for kind in ("recommended", "reserve"):
+            group = [(row, card) for row, card in prepared if row["kind"] == kind]
+            positions = sorted(row["position"] for row, _card in group)
+            if model_hash:
+                group.sort(key=lambda pair: (-pair[1]["preference_score"], -pair[1]["explanation"]["score"], str(pair[0]["candidate_id"])))
+            else:
+                group.sort(key=lambda pair: pair[1]["position"])
+            for position, (row, card) in zip(positions, group, strict=True):
+                card["preference_position"] = position
+                connection.execute("UPDATE feed_pipeline.exposures SET position=%s,card=%s WHERE exposure_id=%s",
+                                   (position, Jsonb(card), row["exposure_id"]))
+        return connection.execute("""UPDATE feed_pipeline.sessions SET preference_revision=%s,
+            preference_model_hash=%s,order_revision=order_revision+1 WHERE session_id=%s RETURNING *""",
+            (control["revision"], model_hash, session["session_id"])).fetchone()
+
     def _page_locked(self, connection: psycopg.Connection, owner_id: UUID, session_id: UUID,
                      cursor: str | None, limit: int) -> FeedPage:
         """Read and mark a stable position page while holding the session row lock."""
@@ -290,6 +354,7 @@ class FeedStore:
         if session["expires_at"] <= connection.execute("SELECT now() AS value").fetchone()["value"]:
             raise ConflictError("feed session expired")
         stale = self._validate_session(connection, session)
+        session = self._refresh_preferences(connection, session)
         after = _decode_cursor(cursor)
         rows = connection.execute("""SELECT e.*,d.action,
                 COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
@@ -313,7 +378,7 @@ class FeedStore:
         next_cursor = _encode_cursor(rows[-1]["position"]) if rows and has_more else None
         return FeedPage(session_id=session_id, vacancy_id=session["vacancy_id"], vacancy_revision=session["vacancy_revision"],
                         policy_hash=session["policy_hash"], expires_at=session["expires_at"], cursor=cursor,
-                        next_cursor=next_cursor, has_more=has_more, items=items)
+                        next_cursor=next_cursor, has_more=has_more, items=items, order_revision=session["order_revision"])
 
     def page(self, owner_id: UUID, vacancy_id: UUID, session_id: UUID, cursor: str | None, limit: int = 50) -> FeedPage:
         """Continue one owner's session after feedback using a stable position cursor."""
@@ -454,6 +519,7 @@ class FeedStore:
                     request.action, row["profile_revision"], Jsonb(baseline), Jsonb(policy), policy_digest, Jsonb(badges),
             ))
             LearningStore.event(connection, row, request.action, request.idempotency_key)
+            PreferenceStore.enqueue(connection, row)
             if request.action == "like":
                 connection.execute("""INSERT INTO feed_pipeline.saved(owner_id,vacancy_id,candidate_id,profile_revision,exposure_id,card)
                     VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,vacancy_id,candidate_id) DO UPDATE SET

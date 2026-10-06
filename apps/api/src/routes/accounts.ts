@@ -139,9 +139,9 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     if (name === "cursor") return { type: "string", pattern: "^[A-Za-z0-9_-]{1,30}$" };
     return refs(schema, "matching");
   };
-  // Feed contracts come from the same generated OpenAPI as the private engine.
+  // Employer matching contracts come from the same generated OpenAPI as the private engine.
   for (const [path, methods] of Object.entries(engineSpec.paths)) {
-    const match = /^\/internal\/vacancies\/\{vacancy_id\}(\/(?:feed|saved|visited)(?:\/.*)?)$/.exec(path);
+    const match = /^\/internal\/vacancies\/\{vacancy_id\}(\/(?:feed|saved|visited|preferences)(?:\/.*)?)$/.exec(path);
     if (!match) continue;
     const suffix = match[1]!;
     for (const [method, raw] of Object.entries(methods)) {

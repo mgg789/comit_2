@@ -4,7 +4,7 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard,
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile } from "@comit/shared";
 
@@ -59,6 +59,14 @@ export interface ApiClient {
   getSaved(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<SavedCard>>;
   /** Read retained visited history, including nonblocking updated entries. */
   getVisited(draftId: string, limit?: number, offset?: number): Promise<FeedListPage<VisitedCard>>;
+  /** Read the current vacancy-local preference control for an owned draft. */
+  getPreferenceStatus(draftId: string): Promise<PreferenceStatus>;
+  /** Queue a preference fit/retry using a revision-checked idempotent command. */
+  retryPreferences(draftId: string, body: PreferenceCommand): Promise<PreferenceStatus>;
+  /** Disable and clear live preference activation using a revision-checked command. */
+  resetPreferences(draftId: string, body: PreferenceCommand): Promise<PreferenceStatus>;
+  /** Roll back the active live preference model using a revision-checked command. */
+  rollbackPreferences(draftId: string, body: PreferenceCommand): Promise<PreferenceStatus>;
   /** Invite an eligible candidate using immutable vacancy terms and a UUID retry key. */
   inviteCandidate(draftId: string, body: InviteRequest): Promise<RecruitmentView>;
   /** Close a saved shortlist entry before inviting; this decision is employer-only. */
@@ -126,6 +134,10 @@ export function createApiClient({
     acknowledgeFeedImpression: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/impressions`, body),
     getSaved: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/saved?limit=${limit}&offset=${offset}`),
     getVisited: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/visited?limit=${limit}&offset=${offset}`),
+    getPreferenceStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences`),
+    retryPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/retry`, body),
+    resetPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/reset`, body),
+    rollbackPreferences: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/preferences/rollback`, body),
     inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),
     rejectSavedCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment/reject`, body),
     getEmployerRecruitment: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment?limit=${limit}&offset=${offset}`),

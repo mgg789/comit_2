@@ -305,3 +305,19 @@ consents под source row locks до записи отчёта. Каталог�
 перезаписываются и остаются вне Git. Эти модели не записываются в live registry
 и не изменяют PostgreSQL-схему или HTTP-контракты.
 [Структура, протокол и команды](preference-learning.md).
+
+## Фоновый реестр предпочтений вакансии
+
+Миграция matching `009_live_preferences.sql` добавляет `preference_pipeline`:
+controls хранит контекст/epoch/CAS revision/active pointer; jobs — sealed план,
+хеши входа, lease token/expiry, retries и отчёт; models — неизменяемую версию
+модели до обязательного удаления payload при отзыве; participants — связи для
+проверки и отзыва согласия; events — историю активаций, отказов, reset/rollback.
+Отзыв стирает model и job plan/report, сохраняя аудит по хешам. Участники и
+коэффициенты не публикуются через HTTP.
+
+Feed sessions получают preference revision/model hash и order revision.
+Уникальность session/position теперь DEFERRABLE для атомарной перестановки
+unserved suffix. Delivered позиции и card payloads фиксированы. Export сохраняет
+preference identity/order/score и исходный R₀; propensity остаётся неизвестной.
+Политика и команды: [обучение предпочтений](preference-learning.md).

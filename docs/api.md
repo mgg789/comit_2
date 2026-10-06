@@ -416,3 +416,19 @@ DTO в `packages/shared/chat.ts`, типизированные методы в a
 Участники и комната определяются API из приглашения, не из body/header клиента.
 Чат доступен до accept, контакты — по прежнему правилу после accept.
 [Лимиты, ошибки, курсор и протокол публикации файлов](chat.md).
+
+## Управление предпочтениями вакансии
+
+В matching добавлены owner-scoped `GET /internal/vacancies/{vacancy_id}/preferences`
+и `POST .../preferences/{retry,reset,rollback}`. Token и X-Owner-ID обязательны.
+Штатный employer gateway публикует их как
+`/api/employer/vacancy-drafts/{draft_id}/preferences...`, выводя owner из session.
+POST принимает `PreferenceCommand`: UUID idempotency_key и expected_revision.
+Статус содержит счётчики/worker job/model hash и явную оговорку selection bias,
+без feature/model payloads. Reset вводит cutoff; rollback выключает обучение.
+409 означает конфликт CAS/контекста, 404 — отсутствие собственной вакансии.
+
+FeedCard дополнен preference revision/model hash/score/adjustment/contributions,
+preference position/state и delivery order revision; FeedPage содержит текущий
+order_revision. Shared, generated engine OpenAPI, gateway и api-client обновлены
+синхронно. [Доставка и управление](preference-learning.md#доставка-и-управление).

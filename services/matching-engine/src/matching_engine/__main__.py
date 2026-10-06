@@ -17,7 +17,7 @@ def main() -> None:
     """Run one chosen mode, using environment configuration without exposing credentials."""
     parser = argparse.ArgumentParser(description="Comit candidate pipeline")
     parser.add_argument("mode", nargs="?", default="serve",
-                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker"))
+                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker", "preference-worker"))
     parser.add_argument("--once", action="store_true", help="Process one available worker job")
     args = parser.parse_args()
     if args.mode == "serve":
@@ -42,7 +42,11 @@ def main() -> None:
         "max_attempts": int(os.environ.get("PIPELINE_MAX_ATTEMPTS", "5")),
         "retry_base_seconds": int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30")),
     }
-    if args.mode == "rerank-worker":
+    if args.mode == "preference-worker":
+        from matching_engine.preference_store import PreferenceStore
+        from matching_engine.preference_worker import PreferenceWorker
+        worker = PreferenceWorker(PreferenceStore(database_url), **options)
+    elif args.mode == "rerank-worker":
         reranks = RerankStore(database_url)
         from matching_engine.rerank_activation import bootstrap_packaged
         from matching_engine.store import ConflictError

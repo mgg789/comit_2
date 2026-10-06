@@ -21,6 +21,8 @@ from matching_engine.models import (
     PoolPage,
     StrictSchema,
 )
+from matching_engine.preference_routes import preference_router
+from matching_engine.preference_store import PreferenceStore
 from matching_engine.rerank_routes import rerank_router
 from matching_engine.rerank_store import RerankStore
 from matching_engine.store import ConflictError, NotFoundError, Store
@@ -64,6 +66,9 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
         if pipeline_store is None:
             raise HTTPException(status_code=503, detail="pipeline database is not configured")
         return pipeline_store
+
+    app.include_router(preference_router(PreferenceStore(pipeline_store.database_url) if pipeline_store else None,
+                                         require_internal))
 
     @app.exception_handler(ConflictError)
     async def conflict_handler(_request: Request, exception: ConflictError) -> JSONResponse:

@@ -119,3 +119,11 @@ events требуют вызова клиентского контракта, о
 См. также [активация](rerank-activation.md), [matching](matching.md),
 [историческая synthetic-приёмка](rerank-grounded-cohort-acceptance.md),
 [канон обучения](../context/51-reranker-and-feed-learning.md).
+
+## Подключение фонового обучения
+
+Помимо операторского shadow CLI подключён `preference-worker`:
+[расписание, проверка, реестр и доставка](preference-learning.md#фоновое-обучение-в-контуре).
+Реакция и постановка задания атомарны. Learning status сборщика продолжает
+описывать только collection/export, поле `training_started` в старом export
+не является статусом worker. Его состояние доступно через vacancy preferences API.
