@@ -98,4 +98,4 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 | agents-service | 8104 внутри compose | `PORT`, opt-in overlay |
 | postgres | 5433→5432 | `POSTGRES_PORT` |
 
-В prod (`infra/docker-compose.prod.yml`) публикуется только web; engines и БД — внутренняя сеть.
+В prod (`infra/docker-compose.prod.yml`) наружу публикуется только web; api и engines доступны лишь на `127.0.0.1` сервера (отладка и smoke), БД — только внутренняя сеть.

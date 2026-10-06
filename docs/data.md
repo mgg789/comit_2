@@ -77,7 +77,8 @@ semantic vectors, PDF или pool-ready.
 ## Миграции
 
 - api-core: явный Node/pg runner с checksum/advisory lock; файлы в `apps/api/migrations/`.
-- matching-engine: вектора/индексы pgvector — в тех же миграциях или отдельной схемой `matching`.
+- matching-engine: `python -m matching_engine migrate` (advisory lock, checksum в `candidate_pipeline.migrations`); SQL 001–006 в схемах `candidate_pipeline`, `vacancy_pipeline`, `matching_pipeline`, `rerank_pipeline`; 006 добавляет `pool.grade_status` (approved|self_reported).
+- agents-service: `python -m agents_service migrate`, схема `agents_service` (см. ниже).
 
 ## Синтетика
 

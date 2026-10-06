@@ -17,6 +17,7 @@
 | POST | `/candidate/profile/projection/retry` | retry последней terminal `failed` projection |
 | GET | `/candidate/pipeline` | статус matching projection кандидата |
 | GET | `/candidate/resume.pdf` | собственный owner PDF после актуальной projection |
+| GET | `/candidate/taxonomy` | текущая strict-schema (ключи доменов/стеков/soft skills) из matching-engine |
 
 `candidate_id` и owner выводятся из JWT/DB session. Клиент не передаёт owner UUID,
 email, evidence или server timestamps. Создание выполняется с

@@ -6,14 +6,15 @@
 
 ```
 push main ──► deploy.yml (runner mgg-ci-*, контейнер docker на сервере)
-                ├─ docker compose -f infra/docker-compose.prod.yml build
-                ├─ docker compose up -d
-                └─ ./tests/smoke.sh  (порты по умолчанию: web 8088, api 8080, engines 8101-8103)
+                ├─ cp /home/mgg/comit/.env .env  (+ *_PORT из него в env smoke)
+                ├─ docker compose -p comit --env-file .env -f infra/docker-compose.prod.yml up -d --build
+                ├─ ./tests/smoke.sh  (порты из серверного .env)
+                └─ docker image prune -f
 ```
 
 - Стек живёт в Docker с `COMPOSE_PROJECT_NAME=comit` (имена `comit-web-1`, `comit-api-1`, ...), checkout раннера — временный, контейнеры от него не зависят.
 - Секреты: `/home/mgg/comit/.env` (создаётся один раз вручную по `.env.example`; `POSTGRES_PASSWORD` и `JWT_SECRET` обязательны — prod compose падает без них намеренно).
-- Порты на сервере (из `/home/mgg/comit/.env`, задеваем чужие): web `8088`, api `28080`, matching `28101`, testing `8102`, integration `8103` — 8080/8101 на хосте заняты другими контейнерами (kan-web и пр.). Deploy-workflow подхватывает эти порты в smoke автоматически.
+- Порты на сервере (из `/home/mgg/comit/.env`, задеваем чужие): web `8088`, api `28080`, matching `28101`, testing `8102`, integration `8103` — 8080/8101 на хосте заняты другими контейнерами (kan-web и пр.). Deploy-workflow подхватывает эти порты в smoke автоматически. Наружу публикуется только web; api и engines в prod compose привязаны к `127.0.0.1`, postgres не публикуется.
 
 ## Операции
 
