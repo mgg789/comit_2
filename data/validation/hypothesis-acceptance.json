@@ -1,0 +1,279 @@
+{
+  "version": "hypothesis-system-acceptance-v1",
+  "state": "passed_synthetic_mechanics_not_real_employer_quality",
+  "checked_at": "2026-10-06T21:29:54.323896+00:00",
+  "starting_commit": "a47063f",
+  "policy_hash": "0a60b0ff643d295cec1007b9f7ae8664aa426c87391328110204e70cbf4014a3",
+  "allocation_hash": "6d0d9fb907422c9c0090639d0dd09f940aa620cf605da6f31372a2dacbe5405e",
+  "scope": "context/51 sections4-5 backend paired exploration and existing live learner",
+  "e2e_receipts": [
+    {
+      "version": "hypothesis-acceptance-v1",
+      "state": "passed_synthetic_mechanics",
+      "profiles": 22,
+      "ordinary_deliveries": 18,
+      "research_deliveries": 2,
+      "real_harrier_dimensions": 640,
+      "migrations": [
+        "001_candidate_pipeline.sql",
+        "002_vacancy_pipeline.sql",
+        "003_vacancy_city_required.sql",
+        "004_matching_pipeline.sql",
+        "005_baseline_reranker.sql",
+        "006_declared_grade.sql",
+        "007_employer_feed.sql",
+        "008_real_card_learning.sql",
+        "009_live_preferences.sql",
+        "010_preference_event_clock.sql",
+        "011_hypothesis_exploration.sql"
+      ],
+      "family": "H2",
+      "conditional_pair_probability": 0.254330448816133,
+      "order_probability": 0.5,
+      "actual_outside_top_k_pair": true,
+      "main_selected_count_unchanged": true,
+      "delivery_replay_equal": true,
+      "prefix_immutable": true,
+      "budget_pairs": 1,
+      "no_single_pair_confirmation": true,
+      "learner_explicit_actions": 2,
+      "export_manifest_hash": "e3edac3791a0c42f76504897123963208d5367fe4ea7ee5ec2c577ae9200e947",
+      "global_propensity": null,
+      "source_only_withdrawal": true,
+      "parameters_purged": true,
+      "reset": true,
+      "new_coordinate_stale_rejected": true,
+      "network_model_calls": 0,
+      "human_quality_evaluated": false,
+      "production_deployed": false,
+      "report_hash": "f974ec2894e746615f1efbf65e43819e248f0b643a4382ed2cd317446a6fc2f6"
+    },
+    {
+      "version": "hypothesis-acceptance-v1",
+      "state": "passed_synthetic_mechanics",
+      "profiles": 22,
+      "ordinary_deliveries": 18,
+      "research_deliveries": 2,
+      "real_harrier_dimensions": 640,
+      "migrations": [
+        "001_candidate_pipeline.sql",
+        "002_vacancy_pipeline.sql",
+        "003_vacancy_city_required.sql",
+        "004_matching_pipeline.sql",
+        "005_baseline_reranker.sql",
+        "006_declared_grade.sql",
+        "007_employer_feed.sql",
+        "008_real_card_learning.sql",
+        "009_live_preferences.sql",
+        "010_preference_event_clock.sql",
+        "011_hypothesis_exploration.sql"
+      ],
+      "family": "H2",
+      "conditional_pair_probability": 0.254330448816133,
+      "order_probability": 0.5,
+      "actual_outside_top_k_pair": true,
+      "main_selected_count_unchanged": true,
+      "delivery_replay_equal": true,
+      "prefix_immutable": true,
+      "budget_pairs": 1,
+      "no_single_pair_confirmation": true,
+      "learner_explicit_actions": 2,
+      "export_manifest_hash": "97e91113432f07a3b685ed6a55559c7f9fbd1b801a541c69ab22c752858d9e07",
+      "global_propensity": null,
+      "source_only_withdrawal": true,
+      "parameters_purged": true,
+      "reset": true,
+      "new_coordinate_stale_rejected": true,
+      "network_model_calls": 0,
+      "human_quality_evaluated": false,
+      "production_deployed": false,
+      "report_hash": "8cd91461204e82d460a03f4a78f81d49858492d3b2bc5a6b0b0c2159c7e5e0ce"
+    }
+  ],
+  "preserved_rejected_scenarios": [
+    {
+      "version": "hypothesis-format-scenario-pilot-v1",
+      "state": "no_comparable_pair",
+      "profiles": 40,
+      "ordinary_deliveries": 18,
+      "feasible_pairs": 0,
+      "reason": "closest_confirmation_depth_tradeoff_exceeds_frozen_utility_loss_0_35",
+      "best_pair_loss": 0.3987886185332914,
+      "policy_modified": false,
+      "human_quality_evaluated": false,
+      "network_model_calls": 0,
+      "report_hash": "88c03c037f35ca5f7708e70b265d6b45297d6c08703975b30c667a71361cc2b1"
+    },
+    {
+      "version": "hypothesis-scenario-pilot-v2",
+      "state": "no_comparable_pair",
+      "profiles": 40,
+      "ordinary_deliveries": 18,
+      "feasible_pairs": 0,
+      "reason": "closest_confirmation_depth_tradeoff_exceeds_frozen_utility_loss_0_35",
+      "best_pair_loss": 0.7385450689722053,
+      "policy_modified": false,
+      "human_quality_evaluated": false,
+      "network_model_calls": 0,
+      "report_hash": "860f95eeac45d45ddbdc9f9e844729dd369453f3066f522f229bef7d872180ef"
+    },
+    {
+      "version": "hypothesis-scenario-pilot-v3",
+      "state": "no_comparable_pair",
+      "profiles": 40,
+      "ordinary_deliveries": 18,
+      "feasible_pairs": 0,
+      "reason": "confirmation_vs_declared_strength_plus_full_class_rank_gap_exceeds_utility_loss_0_35",
+      "best_pair_loss": 0.5572086039423887,
+      "policy_modified": false,
+      "human_quality_evaluated": false,
+      "network_model_calls": 0,
+      "report_hash": "b439d4beccaa276840b40602d8a8ca54469d69a22a40b30644d365702a7f385e"
+    }
+  ],
+  "preserved_prerequisite_failure": [
+    {
+      "version": "hypothesis-acceptance-prerequisite-v1",
+      "state": "blocked_before_profile_creation",
+      "profiles": 0,
+      "reason": "temporary_helper_supplied_libpq_dsn_to_node_pg_instead_of_uri",
+      "network_model_calls": 0,
+      "report_hash": "91488d4dace5e035fbf1c1c5e197ccef5cfd8741ff5e9b22c538ae9cd251720b"
+    }
+  ],
+  "acceptance_script_attempt_profiles": 164,
+  "network_model_calls": 0,
+  "global_propensity_available": false,
+  "protocol": {
+    "ordinary_unique_credits_per_pair": 18,
+    "research_cards_per_pair": 2,
+    "maximum_allocation_fraction": 0.1,
+    "cancelled_pairs_consume_budget": true,
+    "conditional_selection_probability_recorded": true,
+    "pair_order_probability": 0.5,
+    "probability_support_and_selected_index_recorded": true,
+    "sealed_batch_decisive_pairs": 20,
+    "seal_on_decision_transaction": true,
+    "post_batch_counters_separate": true,
+    "withdrawn_batch_replaced": false,
+    "multiple_testing_families": 10,
+    "familywise_alpha": 0.05,
+    "contrast_thresholds_calibration": "uncalibrated_baseline",
+    "disabled_families": {
+      "H9": "explicit_neighbor_technology_taxonomy_missing"
+    },
+    "snapshot_scan_cap": 5000,
+    "comparison_pool_cap": 200,
+    "candidate_numeric_contrast_parameters_public": false
+  },
+  "verification": {
+    "full_python_postgresql_before_sealing_refinement": {
+      "passed": 1155,
+      "failed": 0,
+      "skipped": 0,
+      "command": "python -m pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q"
+    },
+    "final_affected_python_postgresql": {
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "command": "python -m pytest services/matching-engine/tests/test_hypothesis_policy.py services/matching-engine/tests/test_hypothesis_integration.py services/matching-engine/tests/test_learning_consent_lock.py -q"
+    },
+    "api_postgresql_serial": {
+      "passed": 45,
+      "failed": 0,
+      "skipped": 1,
+      "skip_reason": "external QGramm environment unavailable",
+      "command": "pnpm --filter @comit/api exec tsx --test --test-concurrency=1 'tests/*.test.ts'",
+      "new_routes_use_dedicated_database": true,
+      "seconds": 4.966
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "pnpm -r typecheck"
+    },
+    "build": {
+      "passed": true,
+      "command": "pnpm -r build"
+    },
+    "generated_openapi": {
+      "passed": true,
+      "check": "JSON equality with actual create_app().openapi()"
+    },
+    "ruff_changed_files": {
+      "passed": true,
+      "scope": "modified matching source files, two new hypothesis tests, root acceptance script, run from repository root"
+    },
+    "ruff_whole_matching_from_root": {
+      "passed": false,
+      "errors": 34,
+      "reason": "I001 in unchanged historical tests; no unrelated formatting edits"
+    },
+    "ruff_whole_matching_from_service": {
+      "passed": false,
+      "errors": 21,
+      "reason": "19 historical errors plus2 new-test import classifications differ by cwd; repository-root changed-file command passes"
+    },
+    "smoke": {
+      "passed": true,
+      "checks": 12,
+      "command": "make smoke",
+      "contour": "scoped actual local child services and existing nginx38088",
+      "children_stopped": true
+    },
+    "diff_check": {
+      "passed": true,
+      "command": "git diff --check"
+    },
+    "transaction_code_review": {
+      "verdict": "approved",
+      "findings": 0,
+      "runtime_run_by_reviewer": false
+    },
+    "initial_full_python_failure": {
+      "passed": 1154,
+      "failed": 1,
+      "reason": "legacy pre011 database export lacked sample_scope",
+      "fixed": "missing legacy column defaults to main_top_k without changing old data"
+    },
+    "initial_parallel_api_run": {
+      "passed": 42,
+      "failed": 3,
+      "skipped": 1,
+      "reason": "shared fixture TRUNCATE race/deadlock",
+      "resolution": "dedicated hypothesis route database and serial suite"
+    },
+    "final_full_python_postgresql": {
+      "passed": 1155,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 349.87,
+      "command": "python -m pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q",
+      "scope": "latest implementation including reaction-transaction sealing and fixed public parameters"
+    },
+    "final_inspection": {
+      "verdict": "READY FOR COMMIT",
+      "critical_blockers": 0,
+      "scope": "third CRIT-only recheck of final privacy, support replay and sealing changes"
+    }
+  },
+  "quality_boundaries": {
+    "real_employer_quality_evaluated": false,
+    "human_hypothesis_validation_run": false,
+    "causal_or_global_ips_evaluation_supported": false,
+    "hiring_probability_claimed": false,
+    "llm_teacher_budget_changed": false,
+    "old_golden_or_training_data_changed": false,
+    "twenty_pair_database_fixtures_are": "registry sealing and withdrawal regression, not statistically valid human experiments"
+  },
+  "remaining": [
+    "H9 explicit taxonomy",
+    "hypothesis threshold calibration on real reactions",
+    "Tinder UI and viewport acknowledgement",
+    "ordinary buffer refill from context51 section6",
+    "delayed hiring outcome learning"
+  ],
+  "production_deployed": false,
+  "implementation_commit": "e25c98a",
+  "report_hash": "0f5fb62251f26c53f1f51d71dbd36e0f5599e4a7f69e1f6ad252affbed9a86af"
+}

@@ -93,3 +93,40 @@ min20 и протокол — **uncalibrated_baseline**. Wilson приближё
 Owner устанавливает API session. Статус без участников, коэффициентов и контактов;
 доступен после истечения feed session при текущем контексте. Tinder UI/автоматический
 viewport acknowledgement и серверный deployment в этот backend-этап не входят.
+
+## Локальная приёмка
+
+[Отчёт](../data/validation/hypothesis-acceptance.json) сохраняет хеши всех попыток.
+Два прогона по22 синтетических профиля с настоящим Harrier640 прошли полный путь:
+main top-k18 → research pair вне top-k → replay → две явные реакции → learner/export
+→ source-only отзыв согласия и удаление параметров → reset → новая38-я координата
+и отклонение устаревшей ленты. Три ранних сценария по40 профилей не дали сопоставимой
+пары из-за utility loss>.35; они сохранены, порог не менялся. Ещё одна попытка
+остановилась до создания профилей: временный helper передал Node pg libpq DSN
+вместо PostgreSQL URI. Всего в этих приёмочных попытках164 профиля, внешних LLM
+вызовов0; расход предыдущего teacher и golden не менялись.
+
+Скрипт требует новую пустую loopback PostgreSQL/pgvector БД с именем
+`comit_hypothesis_*` и приватную переменную `HYPOTHESIS_ACCEPTANCE_DATABASE_URL`
+в формате URI. Скрипт применяет API и matching миграции, оставляет БД/артефакты
+для аудита, не очищает старые данные:
+
+```bash
+pnpm --filter @comit/api build
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python tests/hypothesis_acceptance.py
+```
+
+Финальный Python/PostgreSQL прогон:1155 passed,0 skipped; новые policy+PG и
+legacy consent regression:27 passed. API запускается последовательно:
+`pnpm --filter @comit/api exec tsx --test --test-concurrency=1 'tests/*.test.ts'`
+—45 passed, один пропуск внешнего QGramm. Новые API-тесты используют отдельную
+`HYPOTHESIS_ROUTE_TEST_DATABASE_URL`; общий parallel fixture truncate ранее
+конфликтовал. `pnpm -r typecheck`, `pnpm -r build`, scoped Ruff из корня,
+сверка generated OpenAPI и `make smoke`12/12 прошли. Общий Ruff из корня остаётся
+красным на34 исторических import-order ошибках; запуск из каталога сервиса
+иначе классифицирует импорты, включая два новых теста (подробности в отчёте).
+
+Это проверка механики, не качества предпочтений настоящего работодателя.
+Фиксация20 пар проверена отдельными PostgreSQL fixtures до любого GET статуса;
+21-я реакция обновляет только диагностику. Эти fixtures не заменяют независимую
+разметку или живой эксперимент. Обычный буфер, Tinder и production не проверялись.
