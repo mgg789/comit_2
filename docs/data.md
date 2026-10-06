@@ -292,3 +292,16 @@ actor/key, fingerprint command включает endpoint. Event sequence сер�
 существующий process UUID и неизменяемую пару участников. Метаданные и
 секреты восстанавливаются вместе с volume; смена derivation key не является
 безопасной ротацией. [Хранение и backup boundary](chat.md).
+
+## Теневые модели предпочтений вакансии
+
+Операторский цикл сохраняет приватный `plan.json` до fit и `report.json` с
+контекстами, минимальными counts, validation/golden метриками и моделью15признаков.
+JSON-модель включает коэффициенты, covariance, калибровку, trust heuristic,
+полный исходный порядок признаков и hashes baseline/projection/transform.
+Snapshot и temporal assignments запечатаны отдельно; повторный экспорт создаёт
+новый план. Operational fit требует исходный HMAC key и актуальные API/matching
+consents под source row locks до записи отчёта. Каталоги0700/файлы0600 не
+перезаписываются и остаются вне Git. Эти модели не записываются в live registry
+и не изменяют PostgreSQL-схему или HTTP-контракты.
+[Структура, протокол и команды](preference-learning.md).
