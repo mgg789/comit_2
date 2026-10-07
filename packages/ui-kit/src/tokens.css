@@ -17,3 +17,27 @@
   --comit-radius: 12px;
   --comit-space-unit: 4px;
 }
+
+/* Employer Figma surface: scoped so the other three applications retain their palette. */
+.employer-app {
+  --comit-bg: #010101;
+  --comit-text: #f0f0f0;
+  --comit-text-muted: #c0c0c0;
+  --employer-ink: #272930;
+  --employer-blue: #bfe2ff;
+  --employer-violet: #a49bf7;
+  --employer-glass: rgb(255 255 255 / 6%);
+  --employer-card: rgb(255 255 255 / 5%);
+  --employer-border: rgb(255 255 255 / 18%);
+  --employer-line: rgb(255 255 255 / 14%);
+  --employer-gradient: linear-gradient(100deg, #0064b5, #00467f 50%, #bfe2ff);
+  --employer-success: #69cd55;
+  --employer-warning: #ffc655;
+  --employer-danger: #ff7789;
+  --employer-font: "Inter", sans-serif;
+  --employer-display: "Murs Gothic", sans-serif;
+  --employer-logo: "Moon Walk", sans-serif;
+  --employer-radius: 30px;
+  --employer-gap: 20px;
+  --employer-interaction: 160ms;
+}
