@@ -1003,6 +1003,23 @@
             }
           },
           {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
             "name": "x-internal-token",
             "in": "header",
             "required": false,
@@ -1191,6 +1208,23 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           },
           {
@@ -3114,6 +3148,24 @@
             }
           },
           {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
             "name": "X-Owner-ID",
             "in": "header",
             "required": true,
@@ -3204,6 +3256,24 @@
               "minimum": 0,
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^[A-Za-z0-9_-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
             }
           },
           {
@@ -3614,6 +3684,14 @@
             "type": "object",
             "maxProperties": 100,
             "title": "Metadata"
+          },
+          "external_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalEvidence"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "External Evidence"
           }
         },
         "additionalProperties": false,
@@ -4152,6 +4230,55 @@
         "title": "DeliveryStatus",
         "description": "Persisted acknowledgement counts for the two outbox streams and combine queue."
       },
+      "ExternalEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fsp",
+              "repository",
+              "hh"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Subject"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "verified_value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "status"
+        ],
+        "title": "ExternalEvidence",
+        "description": "Safe provider fact copied from API source projection; no account ownership claim."
+      },
       "FeedCard": {
         "properties": {
           "candidate_id": {
@@ -4537,6 +4664,53 @@
             "type": "boolean",
             "title": "Exploration Added",
             "default": false
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "source_main_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Main Run Id"
+          },
+          "source_rerank_run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Rerank Run Id"
+          },
+          "source_pool_generation": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Pool Generation"
           }
         },
         "additionalProperties": false,
@@ -4742,6 +4916,40 @@
           "has_more": {
             "type": "boolean",
             "title": "Has More"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot At"
           }
         },
         "additionalProperties": false,
@@ -4774,6 +4982,40 @@
           "has_more": {
             "type": "boolean",
             "title": "Has More"
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cursor"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "snapshot_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot At"
           }
         },
         "additionalProperties": false,
@@ -4847,6 +5089,37 @@
           "order_revision": {
             "type": "integer",
             "title": "Order Revision",
+            "default": 0
+          },
+          "refill_state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "queued",
+              "running",
+              "exhausted",
+              "failed"
+            ],
+            "title": "Refill State",
+            "default": "active"
+          },
+          "refill_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refill Job Id"
+          },
+          "pool_change_fraction": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Pool Change Fraction",
             "default": 0
           }
         },
@@ -5562,6 +5835,13 @@
           "resume_url": {
             "type": "string",
             "title": "Resume Url"
+          },
+          "external_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalEvidence"
+            },
+            "type": "array",
+            "title": "External Evidence"
           }
         },
         "additionalProperties": false,
@@ -5604,6 +5884,22 @@
           "offset": {
             "type": "integer",
             "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           }
         },
         "additionalProperties": false,
@@ -5781,6 +6077,13 @@
           },
           "search_factors": {
             "$ref": "#/components/schemas/SearchFactors"
+          },
+          "external_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/PublicExternalEvidence"
+            },
+            "type": "array",
+            "title": "External Evidence"
           }
         },
         "additionalProperties": false,
@@ -5839,6 +6142,13 @@
           "search_factors": {
             "$ref": "#/components/schemas/SearchFactors"
           },
+          "external_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/PublicExternalEvidence"
+            },
+            "type": "array",
+            "title": "External Evidence"
+          },
           "public_profile": {
             "$ref": "#/components/schemas/PublicProfile"
           }
@@ -5859,6 +6169,52 @@
         ],
         "title": "PublicCandidateDetail",
         "description": "Current published revision and its safe allowlisted profile."
+      },
+      "PublicExternalEvidence": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fsp",
+              "repository",
+              "hh"
+            ],
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "partial",
+              "self_reported",
+              "pending",
+              "rejected"
+            ],
+            "title": "Status"
+          },
+          "verified_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "status"
+        ],
+        "title": "PublicExternalEvidence",
+        "description": "Allowlisted provider result; authorship is never represented as proven."
       },
       "PublicFacts": {
         "properties": {
@@ -6063,6 +6419,13 @@
             },
             "type": "array",
             "title": "Achievements"
+          },
+          "external_evidence": {
+            "items": {
+              "$ref": "#/components/schemas/PublicExternalEvidence"
+            },
+            "type": "array",
+            "title": "External Evidence"
           }
         },
         "additionalProperties": false,
@@ -6797,6 +7160,18 @@
             "type": "array",
             "maxItems": 8,
             "title": "Classes"
+          },
+          "vacancy_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vacancy Id"
           },
           "grades": {
             "items": {
@@ -7963,6 +8338,22 @@
           "offset": {
             "type": "integer",
             "title": "Offset"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "default": false
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
           }
         },
         "additionalProperties": false,

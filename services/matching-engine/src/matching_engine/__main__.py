@@ -17,7 +17,7 @@ def main() -> None:
     """Run one chosen mode, using environment configuration without exposing credentials."""
     parser = argparse.ArgumentParser(description="Comit candidate pipeline")
     parser.add_argument("mode", nargs="?", default="serve",
-                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker", "preference-worker"))
+                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker", "preference-worker", "feed-refill-worker"))
     parser.add_argument("--once", action="store_true", help="Process one available worker job")
     args = parser.parse_args()
     if args.mode == "serve":
@@ -32,6 +32,8 @@ def main() -> None:
         return
     from matching_engine.combine_store import CombineStore
     from matching_engine.combine_worker import CombineWorker
+    from matching_engine.feed_refill import FeedRefillStore
+    from matching_engine.feed_refill_worker import FeedRefillWorker
     from matching_engine.rerank_store import RerankStore
     from matching_engine.rerank_worker import RerankWorker
     from matching_engine.vacancy_store import VacancyStore
@@ -46,6 +48,8 @@ def main() -> None:
         from matching_engine.preference_store import PreferenceStore
         from matching_engine.preference_worker import PreferenceWorker
         worker = PreferenceWorker(PreferenceStore(database_url), **options)
+    elif args.mode == "feed-refill-worker":
+        worker = FeedRefillWorker(FeedRefillStore(database_url), **options)
     elif args.mode == "rerank-worker":
         reranks = RerankStore(database_url)
         from matching_engine.rerank_activation import bootstrap_packaged

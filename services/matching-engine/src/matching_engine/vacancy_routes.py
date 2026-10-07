@@ -28,9 +28,10 @@ def vacancy_router(repository: VacancyStore | None, require_internal: Callable) 
     @router.get("/ready", response_model=VacancyReadyPage)
     def page(store: Annotated[VacancyStore, Depends(storage)],
              limit: int = Query(default=100, ge=1, le=500),
-             offset: int = Query(default=0, ge=0)) -> VacancyReadyPage:
+             offset: int = Query(default=0, ge=0),
+             cursor: str | None = Query(default=None, max_length=1024)) -> VacancyReadyPage:
         """Page only current eligible artifacts in the active strict generation."""
-        return store.page(limit, offset)
+        return store.page(limit, offset, cursor)
 
     @router.put("/{vacancy_id}", response_model=VacancyPipelineStatus)
     async def intake(vacancy_id: UUID, vacancy: VacancyInput, request: Request,

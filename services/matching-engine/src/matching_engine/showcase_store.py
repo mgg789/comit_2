@@ -9,6 +9,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from psycopg.types.json import Jsonb
 
+from matching_engine.combine_scoring import strict_filter
+from matching_engine.combine_store import CombineStore
 from matching_engine.database import connect
 from matching_engine.embeddings import (
     EMBEDDING_SPACE_ID,
@@ -153,7 +155,44 @@ class ShowcaseStore:
             category={"specialization": row["specialization"], "grade": row["grade"], "grade_status": row["grade_status"]},
             rank=row["rank"], confirmed_strength=row["confirmed_strength"],
             resume_url=f"/internal/pool/{row['candidate_id']}/resume.pdf?profile_revision={row['revision']}",
-            search_factors=SearchFactors(lexical_rank=row.get("lexical_rank"), semantic_rank=row.get("semantic_rank"), rrf_score=row.get("rrf_score", 0)))
+            search_factors=SearchFactors(lexical_rank=row.get("lexical_rank"), semantic_rank=row.get("semantic_rank"), rrf_score=row.get("rrf_score", 0)),
+            external_evidence=profile.external_evidence)
+
+    @staticmethod
+    def _neighbors(connection, where: str, params: list, vector: list[float]) -> list[UUID]:
+        """Retrieve bounded cosine neighbors; exact fallback fills selective filters.
+
+        Eligibility is authoritative before retrieval. HNSW approximation affects
+        only ranking recall, never consent, ownership or strict compatibility.
+        """
+        eligible = connection.execute(f"WITH source AS ({_SOURCE}) SELECT candidate_id FROM source WHERE {where} AND semantic_model_version=%s AND semantic_space_id=%s",
+                                      (*params, MODEL_VERSION, EMBEDDING_SPACE_ID)).fetchall()
+        ids = [row["candidate_id"] for row in eligible]
+        if not ids:
+            return []
+        target = min(len(ids), 200)
+        payload = json.dumps(vector)
+        # Candidate-ID ANY filters distort ANN cost estimates and are checked
+        # after bounded overretrieval; selective filters fall back to exact KNN.
+        ordering = "(semantic_vector <=> %s::vector) + 0,candidate_id"
+        if len(ids) <= 1000:
+            sql = f"SELECT candidate_id FROM candidate_pipeline.pool WHERE candidate_id=ANY(%s) ORDER BY {ordering} LIMIT %s"
+            rows = connection.execute(sql, (ids, payload, target)).fetchall()
+        else:
+            # This branch explicitly chooses approximate retrieval. PostgreSQL
+            # may otherwise choose exact sorting on wide PDF-backed pool rows.
+            # Scope the planner preference to this single bounded KNN statement.
+            previous = connection.execute("SELECT current_setting('enable_seqscan') AS value").fetchone()["value"]
+            connection.execute("SELECT set_config('enable_seqscan','off',true)")
+            try:
+                possible = connection.execute("SELECT candidate_id FROM candidate_pipeline.pool ORDER BY semantic_vector <=> %s::vector LIMIT 400", (payload,)).fetchall()
+            finally:
+                connection.execute("SELECT set_config('enable_seqscan',%s,true)", (previous,))
+            allowed = set(ids)
+            rows = [row for row in possible if row["candidate_id"] in allowed][:target]
+        if len(rows) < target:
+            rows = connection.execute("SELECT candidate_id FROM candidate_pipeline.pool WHERE candidate_id=ANY(%s) ORDER BY (semantic_vector <=> %s::vector)+0,candidate_id LIMIT %s", (ids, payload, target)).fetchall()
+        return [row["candidate_id"] for row in rows]
 
     def search(self, owner_id: UUID, request: SearchRequest) -> SearchPage:
         """Fuse prefiltered channels in repeatable read; reject any continuation drift."""
@@ -169,6 +208,17 @@ class ShowcaseStore:
         with connect(self.database_url) as connection:
             connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
             connection.execute("SET LOCAL statement_timeout = '10s'")
+            connection.execute("SET LOCAL hnsw.ef_search = 400")
+            vacancy_revision = None
+            if request.filters.vacancy_id is not None:
+                vacancy = CombineStore._vacancy(connection, request.filters.vacancy_id)
+                if vacancy.owner_id != owner_id:
+                    raise HTTPException(404, "vacancy not found")
+                vacancy_revision = vacancy.source_revision
+                eligible = [candidate.candidate_id for candidate in CombineStore._candidates(connection)
+                            if strict_filter(vacancy, candidate).passed]
+                where += " AND candidate_id=ANY(%s)"
+                params.append(eligible)
             source = connection.execute(f"""WITH source AS ({_SOURCE}) SELECT
                 COALESCE(md5(string_agg(candidate_id::text || ':' || revision::text || ':' ||
                   schema_hash || ':' || semantic_model_version || ':' || COALESCE(semantic_space_id,'') || ':' ||
@@ -183,7 +233,7 @@ class ShowcaseStore:
             channel = hashlib.sha256(json.dumps({"mode": mode, "fallback": fallback, "model": MODEL_VERSION,
                 "space": EMBEDDING_SPACE_ID, "query_model": self.encoder.model_version,
                 "vector": vector if mode == "hybrid" else None, "index": "russian-jsonb-string-v1:rrf60"}, sort_keys=True).encode()).hexdigest()
-            snapshot = hashlib.sha256(json.dumps(dict(source), sort_keys=True).encode()).hexdigest()
+            snapshot = hashlib.sha256(json.dumps({**dict(source), "vacancy_revision": vacancy_revision}, sort_keys=True).encode()).hexdigest()
             if prior and (prior["snapshot"] != snapshot or prior["channel"] != channel):
                 raise HTTPException(409, "search sources or retrieval mode changed; restart search")
             offset = prior["offset"] if prior else 0
@@ -195,8 +245,13 @@ class ShowcaseStore:
                 semantic = "SELECT candidate_id, NULL::bigint AS semantic_rank FROM filtered WHERE false"
                 result_params = [query, query]
                 if mode == "hybrid":
-                    semantic = "SELECT candidate_id,row_number() OVER (ORDER BY semantic_vector <=> %s::vector,candidate_id) AS semantic_rank FROM filtered WHERE semantic_model_version=%s AND semantic_space_id=%s"
-                    result_params.extend([json.dumps(vector), MODEL_VERSION, EMBEDDING_SPACE_ID])
+                    # Keep KNN ordering on the indexed base relation, outside the
+                    # ranking window/CTE. Exact recheck prevents filter leakage.
+                    # Small or highly selective pools retain exact recall; larger
+                    # searches use a bounded ANN channel (200 nearest neighbors).
+                    neighbors = self._neighbors(connection, where, params, vector)
+                    semantic = "SELECT candidate_id,row_number() OVER (ORDER BY semantic_vector <=> %s::vector,candidate_id) AS semantic_rank FROM filtered WHERE candidate_id=ANY(%s)"
+                    result_params.extend([json.dumps(vector), neighbors])
                 result_sql = f"""WITH lexical AS (SELECT candidate_id,row_number() OVER (ORDER BY ts_rank_cd({_FTS},websearch_to_tsquery('russian',%s)) DESC,candidate_id) AS lexical_rank
                     FROM filtered WHERE {_FTS} @@ websearch_to_tsquery('russian',%s)), semantic AS ({semantic}),
                     channels AS (SELECT COALESCE(l.candidate_id,s.candidate_id) AS candidate_id,l.lexical_rank,s.semantic_rank FROM lexical l FULL JOIN semantic s USING(candidate_id))

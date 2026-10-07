@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 
 from matching_engine.database import PIPELINE_LOCK, connect
 from matching_engine.models import StrictSchema
+from matching_engine.page_cursor import decode_cursor, encode_cursor
 from matching_engine.store import ConflictError, NotFoundError, Store, _schema
 from matching_engine.vacancy_features import build_strict_features, semantic_text
 from matching_engine.vacancy_models import (
@@ -338,17 +339,31 @@ class VacancyStore:
             "published_at": row["published_at"],
         })
 
-    def page(self, limit: int, offset: int) -> VacancyReadyPage:
+    def page(self, limit: int, offset: int, cursor: str | None = None) -> VacancyReadyPage:
         """Return bounded current-generation ready input for the future combiner."""
         with connect(self.database_url) as connection:
-            rows = connection.execute("""
+            connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            source = """
                 SELECT r.*,v.profile,r.semantic_vector::text AS vector FROM vacancy_pipeline.ready r
                 JOIN vacancy_pipeline.vacancies v ON v.vacancy_id=r.vacancy_id AND v.revision=r.revision
                     AND v.state='ready' AND v.business_status='open'
                 JOIN candidate_pipeline.settings s ON s.active_schema_version=r.schema_version
-                ORDER BY r.vacancy_id LIMIT %s OFFSET %s
-            """, (limit, offset)).fetchall()
-            return VacancyReadyPage(items=[self._entry(row) for row in rows], limit=limit, offset=offset)
+                """
+            snapshot = connection.execute(f"WITH ready AS ({source}) SELECT COALESCE(md5(string_agg(vacancy_id::text||':'||revision::text||':'||schema_hash,',' ORDER BY vacancy_id)),md5('')) AS value FROM ready").fetchone()["value"]
+            key = decode_cursor(cursor, "ready-vacancies", snapshot)
+            if key is not None:
+                try:
+                    if offset or len(key) != 1:
+                        raise ValueError
+                    UUID(key[0])
+                except (ValueError, TypeError, AttributeError):
+                    raise ConflictError("invalid vacancy cursor") from None
+            after = "WHERE vacancy_id>%s" if key is not None else ""
+            rows = connection.execute(f"WITH ready AS ({source}) SELECT * FROM ready {after} ORDER BY vacancy_id LIMIT %s OFFSET %s", (*(key or []), limit + 1, offset)).fetchall()
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            next_cursor = encode_cursor("ready-vacancies", snapshot, [str(rows[-1]["vacancy_id"])]) if has_more else None
+            return VacancyReadyPage(items=[self._entry(row) for row in rows], limit=limit, offset=offset, has_more=has_more, next_cursor=next_cursor)
 
     def ready_entry(self, vacancy_id: UUID) -> VacancyReady:
         """Read one eligible artifact; obsolete, incomplete and inactive vacancies return 404."""

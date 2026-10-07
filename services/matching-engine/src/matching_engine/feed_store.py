@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
+from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
@@ -24,12 +26,19 @@ from matching_engine.feed_models import (
     FeedImpressionRequest,
     FeedListPage,
     FeedPage,
+    FeedRefillStatus,
     FeedRequest,
     SavedCard,
     ShowcaseLikeReceipt,
     ShowcaseLikeRequest,
     ShowcaseMismatchWarning,
     VisitedCard,
+)
+from matching_engine.feed_refill import (
+    FeedRefillStore,
+    pool_change_fraction,
+    pool_snapshot,
+    pool_snapshot_hash,
 )
 from matching_engine.learning_store import LearningStore
 from matching_engine.preference_model import apply as apply_preference
@@ -38,6 +47,7 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import tail_policy_hash
 from matching_engine.rerank_store import _schema
 from matching_engine.store import ConflictError, NotFoundError
+from matching_engine.vacancy_models import VacancyReady
 
 
 class ShowcaseMismatchError(ConflictError):
@@ -79,6 +89,45 @@ def _decode_cursor(value: str | None) -> int:
     return result
 
 
+def _encode_list_cursor(kind: str, snapshot_at: datetime, position_at: datetime,
+                        candidate_id: UUID, source_revision: int, owner_id: UUID, vacancy_id: UUID,
+                        candidate_filter: UUID | None = None) -> str:
+    """Encode a bounded keyset cursor bound to owner, vacancy, list kind and filters."""
+    payload = json.dumps({"v": 1, "kind": kind, "at": snapshot_at.isoformat(),
+                          "last_at": position_at.isoformat(),
+                          "id": str(candidate_id), "source_revision": source_revision,
+                          "owner_id": str(owner_id), "vacancy_id": str(vacancy_id),
+                          "candidate_filter": None if candidate_filter is None else str(candidate_filter)},
+                         separators=(",", ":"), sort_keys=True).encode()
+    return base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+
+def _decode_list_cursor(value: str, kind: str, owner_id: UUID, vacancy_id: UUID,
+                        candidate_filter: UUID | None = None) -> tuple[datetime, datetime, UUID, int]:
+    """Decode a keyset cursor and reject cross-owner, vacancy or filter replay."""
+    if not value or len(value) > 1024 or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" for char in value):
+        raise ValueError("invalid list cursor")
+    try:
+        raw = json.loads(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode())
+        if raw.get("v") != 1 or raw.get("kind") != kind:
+            raise ValueError("invalid list cursor")
+        if raw.get("owner_id") != str(owner_id) or raw.get("vacancy_id") != str(vacancy_id):
+            raise ConflictError("list cursor scope changed")
+        expected_filter = None if candidate_filter is None else str(candidate_filter)
+        if raw.get("candidate_filter") != expected_filter:
+            raise ConflictError("list cursor filter changed")
+        timestamp = datetime.fromisoformat(raw["at"])
+        position_at = datetime.fromisoformat(raw["last_at"])
+        if timestamp.tzinfo is None or position_at.tzinfo is None:
+            raise ValueError("invalid list cursor")
+        revision = raw["source_revision"]
+        if isinstance(revision, bool):
+            raise TypeError("invalid list cursor")
+        return timestamp, position_at, UUID(raw["id"]), int(revision)
+    except (ValueError, KeyError, TypeError, UnicodeDecodeError, binascii.Error, json.JSONDecodeError) as exc:
+        raise ValueError("invalid list cursor") from exc
+
+
 class FeedStore:
     """Persist immutable 24-hour feed sessions and apply owner-checked feedback atomically."""
 
@@ -98,7 +147,8 @@ class FeedStore:
                     AND to_regclass('feed_pipeline.visited') IS NOT NULL
                     AND to_regclass('learning_pipeline.events') IS NOT NULL
                     AND to_regclass('preference_pipeline.jobs') IS NOT NULL
-                    AND to_regclass('hypothesis_pipeline.pairs') IS NOT NULL AS ready""").fetchone()["ready"])
+                    AND to_regclass('hypothesis_pipeline.pairs') IS NOT NULL
+                    AND to_regclass('feed_pipeline.refill_jobs') IS NOT NULL AS ready""").fetchone()["ready"])
         except psycopg.Error:
             return False
 
@@ -183,7 +233,10 @@ class FeedStore:
         value = dict(row["card"])
         value.update({"exposure_id": row["exposure_id"], "session_id": row["session_id"],
                       "kind": row["kind"], "served_at": row["served_at"], "decision": decision,
-                      "history_badges": badges or [], "change_assessment": row.get("change_assessment")})
+                      "history_badges": badges or [], "change_assessment": row.get("change_assessment"),
+                      "batch_id": row.get("batch_id"), "source_main_run_id": row.get("source_main_run_id"),
+                      "source_rerank_run_id": row.get("source_rerank_run_id"),
+                      "source_pool_generation": row.get("source_pool_generation")})
         return FeedCard.model_validate(value)
 
     def _current_run(self, connection: psycopg.Connection, vacancy: dict) -> dict:
@@ -274,6 +327,8 @@ class FeedStore:
             rerank = self._current_run(connection, vacancy)
             main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (rerank["main_run_id"],)).fetchone()
             LearningStore.capture_main(connection, main)
+            initial_snapshot = pool_snapshot(connection, VacancyReady.model_validate(main["vacancy_snapshot"]))
+            initial_snapshot_hash = pool_snapshot_hash(initial_snapshot)
             session_id = uuid4()
             expires_at = connection.execute("SELECT now()+interval '24 hours' AS value").fetchone()["value"]
             connection.execute("""INSERT INTO feed_pipeline.sessions
@@ -286,15 +341,29 @@ class FeedStore:
                     rerank["main_policy_hash"], rerank["feed_policy_hash"], rerank["feature_schema_hash"], rerank["tail_policy_hash"],
                     rerank["artifact_hash"], request.include_reserve, expires_at, rerank["activation_revision"],
             ))
+            batch_id = uuid4()
+            connection.execute("""INSERT INTO feed_pipeline.batches
+                (batch_id,session_id,owner_id,vacancy_id,batch_number,reason,main_run_id,rerank_run_id,
+                 pool_generation,pool_snapshot_version,pool_snapshot,pool_snapshot_hash)
+                VALUES (%s,%s,%s,%s,1,'initial',%s,%s,%s,%s,%s,%s)""", (
+                batch_id, session_id, owner_id, selected_vacancy, rerank["main_run_id"], rerank["run_id"],
+                rerank["pool_generation"], "pool-n1-v1", Jsonb(initial_snapshot), initial_snapshot_hash))
+            connection.execute("""UPDATE feed_pipeline.sessions SET pool_snapshot_version=%s,pool_snapshot=%s,
+                pool_snapshot_hash=%s,refill_state='active' WHERE session_id=%s""",
+                               ("pool-n1-v1", Jsonb(initial_snapshot), initial_snapshot_hash, session_id))
             cards = connection.execute("""SELECT * FROM rerank_pipeline.cards WHERE run_id=%s
                 AND (%s OR kind='recommended') ORDER BY position""", (rerank["run_id"], request.include_reserve)).fetchall()
             for source in cards:
                 exposure = uuid4()
+                card = {**source["card"], "batch_id": str(batch_id), "source_main_run_id": str(rerank["main_run_id"]),
+                        "source_rerank_run_id": str(rerank["run_id"]), "source_pool_generation": rerank["pool_generation"]}
                 connection.execute("""INSERT INTO feed_pipeline.exposures
-                    (exposure_id,session_id,owner_id,vacancy_id,candidate_id,profile_revision,position,kind,card)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
+                    (exposure_id,session_id,owner_id,vacancy_id,candidate_id,profile_revision,position,kind,card,batch_id,
+                     source_main_run_id,source_rerank_run_id,source_pool_generation)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""", (
                         exposure, session_id, owner_id, selected_vacancy, source["candidate_id"], source["profile_revision"],
-                        source["position"], source["kind"], Jsonb(source["card"]),
+                        source["position"], source["kind"], Jsonb(card), batch_id, rerank["main_run_id"], rerank["run_id"],
+                        rerank["pool_generation"],
                 ))
                 LearningStore.event(connection, {"exposure_id": exposure, "owner_id": owner_id,
                                                  "vacancy_id": selected_vacancy}, "allocated")
@@ -407,11 +476,30 @@ class FeedStore:
                 AND e.position>%s AND d.exposure_id IS NULL AND NOT e.exploration_suppressed
                 AND NOT(e.candidate_id=ANY(%s::uuid[])) LIMIT 1""",
                 (session_id, rows[-1]["position"], list(stale))).fetchone())
+        refill_status = None
+        pool_fraction = 0.0
+        if session.get("source", "tinder") != "showcase":
+            refill = FeedRefillStore(self.database_url)
+            refill_status = refill.enqueue_locked(connection, owner_id, session["vacancy_id"], session_id)
+            current_pool = pool_snapshot(connection, VacancyReady.model_validate(
+                connection.execute("SELECT vacancy_snapshot FROM matching_pipeline.runs WHERE run_id=%s",
+                                   (session["main_run_id"],)).fetchone()["vacancy_snapshot"]))
+            pool_fraction = pool_change_fraction(list(session["pool_snapshot"] or []), current_pool)
+            latest = connection.execute("""SELECT * FROM feed_pipeline.refill_jobs
+                WHERE session_id=%s ORDER BY created_at DESC LIMIT 1""", (session_id,)).fetchone()
+            if refill_status is None and latest is not None:
+                from matching_engine.feed_refill import _status
+                refill_status = _status(latest)
+            session = connection.execute("SELECT * FROM feed_pipeline.sessions WHERE session_id=%s", (session_id,)).fetchone()
+            has_more = has_more or (refill_status is not None and refill_status.state in ("queued", "running", "retrying"))
         items = [self._card(row, badges=list(row["history_badges"] or [])) for row in rows]
         next_cursor = _encode_cursor(rows[-1]["position"]) if rows and has_more else None
         return FeedPage(session_id=session_id, vacancy_id=session["vacancy_id"], vacancy_revision=session["vacancy_revision"],
                         policy_hash=session["policy_hash"], expires_at=session["expires_at"], cursor=cursor,
-                        next_cursor=next_cursor, has_more=has_more, items=items, order_revision=session["order_revision"])
+                        next_cursor=next_cursor, has_more=has_more, items=items, order_revision=session["order_revision"],
+                        refill_state=session.get("refill_state", "active"),
+                        refill_job_id=None if refill_status is None else refill_status.job_id,
+                        pool_change_fraction=pool_fraction)
 
     def page(self, owner_id: UUID, vacancy_id: UUID, session_id: UUID, cursor: str | None, limit: int = 50) -> FeedPage:
         """Continue one owner's session after feedback using a stable position cursor."""
@@ -422,6 +510,16 @@ class FeedStore:
             if session is None:
                 raise NotFoundError("feed session not found")
             return self._page_locked(connection, owner_id, session_id, cursor, limit)
+
+    def request_refill(self, owner_id: UUID, vacancy_id: UUID, session_id: UUID,
+                       *, force: bool = False, reason: str | None = None) -> FeedRefillStatus | None:
+        """Request a deduplicated refill job for an owned immutable session."""
+        return FeedRefillStore(self.database_url).enqueue(owner_id, vacancy_id, session_id,
+                                                          force=force, reason=reason)
+
+    def refill_status(self, owner_id: UUID, vacancy_id: UUID, session_id: UUID) -> FeedRefillStatus | None:
+        """Read the latest durable refill job for an owned immutable session."""
+        return FeedRefillStore(self.database_url).status(owner_id, vacancy_id, session_id)
 
     def exposure(self, owner_id: UUID, vacancy_id: UUID, exposure_id: UUID) -> FeedCard:
         """Return a current exposure; durable saved membership keeps PDF access past session expiry."""
@@ -714,10 +812,12 @@ class FeedStore:
                                        strict_filter_warnings=suitability.reasons, mismatch_token=token)
 
     def saved(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0,
-              candidate_id: UUID | None = None) -> FeedListPage[SavedCard]:
-        """List saved candidates with immutable exposure cards and bounded offset pagination."""
+              candidate_id: UUID | None = None, cursor: str | None = None) -> FeedListPage[SavedCard]:
+        """List saved candidates with immutable cards and optional keyset pagination."""
         if not 1 <= limit <= 100 or offset < 0:
             raise ValueError("invalid saved pagination")
+        if cursor is not None and offset:
+            raise ValueError("cursor cannot be combined with offset")
         with connect(self.database_url) as connection:
             owner_vacancy = connection.execute("SELECT vacancy_id FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
                                                (vacancy_id, owner_id)).fetchone()
@@ -727,6 +827,18 @@ class FeedStore:
                 vacancy = self._owner_vacancy(connection, owner_id, vacancy_id)
             except NotFoundError:
                 vacancy = None
+            source = connection.execute("SELECT revision FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
+                                        (vacancy_id, owner_id)).fetchone()
+            if source is None:
+                raise NotFoundError("owned vacancy not found")
+            snapshot_at = connection.execute("SELECT clock_timestamp() AS value").fetchone()["value"]
+            keyset = None
+            if cursor is not None:
+                keyset = _decode_list_cursor(cursor, "saved", owner_id, vacancy_id, candidate_id)
+                if keyset[3] != source["revision"]:
+                    raise ConflictError("saved listing source changed")
+                snapshot_at = keyset[0]
+            where_keyset = "" if keyset is None else " AND (s.saved_at < %s OR (s.saved_at=%s AND s.candidate_id>%s))"
             rows = connection.execute("""SELECT s.*,e.session_id,e.kind,e.served_at,e.position,e.card,
                     COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
                     COALESCE(v.last_assessment,'null'::jsonb) AS change_assessment,
@@ -734,14 +846,18 @@ class FeedStore:
                     LEFT JOIN feed_pipeline.visited v ON v.owner_id=s.owner_id AND v.vacancy_id=s.vacancy_id AND v.candidate_id=s.candidate_id
                     LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id WHERE s.owner_id=%s AND s.vacancy_id=%s
                     AND (%s::uuid IS NULL OR s.candidate_id=%s)
-                    ORDER BY s.saved_at DESC,s.candidate_id LIMIT %s OFFSET %s""", (owner_id, vacancy_id, candidate_id, candidate_id, limit + 1, offset)).fetchall()
+                    AND s.saved_at<=%s""" + where_keyset + " ORDER BY s.saved_at DESC,s.candidate_id LIMIT %s OFFSET %s""",
+                (owner_id, vacancy_id, candidate_id, candidate_id, snapshot_at, *(() if keyset is None else (keyset[1], keyset[1], keyset[2])), limit + 1, offset)).fetchall()
             has_more = len(rows) > limit
             items = []
             for row in rows[:limit]:
                 live = vacancy is not None and self._candidate_ready(connection, vacancy, row["candidate_id"], row["profile_revision"], allow_blocked=True)
                 items.append(SavedCard(vacancy_id=row["vacancy_id"], candidate_id=row["candidate_id"], profile_revision=row["profile_revision"],
                     exposure_id=row["exposure_id"], saved_at=row["saved_at"], card=self._card(row, row["action"], list(row["history_badges"] or [])) if live else None))
-            return FeedListPage[SavedCard](items=items, limit=limit, offset=offset, has_more=has_more)
+            next_cursor = _encode_list_cursor("saved", snapshot_at, rows[limit - 1]["saved_at"], rows[limit - 1]["candidate_id"], source["revision"],
+                                              owner_id, vacancy_id, candidate_id) if has_more else None
+            return FeedListPage[SavedCard](items=items, limit=limit, offset=offset, has_more=has_more,
+                                           cursor=cursor, next_cursor=next_cursor, snapshot_at=snapshot_at)
 
     def saved_candidate(self, owner_id: UUID, vacancy_id: UUID, candidate_id: UUID) -> SavedCard:
         """Read one durable saved membership for the recruitment service without scanning the shortlist."""
@@ -750,27 +866,46 @@ class FeedStore:
             raise NotFoundError("saved candidate not found")
         return page.items[0]
 
-    def visited(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0) -> FeedListPage[VisitedCard]:
-        """List visited structural baselines, including legacy migration and update badges."""
+    def visited(self, owner_id: UUID, vacancy_id: UUID, limit: int = 50, offset: int = 0,
+                cursor: str | None = None) -> FeedListPage[VisitedCard]:
+        """List visited baselines with a stable updated_at/candidate_id keyset."""
         if not 1 <= limit <= 100 or offset < 0:
             raise ValueError("invalid visited pagination")
+        if cursor is not None and offset:
+            raise ValueError("cursor cannot be combined with offset")
         with connect(self.database_url) as connection:
             owner_vacancy = connection.execute("SELECT vacancy_id FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
                                                (vacancy_id, owner_id)).fetchone()
             if owner_vacancy is None:
                 raise NotFoundError("owned vacancy not found")
+            source = connection.execute("SELECT revision FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
+                                        (vacancy_id, owner_id)).fetchone()
+            if source is None:
+                raise NotFoundError("owned vacancy not found")
+            snapshot_at = connection.execute("SELECT clock_timestamp() AS value").fetchone()["value"]
+            keyset = None
+            if cursor is not None:
+                keyset = _decode_list_cursor(cursor, "visited", owner_id, vacancy_id)
+                if keyset[3] != source["revision"]:
+                    raise ConflictError("visited listing source changed")
+                snapshot_at = keyset[0]
+            where_keyset = "" if keyset is None else " AND (v.updated_at < %s OR (v.updated_at=%s AND v.candidate_id>%s))"
             rows = connection.execute("""SELECT v.*,COALESCE(ss.state,'visited') AS selection_state
                 FROM feed_pipeline.visited v LEFT JOIN matching_pipeline.selection_states ss
                   ON ss.vacancy_id=v.vacancy_id AND ss.candidate_id=v.candidate_id
                 WHERE v.owner_id=%s AND v.vacancy_id=%s
-                ORDER BY updated_at DESC,candidate_id LIMIT %s OFFSET %s""", (owner_id, vacancy_id, limit + 1, offset)).fetchall()
+                  AND v.updated_at<=%s""" + where_keyset + " ORDER BY v.updated_at DESC,v.candidate_id LIMIT %s OFFSET %s""",
+                (owner_id, vacancy_id, snapshot_at, *(() if keyset is None else (keyset[1], keyset[1], keyset[2])), limit + 1, offset)).fetchall()
             has_more = len(rows) > limit
             items = [VisitedCard(vacancy_id=row["vacancy_id"], candidate_id=row["candidate_id"], profile_revision=row["profile_revision"],
                 evaluated_revision=row["evaluated_revision"], state=row["selection_state"],
                 exposure_id=row["exposure_id"], baseline_origin=row["baseline_origin"], visited_at=row["visited_at"],
                 updated_at=row["updated_at"], history_badges=list(row["history_badges"] or []), assessment=row["last_assessment"])
                 for row in rows[:limit]]
-            return FeedListPage[VisitedCard](items=items, limit=limit, offset=offset, has_more=has_more)
+            next_cursor = _encode_list_cursor("visited", snapshot_at, rows[limit - 1]["updated_at"], rows[limit - 1]["candidate_id"], source["revision"],
+                                              owner_id, vacancy_id) if has_more else None
+            return FeedListPage[VisitedCard](items=items, limit=limit, offset=offset, has_more=has_more,
+                                             cursor=cursor, next_cursor=next_cursor, snapshot_at=snapshot_at)
 
     @staticmethod
     def _legacy_baseline(row: dict) -> dict[str, Any]:

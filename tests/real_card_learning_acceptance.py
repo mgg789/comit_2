@@ -140,7 +140,9 @@ def main() -> None:
         "schema_change": "37->38", "schema_change_fallback": fallback.run.fallback_reason,
         "migrations": migrations, "bootstrap_activated": bootstrap["state"] == "manual_sort_only_activated",
         "checked_at": datetime.now(UTC).isoformat(), "production": "not_run"}
-    (root / "data/validation/real-card-learning-acceptance.json").write_text(json.dumps(report, indent=2) + "\n")
+    report_path = Path(os.environ.get("LEARNING_ACCEPTANCE_REPORT_PATH",
+                                     str(root / "data/validation/real-card-learning-acceptance.json")))
+    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, sort_keys=True))
 
 

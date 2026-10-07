@@ -23,7 +23,7 @@ from matching_engine.combine_models import (
 from matching_engine.combine_scoring import policy_hash
 from matching_engine.database import PIPELINE_LOCK, connect
 from matching_engine.embeddings import EMBEDDING_SPACE_ID, MODEL_VERSION
-from matching_engine.models import Category, NarrativeClaim
+from matching_engine.models import Category, ExternalEvidence, NarrativeClaim
 from matching_engine.store import ConflictError, NotFoundError
 from matching_engine.vacancy_models import VacancyReady
 from matching_engine.vacancy_store import VacancyStore
@@ -124,6 +124,8 @@ class CombineStore:
             relocation_cities=row["relocation_cities"] or [],
             narrative_facts=project_narrative_facts({key: [NarrativeClaim.model_validate(claim)
                 for claim in (claims or [])] for key, claims in row["narratives"].items()}),
+            external_evidence=[ExternalEvidence.model_validate(item)
+                for item in (row["public_profile"].get("external_evidence", []) or [])],
         ) for row in rows]
 
     @staticmethod

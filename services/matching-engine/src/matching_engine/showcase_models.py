@@ -33,6 +33,7 @@ class SkillGroups(Contract):
 class SearchFilters(Contract):
     """Explicit public-profile filters; salary overlap includes both endpoints."""
     classes: list[Direction] = Field(default_factory=list, max_length=8)
+    vacancy_id: UUID | None = None
     grades: list[Grade] = Field(default_factory=list, max_length=4)
     cities: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(default_factory=list, max_length=100)
     salary: SalaryRange | None = None
@@ -92,6 +93,15 @@ class PublicNarrative(Contract):
     facts: PublicFacts | None = None
 
 
+class PublicExternalEvidence(Contract):
+    """Allowlisted provider result; authorship is never represented as proven."""
+
+    kind: Literal["fsp", "repository", "hh"]
+    subject: str
+    status: ClaimStatus
+    verified_value: object | None = None
+
+
 class PublicProfile(Contract):
     """Versioned, stable public projection without identity or contact fields."""
     projection_version: Literal[1] = 1
@@ -109,6 +119,7 @@ class PublicProfile(Contract):
     projects: list[PublicNarrative] = Field(default_factory=list)
     experience: list[PublicNarrative] = Field(default_factory=list)
     achievements: list[PublicNarrative] = Field(default_factory=list)
+    external_evidence: list[PublicExternalEvidence] = Field(default_factory=list)
 
 
 class SearchFactors(Contract):
@@ -130,6 +141,7 @@ class PublicCandidateCard(Contract):
     confirmed_strength: int
     resume_url: str
     search_factors: SearchFactors = Field(default_factory=SearchFactors)
+    external_evidence: list[PublicExternalEvidence] = Field(default_factory=list)
 
 
 class PublicCandidateDetail(PublicCandidateCard):

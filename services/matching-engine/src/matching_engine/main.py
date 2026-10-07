@@ -162,9 +162,10 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     @app.get("/internal/pool", response_model=PoolPage, tags=["candidate-pipeline"])
     def pool(repository: Annotated[Store, Depends(require_internal)],
              limit: int = Query(default=100, ge=1, le=500),
-             offset: int = Query(default=0, ge=0)) -> PoolPage:
+             offset: int = Query(default=0, ge=0),
+             cursor: str | None = Query(default=None, max_length=1024)) -> PoolPage:
         """Return contact-free ready snapshots, never drafts or mixed strict generations."""
-        return repository.pool(limit, offset)
+        return repository.pool(limit, offset, cursor)
 
     @app.get("/internal/pool/{candidate_id}/resume.pdf", tags=["candidate-pipeline"],
              responses={200: {"content": {"application/pdf": {}}}})

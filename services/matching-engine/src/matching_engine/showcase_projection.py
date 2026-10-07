@@ -40,4 +40,46 @@ def public_profile(profile: CandidateProfile, candidate_id: UUID) -> dict:
             claims.append({"title": clean(claim.title), "description": clean(claim.description),
                            "status": claim.status, "facts": facts})
         result[group] = claims
+    public_evidence = []
+    for evidence in profile.external_evidence:
+        if evidence.status not in ("confirmed", "partial", "pending"):
+            continue
+        value = evidence.verified_value
+        if isinstance(value, dict):
+            if evidence.kind == "fsp":
+                events = value.get("events", [])
+                safe_events = []
+                if isinstance(events, list):
+                    for event in events[:50]:
+                        if isinstance(event, dict):
+                            safe_events.append({
+                                "title": clean(str(event.get("title", "")))[:300],
+                                "year": event.get("year"), "place": event.get("place"),
+                            })
+                value = {"rank": value.get("rank"), "rating": value.get("rating"), "events": safe_events,
+                         "demo_registry": value.get("demo_registry") is True,
+                         "provider_version": clean(str(value.get("provider_version", "")))[:100],
+                         "certificates": [clean(str(item))[:300] for item in value.get("certificates", [])[:50]]
+                         if isinstance(value.get("certificates", []), list) else []}
+            elif evidence.kind == "repository":
+                narrative = value.get("contribution_narrative")
+                value = {"url": value.get("url", evidence.subject), "repository_nonempty": value.get("repository_nonempty") is True,
+                         "contribution_narrative": clean(narrative) if isinstance(narrative, str) else "",
+                         "authorship_proven": False}
+            else:
+                experience = value.get("experience", [])
+                safe_experience = []
+                if isinstance(experience, list):
+                    for item in experience[:20]:
+                        if isinstance(item, dict):
+                            safe_experience.append({key: clean(str(item[key]))[:300] for key in ("title", "company") if isinstance(item.get(key), str)})
+                value = {"resume_id": "hidden", "title": clean(str(value.get("title", "")))[:300],
+                         "area": clean(str(value.get("area", "")))[:300], "experience": safe_experience,
+                         "ownership_proven": False}
+            if evidence.kind == "repository":
+                # A repository being public and non-empty never proves authorship.
+                value["authorship_proven"] = False
+        public_evidence.append({"kind": evidence.kind, "subject": clean(evidence.subject),
+                                "status": evidence.status, "verified_value": value})
+    result["external_evidence"] = public_evidence
     return PublicProfile.model_validate(result).model_dump(mode="json")
