@@ -1,6 +1,149 @@
-.vacancy-editor .form-grid{gap:16rem}.vacancy-editor .form-error{margin-top:16rem}.summary-copy{display:grid;gap:20rem;margin:24rem 0;white-space:pre-wrap;overflow-wrap:anywhere}.vacancy-subtitle{font-size:24rem;margin-top:10rem}.edit-badge{width:43rem;height:43rem;display:grid;place-items:center;background:var(--comit-text);color:var(--employer-ink);border-radius:50%;font-size:26rem}.shortlist-all{margin-left:auto;border:0;background:none;color:var(--comit-text-muted);font-size:18rem}.saved-resume{color:inherit;border:0;text-align:left;background:none;padding:0}.saved-card .action{margin-top:12rem;font-size:18rem;min-height:44rem;padding:8rem 16rem}.saved-initial{position:absolute;top:20rem;right:24rem;font-family:var(--employer-display);font-size:84rem;opacity:.18}.saved-card{background:linear-gradient(130deg,#40364a,#272930);overflow:hidden}.deck-state{width:510rem;display:grid;gap:20rem}.candidate-factor{font-size:18rem;margin-top:12rem;color:var(--comit-text)}.candidate-description>p:first-child{color:var(--comit-text-muted)}.candidate-swipe h2{line-height:1.2}.candidate-controls .icon{width:32rem;height:32rem}.vacancy-editor>h2{font-size:28rem}.vacancy-editor .form-grid>small{font-size:15rem}.detail-fields input{height:66rem;min-height:0}.vacancy-card{border:1px solid transparent}.vacancy-card .card-arrow{transform:rotate(0deg)}
-@media(max-width:760px){.vacancy-editor{width:100%;max-width:484rem}.detail-columns{margin-left:0}.saved-card{width:240rem;min-width:240rem}.deck-state{width:100%}.candidate-factor{font-size:16rem}.vacancy-editor .modal-close{right:12rem;top:-55rem}.vacancy-subtitle{font-size:18rem}.small-heading h2{font-size:21rem}.shortlist-all{font-size:14rem}.interview-row h3{font-size:20rem}}
+.vacancy-editor .form-grid {
+  gap: 16rem;
+}
+.vacancy-editor .form-error {
+  margin-top: 16rem;
+}
+.summary-copy {
+  display: grid;
+  gap: 20rem;
+  margin: 24rem 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vacancy-subtitle {
+  font-size: 24rem;
+  margin-top: 10rem;
+}
+.edit-badge {
+  width: 43rem;
+  height: 43rem;
+  display: grid;
+  place-items: center;
+  background: var(--comit-text);
+  color: var(--employer-ink);
+  border-radius: 50%;
+  font-size: 26rem;
+}
+.shortlist-all {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--comit-text-muted);
+  font-size: 18rem;
+}
+.saved-resume {
+  color: inherit;
+  border: 0;
+  text-align: left;
+  background: none;
+  padding: 0;
+}
+.saved-card .action {
+  margin-top: 12rem;
+  font-size: 18rem;
+  min-height: 44rem;
+  padding: 8rem 16rem;
+}
+.saved-initial {
+  position: absolute;
+  top: 20rem;
+  right: 24rem;
+  font-family: var(--employer-display);
+  font-size: 84rem;
+  opacity: 0.18;
+}
+.saved-card {
+  background: linear-gradient(
+    130deg,
+    var(--employer-paint-40364a),
+    var(--employer-paint-272930)
+  );
+  overflow: hidden;
+}
+.deck-state {
+  width: 510rem;
+  display: grid;
+  gap: 20rem;
+}
+.candidate-factor {
+  font-size: 18rem;
+  margin-top: 12rem;
+  color: var(--comit-text);
+}
+.candidate-description > p:first-child {
+  color: var(--comit-text-muted);
+}
+.candidate-swipe h2 {
+  line-height: 1.2;
+}
+.candidate-controls .icon {
+  width: 32rem;
+  height: 32rem;
+}
+.vacancy-editor > h2 {
+  font-size: 28rem;
+}
+.vacancy-editor .form-grid > small {
+  font-size: 15rem;
+}
+.detail-fields input {
+  height: 66rem;
+  min-height: 0;
+}
+.vacancy-card {
+  border: 1px solid transparent;
+}
+.vacancy-card .card-arrow {
+  transform: rotate(0deg);
+}
+@media (max-width: 760px) {
+  .vacancy-editor {
+    width: 100%;
+    max-width: 484rem;
+  }
+  .detail-columns {
+    margin-left: 0;
+  }
+  .saved-card {
+    width: 240rem;
+    min-width: 240rem;
+  }
+  .deck-state {
+    width: 100%;
+  }
+  .candidate-factor {
+    font-size: 16rem;
+  }
+  .vacancy-editor .modal-close {
+    right: 12rem;
+    top: -55rem;
+  }
+  .vacancy-subtitle {
+    font-size: 18rem;
+  }
+  .small-heading h2 {
+    font-size: 21rem;
+  }
+  .shortlist-all {
+    font-size: 14rem;
+  }
+  .interview-row h3 {
+    font-size: 20rem;
+  }
+}
 
-.invite-fields{display:grid;gap:16rem;border:0;padding:0;margin:0;min-width:0}
+.invite-fields {
+  display: grid;
+  gap: 16rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
 
-.deck-icon{width:36rem;height:36rem;object-fit:contain}
+.deck-icon {
+  width: 36rem;
+  height: 36rem;
+  object-fit: contain;
+}

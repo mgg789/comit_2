@@ -18,39 +18,197 @@ const icons = {
 } as const;
 
 /** Original exported Figma vector; wrapper preserves the source aspect ratio. */
-export function Icon({ name, className = "" }: { name: keyof typeof icons; className?: string }) {
-  return <span className={`icon icon-${name} ${className}`} aria-hidden="true"><img src={asset(icons[name])} alt="" /></span>;
+export function Icon({
+  name,
+  className = "",
+}: {
+  name: keyof typeof icons;
+  className?: string;
+}) {
+  return (
+    <span className={`icon icon-${name} ${className}`} aria-hidden="true">
+      <img src={asset(icons[name])} alt="" />
+    </span>
+  );
 }
 
 /** Refractive backdrop filter and Figma background imagery, isolated from content. */
 export function Backdrop() {
-  const map = (vertical: boolean) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x2="${vertical ? "0" : "1"}" y2="${vertical ? "1" : "0"}"><stop stop-color="${vertical ? "#000000" : "#00007f"}"/><stop offset=".08" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset=".92" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset="1" stop-color="${vertical ? "#00ff00" : "#ff007f"}"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/></svg>`)}`;
-  return <><svg className="glass-filter" aria-hidden="true"><defs><filter id="glass-refraction" x="0" y="0" width="100%" height="100%" colorInterpolationFilters="sRGB"><feImage href={map(false)} preserveAspectRatio="none" width="100%" height="100%" result="horizontal" /><feImage href={map(true)} preserveAspectRatio="none" width="100%" height="100%" result="vertical" /><feComposite in="horizontal" in2="vertical" operator="arithmetic" k2="1" k3="1" result="lens" /><feGaussianBlur in="lens" stdDeviation="2" result="smooth" /><feDisplacementMap in="SourceGraphic" in2="smooth" scale="24" xChannelSelector="R" yChannelSelector="G" /></filter></defs></svg><div className="ambient" aria-hidden="true"><img className="ambient-upper" src={asset("b2e5fa1dc7bd97f4194c3281ddf16908ee7734b3.png")} alt="" /><img className="ambient-lower" src={asset("13441c23b2e09a38d4fef98d24cccd9bf355d639.png")} alt="" /><img className="ambient-glow" src={asset("9ac3e2c307951c9256502142bc9fbad65b066af3.svg")} alt="" /></div></>;
+  const map = (vertical: boolean) =>
+    `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x2="${vertical ? "0" : "1"}" y2="${vertical ? "1" : "0"}"><stop stop-color="${vertical ? "#000000" : "#00007f"}"/><stop offset=".08" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset=".92" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset="1" stop-color="${vertical ? "#00ff00" : "#ff007f"}"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/></svg>`)}`;
+  return (
+    <>
+      <svg className="glass-filter" aria-hidden="true">
+        <defs>
+          <filter
+            id="glass-refraction"
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feImage
+              href={map(false)}
+              preserveAspectRatio="none"
+              width="100%"
+              height="100%"
+              result="horizontal"
+            />
+            <feImage
+              href={map(true)}
+              preserveAspectRatio="none"
+              width="100%"
+              height="100%"
+              result="vertical"
+            />
+            <feComposite
+              in="horizontal"
+              in2="vertical"
+              operator="arithmetic"
+              k2="1"
+              k3="1"
+              result="lens"
+            />
+            <feGaussianBlur in="lens" stdDeviation="2" result="smooth" />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="smooth"
+              scale="24"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+      </svg>
+      <div className="ambient" aria-hidden="true">
+        <img
+          className="ambient-upper"
+          src={asset("b2e5fa1dc7bd97f4194c3281ddf16908ee7734b3.png")}
+          alt=""
+        />
+        <img
+          className="ambient-lower"
+          src={asset("13441c23b2e09a38d4fef98d24cccd9bf355d639.png")}
+          alt=""
+        />
+        <img
+          className="ambient-glow"
+          src={asset("9ac3e2c307951c9256502142bc9fbad65b066af3.svg")}
+          alt=""
+        />
+      </div>
+    </>
+  );
 }
 
 /** Animated button with design-system variants and native form semantics. */
-export function Action({ children, className = "", variant = "glass", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "glass" | "primary" | "light"; children: ReactNode }) {
-  return <button {...props} className={`action ${variant === "glass" ? "glass" : variant} ${className}`}>{children}</button>;
+export function Action({
+  children,
+  className = "",
+  variant = "glass",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "glass" | "primary" | "light";
+  children: ReactNode;
+}) {
+  return (
+    <button
+      {...props}
+      className={`action ${variant === "glass" ? "glass" : variant} ${className}`}
+    >
+      {children}
+    </button>
+  );
 }
 
 /** Section title and back control matching the reference geometry. */
-export function PageTitle({ title, back, children }: { title: string; back?: () => void; children?: ReactNode }) {
-  return <div className="page-heading">{back && <Action className="circle" onClick={back} aria-label="Назад"><Icon name="back" /></Action>}<h1>{title}</h1>{children}</div>;
+export function PageTitle({
+  title,
+  back,
+  children,
+}: {
+  title: string;
+  back?: () => void;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      {back && (
+        <Action className="circle" onClick={back} aria-label="Назад">
+          <Icon name="back" />
+        </Action>
+      )}
+      <h1>{title}</h1>
+      {children}
+    </div>
+  );
 }
 
 /** Accessible request state; retry never fabricates unavailable data. */
-export function State({ loading, error, empty, retry }: { loading?: boolean; error?: string | null; empty?: string; retry?: () => void }) {
-  if (loading) return <div className="state glass" role="status"><span className="spinner" />Загружаем…</div>;
-  return <div className="state glass" role={error ? "alert" : "status"}><p>{error || empty || "Пока ничего нет"}</p>{retry && <Action onClick={retry}>Обновить</Action>}</div>;
+export function State({
+  loading,
+  error,
+  empty,
+  retry,
+}: {
+  loading?: boolean;
+  error?: string | null;
+  empty?: string;
+  retry?: () => void;
+}) {
+  if (loading)
+    return (
+      <div className="state glass" role="status">
+        <span className="spinner" />
+        Загружаем…
+      </div>
+    );
+  return (
+    <div className="state glass" role={error ? "alert" : "status"}>
+      <p>{error || empty || "Пока ничего нет"}</p>
+      {retry && <Action onClick={retry}>Обновить</Action>}
+    </div>
+  );
 }
 
 /** Field label and help remain associated with the real form control. */
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+export function Field({
+  label,
+  children,
+  hint,
+}: {
+  label: string;
+  children: ReactNode;
+  hint?: string;
+}) {
   const id = useId();
-  return <label className="field"><span>{label}</span>{children}{hint && <small id={id}>{hint}</small>}</label>;
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+      {hint && <small id={id}>{hint}</small>}
+    </label>
+  );
 }
 
 /** Staggered entry for page surfaces; reduced motion is managed at app level. */
-export function Reveal({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <motion.div className={className} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.28 }}>{children}</motion.div>;
+export function Reveal({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.28 }}
+    >
+      {children}
+    </motion.div>
+  );
 }
