@@ -5533,6 +5533,16 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Idempotency Key"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "off",
+              "medium",
+              "max"
+            ],
+            "title": "Reasoning Effort",
+            "default": "off"
           }
         },
         "additionalProperties": false,
@@ -5817,6 +5827,16 @@
             "maxLength": 8000,
             "minLength": 1,
             "title": "User Message"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "off",
+              "medium",
+              "max"
+            ],
+            "title": "Reasoning Effort",
+            "default": "off"
           },
           "status": {
             "type": "string",

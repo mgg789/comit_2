@@ -99,7 +99,7 @@ export type AgentsOrganizationMessage = { "message_id": string; "chat_id": strin
 export type AgentsOrganizationMessagePage = { "items": Array<AgentsOrganizationMessage>; "next_sequence"?: (number | null); };
 
 /** Request to queue a user message in the sole owner chat. */
-export type AgentsOrganizationMessageRequest = { "message": string; "idempotency_key": string; };
+export type AgentsOrganizationMessageRequest = { "message": string; "idempotency_key": string; "reasoning_effort"?: "off" | "medium" | "max"; };
 
 /** Explicit employer-authorized delegated task and its candidate references. */
 export type AgentsOrganizationTask = { "task_id": string; "chat_id": string; "owner_id": string; "kind": "schedule_interview" | "inquiry" | "stand_in"; "instruction": string; "conversation_refs"?: Record<string, AgentsJsonValue>; "status"?: "queued" | "processing" | "retrying" | "waiting" | "waiting_employer" | "succeeded" | "failed" | "stopped"; "stop_reason"?: (string | null); "result"?: (Record<string, AgentsJsonValue> | null); "error_code"?: (string | null); "idempotency_key": string; "lease_token"?: (string | null); "lease_until"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); "next_run_at"?: (string | null); };
@@ -108,7 +108,7 @@ export type AgentsOrganizationTask = { "task_id": string; "chat_id": string; "ow
 export type AgentsOrganizationTaskRequest = { "kind": "schedule_interview" | "inquiry" | "stand_in"; "instruction": string; "conversation_refs"?: Record<string, AgentsJsonValue>; "idempotency_key": string; };
 
 /** One idempotent queued model turn with exact provider usage counters. */
-export type AgentsOrganizationTurn = { "turn_id": string; "chat_id": string; "owner_id": string; "task_id"?: (string | null); "source"?: "employer" | "workflow"; "task_lease_token"?: (string | null); "sequence": number; "user_message": string; "status"?: "queued" | "processing" | "retrying" | "succeeded" | "failed"; "idempotency_key": string; "provider_result"?: (Record<string, AgentsJsonValue> | null); "input_tokens"?: number; "output_tokens"?: number; "rounds"?: number; "tool_calls"?: number; "error_code"?: (string | null); "error_message"?: (string | null); "lease_token"?: (string | null); "lease_until"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); };
+export type AgentsOrganizationTurn = { "turn_id": string; "chat_id": string; "owner_id": string; "task_id"?: (string | null); "source"?: "employer" | "workflow"; "task_lease_token"?: (string | null); "sequence": number; "user_message": string; "reasoning_effort"?: "off" | "medium" | "max"; "status"?: "queued" | "processing" | "retrying" | "succeeded" | "failed"; "idempotency_key": string; "provider_result"?: (Record<string, AgentsJsonValue> | null); "input_tokens"?: number; "output_tokens"?: number; "rounds"?: number; "tool_calls"?: number; "error_code"?: (string | null); "error_message"?: (string | null); "lease_token"?: (string | null); "lease_until"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); };
 
 /** Question awaiting an owner answer; answers never enter long-term memory automatically. */
 export type AgentsPendingAnswer = { "answer_id": string; "chat_id": string; "turn_id"?: (string | null); "task_id"?: (string | null); "prompt": string; "answer_schema"?: Record<string, AgentsJsonValue>; "answer"?: (AgentsJsonValue | null); "answered"?: boolean; "created_at"?: (string | null); "answered_at"?: (string | null); };

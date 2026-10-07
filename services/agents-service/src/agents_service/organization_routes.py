@@ -72,7 +72,8 @@ def register_organization_routes(app: FastAPI, owner_dependency, database_depend
         """Queue one idempotent user message for the background worker."""
         try:
             require_optional("agent")
-            return _store(database).create_turn(owner_id, request.message, request.idempotency_key)
+            return _store(database).create_turn(owner_id, request.message, request.idempotency_key,
+                                                reasoning_effort=request.reasoning_effort)
         except OrganizationConflict as error:
             raise HTTPException(409, str(error)) from error
 

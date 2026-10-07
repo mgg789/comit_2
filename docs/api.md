@@ -471,6 +471,12 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 
 ## Глобальный агент работодателя
 
+`POST /employer/organization-agent/messages` принимает `message`, `idempotency_key`
+и необязательный `reasoning_effort` (`off`, `medium`, `max`; default `off`).
+Возвращаемый turn содержит сохранённый режим. Повтор ключа с другим режимом,
+сообщением или task возвращает 409. Приватный `reasoning_content` исключён из
+сериализованного provider receipt; история сообщений его не содержит.
+
 Публичные account-scoped маршруты находятся под `/employer/organization-agent`;
 gateway получает владельца из employer session. Внутренние маршруты имеют
 префикс `/internal/organization-agent` и требуют `AGENTS_SERVICE_TOKEN`.

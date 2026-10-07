@@ -20,6 +20,8 @@
 
 /* Employer Figma surface: scoped so the other three applications retain their palette. */
 .employer-app {
+  --employer-paint-2f2f2d: #2f2f2d;
+  --employer-paint-f8fcfe: #f8fcfe;
   --employer-control-min: 44px;
   --employer-input-text-min: 16px;
   --employer-caption-text-min: 14px;

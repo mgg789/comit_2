@@ -432,6 +432,17 @@
   font-size: 54rem;
   font-weight: 400;
   padding: 0 !important;
+  backdrop-filter: blur(22rem) saturate(1.35);
+  -webkit-backdrop-filter: blur(22rem) saturate(1.35);
+}
+.agent-close .icon {
+  width: 28rem;
+  height: 28rem;
+  transform: rotate(45deg);
+}
+.organization-composer .attach-button .icon {
+  width: 28rem;
+  height: 28rem;
 }
 .agent-tools {
   position: absolute;
@@ -446,8 +457,10 @@
   align-items: center;
   padding: 12rem 0;
   gap: 9rem;
+  transform-origin: center bottom;
 }
-.agent-tools > button {
+.agent-tools > button,
+.agent-reasoning-control > button {
   background: none;
   border: 0;
   width: 36rem;
@@ -457,11 +470,115 @@
   color: var(--employer-paint-fff);
   cursor: pointer;
   transition: transform 0.15s;
+  display: grid;
+  place-items: center;
 }
-.agent-tools > button:hover {
+.agent-tools > button:hover,
+.agent-reasoning-control > button:hover {
   transform: scale(1.12);
 }
 .agent-tools > button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.agent-tools button > img {
+  display: block;
+  width: 28rem;
+  height: 28rem;
+  object-fit: contain;
+}
+.agent-reasoning-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36rem;
+  height: 36rem;
+  flex-shrink: 0;
+}
+.agent-reasoning {
+  position: absolute;
+  right: calc(100% + 21rem);
+  top: calc(50% + 4rem);
+  translate: 0 -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 249rem;
+  height: 50rem;
+  padding: 13rem 18rem;
+  gap: 8rem;
+  border-radius: 97rem;
+  box-sizing: border-box;
+  color: var(--employer-paint-fff);
+  font-size: 20rem;
+  line-height: 24rem;
+  font-weight: 500;
+}
+.agent-reasoning::after {
+  content: "";
+  position: absolute;
+  inset: 0 -24rem 0 auto;
+  width: 24rem;
+}
+.agent-reasoning input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 123rem;
+  height: 20rem;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  border-radius: 97rem;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.agent-reasoning input[type="range"]:focus {
+  outline: none;
+  box-shadow: none;
+  border: 0;
+}
+.agent-reasoning input[type="range"]::-webkit-slider-runnable-track {
+  height: 20rem;
+  border: 0;
+  border-radius: 97rem;
+  background: var(--employer-paint-2f2f2d, var(--employer-paint-333));
+}
+.agent-reasoning input[type="range"]::-moz-range-track {
+  height: 20rem;
+  border: 0;
+  border-radius: 97rem;
+  background: var(--employer-paint-2f2f2d, var(--employer-paint-333));
+}
+.agent-reasoning
+  input[type="range"]:focus-visible::-webkit-slider-runnable-track {
+  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
+}
+.agent-reasoning input[type="range"]:focus-visible::-moz-range-track {
+  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
+}
+.agent-reasoning input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20rem;
+  height: 20rem;
+  margin-top: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--employer-paint-f8fcfe, var(--employer-paint-fff));
+}
+.agent-reasoning input[type="range"]::-moz-range-thumb {
+  width: 20rem;
+  height: 20rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--employer-paint-f8fcfe, var(--employer-paint-fff));
+}
+.agent-reasoning input[type="range"]:disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -502,9 +619,20 @@
   padding: 12rem 20rem;
   font-size: 20rem;
 }
-.agent-budget meter {
+.agent-budget-track {
+  display: block;
   width: 130rem;
-  height: 20rem;
+  height: 14rem;
+  border-radius: 20rem;
+  overflow: hidden;
+  background: var(--employer-paint-ffffff38);
+}
+.agent-budget-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--employer-paint-fff);
+  transition: width 0.2s ease;
 }
 .agent-questions {
   position: absolute;
@@ -526,6 +654,15 @@
 }
 .agent-questions .action {
   margin-top: 12rem;
+}
+.agent-pending-questions {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
 }
 @media (max-width: 760px) {
   .recruitment-screen {
@@ -668,6 +805,16 @@
     width: 22rem;
     height: 22rem;
   }
+  .agent-tools button > img {
+    width: 22rem;
+    height: 22rem;
+  }
+  .agent-reasoning {
+    width: 225rem;
+    right: calc(100% + 12rem);
+    font-size: 16rem;
+    padding: 13rem 12rem;
+  }
   .agent-budget {
     right: 70rem;
     bottom: 135rem;
@@ -676,7 +823,7 @@
     font-size: 16rem;
     padding: 10rem 14rem;
   }
-  .agent-budget meter {
+  .agent-budget-track {
     width: 95rem;
   }
   .agent-questions {
@@ -690,6 +837,11 @@
   }
   .agent-questions p {
     font-size: 14rem;
+  }
+  .agent-pending-questions {
+    right: auto;
+    bottom: auto;
+    width: 100%;
   }
   .assistant-welcome h2 {
     font-size: 26rem;

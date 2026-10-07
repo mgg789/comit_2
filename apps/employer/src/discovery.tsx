@@ -11,7 +11,7 @@ import {
   type EmployerStatisticStage,
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
-import { Action, Field, Icon, PageTitle, Reveal, State } from "./ui";
+import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import "./discovery.css";
 
 const evidenceLabels: Record<string, string> = {
@@ -337,7 +337,7 @@ export function Showcase({ navigate }: Navigation) {
   }
   return (
     <Reveal className="discovery-showcase">
-      <PageTitle title="Соискатели" back={() => navigate("/vacancies")}>
+      <PageTitle title="Соискатели">
         <form onSubmit={submit} className="discovery-search">
           <input
             aria-label="Поиск по имени, роли или стеку"
@@ -351,7 +351,7 @@ export function Showcase({ navigate }: Navigation) {
         </form>
       </PageTitle>
       <div className="discovery-filters">
-        <select
+        <Select
           aria-label="Специализация"
           value={specialization}
           onChange={(event) => setSpecialization(event.target.value)}
@@ -362,8 +362,8 @@ export function Showcase({ navigate }: Navigation) {
               {roleLabels[item]}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           aria-label="Грейд"
           value={grade}
           onChange={(event) => setGrade(event.target.value)}
@@ -374,14 +374,14 @@ export function Showcase({ navigate }: Navigation) {
               {gradeLabels[item]}
             </option>
           ))}
-        </select>
+        </Select>
         <input
           aria-label="Стек"
           placeholder="Стек"
           value={stack}
           onChange={(event) => setStack(event.target.value)}
         />
-        <select
+        <Select
           aria-label="Вакансия"
           value={draftId}
           onChange={(event) => {
@@ -395,7 +395,7 @@ export function Showcase({ navigate }: Navigation) {
               {item.fields.title || "Без названия"}
             </option>
           ))}
-        </select>
+        </Select>
         <span className="discovery-sort">
           Сортировка: по релевантности <Icon name="chevron" />
         </span>
@@ -822,7 +822,7 @@ export function Resume({
                 {invite ? (
                   <>
                     <Field label="Открытая вакансия">
-                      <select
+                      <Select
                         value={selected}
                         required
                         onChange={(event) => setSelected(event.target.value)}
@@ -838,7 +838,7 @@ export function Resume({
                               {item.fields.title}
                             </option>
                           ))}
-                      </select>
+                      </Select>
                     </Field>
                     {vacancy && (
                       <p>
@@ -935,6 +935,284 @@ function Milestones({ process }: { process?: RecruitmentView }) {
         ),
       )}
     </div>
+  );
+}
+
+type ResumeVacancyPage = {
+  vacancy: Awaited<ReturnType<typeof api.getVacancyDrafts>>[number];
+  saved: Awaited<ReturnType<typeof api.getSaved>>;
+  processes: Awaited<ReturnType<typeof api.getEmployerRecruitment>>;
+};
+
+/** Owner-wide saved resumes retain vacancy-specific recruitment states and public identities. */
+export function Resumes({ navigate }: Navigation) {
+  const [selection, setSelection] = useState<string[] | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [moreError, setMoreError] = useState("");
+  const drafts = useResource(async () => {
+    const items: Awaited<ReturnType<typeof api.getVacancyDrafts>> = [];
+    for (let offset = 0; ;) {
+      const page = await api.getVacancyDrafts(50, offset);
+      items.push(...page);
+      if (page.length < 50) break;
+      offset += page.length;
+    }
+    return items;
+  });
+  const selectedDrafts =
+    drafts.data?.filter(
+      (item) => selection === null || selection.includes(item.draft_id),
+    ) || [];
+  const identity = JSON.stringify(selectedDrafts.map((item) => item.draft_id));
+  const scope = useRef({ identity, generation: 0 });
+  if (scope.current.identity !== identity)
+    scope.current = { identity, generation: scope.current.generation + 1 };
+  useEffect(
+    () => () => {
+      scope.current.generation += 1;
+    },
+    [],
+  );
+  useEffect(() => {
+    setMoreError("");
+  }, [identity]);
+  const pages = useResource(async () => {
+    const result: ResumeVacancyPage[] = [];
+    // Keep concurrency bounded while reading every owner vacancy.
+    for (let offset = 0; offset < selectedDrafts.length; offset += 4) {
+      const batch = await Promise.all(
+        selectedDrafts.slice(offset, offset + 4).map(async (vacancy) => {
+          const [saved, processes] = await Promise.all([
+            api.getSaved(vacancy.draft_id),
+            api.getEmployerRecruitment(vacancy.draft_id),
+          ]);
+          return { vacancy, saved, processes };
+        }),
+      );
+      result.push(...batch);
+    }
+    return result;
+  }, [identity]);
+  const moreInFlight = useRef(false);
+  async function more() {
+    if (!pages.data || moreInFlight.current || pages.loading) return;
+    moreInFlight.current = true;
+    setMoreBusy(true);
+    setMoreError("");
+    const generation = scope.current.generation;
+    const snapshot = pages.data;
+    try {
+      const next: ResumeVacancyPage[] = [];
+      for (const page of snapshot) {
+        const id = page.vacancy.draft_id;
+        const [saved, processes] = await Promise.all([
+          page.saved.has_more
+            ? api.getSaved(
+                id,
+                page.saved.limit,
+                page.saved.offset + page.saved.items.length,
+                page.saved.next_cursor || undefined,
+              )
+            : Promise.resolve(null),
+          page.processes.has_more
+            ? api.getEmployerRecruitment(
+                id,
+                page.processes.limit,
+                page.processes.offset + page.processes.items.length,
+                page.processes.next_cursor || undefined,
+              )
+            : Promise.resolve(null),
+        ]);
+        next.push({
+          vacancy: page.vacancy,
+          saved: saved
+            ? {
+                ...saved,
+                offset: 0,
+                items: [...page.saved.items, ...saved.items],
+              }
+            : page.saved,
+          processes: processes
+            ? {
+                ...processes,
+                offset: 0,
+                items: [...page.processes.items, ...processes.items],
+              }
+            : page.processes,
+        });
+      }
+      if (generation === scope.current.generation) pages.setData(next);
+    } catch (error) {
+      if (generation === scope.current.generation)
+        setMoreError(errorText(error));
+    } finally {
+      moreInFlight.current = false;
+      setMoreBusy(false);
+    }
+  }
+  const rows = (pages.data || []).flatMap((page) => {
+    const byCandidate = new Map<
+      string,
+      {
+        candidate: CandidateIdentityView | null;
+        process?: RecruitmentView;
+        score?: number;
+      }
+    >();
+    page.saved.items.forEach((item) =>
+      byCandidate.set(item.candidate_id, {
+        candidate: item.card,
+        process: page.processes.items.find(
+          (process) => process.candidate_id === item.candidate_id,
+        ),
+        score: item.card?.explanation.score,
+      }),
+    );
+    page.processes.items.forEach((process) => {
+      if (!byCandidate.has(process.candidate_id))
+        byCandidate.set(process.candidate_id, { candidate: null, process });
+    });
+    return [...byCandidate].map(([id, row]) => ({
+      ...row,
+      id,
+      vacancy: page.vacancy,
+    }));
+  });
+  const loading = drafts.loading || pages.loading;
+  const error = drafts.error || pages.error;
+  return (
+    <Reveal>
+      <PageTitle title="Резюме">
+        <details
+          className="resume-vacancy-filter"
+          key={drafts.data ? "ready" : "loading"}
+        >
+          <summary aria-label="Фильтр резюме по вакансиям">
+            {selection === null
+              ? "Все вакансии"
+              : `Вакансии: ${selection.length}`}
+            <Icon name="chevron" />
+          </summary>
+          <div className="resume-vacancy-options">
+            <label>
+              <input
+                type="checkbox"
+                checked={selection === null}
+                onChange={(event) =>
+                  setSelection(event.target.checked ? null : [])
+                }
+              />
+              Все вакансии
+            </label>
+            {drafts.data?.map((vacancy) => (
+              <label key={vacancy.draft_id}>
+                <input
+                  type="checkbox"
+                  checked={
+                    selection === null || selection.includes(vacancy.draft_id)
+                  }
+                  onChange={(event) =>
+                    setSelection((current) => {
+                      const chosen =
+                        current ||
+                        drafts.data?.map((item) => item.draft_id) ||
+                        [];
+                      return event.target.checked
+                        ? [
+                            ...chosen.filter((id) => id !== vacancy.draft_id),
+                            vacancy.draft_id,
+                          ]
+                        : chosen.filter((id) => id !== vacancy.draft_id);
+                    })
+                  }
+                />
+                {vacancy.fields.title || "Без названия"}
+              </label>
+            ))}
+          </div>
+        </details>
+      </PageTitle>
+      {loading || error ? (
+        <State
+          loading={loading}
+          error={error}
+          retry={() => {
+            scope.current.generation += 1;
+            drafts.refresh();
+            pages.refresh();
+          }}
+        />
+      ) : !rows.length ? (
+        <State
+          empty={
+            selection?.length === 0
+              ? "Выберите вакансии для просмотра резюме"
+              : "В выбранных вакансиях пока нет резюме"
+          }
+        />
+      ) : (
+        <div className="discovery-list vacancy-resume-list">
+          {rows.map((row) => (
+            <article
+              className="discovery-row light-row"
+              key={`${row.vacancy.draft_id}:${row.id}`}
+            >
+              {row.score != null && (
+                <span
+                  className="discovery-score"
+                  title="Вычисленный score; не вероятность найма"
+                >
+                  {row.score.toFixed(2)}
+                </span>
+              )}
+              {row.candidate ? (
+                <CandidateIdentity candidate={row.candidate} />
+              ) : (
+                <>
+                  <AnonymousAvatar name="Анонимный профиль" />
+                  <div className="discovery-identity">
+                    <h3>Анонимный профиль</h3>
+                    <p>
+                      {row.process
+                        ? statusLabels[row.process.state]
+                        : "Сохранён"}
+                    </p>
+                  </div>
+                </>
+              )}
+              <Milestones process={row.process} />
+              <Action
+                className="discovery-dark"
+                title={row.vacancy.fields.title || "Без названия"}
+                onClick={() =>
+                  navigate(
+                    row.process
+                      ? `/chat/${row.process.id}`
+                      : `/resume/${row.id}?draft=${row.vacancy.draft_id}`,
+                  )
+                }
+              >
+                {row.process ? "Обратная связь" : "Открыть профиль"}
+              </Action>
+            </article>
+          ))}
+          {pages.data?.some(
+            (page) => page.saved.has_more || page.processes.has_more,
+          ) && (
+            <div className="pagination">
+              <Action disabled={moreBusy} onClick={() => void more()}>
+                {moreBusy ? "Загружаем…" : "Показать ещё"}
+              </Action>
+            </div>
+          )}
+        </div>
+      )}
+      {moreError && (
+        <p className="form-error" role="alert">
+          {moreError}
+        </p>
+      )}
+    </Reveal>
   );
 }
 
@@ -1117,7 +1395,7 @@ export function Statistics({ navigate }: Navigation) {
   if (data.loading || data.error || !data.data)
     return (
       <>
-        <PageTitle title="Статистика" back={() => navigate("/vacancies")} />
+        <PageTitle title="Статистика" />
         <State {...data} retry={data.refresh} />
       </>
     );
@@ -1140,7 +1418,7 @@ export function Statistics({ navigate }: Navigation) {
   );
   return (
     <Reveal className="discovery-statistics">
-      <PageTitle title="Статистика" back={() => navigate("/vacancies")} />
+      <PageTitle title="Статистика" />
       <div className="statistics-columns">
         <div className="statistics-left">
           <section className="panel statistics-kpis">

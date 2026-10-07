@@ -669,12 +669,17 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
-  const [showQuestions, setShowQuestions] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [reasoningEffort, setReasoningEffort] = useState<
+    "off" | "medium" | "max"
+  >("off");
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const documentInput = useRef<HTMLInputElement>(null);
-  const pending = useRef<{ message: string; idempotency_key: string } | null>(
-    null,
-  );
+  const pending = useRef<{
+    message: string;
+    idempotency_key: string;
+    reasoning_effort: "off" | "medium" | "max";
+  } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -693,6 +698,20 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           ];
         });
         cursor = page.next_sequence ?? cursor;
+        if (page.items.length > 0) {
+          api
+            .getOrganizationBudget()
+            .then((value) => {
+              if (active) setBudget(value);
+            })
+            .catch(() => {});
+          api
+            .getOrganizationPendingAnswers()
+            .then((value) => {
+              if (active) setQuestions(value.filter((item) => !item.answered));
+            })
+            .catch(() => {});
+        }
         if (activeTurn.current) {
           const value = await api.getOrganizationTurn(activeTurn.current);
           if (!active) return;
@@ -757,6 +776,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     const body = pending.current || {
       message: text.trim(),
       idempotency_key: crypto.randomUUID(),
+      reasoning_effort: reasoningEffort,
     };
     pending.current = body;
     try {
@@ -811,11 +831,15 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   );
   const percentage =
     budget && Number(budget.limit_micro_usd) > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (Number(budget.spent_micro_usd) / Number(budget.limit_micro_usd)) *
-              100,
+      ? Math.max(
+          0,
+          Math.min(
+            100,
+            Math.round(
+              (Number(budget.available_micro_usd) /
+                Number(budget.limit_micro_usd)) *
+                100,
+            ),
           ),
         )
       : null;
@@ -904,6 +928,39 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             }
           </div>
         )}
+        {questions.length > 0 && (
+          <div className="agent-questions agent-pending-questions panel glass">
+            <h2>Вопросы от агента</h2>
+            {questions.map((question) => (
+              <form
+                key={question.answer_id}
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  const answer = String(
+                    new FormData(event.currentTarget).get("answer") || "",
+                  );
+                  try {
+                    await api.answerOrganizationQuestion(question.answer_id, {
+                      answer,
+                    });
+                    setQuestions((current) =>
+                      current.filter(
+                        (item) => item.answer_id !== question.answer_id,
+                      ),
+                    );
+                  } catch (reason) {
+                    setError(errorText(reason));
+                  }
+                }}
+              >
+                <Field label={question.prompt}>
+                  <input name="answer" required />
+                </Field>
+                <Action type="submit">Ответить</Action>
+              </form>
+            ))}
+          </div>
+        )}
         <div ref={end} />
       </div>
       <div className="communication-composer-wrap organization-composer">
@@ -927,7 +984,11 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             disabled={uploadingDocument || sending}
             onClick={() => documentInput.current?.click()}
           >
-            {uploadingDocument ? "…" : "+"}
+            {uploadingDocument ? (
+              <span className="spinner" />
+            ) : (
+              <Icon name="plus" />
+            )}
           </button>
           <input
             autoFocus
@@ -952,7 +1013,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               !text.trim()
             }
           >
-            {sending ? <span className="spinner" /> : <Icon name="arrow" />}
+            {sending ? <span className="spinner" /> : <Icon name="send" />}
           </Action>
         </form>
         <p className="communication-attribution">
@@ -960,7 +1021,13 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           Работает на Droidje AI
         </p>
       </div>
-      <aside className="agent-tools glass">
+      <motion.aside
+        className="agent-tools glass"
+        initial={{ opacity: 0, y: "190rem", scale: 0.65 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: "190rem", scale: 0.65 }}
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      >
         <button
           type="button"
           title="Очистка истории пока недоступна"
@@ -974,7 +1041,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         </button>
         <button
           type="button"
-          aria-label="Расход бюджета AI"
+          aria-label="Остаток бюджета AI"
           onMouseEnter={() => setShowBudget(true)}
           onMouseLeave={() => setShowBudget(false)}
           onFocus={() => setShowBudget(true)}
@@ -986,28 +1053,71 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             alt=""
           />
         </button>
-        <button
-          type="button"
-          aria-label="Вопросы от агента"
-          onClick={() => {
-            setShowQuestions((value) => !value);
-            api
-              .getOrganizationPendingAnswers()
-              .then((value) =>
-                setQuestions(value.filter((item) => !item.answered)),
-              )
-              .catch((reason) => setError(errorText(reason)));
+        <div
+          className="agent-reasoning-control"
+          onMouseEnter={() => setShowReasoning(true)}
+          onMouseLeave={() => setShowReasoning(false)}
+          onFocus={() => setShowReasoning(true)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget))
+              setShowReasoning(false);
           }}
         >
-          <img
-            src={asset("36de0441b18c0a44358f7a80a61cac89e2b38031.svg")}
-            alt=""
-          />
-          {questions.length > 0 && (
-            <span className="agent-question-count">{questions.length}</span>
-          )}
-        </button>
-      </aside>
+          <button
+            type="button"
+            aria-label="Уровень размышлений AI"
+            aria-expanded={showReasoning}
+            aria-controls="agent-reasoning-options"
+            onClick={() => setShowReasoning(true)}
+          >
+            <img
+              src={asset("36de0441b18c0a44358f7a80a61cac89e2b38031.svg")}
+              alt=""
+            />
+          </button>
+          <AnimatePresence>
+            {showReasoning && (
+              <motion.div
+                id="agent-reasoning-options"
+                className="agent-reasoning glass"
+                role="group"
+                aria-label="Уровень размышлений"
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.15 }}
+              >
+                <span aria-hidden="true">low</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={1}
+                  value={{ off: 0, medium: 1, max: 2 }[reasoningEffort]}
+                  aria-label="Уровень размышлений AI"
+                  aria-valuetext={
+                    {
+                      off: "Без размышлений",
+                      medium: "Средний",
+                      max: "Максимальный",
+                    }[reasoningEffort]
+                  }
+                  disabled={sending || !!activeTurn.current}
+                  onChange={(event) => {
+                    const value = (["off", "medium", "max"] as const)[
+                      Number(event.target.value)
+                    ];
+                    if (!value || value === reasoningEffort) return;
+                    setReasoningEffort(value);
+                    pending.current = null;
+                  }}
+                />
+                <span aria-hidden="true">max</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </motion.aside>
       {showBudget && (
         <div className="agent-budget glass">
           {percentage == null ? (
@@ -1015,48 +1125,18 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           ) : (
             <>
               <strong>{percentage}%</strong>
-              <meter
-                min={0}
-                max={100}
-                value={percentage}
-                aria-label="Использовано бюджета AI"
-              />
+              <span
+                className="agent-budget-track"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percentage}
+                aria-label="Осталось бюджета AI"
+              >
+                <span style={{ width: `${percentage}%` }} />
+              </span>
             </>
           )}
-        </div>
-      )}
-      {showQuestions && (
-        <div className="agent-questions panel glass">
-          <h2>Вопросы от агента</h2>
-          {!questions.length && <p>Нет вопросов, ожидающих ответа</p>}
-          {questions.map((question) => (
-            <form
-              key={question.answer_id}
-              onSubmit={async (event) => {
-                event.preventDefault();
-                const answer = String(
-                  new FormData(event.currentTarget).get("answer") || "",
-                );
-                try {
-                  await api.answerOrganizationQuestion(question.answer_id, {
-                    answer,
-                  });
-                  setQuestions((current) =>
-                    current.filter(
-                      (item) => item.answer_id !== question.answer_id,
-                    ),
-                  );
-                } catch (reason) {
-                  setError(errorText(reason));
-                }
-              }}
-            >
-              <Field label={question.prompt}>
-                <input name="answer" required />
-              </Field>
-              <Action type="submit">Ответить</Action>
-            </form>
-          ))}
         </div>
       )}
       <Action
@@ -1064,7 +1144,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         aria-label="Закрыть AI-агента"
         onClick={onClose}
       >
-        ×
+        <Icon name="plus" />
       </Action>
     </motion.section>
   );

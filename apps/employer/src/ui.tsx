@@ -1,10 +1,24 @@
-import { useId, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { asset } from "./runtime";
 
 const icons = {
   vacancies: "6d4cf8ae48179dc57156f25db4b058cc5cb57a8e.svg",
   ai: "268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg",
+  resumes: "268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg",
+  plus: "43ffb38ed0f5604cad3f1adb9680d6c0b20d69c9.svg",
+  send: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
   candidates: "c56e9cc719a6147a0c25e9bc7877291a90ef720e.svg",
   statistics: "f82aa184ea85eb5960407a62897d24d7084bfd33.svg",
   settings: "944a3f714471682b2ae2b66d8711c46598ca1e19.svg",
@@ -29,6 +43,220 @@ export function Icon({
     <span className={`icon icon-${name} ${className}`} aria-hidden="true">
       <img src={asset(icons[name])} alt="" />
     </span>
+  );
+}
+
+/** Custom listbox backed by a real select, preserving existing typed change handlers and form values. */
+export function Select({
+  children,
+  className = "",
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  const native = useRef<HTMLSelectElement>(null);
+  const anchor = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [geometry, setGeometry] = useState({
+    left: 0,
+    top: 0,
+    width: 0,
+    maxHeight: 0,
+  });
+  const options = Children.toArray(children).flatMap((child) => {
+    if (
+      !isValidElement<{
+        value?: string | number;
+        children?: ReactNode;
+        disabled?: boolean;
+      }>(child) ||
+      child.type !== "option"
+    )
+      return [];
+    return [
+      {
+        value: String(child.props.value ?? ""),
+        label: child.props.children,
+        disabled: !!child.props.disabled,
+      },
+    ];
+  });
+  const selected = options.findIndex(
+    (option) =>
+      option.value === String(props.value ?? props.defaultValue ?? ""),
+  );
+  function show() {
+    if (props.disabled || !anchor.current) return;
+    const rect = anchor.current.getBoundingClientRect();
+    const available = window.innerHeight - rect.bottom - 12;
+    const height = Math.min(320, options.length * 44 + 56);
+    const above = available < Math.min(height, 180) && rect.top > available;
+    setGeometry({
+      left: Math.max(
+        8,
+        Math.min(rect.left, window.innerWidth - rect.width - 8),
+      ),
+      top: above ? Math.max(8, rect.top - height - 8) : rect.bottom + 8,
+      width: rect.width,
+      maxHeight: above
+        ? Math.min(height, rect.top - 16)
+        : Math.max(80, available),
+    });
+    setActive(Math.max(0, selected));
+    setOpen(true);
+  }
+  function choose(index: number) {
+    const option = options[index];
+    if (!option || option.disabled || !native.current) return;
+    native.current.value = option.value;
+    native.current.dispatchEvent(new Event("change", { bubbles: true }));
+    setOpen(false);
+    anchor.current?.focus();
+  }
+  useEffect(() => {
+    if (!open) return;
+    panel.current?.focus();
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !panel.current?.contains(event.target) &&
+        !anchor.current?.contains(event.target)
+      )
+        setOpen(false);
+    };
+    const close = () => setOpen(false);
+    document.addEventListener("pointerdown", outside);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  return (
+    <div className={`custom-select ${className}`}>
+      <select
+        {...props}
+        ref={native}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="custom-select-native"
+      >
+        {children}
+      </select>
+      <button
+        ref={anchor}
+        type="button"
+        className="custom-select-trigger"
+        disabled={props.disabled}
+        aria-label={props["aria-label"]}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? id : undefined}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={(event) => {
+          if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+            event.preventDefault();
+            show();
+          }
+        }}
+      >
+        <span>{options[selected]?.label ?? options[0]?.label}</span>
+        <Icon name="chevron" />
+      </button>
+      {open &&
+        createPortal(
+          <motion.div
+            ref={panel}
+            id={id}
+            className="custom-select-menu"
+            role="listbox"
+            aria-label={props["aria-label"]}
+            aria-activedescendant={`${id}-${active}`}
+            tabIndex={-1}
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            style={geometry}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+                anchor.current?.focus();
+              }
+              if (event.key === "Tab") {
+                setOpen(false);
+                const controls = Array.from(
+                  document.querySelectorAll<HTMLElement>(
+                    'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
+                  ),
+                ).filter(
+                  (control) =>
+                    control.getClientRects().length > 0 &&
+                    !control.closest(".custom-select-menu") &&
+                    control.tabIndex >= 0,
+                );
+                const current = anchor.current
+                  ? controls.indexOf(anchor.current)
+                  : -1;
+                const next =
+                  current >= 0
+                    ? controls[current + (event.shiftKey ? -1 : 1)]
+                    : undefined;
+                if (next) {
+                  event.preventDefault();
+                  next.focus();
+                }
+              }
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                const direction = event.key === "ArrowDown" ? 1 : -1;
+                let next = active;
+                for (let i = 0; i < options.length; i++) {
+                  next = (next + direction + options.length) % options.length;
+                  if (!options[next]?.disabled) break;
+                }
+                setActive(next);
+                document
+                  .getElementById(`${id}-${next}`)
+                  ?.scrollIntoView({ block: "nearest" });
+              }
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                choose(active);
+              }
+              if (event.key === "Home" || event.key === "End") {
+                event.preventDefault();
+                setActive(event.key === "Home" ? 0 : options.length - 1);
+              }
+            }}
+          >
+            <div className="custom-select-caption">
+              {props["aria-label"] || "Выберите вариант"}
+            </div>
+            {options.map((option, index) => (
+              <button
+                key={`${option.value}-${index}`}
+                id={`${id}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={index === selected}
+                disabled={option.disabled}
+                tabIndex={-1}
+                className={index === active ? "is-active" : ""}
+                onPointerMove={() => setActive(index)}
+                onClick={() => choose(index)}
+              >
+                <span className="custom-select-check">
+                  {index === selected ? "✓" : ""}
+                </span>
+                {option.label}
+              </button>
+            ))}
+          </motion.div>,
+          anchor.current?.closest(".employer-app") ?? document.body,
+        )}
+    </div>
   );
 }
 

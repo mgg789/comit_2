@@ -8,7 +8,13 @@ import { Login } from "./login";
 import { LegalDocument } from "./legal";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
 import { Vacancies, VacancyDetail, VacancyEditor } from "./vacancies";
-import { Resume, Showcase, Statistics, VacancyResumes } from "./discovery";
+import {
+  Resume,
+  Resumes,
+  Showcase,
+  Statistics,
+  VacancyResumes,
+} from "./discovery";
 
 /** Employer SPA with a persistent global assistant and cookie-authenticated routes. */
 export default function App() {
@@ -129,9 +135,13 @@ export default function App() {
   const selected =
     pieces[0] === "statistics"
       ? "statistics"
-      : pieces[0] === "showcase" || pieces[0] === "resume"
-        ? "candidates"
-        : "vacancies";
+      : pieces[0] === "resumes" ||
+          pieces[0] === "resume" ||
+          (pieces[0] === "vacancy" && pieces[2] === "resumes")
+        ? "resumes"
+        : pieces[0] === "showcase"
+          ? "candidates"
+          : "vacancies";
   let screen;
   if (pieces[0] === "vacancy" && pieces[1])
     screen =
@@ -152,6 +162,7 @@ export default function App() {
         navigate={navigate}
       />
     );
+  else if (pieces[0] === "resumes") screen = <Resumes navigate={navigate} />;
   else if (pieces[0] === "showcase") screen = <Showcase navigate={navigate} />;
   else if (pieces[0] === "statistics")
     screen = <Statistics navigate={navigate} />;
@@ -194,7 +205,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <header className="topbar">
+            <header className={`topbar ${agent ? "assistant-open" : ""}`}>
               <a
                 className="brand glass"
                 href="#/vacancies"
@@ -207,7 +218,7 @@ export default function App() {
                 {(
                   [
                     { id: "vacancies", label: "Вакансии", path: "/vacancies" },
-                    { id: "ai", label: "AI-агент" },
+                    { id: "resumes", label: "Резюме", path: "/resumes" },
                     { id: "candidates", label: "Кандидаты", path: "/showcase" },
                     {
                       id: "statistics",
@@ -217,21 +228,43 @@ export default function App() {
                     { id: "settings", label: "Аккаунт" },
                   ] as const
                 ).map((item) => (
-                  <button
+                  <motion.button
+                    layout
+                    transition={{
+                      layout: {
+                        type: "spring",
+                        stiffness: 360,
+                        damping: 34,
+                        mass: 0.85,
+                      },
+                    }}
                     key={item.id}
                     className={`nav-item glass ${selected === item.id ? "selected" : ""}`}
                     onClick={() => {
                       if ("path" in item) navigate(item.path);
-                      else if (item.id === "ai") setAgent(true);
                       else setMenu((value) => !value);
                     }}
                     aria-label={item.label}
                     aria-current={selected === item.id ? "page" : undefined}
                   >
                     <Icon name={item.id} />
-                    <span className="nav-label">{item.label}</span>
-                    <span className="tooltip">{item.label}</span>
-                  </button>
+                    <AnimatePresence initial={false}>
+                      {selected === item.id && (
+                        <motion.span
+                          className="nav-label"
+                          initial={{ width: 0, opacity: 0 }}
+                          animate={{ width: "auto", opacity: 1 }}
+                          exit={{ width: 0, opacity: 0 }}
+                          transition={{
+                            duration: 0.28,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
                 ))}
               </nav>
               <div className="account-tools glass">

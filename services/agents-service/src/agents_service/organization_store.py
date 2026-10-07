@@ -20,6 +20,7 @@ from .organization_models import (
     OrganizationMemory,
     OrganizationMessage,
     OrganizationMessagePage,
+    OrganizationReasoningEffort,
     OrganizationTask,
     OrganizationTaskRequest,
     OrganizationToolJournal,
@@ -159,7 +160,7 @@ class OrganizationStore:
                                        next_sequence=page[-1]["sequence"] if len(rows) > limit else None)
 
     def create_turn(self, owner_id: UUID, message: str, idempotency_key: str, *, task_id: UUID | None = None,
-                    task_lease_token: UUID | None = None) -> OrganizationTurn:
+                    task_lease_token: UUID | None = None, reasoning_effort: OrganizationReasoningEffort = "off") -> OrganizationTurn:
         """Queue one owner turn and its user message atomically; retries return the same turn."""
         chat = self.get_or_create_chat(owner_id)
         with self._db() as db, db.transaction():
@@ -167,7 +168,8 @@ class OrganizationStore:
             existing = db.execute("SELECT * FROM agents_service.organization_turns WHERE owner_id=%s AND idempotency_key=%s FOR UPDATE",
                                   (owner_id, idempotency_key)).fetchone()
             if existing:
-                if existing["user_message"] != message or existing["task_id"] != task_id:
+                if (existing["user_message"] != message or existing["task_id"] != task_id
+                        or existing.get("reasoning_effort", "off") != reasoning_effort):
                     raise OrganizationConflict("idempotency_key_conflict")
                 return self._turn(existing)
             lock = db.execute("SELECT * FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (owner_id,)).fetchone()
@@ -181,10 +183,10 @@ class OrganizationStore:
                                  (chat.chat_id,)).fetchone()["sequence"]
             turn_id = uuid4()
             row = db.execute("""INSERT INTO agents_service.organization_turns
-                (turn_id,chat_id,owner_id,task_id,sequence,user_message,idempotency_key,source,task_lease_token)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+                (turn_id,chat_id,owner_id,task_id,sequence,user_message,idempotency_key,source,task_lease_token,reasoning_effort)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
                 (turn_id, chat.chat_id, owner_id, task_id, sequence, message, idempotency_key,
-                 "workflow" if task_id else "employer", task_lease_token)).fetchone()
+                 "workflow" if task_id else "employer", task_lease_token, reasoning_effort)).fetchone()
             if task_id is None:
                 db.execute("UPDATE agents_service.organization_chats SET presence=true,last_seen_at=now() WHERE owner_id=%s", (owner_id,))
             db.execute("""INSERT INTO agents_service.organization_messages
@@ -236,7 +238,7 @@ class OrganizationStore:
 
     def update_turn(self, owner_id: UUID, turn_id: UUID, *, expected_lease_token: UUID | None = None, **values: Any) -> OrganizationTurn:
         """Update a turn's durable checkpoint under owner scope."""
-        allowed = {"status", "provider_result", "input_tokens", "output_tokens", "rounds", "tool_calls",
+        allowed = {"status", "provider_result", "reasoning_history", "input_tokens", "output_tokens", "rounds", "tool_calls",
                    "error_code", "error_message", "lease_token", "lease_until"}
         invalid = set(values) - allowed
         if invalid:
@@ -245,7 +247,7 @@ class OrganizationStore:
         args: list[Any] = []
         for key, value in values.items():
             sets.append(f"{key}=%s")
-            args.append(Jsonb(_json(value)) if key == "provider_result" else value)
+            args.append(Jsonb(_json(value)) if key in {"provider_result", "reasoning_history"} else value)
         args.extend((owner_id, turn_id))
         clause = ""
         if expected_lease_token is not None:

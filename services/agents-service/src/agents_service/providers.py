@@ -145,7 +145,7 @@ class LayaClient:
 
 
 class DeepSeekClient:
-    """OpenAI-compatible non-thinking tool calls; credentials remain only in worker env."""
+    """Official DeepSeek tool calls; credentials remain only in worker env."""
 
     def __init__(self, base_url: str | None = None, model: str | None = None,
                  token: str | None = None, client: httpx.Client | None = None):
@@ -157,14 +157,20 @@ class DeepSeekClient:
             raise ValueError("DeepSeek transport requires the official HTTPS endpoint")
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
 
-    def complete(self, messages: list[dict], tools: list[dict], max_tokens: int = 1536) -> dict:
+    def complete(self, messages: list[dict], tools: list[dict], max_tokens: int = 1536,
+                 *, reasoning_effort: str = "off") -> dict:
         """Return a checked response envelope; runtime persists it before executing tools."""
         if not self.token:
             raise ProviderError("deepseek_not_configured", False)
+        if reasoning_effort not in {"off", "medium", "max"}:
+            raise ProviderError("invalid_reasoning_effort", False)
+        reasoning = ({"reasoning_effort": "high" if reasoning_effort == "medium" else "max"}
+                     if reasoning_effort != "off" else {})
         result = _request(self.client, "POST", self.base_url + "/chat/completions",
                           headers={"Authorization": "Bearer " + self.token}, json={"model": self.model,
                           "messages": messages, "tools": tools, "max_tokens": max_tokens,
-                          "thinking": {"type": "disabled"}, "stream": False})
+                          "thinking": {"type": "disabled" if reasoning_effort == "off" else "enabled"},
+                          **reasoning, "stream": False})
         try:
             message = result["choices"][0]["message"]
             usage = result["usage"]

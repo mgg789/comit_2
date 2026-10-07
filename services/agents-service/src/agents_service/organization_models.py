@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_serializer
 
 
 class OrganizationContract(BaseModel):
@@ -23,6 +23,7 @@ class OrganizationContract(BaseModel):
 
 OrganizationMessageRole = Literal["system", "user", "assistant", "tool"]
 OrganizationTurnStatus = Literal["queued", "processing", "retrying", "succeeded", "failed"]
+OrganizationReasoningEffort = Literal["off", "medium", "max"]
 OrganizationTaskKind = Literal["schedule_interview", "inquiry", "stand_in"]
 OrganizationTaskStatus = Literal["queued", "processing", "retrying", "waiting", "waiting_employer", "succeeded", "failed", "stopped"]
 
@@ -77,6 +78,8 @@ class OrganizationTurn(OrganizationContract):
     task_lease_token: UUID | None = None
     sequence: int = Field(strict=True, ge=1)
     user_message: str = Field(min_length=1, max_length=8_000)
+    reasoning_effort: OrganizationReasoningEffort = "off"
+    reasoning_history: dict[str, str] = Field(default_factory=dict, exclude=True)
     status: OrganizationTurnStatus = "queued"
     idempotency_key: str = Field(min_length=1, max_length=200)
     provider_result: dict[str, JsonValue] | None = None
@@ -90,6 +93,17 @@ class OrganizationTurn(OrganizationContract):
     lease_until: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    @field_serializer("provider_result")
+    def public_provider_result(self, value: dict[str, JsonValue] | None) -> dict[str, JsonValue] | None:
+        """Keep the receipt shape compatible while hiding private provider reasoning."""
+        def redact(item: JsonValue) -> JsonValue:
+            if isinstance(item, dict):
+                return {key: redact(child) for key, child in item.items() if key != "reasoning_content"}
+            if isinstance(item, list):
+                return [redact(child) for child in item]
+            return item
+        return {key: redact(child) for key, child in value.items() if key != "reasoning_content"} if value else value
 
 
 class OrganizationTask(OrganizationContract):
@@ -177,6 +191,7 @@ class OrganizationMessageRequest(OrganizationContract):
 
     message: str = Field(min_length=1, max_length=8_000)
     idempotency_key: str = Field(min_length=1, max_length=200)
+    reasoning_effort: OrganizationReasoningEffort = "off"
 
 
 class OrganizationTaskRequest(OrganizationContract):

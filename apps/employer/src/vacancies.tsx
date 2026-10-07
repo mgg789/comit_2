@@ -9,7 +9,7 @@ import type {
   SavedCard,
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
-import { Action, Field, Icon, PageTitle, Reveal, State } from "./ui";
+import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import "./vacancies.css";
 
 type Navigate = (path: string) => void;
@@ -53,22 +53,35 @@ export function Vacancies({
     return items;
   });
   const [filter, setFilter] = useState("all");
+  const [query, setQuery] = useState("");
   const items = resource.data || [];
   const matches = (draft: AgentsDraftView, name: string) =>
     !draft.archived && (name === "all" || draft.business_status === name);
-  const filtered = items.filter((draft) => matches(draft, filter));
+  const filtered = items.filter(
+    (draft) =>
+      matches(draft, filter) &&
+      `${draft.fields.title || ""} ${draft.fields.city || ""} ${draft.fields.bio || ""}`
+        .toLocaleLowerCase("ru")
+        .includes(query.trim().toLocaleLowerCase("ru")),
+  );
   return (
     <Reveal>
-      <PageTitle
-        title="Все вакансии"
-        back={() => {
-          window.location.href = "/";
-        }}
-      >
+      <PageTitle title="Все вакансии">
         <Action variant="primary" onClick={onCreate}>
           Добавить вакансию
           <Icon name="arrow" />
         </Action>
+        <label className="vacancy-search discovery-search">
+          <input
+            aria-label="Поиск по вакансиям"
+            placeholder="Поиск по вакансиям"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <span className="search-glyph">
+            <Icon name="search" />
+          </span>
+        </label>
       </PageTitle>
       <div
         className="vacancy-filters"
@@ -462,7 +475,7 @@ export function VacancyEditor({
                   maxLength={500}
                 />
                 <div className="form-row">
-                  <select
+                  <Select
                     aria-label="Специализация"
                     value={specialization}
                     onChange={(event) => {
@@ -477,7 +490,7 @@ export function VacancyEditor({
                         {classLabels[key]}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Action
                     type="button"
                     aria-expanded={skillsOpen}
@@ -492,7 +505,7 @@ export function VacancyEditor({
                 </div>
                 {skillsOpen && (
                   <div className="form-grid">
-                    <select
+                    <Select
                       aria-label="Добавить навык"
                       value=""
                       onChange={(event) => {
@@ -511,11 +524,11 @@ export function VacancyEditor({
                             {label}
                           </option>
                         ))}
-                    </select>
+                    </Select>
                     {Object.entries(skills).map(([key, level]) => (
                       <div className="form-row" key={key}>
                         <Field label={skillLabel(key)}>
-                          <select
+                          <Select
                             aria-label={`Требуемый уровень: ${skillLabel(key)}`}
                             value={level}
                             onChange={(event) => {
@@ -543,7 +556,7 @@ export function VacancyEditor({
                                         : ""}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                         </Field>
                         <Action
                           type="button"
@@ -594,7 +607,7 @@ export function VacancyEditor({
                   required
                 />
                 <div className="form-row">
-                  <select
+                  <Select
                     aria-label="Формат работы"
                     value={work}
                     onChange={(event) =>
@@ -606,7 +619,7 @@ export function VacancyEditor({
                         {label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <input
                     aria-label="График работы"
                     placeholder="График: 5/2"

@@ -377,6 +377,18 @@ small {
   font-family: var(--employer-logo);
   font-size: 32rem;
   line-height: 1;
+  transform: translateY(3rem);
+}
+.topbar.assistant-open {
+  z-index: auto;
+}
+.topbar.assistant-open .brand,
+.topbar.assistant-open .account-tools {
+  position: relative;
+  z-index: 70;
+}
+.topbar.assistant-open .account-menu {
+  z-index: 80;
 }
 .nav {
   position: absolute;
@@ -410,11 +422,19 @@ small {
 .nav-item.selected img {
   filter: brightness(0);
 }
+.nav-item:not(.selected) img {
+  filter: brightness(0) invert(0.68);
+}
+.icon-send {
+  transform: rotate(180deg);
+}
 .nav-item:hover {
-  transform: translateY(-3rem);
+  transform: translateY(-1rem);
 }
 .nav-label {
-  display: none;
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .nav-item.selected .nav-label {
   display: block;
@@ -496,6 +516,140 @@ small {
   margin-left: 12rem;
   min-height: 51rem;
   padding: 4rem 4rem 4rem 20rem;
+}
+.page-heading > :not(h1):not(.circle) {
+  transform: translateY(7rem);
+}
+.page-heading > .primary:hover {
+  transform: translateY(5rem);
+}
+.custom-select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.custom-select > .custom-select-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.custom-select-trigger {
+  width: 100%;
+  min-height: 66rem;
+  border: 1px solid transparent;
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  color: var(--comit-text);
+  padding: 18rem 20rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rem;
+  font-size: 20rem;
+}
+.custom-select-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-select-trigger .icon {
+  width: 18rem;
+  height: 18rem;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.custom-select-trigger[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+.custom-select-menu {
+  position: fixed;
+  z-index: 95;
+  border-radius: 27rem;
+  padding: 12rem 8rem;
+  background: var(--comit-text);
+  color: var(--employer-ink);
+  box-shadow: 0 12rem 48rem var(--employer-paint-0000006b);
+  overflow-y: auto;
+  outline: none;
+}
+.custom-select-caption {
+  padding: 8rem 12rem 12rem;
+  font-size: 18rem;
+  font-weight: 600;
+}
+.custom-select-menu > button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10rem;
+  width: 100%;
+  padding: 12rem;
+  border-radius: 15rem;
+  text-align: left;
+  font-size: 20rem;
+}
+.custom-select-menu > button.is-active {
+  background: var(--employer-blue);
+}
+.custom-select-check {
+  width: 20rem;
+  flex-shrink: 0;
+}
+.discovery-filters > .custom-select {
+  width: 210rem;
+}
+.discovery-filters > .custom-select:first-child {
+  width: 430rem;
+}
+.discovery-filters .custom-select-trigger {
+  background: var(--comit-text);
+  color: var(--employer-ink);
+}
+.discovery-filters .custom-select-trigger .icon {
+  filter: brightness(0);
+}
+.discovery-search {
+  transform-origin: left center;
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.page-heading > .discovery-search:focus-within {
+  transform: translateY(7rem) scale(1.045);
+  box-shadow: 0 10rem 28rem var(--employer-paint-0000006b);
+}
+.discovery-search input:focus {
+  outline: none;
+}
+.discovery-search button,
+.discovery-search .search-glyph {
+  transition: scale 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.discovery-search:focus-within button,
+.discovery-search:focus-within .search-glyph {
+  scale: 1.1;
+}
+.vacancy-search {
+  margin-left: auto;
+}
+.vacancy-search .search-glyph {
+  position: absolute;
+  right: 4rem;
+  top: 4rem;
+  width: 43rem;
+  height: 43rem;
+  border-radius: 50%;
+  background: var(--comit-text);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
 .vacancy-filters {
   display: grid;
@@ -701,6 +855,32 @@ small {
   border-radius: 30rem;
   padding: 28rem;
   color: var(--comit-text);
+}
+.modal.vacancy-editor {
+  width: 726rem;
+  max-width: calc(100vw - 144rem);
+}
+@media (max-width: 760px) {
+  .modal.vacancy-editor {
+    width: 100%;
+    max-width: none;
+  }
+  .discovery-filters > .custom-select,
+  .discovery-filters > .custom-select:first-child {
+    width: 100%;
+  }
+  .custom-select-trigger {
+    min-height: 46rem;
+    font-size: 16rem;
+    padding: 12rem 16rem;
+  }
+  .custom-select-menu > button {
+    min-height: 44rem;
+    font-size: 16rem;
+  }
+  .custom-select-caption {
+    font-size: 14rem;
+  }
 }
 .modal-close {
   position: absolute;
