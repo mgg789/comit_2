@@ -4,6 +4,11 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+  AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
+  AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
+  AgentsOrganizationContext, AgentsOrganizationMemory, AgentsOrganizationMemoryPatch,
+  AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
+  AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
   EmployerStatisticsQuery, EmployerStatistics,
   CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
@@ -29,6 +34,42 @@ export interface ApiClientOptions {
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  /** Resolve the sole global employer chat from the authenticated account. */
+  getOrganizationChat(): Promise<AgentsOrganizationChat>;
+  /** Page durable global messages after a server sequence, including background reports. */
+  getOrganizationMessages(afterSequence?: number, limit?: number): Promise<AgentsOrganizationMessagePage>;
+  /** Queue a model turn with a stable retry key; acceptance does not claim completion. */
+  sendOrganizationMessage(body: AgentsOrganizationMessageRequest): Promise<AgentsOrganizationTurn>;
+  /** Poll a queued turn under the employer session. */
+  getOrganizationTurn(turnId: string): Promise<AgentsOrganizationTurn>;
+  /** List explicit candidate-chat delegations for this employer. */
+  getOrganizationTasks(): Promise<AgentsOrganizationTask[]>;
+  /** Authorize a bounded background task through the employer session. */
+  createOrganizationTask(body: AgentsOrganizationTaskRequest): Promise<AgentsOrganizationTask>;
+  /** Revoke a candidate-chat delegation; subsequent sends must recheck the stopped state. */
+  stopOrganizationTask(taskId: string): Promise<AgentsOrganizationTask>;
+  /** Resume paused negotiation using employer-confirmed intervals. */
+  setOrganizationTaskAvailability(taskId: string, body: AgentsTaskAvailabilityRequest): Promise<AgentsOrganizationTask>;
+  /** Read unanswered durable questions from background conversations. */
+  getOrganizationPendingAnswers(): Promise<AgentsPendingAnswer[]>;
+  /** Record a question answer through the owner session. */
+  answerOrganizationQuestion(answerId: string, body: AgentsPendingAnswerRequest): Promise<AgentsPendingAnswer>;
+  /** Heartbeat actual platform presence; provider offline is a separate state. */
+  setOrganizationPresence(present: boolean): Promise<AgentsOrganizationChat>;
+  /** Read rolling seven-day actual spend and unresolved reservations in micro-USD. */
+  getOrganizationBudget(): Promise<AgentsOrganizationBudget>;
+  /** Read compact current task state without replacing durable history. */
+  getOrganizationContext(): Promise<AgentsOrganizationContext>;
+  /** Read general employer memory kept separately from current task state. */
+  getOrganizationMemory(): Promise<AgentsOrganizationMemory>;
+  /** Update memory with the revision read by the caller. */
+  patchOrganizationMemory(body: AgentsOrganizationMemoryPatch): Promise<AgentsOrganizationMemory>;
+  /** Store one private UTF-8 TXT/MD or unencrypted PDF attachment. */
+  uploadOrganizationDocument(body: AgentsDocumentUpload): Promise<AgentsDocumentView>;
+  /** Read a bounded page of extracted private document text. */
+  readOrganizationDocument(documentId: string, offset?: number, limit?: number): Promise<AgentsDocumentText>;
+  /** Download original bytes only through the owner-authenticated gateway. */
+  downloadOrganizationDocument(documentId: string): Promise<AgentsDocumentDownload>;
   /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
   getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
   /** Queue a role-bound code; the receipt never contains the OTP. */
@@ -208,6 +249,24 @@ export function createApiClient({
   }
 
   return {
+    getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
+    getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),
+    sendOrganizationMessage: body => request("POST", "/employer/organization-agent/messages", body),
+    getOrganizationTurn: turnId => request("GET", `/employer/organization-agent/turns/${encodeURIComponent(turnId)}`),
+    getOrganizationTasks: () => request("GET", "/employer/organization-agent/tasks"),
+    createOrganizationTask: body => request("POST", "/employer/organization-agent/tasks", body),
+    stopOrganizationTask: taskId => request("DELETE", `/employer/organization-agent/tasks/${encodeURIComponent(taskId)}`),
+    setOrganizationTaskAvailability: (taskId, body) => request("POST", `/employer/organization-agent/tasks/${encodeURIComponent(taskId)}/availability`, body),
+    getOrganizationPendingAnswers: () => request("GET", "/employer/organization-agent/pending-answers"),
+    answerOrganizationQuestion: (answerId, body) => request("POST", `/employer/organization-agent/pending-answers/${encodeURIComponent(answerId)}`, body),
+    setOrganizationPresence: present => request("POST", "/employer/organization-agent/presence", { present }),
+    getOrganizationBudget: () => request("GET", "/employer/organization-agent/budget"),
+    getOrganizationContext: () => request("GET", "/employer/organization-agent/context"),
+    getOrganizationMemory: () => request("GET", "/employer/organization-agent/memory"),
+    patchOrganizationMemory: body => request("PATCH", "/employer/organization-agent/memory", body),
+    uploadOrganizationDocument: body => request("POST", "/employer/organization-agent/documents", body),
+    readOrganizationDocument: (documentId, offset = 0, limit = 8000) => request("GET", `/employer/organization-agent/documents/${encodeURIComponent(documentId)}?offset=${offset}&limit=${limit}`),
+    downloadOrganizationDocument: documentId => request("GET", `/employer/organization-agent/documents/${encodeURIComponent(documentId)}/download`),
     getEmployerStatistics: (query = {}) => {
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);

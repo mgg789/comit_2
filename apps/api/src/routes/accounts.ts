@@ -18,6 +18,14 @@ function refs(value: Schema, namespace: string): Schema {
   return value;
 }
 
+/** Query values arrive as strings because coercion is deliberately disabled at the API boundary. */
+function numericQuerySchema(value: Schema): Schema {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  if (value.type === "integer") return { type: "string", pattern: "^-?(?:0|[1-9][0-9]*)$" };
+  if (Array.isArray(value.anyOf)) return { ...value, anyOf: value.anyOf.map(numericQuerySchema) };
+  return value;
+}
+
 /** Dependencies are injectable for ownership/transport tests; production uses private service configuration. */
 export interface AccountGatewayOptions extends AuthOptions {
   agentsUrl?: string;
@@ -58,24 +66,27 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   for (const [path, methods] of Object.entries(agentsSpec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post", "patch", "delete"].includes(method)) continue;
+      if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
-        responses: { "200"?: { content?: { "application/json"?: { schema: Schema } } } } };
+        responses: Record<string, { content?: { "application/json"?: { schema: Schema } } }> };
       const params = operation.parameters?.filter(value => value.in === "path") ?? [];
       const queries = operation.parameters?.filter(value => value.in === "query") ?? [];
-      const response = operation.responses["200"]?.content?.["application/json"]?.schema;
+      const responses = Object.fromEntries(Object.entries(operation.responses)
+        .filter(([status, definition]) => ["200", "202"].includes(status) && definition.content?.["application/json"]?.schema)
+        .map(([status, definition]) => [status, refs(definition.content!["application/json"]!.schema, "agents")]));
       app.route({ method: method.toUpperCase() as HTTPMethods,
         url: path.replace("/internal/", "/employer/").replace(/\{([^}]+)\}/g, ":$1"),
+        ...(path === "/internal/organization-agent/documents" && method === "post" ? { bodyLimit: 7 * 1024 * 1024 } : {}),
         schema: { tags: ["employer-account"], security: [{ bearerAuth: [] }, { employerSession: [] }],
           ...(params.length ? { params: { type: "object", required: params.map(value => value.name),
             properties: Object.fromEntries(params.map(value => [value.name, refs(value.schema, "agents")])) } } : {}),
           ...(operation.requestBody ? { body: refs(operation.requestBody.content["application/json"].schema, "agents") } : {}),
           ...(queries.length ? { querystring: { type: "object", additionalProperties: false, properties: Object.fromEntries(queries.map(value => [value.name,
-            value.name === "limit" ? { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
+            value.name === "limit" && !path.startsWith("/internal/organization-agent") ? { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
               : value.name === "offset" ? { type: "string", pattern: "^(?:0|[1-9][0-9]{0,5}|1000000)$" }
-                : refs(value.schema, "agents")])) } } : {}),
-          ...(response ? { response: { 200: refs(response, "agents") } } : {}) },
+                : numericQuerySchema(refs(value.schema, "agents"))])) } } : {}),
+          ...(Object.keys(responses).length ? { response: responses } : {}) },
         onRequest: guard("employer"),
         handler: async (request, reply) => {
           const identity = identities.get(request);

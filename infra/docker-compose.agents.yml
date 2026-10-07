@@ -21,6 +21,15 @@ services:
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ORGANIZATION_API_URL: http://api:8080
+      AGENT_INPUT_USD_PER_MILLION: ${AGENT_INPUT_USD_PER_MILLION:-0.2}
+      AGENT_OUTPUT_USD_PER_MILLION: ${AGENT_OUTPUT_USD_PER_MILLION:-0.7}
+      AGENT_CACHED_INPUT_USD_PER_MILLION: ${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}
+      JEV_API_URL: ${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}
+      JEV_MODEL: ${JEV_MODEL:-kev-latest}
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      JEV_INPUT_USD_PER_MILLION: ${JEV_INPUT_USD_PER_MILLION:-0.042}
+      JEV_OUTPUT_USD_PER_MILLION: ${JEV_OUTPUT_USD_PER_MILLION:-0}
     depends_on:
       agents-migrate:
         condition: service_completed_successfully
@@ -42,6 +51,17 @@ services:
       context: ..
       dockerfile: infra/agents-service.Dockerfile
     command: ["python", "-m", "agents_service", "worker"]
+    environment: *agents-env
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  organization-agent-worker:
+    build:
+      context: ..
+      dockerfile: infra/agents-service.Dockerfile
+    command: ["python", "-m", "agents_service", "organization-worker"]
     environment: *agents-env
     depends_on:
       agents-migrate:
