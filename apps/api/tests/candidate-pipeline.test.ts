@@ -105,7 +105,7 @@ test("vacancy ready page uses the static route and anonymous intake never reache
   assert.equal((await app.inject({ method: "PUT", url: "/internal/vacancies/00000000-0000-4000-8000-000000000001", payload: {} })).statusCode, 401);
   const result = await app.inject({ method: "GET", url: "/internal/vacancies/ready", headers: { "x-internal-token": "synthetic-test-token" } });
   assert.equal(result.statusCode, 200);
-  assert.deepEqual(result.json(), { items: [], limit: 100, offset: 0 });
+  assert.deepEqual(result.json(), { items: [], limit: 100, offset: 0, has_more: false });
   assert.equal(calls, 1);
   await app.close();
 });

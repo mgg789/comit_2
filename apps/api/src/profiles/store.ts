@@ -1,12 +1,15 @@
 /** Candidate-owned source profile store and its transactional projection outbox. */
-import { createHash, randomUUID } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
   CandidateClaimEvidence,
+  ClaimStatus,
   CandidateProfileFields,
   CandidateProfileMutation,
   CandidateProfileView,
   CandidateProjectionDelivery,
+  CandidateVerificationDocument,
+  CandidateVerificationDocumentUpload,
   JsonValue,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
@@ -26,7 +29,7 @@ const KEY = /^[a-z][a-z0-9_-]*$/;
 const FIELD_NAMES = new Set([
   "display_name", "phone", "city", "work_types", "relocation_ready", "relocation_cities", "salary",
   "primary_direction", "declared_grade", "domains", "stacks", "soft_skills", "description", "projects",
-  "experience", "achievements", "preferences",
+  "experience", "achievements", "preferences", "fsp_id", "fsp_claim_id",
 ]);
 const FORBIDDEN_NAMES = new Set([
   "id", "candidate_id", "email", "email_verified", "revision", "status", "evidence", "consent", "consents",
@@ -83,6 +86,19 @@ interface OutboxJobRow extends QueryResultRow {
   lease_until: Date | string;
 }
 
+interface DocumentRow extends QueryResultRow {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  status: "pending";
+  uploaded_at: Date | string;
+  claim_kind: "projects" | "experience" | "achievements";
+  claim_id: string;
+  nonce?: Buffer;
+  ciphertext?: Buffer;
+}
+
 /** A leased exact snapshot handed to the matching engine. */
 export interface ProfileProjectionJob {
   job_id: string;
@@ -106,6 +122,14 @@ function uuid(value: string): boolean {
   return UUID.test(value);
 }
 
+function stableClaimUuid(value: string): string {
+  const bytes = createHash("sha256").update(`fsp-claim:${value}`, "utf8").digest().subarray(0, 16);
+  bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x50;
+  bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function integer(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_SAFE_INTEGER;
 }
@@ -123,7 +147,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function normalizeNarratives(fields: CandidateProfileFields, current: CandidateProfileFields | null): CandidateProfileFields {
+function normalizeNarratives(fields: CandidateProfileFields, current: CandidateProfileFields | null, allowNewIds = false): CandidateProfileFields {
   const result = clone(fields);
   const seen = new Set<string>();
   const existing = new Map<string, string>();
@@ -134,7 +158,7 @@ function normalizeNarratives(fields: CandidateProfileFields, current: CandidateP
     result[group] = (result[group] ?? []).map(item => {
       const id = item.id ?? randomUUID();
       if (!uuid(id)) throw new ProfileError(422, "unknown_narrative_id");
-      if (item.id !== undefined && existing.get(id) !== group) throw new ProfileError(422, "unknown_narrative_id");
+      if (item.id !== undefined && !allowNewIds && existing.get(id) !== group) throw new ProfileError(422, "unknown_narrative_id");
       if (seen.has(id)) throw invalid("duplicate_narrative_id");
       seen.add(id);
       return { ...item, id };
@@ -170,6 +194,8 @@ function validateFields(value: unknown): asserts value is CandidateProfileFields
   if (fields.declared_grade !== undefined && fields.declared_grade !== null
     && !["intern", "junior", "middle", "senior"].includes(fields.declared_grade)) throw invalid("invalid_profile_fields");
   if (fields.description !== undefined && (typeof fields.description !== "string" || fields.description.length > 10000)) throw invalid("invalid_profile_fields");
+  if (fields.fsp_id !== undefined && fields.fsp_id !== null && (typeof fields.fsp_id !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(fields.fsp_id))) throw invalid("invalid_fsp_id");
+  if (fields.fsp_claim_id !== undefined && fields.fsp_claim_id !== null && (typeof fields.fsp_claim_id !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(fields.fsp_claim_id))) throw invalid("invalid_fsp_claim_id");
   if (fields.preferences !== undefined && (!arrayOfStrings(fields.preferences) || new Set(fields.preferences).size !== fields.preferences.length)) throw invalid("invalid_profile_fields");
   for (const group of SKILL_GROUPS) {
     const skills = fields[group];
@@ -269,6 +295,36 @@ function evidenceRows(fields: CandidateProfileFields, previous: Map<string, Evid
     }
     return { key, inputHash, status: "self_reported", verifiedValue: null, provenance: [], checkedAt: null };
   });
+}
+
+function isFspImportedAchievement(row: EvidenceDbRow): boolean {
+  if (!row.evidence_key.startsWith("achievements:")) return false;
+  const value = row.verified_value;
+  return row.provenance.some(item => item.startsWith("fsp_hackathon_registry:"))
+    && jsonObject(value) && typeof value.id === "string";
+}
+
+/** Keep provider evidence across unrelated profile edits; a removed/changed bound URL invalidates it. */
+function externalEvidenceRows(fields: CandidateProfileFields, previous: Map<string, EvidenceDbRow>): Array<{
+  key: string; inputHash: string; status: string; verifiedValue: JsonValue | null; provenance: string[]; checkedAt: Date | string | null;
+}> {
+  return [...previous.values()].filter(row => {
+    if (!row.evidence_key.startsWith("external:")) return false;
+    if (row.evidence_key.startsWith("external:fsp:")) {
+      const subject = row.evidence_key.slice("external:fsp:".length).split(":");
+      return subject[0] === fields.fsp_id && (!subject[1] || subject[1] === fields.fsp_claim_id);
+    }
+    if (row.evidence_key.startsWith("external:hh:")) return true;
+    const subject = row.evidence_key.slice("external:repository:".length);
+    const parts = subject.split(":");
+    if (parts.length !== 2 || !NARRATIVE_GROUPS.includes(parts[0] as typeof NARRATIVE_GROUPS[number])) return false;
+    const narrative = (fields[parts[0] as "projects" | "experience" | "achievements"] ?? []).find(item => item.id === parts[1]);
+    if (!narrative?.link || !narrative.description) return false;
+    const value = row.verified_value;
+    const verified = typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, JsonValue> : null;
+    return verified?.url === narrative.link && verified.contribution_narrative === narrative.description;
+  }).map(row => ({ key: row.evidence_key, inputHash: row.input_hash, status: row.status,
+    verifiedValue: row.verified_value, provenance: row.provenance, checkedAt: row.checked_at }));
 }
 
 async function accountFor(client: PoolClient, accountId: string, lock = true): Promise<AccountRow> {
@@ -383,6 +439,7 @@ export class CandidateProfileStore {
   public async save(accountId: string, mutation: CandidateProfileMutation, replace = false): Promise<CandidateProfileView> {
     if (!integer(mutation?.expected_revision)) throw invalid("invalid_profile_revision");
     validateFields(mutation?.fields);
+    if (Object.prototype.hasOwnProperty.call(mutation.fields, "fsp_id") || Object.prototype.hasOwnProperty.call(mutation.fields, "fsp_claim_id")) throw invalid("server_managed_field");
     const hasConsent = mutation.consent !== undefined;
     if (hasConsent) validateConsent(mutation.consent);
     return transaction(this.pool, async client => {
@@ -423,9 +480,13 @@ export class CandidateProfileStore {
       );
       const profile = inserted.rows[0];
       if (!profile) throw new Error("profile insert returned no row");
-      const previous = new Map((current ? await evidenceFor(client, accountId) : []).map(row => [row.evidence_key, row]));
+      const previousRows = current ? await evidenceFor(client, accountId) : [];
+      const bindingChanged = current?.fields.fsp_id !== fields.fsp_id || current?.fields.fsp_claim_id !== fields.fsp_claim_id;
+      const previous = new Map((bindingChanged ? previousRows.filter(row => !isFspImportedAchievement(row)) : previousRows)
+        .map(row => [row.evidence_key, row]));
       await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id = $1", [accountId]);
-      for (const row of evidenceRows(fields, previous)) {
+      const rows = [...evidenceRows(fields, previous), ...externalEvidenceRows(fields, previous)];
+      for (const row of rows) {
         await client.query(
           `INSERT INTO candidate_profile_evidence(candidate_id, evidence_key, input_hash, status, verified_value, provenance, checked_at)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,
@@ -439,6 +500,253 @@ export class CandidateProfileStore {
       const currentEvidence = await evidenceFor(client, accountId);
       await enqueue(client, account, profile, currentEvidence);
       return viewInTransaction(client, accountId, account, profile);
+    });
+  }
+
+  /** Bind a provider response to the current canonical input and reproject it atomically.
+   * Revisions advance so a later edit cannot leave a stale matching snapshot acknowledged.
+   */
+  public async applyVerification(accountId: string, expectedRevision: number, evidenceKey: string, input: unknown, binding: {
+    kind: "fsp" | "repository" | "hh"; subject: string; claim_id?: string; claim_kind?: "projects" | "experience" | "achievements"; url?: string; narrative?: string;
+  }, result: {
+    status: ClaimStatus; verified_value: JsonValue | null; provenance: string[]; checked_at?: string | null;
+  }): Promise<CandidateProfileView> {
+    if (!/^external:(fsp|repository|hh):.{1,2000}$/.test(evidenceKey)) throw invalid("invalid_verification_key");
+    if (!Array.isArray(result.provenance) || result.provenance.some(value => typeof value !== "string" || value.length > 1000)) throw invalid("invalid_verification_result");
+    const inputHash = createHash("sha256").update(canonicalJson(input), "utf8").digest("hex");
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, accountId);
+      const current = await profileRow(client, accountId, true);
+      if (!current) throw new ProfileError(404, "profile_not_found");
+      if (Number(current.revision) !== expectedRevision) throw conflict("profile_revision_conflict");
+      if (binding.kind === "fsp" && (current.fields.fsp_id !== binding.subject || (binding.claim_id && current.fields.fsp_claim_id !== binding.claim_id))) throw conflict("fsp_claim_not_current");
+      if (binding.kind === "repository") {
+        if (!binding.claim_id || !binding.url || !binding.narrative) throw invalid("repository_claim_required");
+        const narrative = (current.fields[binding.subject as "projects" | "experience" | "achievements"] ?? []).find(item => item.id === binding.claim_id);
+        if (!narrative || narrative.link !== binding.url || narrative.description !== binding.narrative) throw conflict("repository_claim_not_current");
+      }
+      if (binding.kind === "hh") {
+        if (binding.claim_kind !== "experience" || !binding.claim_id) throw invalid("hh_claim_required");
+        const narrative = (current.fields.experience ?? []).find(item => item.id === binding.claim_id);
+        const verified = result.verified_value;
+        const entries = verified && typeof verified === "object" && !Array.isArray(verified)
+          ? (verified as { experience?: unknown }).experience : undefined;
+        const matches = narrative && Array.isArray(entries) && entries.some(item => item && typeof item === "object"
+          && (item as { title?: unknown }).title === narrative.title
+          && (narrative.organization === undefined || narrative.organization === null || (item as { company?: unknown }).company === narrative.organization));
+        if (!matches) throw conflict("hh_experience_not_found");
+      }
+      const previous = await evidenceFor(client, accountId);
+      const evidence = new Map(previous.map(row => [row.evidence_key, row]));
+      evidence.set(evidenceKey, { evidence_key: evidenceKey, input_hash: inputHash, status: result.status,
+        verified_value: result.verified_value, provenance: result.provenance,
+        checked_at: result.checked_at ?? new Date().toISOString() });
+      await client.query(
+        `INSERT INTO candidate_verification_ledger(id,candidate_id,evidence_key,input_hash,status,verified_value,provenance)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)`,
+        [randomUUID(), accountId, evidenceKey, inputHash, result.status,
+          result.verified_value === null ? null : JSON.stringify(result.verified_value), JSON.stringify(result.provenance)],
+      );
+      const revision = Number(current.revision) + 1;
+      const updated = await client.query<ProfileRow>(
+        `UPDATE candidate_profiles SET revision=$2, updated_at=now() WHERE candidate_id=$1
+         RETURNING candidate_id, revision, fields, processing_consent, pool_consent, training_consent,
+           training_consent_version, training_consent_accepted_at, consent_version, consent_accepted_at, updated_at`,
+        [accountId, revision],
+      );
+      const profile = updated.rows[0];
+      if (!profile) throw new Error("verification profile update returned no row");
+      await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id=$1", [accountId]);
+      for (const row of evidence.values()) await client.query(
+        `INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
+        [accountId, row.evidence_key, row.input_hash, row.status, row.verified_value === null ? null : JSON.stringify(row.verified_value), JSON.stringify(row.provenance), row.checked_at],
+      );
+      await client.query(
+        `UPDATE candidate_profile_outbox SET state='obsolete',lease_token=NULL,lease_until=NULL,updated_at=now()
+         WHERE candidate_id=$1 AND state IN ('queued','processing','retrying','failed')`, [accountId]);
+      await enqueue(client, account, profile, await evidenceFor(client, accountId));
+      return viewInTransaction(client, accountId, account, profile);
+    });
+  }
+
+  /** Start a candidate-bound, short-lived synthetic FSP authorization state. */
+  public async startFspDemoAuthorization(accountId: string, expectedRevision: number, fixtureId: "fsp-001" | "fsp-002"): Promise<{ state: string; expires_at: string }> {
+    if (!integer(expectedRevision) || expectedRevision < 1) throw invalid("invalid_profile_revision");
+    return transaction(this.pool, async client => {
+      await accountFor(client, accountId);
+      await client.query(`WITH expired AS (SELECT id FROM candidate_fsp_demo_auth_states WHERE expires_at < now() LIMIT 4096)
+        DELETE FROM candidate_fsp_demo_auth_states WHERE id IN (SELECT id FROM expired)`);
+      const profile = await profileRow(client, accountId, true);
+      if (!profile || Number(profile.revision) !== expectedRevision) throw conflict("profile_revision_conflict");
+      const state = randomBytes(32).toString("base64url");
+      const expires = new Date(Date.now() + 120_000);
+      await client.query(
+        `INSERT INTO candidate_fsp_demo_auth_states(id,candidate_id,state_hash,expected_revision,fixture_id,expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6)`, [randomUUID(), accountId, createHash("sha256").update(state, "utf8").digest("hex"), expectedRevision, fixtureId, expires],
+      );
+      return { state, expires_at: expires.toISOString() };
+    });
+  }
+
+  /** Check a callback state before any provider code is consumed. */
+  public async assertFspDemoState(accountId: string, expectedRevision: number, state: string): Promise<"fsp-001" | "fsp-002"> {
+    const stateHash = createHash("sha256").update(state, "utf8").digest("hex");
+    return transaction(this.pool, async client => {
+      await accountFor(client, accountId, false);
+      const row = (await client.query<{ fixture_id: "fsp-001" | "fsp-002"; expected_revision: number | string; expires_at: Date | string; used_at: Date | string | null }>(
+        `SELECT fixture_id,expected_revision,expires_at,used_at FROM candidate_fsp_demo_auth_states WHERE candidate_id=$1 AND state_hash=$2`, [accountId, stateHash])).rows[0];
+      if (!row || row.used_at || Number(row.expected_revision) !== expectedRevision || new Date(row.expires_at).getTime() <= Date.now()) throw conflict("demo_state_invalid_or_replayed");
+      return row.fixture_id;
+    });
+  }
+
+  /** Consume one candidate-bound demo code and import all registry achievements atomically. */
+  public async completeFspDemoAuthorization(accountId: string, expectedRevision: number, state: string, participant: unknown): Promise<CandidateProfileView> {
+    if (!state || state.length > 256 || !jsonObject(participant)) throw invalid("invalid_demo_callback");
+    const fspId = participant.fsp_id;
+    const rank = participant.rank;
+    const rating = participant.rating;
+    const achievements = participant.achievements;
+    if (typeof fspId !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(fspId)
+      || typeof rank !== "string" || !Number.isSafeInteger(rating) || !Array.isArray(achievements) || achievements.length > 100) throw invalid("invalid_demo_provider_response");
+    const ratingValue = rating as number;
+    const providerVersion = typeof participant.provider_version === "string" && participant.provider_version.length <= 100
+      ? participant.provider_version : "unknown";
+    const imported = achievements.map(item => {
+      if (!jsonObject(item) || typeof item.claim_id !== "string" || !/^[A-Za-z0-9._:-]{1,120}$/.test(item.claim_id) || typeof item.title !== "string" || !item.title.trim()) throw invalid("invalid_demo_provider_response");
+      return { id: stableClaimUuid(item.claim_id), title: item.title.slice(0, 300), description: `ФСП: ${String(item.year ?? "")} место ${String(item.place ?? "")}`.slice(0, 10000), organization: "ФСП" };
+    });
+    const safeParticipant = { fsp_id: fspId, rank, rating: ratingValue, achievements: imported,
+      events: Array.isArray(participant.events) ? participant.events.slice(0, 50) : [],
+      certificates: Array.isArray(participant.certificates) ? participant.certificates.slice(0, 50) : [],
+      provider: "fsp_hackathon_registry", provider_version: providerVersion, imported_at: new Date().toISOString(),
+      demo_registry: true, ownership_proven: false };
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, accountId);
+      const stateHash = createHash("sha256").update(state, "utf8").digest("hex");
+      const authState = (await client.query<{ fixture_id: "fsp-001" | "fsp-002"; expected_revision: number | string; expires_at: Date | string; used_at: Date | string | null }>(
+        `SELECT fixture_id,expected_revision,expires_at,used_at FROM candidate_fsp_demo_auth_states
+         WHERE candidate_id=$1 AND state_hash=$2 FOR UPDATE`, [accountId, stateHash])).rows[0];
+      if (!authState || authState.used_at || new Date(authState.expires_at).getTime() <= Date.now()) throw conflict("demo_state_invalid_or_replayed");
+      if (Number(authState.expected_revision) !== expectedRevision) throw conflict("profile_revision_conflict");
+      if (authState.fixture_id !== fspId) throw conflict("demo_fixture_mismatch");
+      const current = await profileRow(client, accountId, true);
+      if (!current || Number(current.revision) !== expectedRevision) throw conflict("profile_revision_conflict");
+      const previous = await evidenceFor(client, accountId);
+      const providerAchievementIds = new Set(previous.filter(isFspImportedAchievement).map(row => row.evidence_key.slice("achievements:".length)));
+      const rawClaimId = achievements.length > 0 && jsonObject(achievements[0]) && typeof achievements[0].claim_id === "string" ? achievements[0].claim_id : null;
+      if (current.fields.fsp_id && current.fields.fsp_id !== fspId) throw conflict("fsp_relink_requires_unlink");
+      const fields = normalizeNarratives({ ...current.fields, fsp_id: fspId, fsp_claim_id: rawClaimId,
+        achievements: [...(current.fields.achievements ?? []).filter(item => !item.id || (!providerAchievementIds.has(item.id) && !imported.some(next => next.id === item.id))), ...imported] }, current.fields, true);
+      validateFields(fields);
+      await client.query(`UPDATE candidate_fsp_demo_auth_states SET used_at=now() WHERE state_hash=$1`, [stateHash]);
+      const revision = expectedRevision + 1;
+      const updated = await client.query<ProfileRow>(
+        `UPDATE candidate_profiles SET revision=$2,fields=$3::jsonb,updated_at=now() WHERE candidate_id=$1
+         RETURNING candidate_id,revision,fields,processing_consent,pool_consent,training_consent,training_consent_version,training_consent_accepted_at,consent_version,consent_accepted_at,updated_at`,
+        [accountId, revision, JSON.stringify(fields)]);
+      const profile = updated.rows[0];
+      if (!profile) throw new Error("demo profile update returned no row");
+      const retained = new Map(previous.filter(row => !row.evidence_key.startsWith("external:fsp:")).map(row => [row.evidence_key, row]));
+      const evidence = new Map(evidenceRows(fields, retained).map(row => [row.key, {
+        evidence_key: row.key, input_hash: row.inputHash, status: row.status, verified_value: row.verifiedValue,
+        provenance: row.provenance, checked_at: row.checkedAt,
+      }]));
+      for (const item of achievements) {
+        if (!jsonObject(item) || typeof item.claim_id !== "string") continue;
+        const importedId = stableClaimUuid(item.claim_id);
+        const claimKey = `achievements:${importedId}`;
+        const importedClaim = fields.achievements?.find(claim => claim.id === importedId);
+        const claimValue = importedClaim ? {
+          id: importedId, title: importedClaim.title, description: importedClaim.description ?? "", organization: importedClaim.organization ?? "ФСП",
+        } : { id: importedId, title: typeof item.title === "string" ? item.title : "", description: "", organization: "ФСП" };
+        evidence.set(claimKey, { evidence_key: claimKey,
+          input_hash: createHash("sha256").update(canonicalJson(fields.achievements?.find(claim => claim.id === importedId) ?? claimValue), "utf8").digest("hex"),
+          status: "confirmed", verified_value: claimValue, provenance: ["fsp_hackathon_registry:demo-2026-10"], checked_at: new Date().toISOString() });
+      }
+      const evidenceKey = `external:fsp:${fspId}${rawClaimId ? `:${rawClaimId}` : ""}`;
+      const inputHash = createHash("sha256").update(canonicalJson(safeParticipant), "utf8").digest("hex");
+      evidence.set(evidenceKey, { evidence_key: evidenceKey, input_hash: inputHash, status: "partial", verified_value: safeParticipant,
+        provenance: ["fsp_hackathon_registry:demo-2026-10"], checked_at: new Date().toISOString() });
+      await client.query(`INSERT INTO candidate_verification_ledger(id,candidate_id,evidence_key,input_hash,status,verified_value,provenance)
+        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb)`, [randomUUID(), accountId, evidenceKey, inputHash, "partial", JSON.stringify(safeParticipant), JSON.stringify(["fsp_hackathon_registry:demo-2026-10"])]);
+      await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id=$1", [accountId]);
+      for (const row of evidence.values()) await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+        VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`, [accountId,row.evidence_key,row.input_hash,row.status,row.verified_value===null?null:JSON.stringify(row.verified_value),JSON.stringify(row.provenance),row.checked_at]);
+      await client.query(`UPDATE candidate_profile_outbox SET state='obsolete',lease_token=NULL,lease_until=NULL,updated_at=now()
+        WHERE candidate_id=$1 AND state IN ('queued','processing','retrying','failed')`, [accountId]);
+      await enqueue(client, account, profile, await evidenceFor(client, accountId));
+      return viewInTransaction(client, accountId, account, profile);
+    });
+  }
+
+  /** Encrypt a candidate document at rest; upload creates pending metadata only. */
+  public async uploadVerificationDocument(accountId: string, upload: CandidateVerificationDocumentUpload, content: Buffer): Promise<CandidateVerificationDocument> {
+    if (!upload.filename || upload.filename.length > 255 || upload.filename === "." || upload.filename === ".."
+      || /[\\/\u0000-\u001f\u007f]/u.test(upload.filename) || !/^[\w.+-]+\/[\w.+-]+$/.test(upload.content_type)) throw invalid("invalid_document_metadata");
+    if (content.length < 1 || content.length > 10 * 1024 * 1024) throw invalid("invalid_document_size");
+    const secret = process.env.VERIFICATION_DOCUMENT_KEY;
+    if (!secret) throw new ProfileError(503, "document_encryption_unavailable");
+    const key = createHash("sha256").update(secret, "utf8").digest();
+    const nonce = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, nonce);
+    const ciphertext = Buffer.concat([cipher.update(content), cipher.final(), cipher.getAuthTag()]);
+    return transaction(this.pool, async client => {
+      await accountFor(client, accountId);
+      const profile = await profileRow(client, accountId);
+      if (!profile) throw new ProfileError(404, "profile_not_found");
+      const claims = profile.fields[upload.claim_kind] ?? [];
+      const claim = claims.find(item => item.id === upload.claim_id);
+      if (!claim) throw conflict("document_claim_not_current");
+      const id = randomUUID();
+      const row = await client.query<DocumentRow>(
+        `INSERT INTO candidate_verification_documents(id,candidate_id,filename,content_type,size_bytes,nonce,ciphertext,claim_kind,claim_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,filename,content_type,size_bytes,status,uploaded_at,claim_kind,claim_id`,
+        [id, accountId, upload.filename, upload.content_type, content.length, nonce, ciphertext, upload.claim_kind, upload.claim_id],
+      );
+      const saved = row.rows[0];
+      if (!saved) throw new Error("document insert returned no row");
+      return { id: saved.id, filename: saved.filename, content_type: saved.content_type, size_bytes: saved.size_bytes,
+        status: saved.status, claim_kind: saved.claim_kind, claim_id: saved.claim_id,
+        uploaded_at: projectionTimestamp(saved.uploaded_at) ?? new Date(0).toISOString() };
+    });
+  }
+
+  /** List owned uploads; no ciphertext or automatic evidence is exposed. */
+  public async verificationDocuments(accountId: string): Promise<CandidateVerificationDocument[]> {
+    return transaction(this.pool, async client => {
+      await accountFor(client, accountId, false);
+      const rows = await client.query<DocumentRow>(
+        `SELECT id,filename,content_type,size_bytes,status,uploaded_at,claim_kind,claim_id FROM candidate_verification_documents
+         WHERE candidate_id=$1 ORDER BY uploaded_at DESC`, [accountId]);
+      return rows.rows.map(row => ({ id: row.id, filename: row.filename, content_type: row.content_type,
+        size_bytes: row.size_bytes, status: row.status, claim_kind: row.claim_kind, claim_id: row.claim_id,
+        uploaded_at: projectionTimestamp(row.uploaded_at) ?? new Date(0).toISOString() }));
+    });
+  }
+
+  /** Download one owned encrypted document; pending status is preserved. */
+  public async downloadVerificationDocument(accountId: string, documentId: string): Promise<{ filename: string; content_type: string; content: Buffer }> {
+    if (!uuid(documentId)) throw invalid("invalid_document_id");
+    const secret = process.env.VERIFICATION_DOCUMENT_KEY;
+    if (!secret) throw new ProfileError(503, "document_encryption_unavailable");
+    const key = createHash("sha256").update(secret, "utf8").digest();
+    return transaction(this.pool, async client => {
+      await accountFor(client, accountId, false);
+      const row = (await client.query<DocumentRow>(
+        `SELECT filename,content_type,nonce,ciphertext FROM candidate_verification_documents WHERE id=$1 AND candidate_id=$2`,
+        [documentId, accountId],
+      )).rows[0];
+      if (!row || !row.nonce || !row.ciphertext) throw new ProfileError(404, "document_not_found");
+      if (row.nonce.length !== 12 || row.ciphertext.length < 16) throw new ProfileError(503, "document_ciphertext_invalid");
+      try {
+        const decipher = createDecipheriv("aes-256-gcm", key, row.nonce);
+        const tag = row.ciphertext.subarray(row.ciphertext.length - 16);
+        decipher.setAuthTag(tag);
+        const content = Buffer.concat([decipher.update(row.ciphertext.subarray(0, -16)), decipher.final()]);
+        return { filename: row.filename, content_type: row.content_type, content };
+      } catch { throw new ProfileError(503, "document_decryption_failed"); }
     });
   }
 

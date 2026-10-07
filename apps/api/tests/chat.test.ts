@@ -15,6 +15,7 @@ import { ProfileStore } from "../src/profiles/store.js";
 import { RecruitmentStore } from "../src/recruitment/store.js";
 import { chatConfiguration, chatRoutes } from "../src/routes/chat.js";
 import { authRoutes } from "../src/routes/auth.js";
+import { createApiClient } from "../../../packages/api-client/src/index.js";
 
 test("chat configuration fails closed without valid private credentials", () => {
   assert.equal(chatConfiguration({}), null);
@@ -153,6 +154,24 @@ test("invitation chat: two authenticated participants, files, polling, retries, 
     assert.equal(download.statusCode, 200, download.body);
     assert.deepEqual(Buffer.from(download.json<DownloadChatFile>().data_base64, "base64"), bytes);
     assert.equal(download.json<DownloadChatFile>().name, "cv.txt");
+    // Exercise the actual QGramm event journal through public authenticated SSE.
+    const streaming = createApiClient({ baseUrl, getAuthToken: () => candidate.token });
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 5000);
+    let fileEvent = false, lastSequence = 0;
+    try {
+      await streaming.streamChatEvents("candidate", id, event => {
+        assert.ok(event.sequence > lastSequence);
+        lastSequence = event.sequence;
+        if (event.type === "message.created" && event.message.files.some(item => item.id === file.id)) {
+          fileEvent = true;
+          controller.abort();
+        }
+      }, { signal: controller.signal });
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+    } finally { clearTimeout(deadline); controller.abort(); }
+    assert.ok(fileEvent, "encrypted attachment message must arrive through the durable SSE journal");
     assert.equal((await http({ url: `/candidate/recruitment/${anotherProcess}/chat/files/${file.id}`, headers: candidate.headers })).statusCode, 404, "same participants cannot read a different invitation's file");
     assert.equal((await http({ method: "POST", url: `/employer/recruitment/${anotherProcess}/chat/messages`, headers: owner.headers,
       payload: { idempotency_key: randomUUID(), text: "wrong process", files: [file] } })).statusCode, 404);

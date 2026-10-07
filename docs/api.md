@@ -463,3 +463,6 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 [Документы для тестового контура](legal/README.md).
 
 [Проверка кандидатского backend и воспроизведение результатов](candidate-backend-audit.md).
+# Внешняя верификация
+
+Кандидатские `POST /candidate/profile/verifications/fsp`, `/repository` и `/hh` требуют authenticated candidate session и CAS `expected_revision`; account id не передаётся provider-сервису. Demo FSP flow: `POST /candidate/profile/fsp/demo/authorize` → GET/POST integration `/fsp/demo/authorize` → `POST /candidate/profile/fsp/demo/callback`; state candidate-bound, 120 секунд, callback allowlist и code одноразовые. Callback bulk-upsert-ит fixture achievements и binding `fsp_id`/`fsp_claim_id`. Account identity и ownership не выводятся из demo registry. Facts возвращаются в private profile view и доставляются matching через source outbox. Контракт провайдеров и деградация HH описаны в [verification.md](verification.md).

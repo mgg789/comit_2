@@ -10,6 +10,8 @@ export interface SkillFilter { key: string; min_level?: number; statuses?: Claim
 export interface SkillGroups { domains?: SkillFilter[]; stacks?: SkillFilter[]; soft_skills?: SkillFilter[]; }
 /** Inclusive salary overlap, explicit working conditions and public classification filters. */
 export interface SearchFilters {
+  /** Optional canonical open vacancy UUID; ownership is checked before applying its strict filters. */
+  vacancy_id?: string | null;
   classes?: Specialization[]; grades?: Grade[]; cities?: string[];
   salary?: { from_rub: number; to_rub: number } | null;
   work_types?: VacancyWorkType[]; relocation_ready?: boolean | null; groups?: SkillGroups;

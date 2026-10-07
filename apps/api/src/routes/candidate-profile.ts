@@ -5,6 +5,7 @@ import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { ProfileStore } from "../profiles/store.js";
 import { candidateProfileMutationSchema, candidateProfileViewSchema } from "../profiles/schemas.js";
+import { candidateVerificationRoutes } from "./candidate-verification.js";
 
 /** Shared auth and database boundaries are injected; the browser cannot choose a profile owner. */
 export interface CandidateProfileOptions extends AuthOptions { profiles: ProfileStore }
@@ -60,6 +61,7 @@ export async function candidateProfileRoutes(app: FastifyInstance, options: Cand
     try { return reply.header("cache-control", "no-store").send(await options.profiles.retry(identity.accountId)); }
     catch (error) { return failure(reply, error); }
   });
+  await candidateVerificationRoutes(app, options);
 }
 
 function failure(reply: FastifyReply, error: unknown): FastifyReply {

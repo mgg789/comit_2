@@ -23,6 +23,40 @@ type testServer struct {
 	configPath string
 }
 
+func TestEventsReplayAuthorizedMessageAndResume(t *testing.T) {
+	ts := newTestServer(t)
+	var sent Message
+	in := sendInput{contextInput: ts.c, IdempotencyKey: uuid.NewString(), Text: "event replay fixture", Files: []File{}}
+	if ts.call(t, "/internal/chat/send", in, string(ts.b.serviceToken), &sent) != 200 {
+		t.Fatal("send failed")
+	}
+	var page struct {
+		Events       []ChatEvent `json:"events"`
+		NextSequence int64       `json:"next_sequence"`
+	}
+	context := ts.c
+	context.ActorID = context.CandidateID
+	if ts.call(t, "/internal/chat/events", historyInput{contextInput: context, Limit: 100}, string(ts.b.serviceToken), &page) != 200 {
+		t.Fatal("events failed")
+	}
+	found := false
+	for _, event := range page.Events {
+		if event.Type == "message.created" && event.Message != nil && event.Message.ID == sent.ID {
+			found = event.Message.Text == in.Text
+		}
+	}
+	if !found {
+		t.Fatal("authorized message absent")
+	}
+	if ts.call(t, "/internal/chat/events", historyInput{contextInput: context, AfterSequence: page.NextSequence, Limit: 100}, string(ts.b.serviceToken), &page) != 200 || len(page.Events) != 0 {
+		t.Fatal("resume replayed events")
+	}
+	context.ActorID = "outsider"
+	if ts.call(t, "/internal/chat/events", historyInput{contextInput: context, Limit: 100}, string(ts.b.serviceToken), nil) != 403 {
+		t.Fatal("outsider access")
+	}
+}
+
 func newTestServer(t *testing.T) *testServer {
 	t.Helper()
 	dir := t.TempDir()

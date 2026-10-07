@@ -7,7 +7,8 @@
 export type {
   CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
   CandidateProfileFields, CandidateProfileConsentInput, CandidateProfileMutation,
-  CandidateClaimEvidence, CandidateProjectionDelivery, CandidateProfileView,
+  CandidateClaimEvidence, CandidateExternalEvidence, CandidateProjectionDelivery, CandidateProfileView,
+  CandidateVerificationRequest, CandidateVerificationDocument, CandidateVerificationDocumentUpload,
 } from "./candidate-profile.js";
 export type {
   CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,

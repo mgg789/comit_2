@@ -24,7 +24,7 @@ smoke:
 
 ## Full Python regression suite; export PIPELINE_TEST_DATABASE_URL to include PostgreSQL-backed tests
 regression:
-	pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q
+	pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests services/verification-engine/tests -q
 
 ## Regenerate the scoring golden snapshot after an intended scoring change (explain the diff in the commit)
 regression-golden-update:

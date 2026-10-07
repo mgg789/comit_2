@@ -2,6 +2,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, HTTPMethods } from "fastify";
 import spec from "../contracts/agents.openapi.json" with { type: "json" };
+import { correlatedFetch } from "../operations/index.js";
 
 /** Injectable HTTP transport for isolated protocol tests. */
 export interface AgentsGatewayOptions {
@@ -27,7 +28,7 @@ function schema(value: JsonSchemaValue): JsonSchemaValue {
 export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayOptions = {}): Promise<void> {
   const token = options.token ?? process.env.AGENTS_SERVICE_TOKEN;
   const base = options.serviceUrl ?? process.env.AGENTS_SERVICE_URL ?? "http://agents-service:8104";
-  const transport = options.transport ?? fetch;
+  const transport = correlatedFetch(options.transport ?? fetch);
   for (const [name, value] of Object.entries(spec.components.schemas)) {
     const transformed = schema(value);
     if (transformed !== null && typeof transformed === "object" && !Array.isArray(transformed)) {
@@ -37,7 +38,7 @@ export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayO
   for (const [path, operations] of Object.entries(spec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, operation] of Object.entries(operations)) {
-      if (!["get", "post", "patch"].includes(method)) continue;
+      if (!["get", "post", "patch", "delete"].includes(method)) continue;
       const op = operation as {
         parameters?: Array<{ name: string; in: string; required?: boolean; schema: JsonSchemaValue }>;
         requestBody?: { content: { "application/json": { schema: JsonSchemaValue } } };
@@ -47,7 +48,8 @@ export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayO
       const params = op.parameters?.filter(parameter => parameter.in === "path") ?? [];
       app.route({
         method: method.toUpperCase() as HTTPMethods,
-        url: path.replace(/\{([^}]+)\}/g, ":$1"),
+        // Matching owns /internal/vacancies; editorial CRUD uses a distinct API namespace.
+        url: path.replace(/^\/internal\/vacancies(?=\/|$)/, "/internal/agents/vacancies").replace(/\{([^}]+)\}/g, ":$1"),
         schema: {
           tags: ["agents"], security: [{ internalToken: [] }],
           ...(params.length ? { params: { type: "object", required: params.map(parameter => parameter.name),
@@ -71,7 +73,7 @@ export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayO
           try {
             const incoming = new URL(request.url, "http://gateway.invalid");
             const upstream = new URL(base);
-            upstream.pathname = incoming.pathname;
+            upstream.pathname = incoming.pathname.replace(/^\/internal\/agents\/vacancies(?=\/|$)/, "/internal/vacancies");
             upstream.search = incoming.search;
             const owner = request.headers["x-owner-id"];
             const result = await transport(upstream, {

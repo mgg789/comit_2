@@ -39,6 +39,16 @@ class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
+class CapabilityView(Contract):
+    """Optional provider availability; manual editing remains explicitly available."""
+
+    manual_editing: Literal[True]
+    agent: bool
+    enrichment: bool
+    fallback: Literal["manual_editing"]
+    disabled_code: Literal["agent_disabled_manual_available"]
+
+
 class SchemaCoordinate(Contract):
     """One immutable coordinate from the matching registry."""
 
@@ -206,6 +216,17 @@ class DraftView(Contract):
     missing_requirements: list[str] = Field(default_factory=list)
     summary: SummarySnapshot | None = None
     publication: PublicationView | None = None
+    business_status: Literal["draft", "open", "closed"] = "draft"
+    archived: bool = False
+
+
+class DraftPage(Contract):
+    """Owner-scoped keyset page ordered by immutable creation time and UUID."""
+
+    items: list[DraftView]
+    limit: int
+    has_more: bool
+    next_cursor: str | None = None
 
 
 class JobView(Contract):

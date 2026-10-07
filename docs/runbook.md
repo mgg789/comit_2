@@ -49,7 +49,7 @@ AUTH_ROUTE_TEST_DATABASE_URL='postgres://...' \
 ## Candidate source profile и projection worker
 
 Перед запуском API или worker примените API migration runner: он читает
-`apps/api/migrations/001_accounts.sql` и `002_candidate_profiles.sql` в
+все SQL-файлы из `apps/api/migrations/` в
 лексикографическом порядке, держит advisory lock и сохраняет SHA-256 checksum;
 изменение уже применённого SQL останавливает запуск.
 

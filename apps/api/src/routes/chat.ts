@@ -1,13 +1,18 @@
 /** Authenticate every chat call in Comit; private QGramm identities and credentials never reach clients. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AccountRole, SendChatMessage, UploadChatFile } from "@comit/shared";
+import type { AccountRole, ChatEventPage, SendChatMessage, UploadChatFile } from "@comit/shared";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { RecruitmentError } from "../recruitment/store.js";
 import type { RecruitmentOptions } from "./recruitment.js";
 import { chatPageSchema, chatMessageSchema, chatFileSchema, chatSendSchema, chatUploadSchema, chatDownloadSchema } from "../chat/schemas.js";
+import { correlatedFetch } from "../operations/index.js";
+import { serveStream, streamCursor } from "../chat/sse.js";
 
 /** Explicit optional chat wiring; missing configuration returns 503 without creating fake history. */
-export interface ChatOptions extends RecruitmentOptions { chatUrl?: string; chatToken?: string; chatTransport?: typeof fetch }
+export interface ChatOptions extends RecruitmentOptions {
+  chatUrl?: string; chatToken?: string; chatTransport?: typeof fetch;
+  streamLifetimeMs?: number; streamPollMs?: number;
+}
 
 /** Load a private HTTP(S) endpoint and sufficiently long token; malformed partial config fails closed. */
 export function chatConfiguration(env: NodeJS.ProcessEnv = process.env): { url: string; token: string } | null {
@@ -23,9 +28,31 @@ export function chatConfiguration(env: NodeJS.ProcessEnv = process.env): { url: 
 export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Promise<void> {
   const config = chatConfiguration();
   const chatUrl = options.chatUrl ?? config?.url, chatToken = options.chatToken ?? config?.token;
-  const transport = options.chatTransport ?? fetch;
+  const transport = correlatedFetch(options.chatTransport ?? fetch);
   // Production shares a ten-connection pool with accounts/profiles: chat may retain at most three clients.
   let activeOperations = 0;
+  const streams = new Map<string, number>();
+  const enterStream = (actorId: string): boolean => {
+    if ([...streams.values()].reduce((total, value) => total + value, 0) >= 32 || (streams.get(actorId) ?? 0) >= 2) return false;
+    streams.set(actorId, (streams.get(actorId) ?? 0) + 1);
+    return true;
+  };
+  const leaveStream = (actorId: string) => {
+    const remaining = (streams.get(actorId) ?? 1) - 1;
+    if (remaining) streams.set(actorId, remaining); else streams.delete(actorId);
+  };
+  const shutdown = new AbortController();
+  app.addHook("preClose", async () => { shutdown.abort(); });
+  const lifetimeMs = Math.min(60000, options.streamLifetimeMs ?? 60000);
+  const pollMs = options.streamPollMs ?? 1000;
+  if (lifetimeMs < 1 || pollMs < 1) throw new Error("invalid_stream_configuration");
+  const eventPageSchema = { type: "object", additionalProperties: false, required: ["events", "next_sequence"], properties: {
+    next_sequence: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, events: { type: "array", maxItems: 100, items: { oneOf: [
+      { type: "object", additionalProperties: false, required: ["sequence", "type", "message"], properties: {
+        sequence: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, type: { const: "message.created" }, message: chatMessageSchema } },
+      { type: "object", additionalProperties: false, required: ["sequence", "type"], properties: {
+        sequence: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER }, type: { const: "cursor" } } },
+    ] } } } };
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
   const params = { type: "object", additionalProperties: false, required: ["id"], properties: { id: { type: "string", format: "uuid" } } };
   const guard = (role: AccountRole) => async (request: FastifyRequest, reply: FastifyReply) => {
@@ -79,6 +106,104 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
   for (const role of ["candidate", "employer"] as const) {
     const security = [{ bearerAuth: [] }, { [role === "candidate" ? "candidateSession" : "employerSession"]: [] }];
     const base = `/${role}/recruitment/:id/chat`;
+    app.get<{ Querystring: { after_sequence?: string }; Reply: unknown }>(`/${role}/recruitment-events/stream`, {
+      schema: { tags: ["recruitment"], security, querystring: { type: "object", additionalProperties: false,
+        properties: { after_sequence: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,15})$" } } },
+        headers: { type: "object", properties: { "last-event-id": { type: "string", maxLength: 16 } } },
+        produces: ["text/event-stream"], response: { 200: { type: "string" } } }, onRequest: guard(role),
+    }, async (request, reply) => {
+      const identity = identities.get(request);
+      if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
+      let cursor: number;
+      try { cursor = streamCursor(request.headers["last-event-id"], request.query.after_sequence); }
+      catch { return reply.code(400).send({ detail: "recruitment_cursor_invalid" }); }
+      if (!enterStream(identity.accountId)) return reply.code(429).header("retry-after", "1").send({ detail: "chat_stream_busy" });
+      const poll = async (after: number) => {
+        if (activeOperations >= 3) throw new RecruitmentError(429, "chat_busy");
+        activeOperations++;
+        try {
+          const current = await resolveSession(request, role, options.config, options.store);
+          if (!current || current.accountId !== identity.accountId) throw new RecruitmentError(401, "session_revoked");
+          const page = await options.recruitment.events(role, identity.accountId, after, 100);
+          if (!Number.isSafeInteger(page.next_sequence) || page.next_sequence < after) throw new RecruitmentError(503, "recruitment_invalid_response");
+          let previous = after;
+          for (const item of page.items) {
+            if (!Number.isSafeInteger(item.sequence) || item.sequence <= previous) throw new RecruitmentError(503, "recruitment_invalid_response");
+            previous = item.sequence;
+          }
+          return { events: page.items.map(event => ({ sequence: event.sequence, type: "recruitment.changed", event })), next_sequence: page.next_sequence };
+        } finally { activeOperations--; }
+      };
+      try {
+        const initial = await poll(cursor);
+        await serveStream(request, reply, initial, poll, { lifetimeMs, pollMs, signal: shutdown.signal, afterSequence: cursor }, error =>
+          error instanceof RecruitmentError ? { status: error.status, code: error.code } : { status: 503, code: "recruitment_unavailable" });
+      } catch (error) {
+        if (error instanceof RecruitmentError) return reply.code(error.status).send({ detail: error.code });
+        return reply.code(503).send({ detail: "recruitment_unavailable" });
+      } finally { leaveStream(identity.accountId); }
+    });
+    app.get<{ Params: { id: string }; Querystring: { after_sequence?: string }; Reply: unknown }>(`${base}/events`, {
+      schema: { tags: ["chat"], security, params, querystring: { type: "object", additionalProperties: false,
+        properties: { after_sequence: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,15})$" } } },
+        headers: { type: "object", properties: { "last-event-id": { type: "string", maxLength: 16 } } },
+        produces: ["text/event-stream"], response: { 200: { type: "string" } } }, onRequest: guard(role),
+    }, async (request, reply) => {
+      const identity = identities.get(request);
+      if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
+      let cursor: number;
+      try { cursor = streamCursor(request.headers["last-event-id"], request.query.after_sequence); }
+      catch { return reply.code(400).send({ detail: "chat_cursor_invalid" }); }
+      if (!enterStream(identity.accountId)) {
+        return reply.code(429).header("retry-after", "1").send({ detail: "chat_stream_busy" });
+      }
+      const poll = async (after: number, signal: AbortSignal = shutdown.signal): Promise<ChatEventPage> => {
+        if (activeOperations >= 3) throw new RecruitmentError(429, "chat_busy");
+        activeOperations++;
+        try {
+          const current = await resolveSession(request, role, options.config, options.store);
+          if (!current || current.accountId !== identity.accountId) throw new RecruitmentError(401, "chat_session_revoked");
+          return await options.recruitment.withChatGrant(role, identity.accountId, request.params.id, false, async grant => {
+            if (!chatUrl || !chatToken) throw new RecruitmentError(503, "chat_not_configured");
+            const response = await transport(new URL("/internal/chat/events", chatUrl), { method: "POST",
+              headers: { "content-type": "application/json", "x-internal-token": chatToken },
+              body: JSON.stringify({ ...grant, after_sequence: after, limit: 100 }),
+              signal: AbortSignal.any([shutdown.signal, signal, AbortSignal.timeout(5000)]), redirect: "error" });
+            if (!response.ok) throw new RecruitmentError(response.status === 410 ? 410 : response.status === 400 ? 400 : response.status === 429 ? 429 : 503,
+              response.status === 410 ? "chat_resync_required" : response.status === 400 ? "chat_cursor_invalid" : "chat_unavailable");
+            const reader = response.body?.getReader();
+            if (!reader) throw new RecruitmentError(503, "chat_invalid_response");
+            const chunks: Uint8Array[] = []; let size = 0;
+            while (true) {
+              const part = await reader.read(); if (part.done) break;
+              size += part.value.byteLength;
+              if (size > 4 * 1024 * 1024) { await reader.cancel(); throw new RecruitmentError(503, "chat_invalid_response"); }
+              chunks.push(part.value);
+            }
+            const page: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+            if (!request.compileValidationSchema(eventPageSchema)(page)) throw new RecruitmentError(503, "chat_invalid_response");
+            const result = page as ChatEventPage;
+            let previous = after;
+            for (const event of result.events) {
+              if (event.sequence <= previous || event.type === "message.created" && ![grant.owner_id, grant.candidate_id].includes(event.message.sender_id)) throw new RecruitmentError(503, "chat_invalid_response");
+              previous = event.sequence;
+            }
+            if (result.next_sequence < previous) throw new RecruitmentError(503, "chat_invalid_response");
+            return result;
+          });
+        } finally { activeOperations--; }
+      };
+      try {
+        const initial = await poll(cursor);
+        await serveStream(request, reply, initial, poll, { lifetimeMs, pollMs, signal: shutdown.signal, afterSequence: cursor }, error =>
+          error instanceof RecruitmentError ? { status: error.status, code: error.code } : { status: 503, code: "chat_unavailable" });
+      } catch (error) {
+        if (error instanceof RecruitmentError) return reply.code(error.status).send({ detail: error.code });
+        return reply.code(503).send({ detail: "chat_unavailable" });
+      } finally {
+        leaveStream(identity.accountId);
+      }
+    });
     app.get<{ Params: { id: string }; Querystring: { after_sequence?: string; limit?: string } }>(`${base}/messages`, {
       schema: { tags: ["chat"], security, params, querystring: { type: "object", additionalProperties: false, properties: {
         after_sequence: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,14})$" },

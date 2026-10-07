@@ -68,6 +68,13 @@ export interface CandidateCard {
   resume_url: string;
   filter_factors: string[];
   explanation: ScoreBreakdown;
+  /** Safe provider facts shown with the anonymous card; no account identity or authorship proof. */
+  external_evidence?: Array<{
+    kind: "fsp" | "repository";
+    subject: string;
+    status: ClaimStatus;
+    verified_value: import("./candidate-pipeline.js").JsonValue | null;
+  }>;
 }
 /** One current ready main batch; stale or incomplete batches return a non-success status. */
 export interface SelectionPage {
@@ -311,4 +318,4 @@ export interface VisitedCard {
   assessment: Record<string, unknown>;
 }
 /** Bounded membership pagination; independent of a current main run. */
-export interface FeedListPage<T> { items: T[]; limit: number; offset: number; has_more: boolean; }
+export interface FeedListPage<T> { items: T[]; limit: number; offset: number; has_more: boolean; next_cursor?: string | null; }

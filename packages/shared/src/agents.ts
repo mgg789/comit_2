@@ -14,6 +14,9 @@ export type AgentsAgentStatusView = { "session": AgentsAgentSession; "turn"?: (A
 /** One idempotent user request and its durable provider/tool execution state. */
 export type AgentsAgentTurn = { "turn_id": string; "session_id": string; "owner_id": string; "draft_id": string; "sequence": number; "user_message": string; "expected_revision": number; "draft_revision": number; "status"?: "queued" | "processing" | "retrying" | "failed" | "succeeded"; "idempotency_key": string; "provider_result"?: (Record<string, AgentsJsonValue> | null); "input_tokens"?: number; "output_tokens"?: number; "rounds"?: number; "tool_calls"?: number; "error_code"?: (string | null); "error_message"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); };
 
+/** Optional provider availability; manual editing remains explicitly available. */
+export type AgentsCapabilityView = { "manual_editing": true; "agent": boolean; "enrichment": boolean; "fallback": "manual_editing"; "disabled_code": "agent_disabled_manual_available"; };
+
 /** Human publication confirmation for one exact approved summary. */
 export type AgentsCreateRequest = { "expected_revision": number; "summary_hash": string; };
 
@@ -26,11 +29,14 @@ export type AgentsDraftFields_Input = { "title"?: (string | null); "zp_min"?: (n
 /** Partial or canonical vacancy fields; omitted values remain distinguishable in patches. */
 export type AgentsDraftFields_Output = { "title"?: (string | null); "zp_min"?: (number | null); "zp_max"?: (number | null); "daily"?: (string | null); "city"?: (string | null); "type"?: ("onsite" | "remote" | "hybrid" | null); "bio"?: (string | null); "domens"?: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>; "stacks"?: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>; "soft_skills"?: Record<string, 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7>; "class"?: ("backend" | "frontend" | "fullstack" | "mobile" | "devops" | "data" | "qa" | "ml" | null); "metadata"?: Record<string, AgentsJsonValue>; };
 
+/** Owner-scoped keyset page ordered by immutable creation time and UUID. */
+export type AgentsDraftPage = { "items": Array<AgentsDraftView>; "limit": number; "has_more": boolean; "next_cursor"?: (string | null); };
+
 /** Compare-and-swap patch request; ``exclude_unset`` preserves omitted fields. */
 export type AgentsDraftPatch = { "expected_revision": number; "fields"?: AgentsDraftFields_Input; };
 
 /** Owner-scoped draft response with revision, provenance and publication state. */
-export type AgentsDraftView = { "draft_id": string; "vacancy_id": string; "owner_id": string; "revision": number; "state": "editing" | "summary" | "creating" | "created" | "failed"; "fields": AgentsDraftFields_Output; "field_sources"?: Record<string, AgentsFieldSource>; "missing_requirements"?: Array<string>; "summary"?: (AgentsSummarySnapshot | null); "publication"?: (AgentsPublicationView | null); };
+export type AgentsDraftView = { "draft_id": string; "vacancy_id": string; "owner_id": string; "revision": number; "state": "editing" | "summary" | "creating" | "created" | "failed"; "fields": AgentsDraftFields_Output; "field_sources"?: Record<string, AgentsFieldSource>; "missing_requirements"?: Array<string>; "summary"?: (AgentsSummarySnapshot | null); "publication"?: (AgentsPublicationView | null); "business_status"?: "draft" | "open" | "closed"; "archived"?: boolean; };
 
 /** Provenance attached to one field or requirement group. */
 export type AgentsFieldSource = { "source": "manual" | "agent" | "laya" | "system" | "fsp"; "metadata"?: Record<string, AgentsJsonValue>; };

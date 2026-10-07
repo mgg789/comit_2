@@ -7,6 +7,7 @@ import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { typ
 import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { showcaseRoutes } from "./showcase.js";
+import { correlatedFetch } from "../operations/index.js";
 
 type Schema = string | number | boolean | null | undefined | Schema[] | { [key: string]: Schema };
 
@@ -30,7 +31,7 @@ export interface AccountGatewayOptions extends AuthOptions {
 /** Expose employer editorial endpoints and candidate private reads with server-derived UUIDs. */
 export async function accountRoutes(app: FastifyInstance, options: AccountGatewayOptions): Promise<void> {
   const { config, store } = options;
-  const transport = options.transport ?? fetch;
+  const transport = correlatedFetch(options.transport ?? fetch);
   const agentsUrl = options.agentsUrl ?? process.env.AGENTS_SERVICE_URL ?? "http://agents-service:8104";
   const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
   const matchingUrl = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
@@ -57,11 +58,12 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   for (const [path, methods] of Object.entries(agentsSpec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post", "patch"].includes(method)) continue;
+      if (!["get", "post", "patch", "delete"].includes(method)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
         responses: { "200"?: { content?: { "application/json"?: { schema: Schema } } } } };
       const params = operation.parameters?.filter(value => value.in === "path") ?? [];
+      const queries = operation.parameters?.filter(value => value.in === "query") ?? [];
       const response = operation.responses["200"]?.content?.["application/json"]?.schema;
       app.route({ method: method.toUpperCase() as HTTPMethods,
         url: path.replace("/internal/", "/employer/").replace(/\{([^}]+)\}/g, ":$1"),
@@ -69,6 +71,10 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
           ...(params.length ? { params: { type: "object", required: params.map(value => value.name),
             properties: Object.fromEntries(params.map(value => [value.name, refs(value.schema, "agents")])) } } : {}),
           ...(operation.requestBody ? { body: refs(operation.requestBody.content["application/json"].schema, "agents") } : {}),
+          ...(queries.length ? { querystring: { type: "object", additionalProperties: false, properties: Object.fromEntries(queries.map(value => [value.name,
+            value.name === "limit" ? { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
+              : value.name === "offset" ? { type: "string", pattern: "^(?:0|[1-9][0-9]{0,5}|1000000)$" }
+                : refs(value.schema, "agents")])) } } : {}),
           ...(response ? { response: { 200: refs(response, "agents") } } : {}) },
         onRequest: guard("employer"),
         handler: async (request, reply) => {
@@ -137,7 +143,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     // URL parameters are strings; global intake validation intentionally disables coercion.
     if (name === "limit") return { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" };
     if (name === "offset") return { type: "string", pattern: "^(0|[1-9][0-9]*)$", maxLength: 15 };
-    if (name === "cursor") return { type: "string", pattern: "^[A-Za-z0-9_-]{1,30}$" };
+    if (name === "cursor") return { type: "string", maxLength: 1024, pattern: "^[A-Za-z0-9_-]+$" };
     return refs(schema, "matching");
   };
   // Employer matching contracts come from the same generated OpenAPI as the private engine.

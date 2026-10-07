@@ -2,6 +2,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard } from "@comit/shared";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
+import { correlatedFetch } from "../operations/index.js";
 import type { AccountGatewayOptions } from "./accounts.js";
 import { RecruitmentError, recruitmentFingerprint, type RecruitmentStore } from "../recruitment/store.js";
 import {
@@ -18,13 +19,14 @@ const draftParams = { type: "object", additionalProperties: false, required: ["d
 const querySchema = { type: "object", additionalProperties: false, properties: {
   limit: { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" },
   offset: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,14})$" },
+  cursor: { type: "string", maxLength: 1024, pattern: "^[A-Za-z0-9_-]+\\.[a-f0-9]{64}$" },
 } };
 const security = (role: AccountRole) => [{ bearerAuth: [] }, { [role === "employer" ? "employerSession" : "candidateSession"]: [] }];
 const invalid = (status: number, code: string): never => { throw new RecruitmentError(status, code); };
 
 /** Register OpenAPI-described employer/candidate lifecycle endpoints with server-derived participant IDs. */
 export async function recruitmentRoutes(app: FastifyInstance, options: RecruitmentOptions): Promise<void> {
-  const transport = options.transport ?? fetch;
+  const transport = correlatedFetch(options.transport ?? fetch);
   const agentsUrl = options.agentsUrl ?? process.env.AGENTS_SERVICE_URL ?? "http://agents-service:8104";
   const matchingUrl = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
   const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
@@ -107,13 +109,15 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     return options.recruitment.rejectSaved(ownerId, draft.draft_id, draft.vacancy_id, saved.profile_revision, request.body);
   }));
 
-  app.get<{ Params: { draft_id: string }; Querystring: { limit?: string; offset?: string } }>("/employer/vacancy-drafts/:draft_id/recruitment", {
+  app.get<{ Params: { draft_id: string }; Querystring: { limit?: string; offset?: string; cursor?: string } }>("/employer/vacancy-drafts/:draft_id/recruitment", {
     schema: { tags: ["recruitment"], security: security("employer"), params: draftParams, querystring: querySchema, response: { 200: recruitmentPageSchema } }, onRequest: guard("employer"),
-  }, (request, reply) => safely(reply, () => options.recruitment.list("employer", actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), request.params.draft_id)));
+  }, (request, reply) => safely(reply, () => options.recruitment.list("employer", actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), request.params.draft_id, request.query.cursor)));
 
-  app.get<{ Querystring: { limit?: string; offset?: string } }>("/candidate/recruitment", {
-    schema: { tags: ["recruitment"], security: security("candidate"), querystring: querySchema, response: { 200: recruitmentPageSchema } }, onRequest: guard("candidate"),
-  }, (request, reply) => safely(reply, () => options.recruitment.list("candidate", actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0))));
+  for (const role of ["candidate", "employer"] as const) {
+    app.get<{ Querystring: { limit?: string; offset?: string; cursor?: string } }>(`/${role}/recruitment`, {
+      schema: { tags: ["recruitment"], security: security(role), querystring: querySchema, response: { 200: recruitmentPageSchema } }, onRequest: guard(role),
+    }, (request, reply) => safely(reply, () => options.recruitment.list(role, actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), undefined, request.query.cursor)));
+  }
 
   for (const role of ["candidate", "employer"] as const) {
     app.get<{ Params: { id: string } }>(`/${role}/recruitment/:id`, {
@@ -124,7 +128,7 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     }, (request, reply) => safely(reply, () => options.recruitment.act(role, actor(request), request.params.id, request.body)));
     app.get<{ Querystring: { after_sequence?: string; limit?: string } }>(`/${role}/recruitment-events`, {
       schema: { tags: ["recruitment"], security: security(role), querystring: { type: "object", additionalProperties: false,
-        properties: { limit: querySchema.properties.limit, after_sequence: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,14})$" } } }, response: { 200: recruitmentEventPageSchema } }, onRequest: guard(role),
+        properties: { limit: querySchema.properties.limit, after_sequence: { type: "string", pattern: "^(?:0|[1-9][0-9]{0,15})$" } } }, response: { 200: recruitmentEventPageSchema } }, onRequest: guard(role),
     }, (request, reply) => safely(reply, () => options.recruitment.events(role, actor(request), Number(request.query.after_sequence ?? 0), Number(request.query.limit ?? 50))));
   }
   app.get<{ Params: { id: string } }>("/employer/recruitment/:id/contacts", {

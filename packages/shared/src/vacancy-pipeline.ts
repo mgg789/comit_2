@@ -67,4 +67,6 @@ export interface VacancyReadyPage {
   items: VacancyReady[];
   limit: number;
   offset: number;
+  has_more?: boolean;
+  next_cursor?: string | null;
 }

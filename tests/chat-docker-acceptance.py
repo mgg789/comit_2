@@ -67,6 +67,10 @@ def main() -> None:
     context["actor_id"] = context["candidate_id"]
     page = call("history", {"after_sequence": 0, "limit": 100})
     assert page["messages"][0] == message
+    events = call("events", {"after_sequence": 0, "limit": 100})
+    assert any(event.get("message") == message for event in events["events"])
+    resumed = call("events", {"after_sequence": events["next_sequence"], "limit": 100})
+    assert resumed["events"] == []
     downloaded = call("download", {"file_id": file["id"]})
     assert base64.b64decode(downloaded["data_base64"], validate=True) == data
     assert downloaded["name"] == filename
@@ -82,7 +86,7 @@ def main() -> None:
             assert marker.encode() not in stored, "Plaintext content found in storage"
             assert filename.encode() not in stored, "Plaintext filename found in storage"
     print(json.dumps({"status": "passed", "restart": True, "file_round_trip": True,
-                      "encrypted_storage": True, "durable_idempotency": True}))
+                      "encrypted_storage": True, "durable_idempotency": True, "event_replay": True}))
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ services:
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
       AGENTS_SERVICE_TOKEN: ${AGENTS_SERVICE_TOKEN:?Set a private agents service token}
       MATCHING_ENGINE_URL: http://matching-engine:8101
+      AGENTS_MODE: ${AGENTS_MODE:-auto}
       CANDIDATE_PIPELINE_TOKEN: ${CANDIDATE_PIPELINE_TOKEN:?Set a private matching token}
       JEV_LOCAL_URL: ${JEV_LOCAL_URL:-http://host.docker.internal:12444}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
