@@ -5,6 +5,7 @@ import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
 import { Action, Backdrop, Icon, Reveal, State } from "./ui";
 import { Login } from "./login";
+import { LegalDocument } from "./legal";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
 import { Vacancies, VacancyDetail, VacancyEditor } from "./vacancies";
 import { Resume, Showcase, Statistics, VacancyResumes } from "./discovery";
@@ -170,7 +171,9 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <div className={`employer-app ${account ? "" : "is-login"}`}>
         <Backdrop />
-        {checking ? (
+        {pieces[0] === "legal" ? (
+          <LegalDocument name={pieces[1] || "privacy-policy"} />
+        ) : checking ? (
           <main className="auth-check">
             <State loading />
           </main>

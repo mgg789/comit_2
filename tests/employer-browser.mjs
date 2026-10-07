@@ -591,16 +591,66 @@ async function capture(name, width = 1920) {
 try {
   await page.goto(base);
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Получить код", exact: true })
-      .isDisabled(),
-    true,
-  );
   await page
     .getByRole("textbox", { name: "Email", exact: true })
     .fill(account.email);
+  await page.getByRole("button", { name: "Получить код", exact: true }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Отметьте согласие" })
+    .waitFor();
+  assert.equal(
+    await page.getByRole("checkbox").getAttribute("aria-invalid"),
+    "true",
+  );
+  await page.getByRole("button", { name: "Войти через Яндекс" }).click();
+  assert.equal(await page.getByRole("checkbox").isChecked(), false);
+  const legalLink = page.getByRole("link", { name: "Я согласен(а)" });
+  const [policy] = await Promise.all([
+    page.waitForEvent("popup"),
+    legalLink.click(),
+  ]);
+  await policy
+    .getByRole("heading", {
+      name: "Тестовая политика конфиденциальности Comit",
+      exact: true,
+    })
+    .waitFor();
+  await policy.getByRole("link", { name: "Текст согласия", exact: true }).click();
+  await policy.getByRole("heading", { name: "Аккаунт — account-v1", exact: true }).waitFor();
+  await policy.close();
+  assert.equal(await page.getByRole("checkbox").isChecked(), false);
+  for (const width of [1920, 1024, 390]) {
+    await page.setViewportSize({ width, height: 1080 });
+    const geometry = await page.evaluate(() => {
+      const input = document
+        .querySelector(".login-email input")
+        .getBoundingClientRect();
+      const yandex = document.querySelector(".yandex").getBoundingClientRect();
+      const box = document
+        .querySelector(".login-consent input")
+        .getBoundingClientRect();
+      const text = document
+        .querySelector(".login-consent a")
+        .getBoundingClientRect();
+      return {
+        input: input.height,
+        yandex: yandex.height,
+        alignment: Math.abs(box.y + box.height / 2 - text.y - text.height / 2),
+      };
+    });
+    assert.ok(
+      Math.abs(geometry.input - geometry.yandex) < 1,
+      `login control heights at ${width}`,
+    );
+    assert.ok(geometry.alignment < 1, `consent centered at ${width}`);
+  }
   await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Войти через Яндекс" }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "Вход через Яндекс пока не подключён" })
+    .waitFor();
   await page.getByRole("button", { name: "Получить код", exact: true }).click();
   await page
     .getByRole("alert")

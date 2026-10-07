@@ -12,12 +12,20 @@ export function Login({
 }) {
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
+  const [consentError, setConsentError] = useState(false);
   const [receipt, setReceipt] = useState<EmailCodeReceipt | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const input = useRef<HTMLInputElement>(null);
+  const consentInput = useRef<HTMLInputElement>(null);
+  function requireConsent() {
+    if (consent) return true;
+    setConsentError(true);
+    consentInput.current?.focus();
+    return false;
+  }
   useEffect(() => {
     if (receipt) input.current?.focus();
   }, [receipt]);
@@ -27,7 +35,7 @@ export function Login({
   }, []);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || !consent) return;
+    if (busy || !requireConsent()) return;
     setBusy(true);
     setError(null);
     try {
@@ -121,7 +129,10 @@ export function Login({
           <Action
             type="submit"
             className="circle"
-            disabled={busy || !consent}
+            disabled={busy}
+            onClick={(event) => {
+              if (!requireConsent()) event.preventDefault();
+            }}
             aria-label={receipt ? "Войти" : "Получить код"}
           >
             <img
@@ -135,9 +146,13 @@ export function Login({
           <button
             type="button"
             className="yandex"
-            disabled
-            title="Вход через Яндекс пока не подключён. Используйте email."
-            aria-label="Вход через Яндекс пока недоступен"
+            onClick={() => {
+              if (requireConsent())
+                setError(
+                  "Вход через Яндекс пока не подключён. Войдите по почте.",
+                );
+            }}
+            aria-label="Войти через Яндекс"
           >
             <img
               src={asset("a3c8e3c0abb4dfca0ad94e35ca485cbec998042f.svg")}
@@ -162,17 +177,35 @@ export function Login({
             </Action>
           </>
         )}
-        <label className="checkbox">
+        <div
+          className={`checkbox login-consent ${consentError ? "has-error" : ""}`}
+        >
           <input
+            ref={consentInput}
             type="checkbox"
+            aria-label="Согласие на обработку данных"
+            aria-invalid={consentError}
+            aria-describedby={consentError ? "consent-error" : undefined}
             checked={consent}
-            onChange={(event) => setConsent(event.target.checked)}
-            required
+            onChange={(event) => {
+              setConsent(event.target.checked);
+              setConsentError(false);
+            }}
           />
-          <span>
+          <a href="#/legal/privacy-policy" target="_blank" rel="noopener">
             Я согласен(а) на обработку данных и получение уведомления о доступе
-          </span>
-        </label>
+          </a>
+        </div>
+        <small className="login-consent-details">
+          <a href="#/legal/processing-consent" target="_blank" rel="noopener">
+            Текст согласия на обработку данных
+          </a>
+        </small>
+        {consentError && (
+          <p id="consent-error" className="form-error" role="alert">
+            Отметьте согласие на обработку данных, чтобы продолжить.
+          </p>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}

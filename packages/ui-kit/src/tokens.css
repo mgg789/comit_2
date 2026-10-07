@@ -20,6 +20,10 @@
 
 /* Employer Figma surface: scoped so the other three applications retain their palette. */
 .employer-app {
+  --employer-control-min: 44px;
+  --employer-input-text-min: 16px;
+  --employer-caption-text-min: 14px;
+  --employer-checkbox-min: 20px;
   --comit-bg: #010101;
   --comit-text: #f0f0f0;
   --comit-text-muted: #c0c0c0;

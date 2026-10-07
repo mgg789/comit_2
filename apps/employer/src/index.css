@@ -64,14 +64,14 @@
 }
 .login-input-wrap > img {
   position: absolute;
-  left: 16rem;
+  left: max(16rem, 12px);
   top: 50%;
   transform: translateY(-50%);
-  width: 24rem;
-  height: 24rem;
+  width: max(24rem, 20px);
+  height: max(24rem, 20px);
 }
 .login-input-wrap > input {
-  padding-left: 48rem;
+  padding-left: max(48rem, 40px);
 }
 .login-submit-asset {
   max-width: 100%;
@@ -869,6 +869,7 @@ textarea::placeholder {
   margin-left: 12rem;
 }
 .login-card {
+  --login-control-height: max(66rem, var(--employer-control-min));
   width: 688rem;
   min-height: 460rem;
   margin: auto;
@@ -892,6 +893,8 @@ textarea::placeholder {
   align-items: center;
 }
 .login-email input {
+  height: var(--login-control-height);
+  min-height: 0;
   border-radius: 97rem;
   background: linear-gradient(
     180deg,
@@ -899,10 +902,14 @@ textarea::placeholder {
     var(--employer-paint-ffffff24)
   );
   box-shadow: inset 0 0 1px var(--employer-border);
-  font-size: 20rem;
+  font-size: max(20rem, var(--employer-input-text-min));
+}
+.login-email .circle {
+  height: var(--login-control-height);
+  width: var(--login-control-height);
 }
 .yandex {
-  height: 66rem;
+  height: var(--login-control-height);
   border-radius: 97rem;
   background: var(--comit-text);
   color: var(--comit-bg);
@@ -918,8 +925,98 @@ textarea::placeholder {
   margin-top: 34rem;
   padding: 0 40rem;
 }
+.login-card .login-consent {
+  align-items: center;
+  font-size: max(18rem, var(--employer-caption-text-min));
+}
+.login-consent a {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 4rem;
+}
+.login-consent a:hover {
+  text-decoration: underline;
+}
+.login-consent input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 max(24rem, var(--employer-checkbox-min));
+  width: max(24rem, var(--employer-checkbox-min));
+  height: max(24rem, var(--employer-checkbox-min));
+  margin: 0;
+  border: 1px solid var(--employer-border);
+  border-radius: max(7rem, 5px);
+  background: var(--employer-paint-ffffff08);
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    box-shadow 0.16s;
+}
+.login-consent input:checked {
+  background: var(--employer-blue);
+  border-color: var(--employer-blue);
+}
+.login-consent input:checked::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 50%;
+  left: 35%;
+  top: 12%;
+  border: solid var(--comit-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.login-consent input:focus-visible {
+  outline: 2px solid var(--employer-blue);
+  outline-offset: 4rem;
+}
+.login-consent.has-error input {
+  border-color: var(--employer-danger);
+  box-shadow: 0 0 0 4rem var(--employer-paint-ffffff08);
+}
+.login-consent.has-error a {
+  color: var(--employer-danger);
+}
 .login-card small {
   text-align: center;
+  font-size: max(18rem, var(--employer-caption-text-min));
+}
+.login-card .login-consent-details {
+  margin-top: -12rem;
+  font-size: max(14rem, var(--employer-caption-text-min));
+}
+.login-card .form-error {
+  font-size: max(18rem, var(--employer-caption-text-min));
+}
+.login-consent-details a {
+  color: var(--comit-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3rem;
+}
+.legal-document {
+  margin: 48rem auto;
+  width: min(1100rem, calc(100% - 48rem));
+  display: grid;
+  gap: 24rem;
+}
+.legal-document a {
+  color: var(--employer-blue);
+  text-decoration: underline;
+}
+.legal-document p {
+  white-space: pre-line;
+}
+.legal-table {
+  overflow-x: auto;
+}
+.legal-table th,
+.legal-table td {
+  padding: 12rem;
+  border: 1px solid var(--employer-border);
+  text-align: left;
+  vertical-align: top;
 }
 .detail-columns {
   display: grid;
@@ -1460,6 +1557,7 @@ textarea::placeholder {
     font-size: 20rem;
   }
   .login-card {
+    --login-control-height: 48rem;
     width: 100%;
     max-width: 460rem;
     min-height: 0;
@@ -1472,6 +1570,7 @@ textarea::placeholder {
   }
   .login-email input {
     font-size: 16rem;
+    height: 48rem;
   }
   .yandex {
     font-size: 32rem;
@@ -1480,6 +1579,15 @@ textarea::placeholder {
   .login-card .checkbox {
     margin-top: 18rem;
     padding: 0;
+  }
+  .login-consent input {
+    flex-basis: 20rem;
+  }
+  .login-consent input:checked::after {
+    left: 6rem;
+    top: 2rem;
+    width: 6rem;
+    height: 10rem;
   }
   .detail-columns,
   .resume-grid {
