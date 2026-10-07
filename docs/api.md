@@ -1,5 +1,7 @@
 # API — Comit
 
+Статистика работодателя: `GET /api/employer/statistics?from=YYYY-MM-DD&to=YYYY-MM-DD&vacancy_id=UUID` — текущий инвентарь, этапы подбора, дневные события и предыдущий период; [контракт и определения](employer-statistics.md).
+
 Feed поддерживает `POST /api/employer/vacancy-drafts/{draft_id}/feed/impressions`
 (`FeedImpressionRequest`: exposure_id/idempotency_key) и чтение первого receipt
 по `GET .../feed/impressions/{idempotency_key}`. Это клиентское подтверждение

@@ -355,3 +355,6 @@ consent_version/consent_accepted_at, а не подменяют их време�
 # Внешняя верификация и документы
 
 `candidate_profile_evidence` хранит canonical input SHA-256, provider status, verified value и provenance. `candidate_verification_ledger` append-only записывает каждый provider result до замены latest evidence. Каждое подтверждение поднимает source revision и создаёт новый immutable outbox snapshot; профильная правка с изменённым input сбрасывает старый status. `candidate_fsp_demo_auth_states` хранит только hash short-lived state, выбранный fixture, revision и одноразовую отметку consumption. Imported facts несут immutable `provider_version` и server `imported_at`. `candidate_verification_documents` хранит только AES-256-GCM ciphertext и metadata со статусом `pending`; загрузка не является подтверждением.
+## Статистика работодателя: чтение агрегатов
+
+API статистики читает общую PostgreSQL без новых таблиц и изменений исходных событий: source vacancy drafts, feed exposures/decisions/impressions и recruitment events. Один SQL-снимок, owner scope на всех источниках, таймаут 5 секунд; [определения метрик](employer-statistics.md). Приватные профили и learning features не входят в ответ.

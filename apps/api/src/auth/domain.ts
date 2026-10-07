@@ -12,6 +12,8 @@ import { RecruitmentStore } from "../recruitment/store.js";
 import { recruitmentRoutes } from "../routes/recruitment.js";
 import { chatConfiguration, chatRoutes } from "../routes/chat.js";
 import { correlatedFetch } from "../operations/index.js";
+import { EmployerStatisticsStore } from "../statistics/store.js";
+import { statisticsRoutes } from "../routes/statistics.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
 export async function authDomain(app: FastifyInstance): Promise<void> {
@@ -44,4 +46,5 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret);
   await app.register(recruitmentRoutes, { ...options, recruitment });
   await app.register(chatRoutes, { ...options, recruitment });
+  await app.register(statisticsRoutes, { ...options, statistics: new EmployerStatisticsStore(pool) });
 }

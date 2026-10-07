@@ -4,6 +4,7 @@
  * handling stay in one place.
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+  EmployerStatisticsQuery, EmployerStatistics,
   CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
@@ -28,6 +29,8 @@ export interface ApiClientOptions {
 export interface ApiClient {
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
+  /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
+  getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
   /** Queue a role-bound code; the receipt never contains the OTP. */
   requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
   /** Verify a code, including account consent only for first registration. */
@@ -205,6 +208,11 @@ export function createApiClient({
   }
 
   return {
+    getEmployerStatistics: (query = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);
+      return request("GET", `/employer/statistics${params.size ? `?${params}` : ""}`);
+    },
     get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
     requestLoginCode: (role, email) => request("POST", `/auth/${role}/code`, { email }),

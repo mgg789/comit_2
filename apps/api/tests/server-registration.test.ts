@@ -26,6 +26,7 @@ test("full server registers matching, editorial CRUD and authenticated public ro
       ["POST", "/employer/vacancies"], ["GET", "/employer/vacancies/:draft_id"],
       ["PATCH", "/employer/vacancies/:draft_id"], ["DELETE", "/employer/vacancies/:draft_id"],
       ["GET", "/candidate/recruitment/:id/chat/events"], ["GET", "/employer/recruitment-events/stream"],
+      ["GET", "/employer/statistics"],
     ] as const) assert.equal(app.hasRoute({ method, url }), true, `${method} ${url}`);
     assert.equal((await app.inject({ url: "/healthz" })).statusCode, 200);
     const paths = app.swagger().paths ?? {};
