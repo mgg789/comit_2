@@ -91,6 +91,26 @@ def test_migrations_are_idempotent_and_checksum_guarded(store: Store) -> None:
                                        (sha256(migration.read_text().encode()).hexdigest(), migration.name))
 
 
+def test_legacy_duplicate_version_alias_never_replays_sql(store: Store) -> None:
+    """Upgrade the historical filename without replaying its non-idempotent DDL."""
+    canonical = "012_hypothesis_exploration.sql"
+    legacy = "011_hypothesis_exploration.sql"
+    with connect(store.database_url) as connection:
+        connection.execute("DELETE FROM candidate_pipeline.migrations WHERE name=%s", (legacy,))
+        connection.execute("UPDATE candidate_pipeline.migrations SET name=%s WHERE name=%s", (legacy, canonical))
+    assert migrate(store.database_url) == []
+    with connect(store.database_url) as connection:
+        rows = connection.execute("SELECT checksum FROM candidate_pipeline.migrations WHERE name=ANY(%s)", ([legacy, canonical],)).fetchall()
+        assert len(rows) == 2 and rows[0]["checksum"] == rows[1]["checksum"]
+        connection.execute("UPDATE candidate_pipeline.migrations SET checksum='invalid' WHERE name=%s", (legacy,))
+    try:
+        with pytest.raises(RuntimeError, match="applied migration changed"):
+            migrate(store.database_url)
+    finally:
+        with connect(store.database_url) as connection:
+            connection.execute("DELETE FROM candidate_pipeline.migrations WHERE name=%s", (legacy,))
+
+
 def test_complete_pipeline_api_rank_and_contact_free_pool(store: Store) -> None:
     client = TestClient(create_app(store=store, internal_token="synthetic-token",
                                    encoder_ready=lambda: True))
