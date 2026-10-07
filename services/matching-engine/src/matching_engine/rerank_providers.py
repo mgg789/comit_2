@@ -20,7 +20,10 @@ from matching_engine.rerank_hash import digest
 QWEN = "mlx-community/Qwen3.5-4B-MLX-4bit"
 LAYA = "aac6fef/laya-multilingual-mlx"
 PROMPT_VERSION = "rerank-synthetic-v1"
-LIMITS = {"generation": 120, "pair": 3000, "grade": 600}
+# Operator decision (Mike, 2026-10-07): the hard benchmark labeling allowance
+# requires grades beyond the original 600 ceiling. The cumulative usage ledger
+# is never reset; only this hard ceiling moves (600 -> 700).
+LIMITS = {"generation": 120, "pair": 3000, "grade": 700}
 ENDPOINTS = {"generation": "/api/v1/chat/completions", "pair": "/v1/choice", "grade": "/v1/score"}
 SYSTEMONE_URL = "https://ai.sverk.tech/v1/systemone"
 SYSTEMONE_MODEL = "kev-latest"
