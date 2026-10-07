@@ -25,6 +25,8 @@ api-core (Fastify)  ────────────  PostgreSQL 16 + pgvect
         ▲
 services/matching-engine     services/testing-engine     services/integration-engine
 (Python/FastAPI, :8101)      (Python/FastAPI, :8102)     (Python/FastAPI, :8103)
+                                                          ▲
+                             services/verification-engine (Python/FastAPI, :8105, только внутри compose)
 ```
 
 ## Сервисы
@@ -34,7 +36,8 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `apps/api` | Fastify, TS (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, account-owned candidate source profile, employer owner gateway, вакансии/приглашения, OpenAPI | Транзакционная логика, целостность |
 | `services/matching-engine` | FastAPI, pgvector | Комбайн: strict filter → hybrid scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек; объяснимость выдачи | ML-эксперименты на Python, независимые релизы |
 | `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
-| `services/integration-engine` | FastAPI | Верификация внешних данных; мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`) | Внешние источники меняются независимо от ядра |
+| `services/integration-engine` | FastAPI | Мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`, достижения) и демо-привязка (`/fsp/demo/authorize`, `/fsp/demo/token`) | Внешние источники меняются независимо от ядра |
+| `services/verification-engine` | FastAPI | Внутренние `/verify/fsp`, `/verify/repository`, `/verify/hh` под сервисным токеном; без candidate id ([verification.md](verification.md)) | Сетевые проверки внешних провайдеров изолированы от ядра |
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
@@ -66,7 +69,9 @@ vacancy worker → ready; combine worker → main top-k; rerank worker →
 рекомендованный порядок/резерв либо явный fallback. Постановка R₀ атомарна с main
 publication; активная модель хранится в immutable PG registry/settings pointer.
 Обучение выполняет отдельный operator workflow; runtime использует JSON linear
-artifact без sklearn/LLM. Teacher pilot остановлен, активного learned artifact нет.
+artifact без sklearn/LLM. Gated promotion не пройден; текущий R₀ включается
+ручным sort-only rollout при старте rerank-worker ([активация](rerank-activation.md)).
+Отдельные preference-worker и feed-refill-worker обновляют предпочтения вакансии и добор ленты.
 Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
 Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 
@@ -96,9 +101,10 @@ artifact без sklearn/LLM. Teacher pilot остановлен, активно�
 | testing-engine | 8102 | `TESTING_PORT` |
 | integration-engine | 8103 | `INTEGRATION_PORT` |
 | agents-service | 8104 внутри compose | `PORT`, opt-in overlay |
+| verification-engine | 8105 внутри compose, без host-порта | `PORT` |
 | postgres | 5433→5432 | `POSTGRES_PORT` |
 
-В prod (`infra/docker-compose.prod.yml`) наружу публикуется только web; api и engines доступны лишь на `127.0.0.1` сервера (отладка и smoke), БД — только внутренняя сеть.
+В prod (`infra/docker-compose.prod.yml`) наружу публикуется только web; api и engines доступны лишь на `127.0.0.1` сервера (отладка и smoke), БД — только внутренняя сеть. verification-engine пока есть только в dev compose (`infra/docker-compose.yml`), в prod compose его нет.
 
 ## Hiring aggregate после подбора
 

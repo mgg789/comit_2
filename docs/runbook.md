@@ -133,8 +133,9 @@ Runtime использует `local_files_only=True`, не требует вне
 кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
 
 Опциональный **локальный** compose-overlay включает миграции перед серверами и
-отдельные candidate-, vacancy- и combine-worker (rerank-worker в overlay нет — см.
-«Baseline R₀»); базовый `make up` сам по себе worker не запускает:
+отдельные candidate-, vacancy-, combine-, rerank-, feed-refill- и preference-worker
+(см. «Baseline R₀», [feed-refill.md](feed-refill.md), [preference-learning.md](preference-learning.md));
+базовый `make up` сам по себе worker не запускает:
 
 ```bash
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
@@ -156,6 +157,9 @@ PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.ven
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine vacancy-worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine combine-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine rerank-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine feed-refill-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine preference-worker
 PORT=38080 pnpm --filter @comit/api start
 ```
 
