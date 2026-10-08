@@ -192,15 +192,10 @@ export function Login({
               setConsentError(false);
             }}
           />
-          <a href="#/legal/privacy-policy" target="_blank" rel="noopener">
+          <a href="#/legal/processing-consent" target="_blank" rel="noopener">
             Я согласен(а) на обработку данных и получение уведомления о доступе
           </a>
         </div>
-        <small className="login-consent-details">
-          <a href="#/legal/processing-consent" target="_blank" rel="noopener">
-            Текст согласия на обработку данных
-          </a>
-        </small>
         {consentError && (
           <p id="consent-error" className="form-error" role="alert">
             Отметьте согласие на обработку данных, чтобы продолжить.

@@ -1108,6 +1108,7 @@ textarea::placeholder {
   font-size: 46rem;
   font-weight: 600;
   margin-left: 12rem;
+  margin-top: -14rem;
 }
 .login-card {
   --login-control-height: max(66rem, var(--employer-control-min));
@@ -1169,14 +1170,19 @@ textarea::placeholder {
 .login-card .login-consent {
   align-items: center;
   font-size: max(18rem, var(--employer-caption-text-min));
+  padding: 0 12rem;
 }
 .login-consent a {
   color: inherit;
-  text-decoration: none;
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
   text-underline-offset: 4rem;
+  transition: text-decoration-color 280ms ease;
 }
-.login-consent a:hover {
-  text-decoration: underline;
+.login-consent a:hover,
+.login-consent a:focus-visible {
+  text-decoration-color: currentColor;
 }
 .login-consent input {
   appearance: none;
@@ -1224,17 +1230,8 @@ textarea::placeholder {
   text-align: center;
   font-size: max(18rem, var(--employer-caption-text-min));
 }
-.login-card .login-consent-details {
-  margin-top: -12rem;
-  font-size: max(14rem, var(--employer-caption-text-min));
-}
 .login-card .form-error {
   font-size: max(18rem, var(--employer-caption-text-min));
-}
-.login-consent-details a {
-  color: var(--comit-text-muted);
-  text-decoration: underline;
-  text-underline-offset: 3rem;
 }
 .legal-document {
   margin: 48rem auto;
