@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 11939">
+<circle id="Ellipse 6" cx="40" cy="40" r="40" fill="#E0E0E0"/>
+<g id="plus">
+<rect width="32" height="32" transform="translate(24 24)" fill="#E0E0E0"/>
+<path id="icon" fill-rule="evenodd" clip-rule="evenodd" d="M40 27.5C40.8284 27.5 41.5 28.1716 41.5 29V38.5H51C51.8284 38.5 52.5 39.1716 52.5 40C52.5 40.8284 51.8284 41.5 51 41.5H41.5V51C41.5 51.8284 40.8284 52.5 40 52.5C39.1716 52.5 38.5 51.8284 38.5 51V41.5H29C28.1716 41.5 27.5 40.8284 27.5 40C27.5 39.1716 28.1716 38.5 29 38.5H38.5V29C38.5 28.1716 39.1716 27.5 40 27.5Z" fill="#717377"/>
+</g>
+</g>
+</svg>

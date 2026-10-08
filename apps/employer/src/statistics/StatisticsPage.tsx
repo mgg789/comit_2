@@ -51,12 +51,12 @@ export function StatisticsPage() {
     <>
       <PageHeader title="Статистика" />
       <div className="mb-6 flex flex-wrap gap-3">
-        <SelectField aria-label="Период" value={days} onChange={(event) => setDays(event.target.value)} options={PERIODS} containerClassName="w-40" />
+        <SelectField aria-label="Период" value={days} onChange={setDays} options={PERIODS} containerClassName="w-40" />
         <SelectField
           aria-label="Вакансия"
           placeholder="Все вакансии"
           value={vacancyId}
-          onChange={(event) => setVacancyId(event.target.value)}
+          onChange={setVacancyId}
           options={(vacancies.data?.items ?? []).filter((vacancy) => vacancy.publication).map((vacancy) => ({ value: vacancy.vacancy_id, label: vacancyTitle(vacancy) }))}
           containerClassName="w-72"
         />
@@ -165,8 +165,8 @@ function Funnel({ stats }: { stats: EmployerStatistics }) {
         return (
           <li key={stage.key} className="grid grid-cols-[150px_1fr_auto] items-center gap-3 text-sm">
             <span className="text-subtle">{stage.label}</span>
-            <span className="h-3 overflow-hidden rounded-r-[4px] bg-white/5" aria-hidden>
-              <span className="block h-full rounded-r-[4px] bg-primary" style={{ width: `${(value / max) * 100}%` }} />
+            <span className="h-3 overflow-hidden rounded-r-[0.25rem] bg-white/5" aria-hidden>
+              <span className="block h-full rounded-r-[0.25rem] bg-primary" style={{ width: `${(value / max) * 100}%` }} />
             </span>
             <span className="w-10 text-right tabular-nums">{value}</span>
           </li>
@@ -188,7 +188,7 @@ function DailyChart({ stats }: { stats: EmployerStatistics }) {
       <p className="h-5 text-sm text-subtle" aria-live="polite">
         {active ? `${dayLabel(active.date)}: ${active.counts.delivered} показов, ${active.counts.liked} лайков` : "Наведите на столбец, чтобы увидеть день"}
       </p>
-      <div className="flex h-40 items-end gap-[2px] border-b border-white/15" onMouseLeave={() => setHover(null)}>
+      <div className="flex h-40 items-end gap-[0.125rem] border-b border-white/15" onMouseLeave={() => setHover(null)}>
         {stats.daily.map((day, index) => (
           <button
             key={day.date}
@@ -199,7 +199,7 @@ function DailyChart({ stats }: { stats: EmployerStatistics }) {
             className="flex h-full min-w-0 flex-1 cursor-default items-end justify-center focus-visible:outline-none"
           >
             <span
-              className={cx("block w-full max-w-6 rounded-t-[4px] transition-opacity duration-150", hover !== null && hover !== index ? "bg-primary/40" : "bg-primary")}
+              className={cx("block w-full max-w-6 rounded-t-[0.25rem] transition-opacity duration-150", hover !== null && hover !== index ? "bg-primary/40" : "bg-primary")}
               style={{ height: `${(day.counts.delivered / max) * 100}%`, minHeight: day.counts.delivered > 0 ? 2 : 0 }}
             />
           </button>

@@ -1,5 +1,19 @@
 /// <reference path="./assets.d.ts" />
 import type { CSSProperties } from "react";
+import {
+  ArrowUpRight,
+  BrainCircuit,
+  Copy,
+  Gauge,
+  Heart,
+  MessageCircle,
+  Paperclip,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import angleDown from "./assets/icons/angle-down.svg";
 import arrowLeft from "./assets/icons/arrow-left.svg";
 import at from "./assets/icons/at.svg";
@@ -30,11 +44,31 @@ export const ICONS = {
   resumes,
 } as const;
 
-export type IconName = keyof typeof ICONS;
+/** The design draws the rest of its icons from lucide; these render as stroke icons in currentColor. */
+const LUCIDE = {
+  "arrow-up-right": ArrowUpRight,
+  brain: BrainCircuit,
+  chat: MessageCircle,
+  close: X,
+  copy: Copy,
+  gauge: Gauge,
+  heart: Heart,
+  "heart-filled": Heart,
+  paperclip: Paperclip,
+  pencil: Pencil,
+  plus: Plus,
+  trash: Trash2,
+} satisfies Record<string, LucideIcon>;
+
+export type IconName = keyof typeof ICONS | keyof typeof LUCIDE;
+
+function isLucide(name: IconName): name is keyof typeof LUCIDE {
+  return name in LUCIDE;
+}
 
 export interface IconProps {
   name: IconName;
-  /** Square size in px. */
+  /** Square size in design px (1920 artboard); rendered in rem so it follows the fluid scale. */
   size?: number;
   className?: string;
   /** Accessible label; omitted icons are decorative and hidden from assistive tech. */
@@ -46,10 +80,24 @@ export interface IconProps {
  * (active nav pills switch the same icon from light to dark).
  */
 export function Icon({ name, size = 24, className, label }: IconProps) {
+  if (isLucide(name)) {
+    const Glyph = LUCIDE[name];
+    return (
+      <Glyph
+        role={label ? "img" : undefined}
+        aria-label={label}
+        aria-hidden={label ? undefined : true}
+        strokeWidth={2}
+        fill={name === "heart-filled" ? "currentColor" : "none"}
+        className={cx("inline-block shrink-0", className)}
+        style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }}
+      />
+    );
+  }
   const url = `url("${ICONS[name]}")`;
   const style: CSSProperties = {
-    width: size,
-    height: size,
+    width: `${size / 16}rem`,
+    height: `${size / 16}rem`,
     backgroundColor: "currentColor",
     maskImage: url,
     WebkitMaskImage: url,

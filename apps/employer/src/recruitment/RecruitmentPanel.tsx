@@ -1,5 +1,5 @@
 import type { ContactsView, InterviewKind, InterviewOutcome, RecruitmentAction, RecruitmentView } from "@comit/shared";
-import { Button, Dialog, Panel, SelectField, TextArea, TextField } from "@comit/ui-kit";
+import { Button, Dialog, SelectField, TextArea, TextField, cx } from "@comit/ui-kit";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import { api, describeError, isUnauthorized, newIdempotencyKey } from "../api";
@@ -31,7 +31,7 @@ type ActionBody = Distributive<RecruitmentAction>;
 
 type DialogKind = "invite" | "reject_saved" | "reject" | "interview_propose" | "interview_complete" | "offer_send";
 
-interface RecruitmentPanelProps {
+interface RecruitmentControlsProps {
   draftId: string;
   candidateId: string;
   /** Existing process for this vacancy/candidate pair, or null before an invitation. */
@@ -39,106 +39,118 @@ interface RecruitmentPanelProps {
   /** Vacancy salary interval used as the invitation default (mandatory, TZ §2.2). */
   vacancySalary: { from_rub: number; to_rub: number } | null;
   vacancyTitle: string;
+  /** Protected PDF of the public résumé projection. */
+  resumeUrl: string;
   /** Server state changed — reload the process. */
   onChanged: (process: RecruitmentView) => void;
 }
 
+/** Bottom action buttons of the candidate screen (design: 24px semibold, radius 20, 24px vertical padding). */
+const BUTTON = "inline-flex h-14 items-center justify-center rounded-[1.25rem] px-8 text-lg font-semibold tracking-[-0.045rem] text-white transition-[filter] duration-150 hover:brightness-115 disabled:opacity-50 lg:h-[4.75rem] lg:px-[5rem] lg:text-[1.5rem]";
+
 /**
- * Hiring actions for one candidate inside one vacancy. Buttons come from the server's
- * `allowed_actions`; every mutation carries the read revision (CAS) and a UUID retry key.
- * Contacts are requested only after acceptance through the dedicated endpoint.
+ * Hiring controls for one candidate inside one vacancy (Figma «ПРОСМОТР»): a «Процесс найма» row in the
+ * information list, then the button row — PDF, interview, reject, hire. Buttons come from the server's
+ * `allowed_actions`; every mutation carries the read revision (CAS) and a UUID retry key. Contacts are
+ * requested only after acceptance through the dedicated endpoint.
  */
-export function RecruitmentPanel({ draftId, candidateId, process, vacancySalary, vacancyTitle, onChanged }: RecruitmentPanelProps) {
+export function RecruitmentControls({ draftId, candidateId, process, vacancySalary, vacancyTitle, resumeUrl, onChanged }: RecruitmentControlsProps) {
   const [dialog, setDialog] = useState<DialogKind | null>(null);
   const [interviewId, setInterviewId] = useState<string | null>(null);
   const allowed = new Set(process?.allowed_actions ?? []);
   const terminal = process ? TERMINAL_STATES.has(process.state) : false;
 
   return (
-    <Panel tone="solid" className="flex flex-col gap-4 p-5 sm:p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl">Процесс найма</h2>
-        <span className="rounded-chip bg-surface-raised px-3 py-1.5 text-sm">
-          {process ? RECRUITMENT_STATE_LABEL[process.state] : "В шортлисте вакансии"}
-        </span>
-      </header>
-      <p className="text-sm text-muted">Вакансия: {vacancyTitle}</p>
-
-      {process?.terms && (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="text-muted">Компания</dt>
-          <dd>{process.terms.company_name}</dd>
-          <dt className="text-muted">ЗП в приглашении</dt>
-          <dd>{formatSalaryRange(process.terms.salary.from_rub, process.terms.salary.to_rub)}</dd>
-        </dl>
-      )}
-      {process?.closure && (
-        <p className="text-sm text-subtle">
-          Причина закрытия ({process.closure.actor === "employer" ? "работодатель" : "кандидат"}): {process.closure.reason}
-        </p>
-      )}
-
-      {process && process.interviews.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {process.interviews.map((interview) => (
-            <li key={interview.id} className="flex flex-wrap items-center justify-between gap-2 rounded-field bg-surface-raised px-4 py-3 text-sm">
-              <span>
-                {INTERVIEW_KIND_LABEL[interview.kind]} · <span className="first-letter:uppercase">{formatInterviewTime(interview)}</span> ·{" "}
-                {interview.outcome ? INTERVIEW_OUTCOME_LABEL[interview.outcome] : interview.state === "proposed" ? "ждёт подтверждения" : interview.state === "scheduled" ? "назначено" : interview.state}
-              </span>
-              {interview.state === "scheduled" && allowed.has("interview_complete") && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setInterviewId(interview.id);
-                    setDialog("interview_complete");
-                  }}
-                >
-                  Заполнить ОС
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {process && <ContactsBlock process={process} />}
-
-      {!terminal && (
-        <div className="flex flex-wrap gap-3">
-          {!process && (
-            <>
-              <Button variant="accent" onClick={() => setDialog("invite")}>
-                Пригласить
-              </Button>
-              <Button variant="danger" onClick={() => setDialog("reject_saved")}>
-                Отклонить
-              </Button>
-            </>
+    <>
+      <section className="rounded-[2rem] bg-light px-5 py-5 text-on-chip lg:px-[1.5625rem] lg:py-[1.75rem]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className="text-xl font-medium tracking-[-0.04875rem] lg:text-[1.625rem]">Процесс найма · {vacancyTitle}</h4>
+          <span className="rounded-full bg-black/5 px-4 py-2 text-base font-medium lg:text-[1.25rem]">
+            {process ? RECRUITMENT_STATE_LABEL[process.state] : "В шортлисте вакансии"}
+          </span>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 text-base lg:text-[1.25rem]">
+          {process?.terms ? (
+            <p>
+              {process.terms.company_name} · {formatSalaryRange(process.terms.salary.from_rub, process.terms.salary.to_rub)} в месяц
+            </p>
+          ) : (
+            !process && <p className="text-on-chip/70">Приглашение ещё не отправлено: кандидат не знает о шортлисте.</p>
           )}
-          {allowed.has("interview_propose") && (
-            <Button variant="dark" onClick={() => setDialog("interview_propose")}>
-              Собеседование
-            </Button>
+          {process?.closure && (
+            <p className="text-on-chip/70">
+              Причина закрытия ({process.closure.actor === "employer" ? "работодатель" : "кандидат"}): {process.closure.reason}
+            </p>
           )}
-          {allowed.has("offer_send") && (
-            <Button variant="accent" onClick={() => setDialog("offer_send")}>
-              Взять на работу
-            </Button>
+          {process && process.interviews.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {process.interviews.map((interview) => (
+                <li key={interview.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[1.25rem] bg-black/5 px-4 py-3">
+                  <span>
+                    {INTERVIEW_KIND_LABEL[interview.kind]} · <span className="first-letter:uppercase">{formatInterviewTime(interview)}</span> ·{" "}
+                    {interview.outcome
+                      ? INTERVIEW_OUTCOME_LABEL[interview.outcome]
+                      : interview.state === "proposed"
+                        ? "ждёт подтверждения"
+                        : interview.state === "scheduled"
+                          ? "назначено"
+                          : interview.state}
+                  </span>
+                  {interview.state === "scheduled" && allowed.has("interview_complete") && (
+                    <Button
+                      size="sm"
+                      variant="dark"
+                      onClick={() => {
+                        setInterviewId(interview.id);
+                        setDialog("interview_complete");
+                      }}
+                    >
+                      Заполнить ОС
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
-          {allowed.has("reject") && (
-            <Button variant="danger" onClick={() => setDialog("reject")}>
-              Отклонить
-            </Button>
-          )}
+          {process && <ContactsBlock process={process} />}
           {process?.chat_available && (
-            <Link to={`/chats/${process.id}`} className="inline-flex h-12 items-center rounded-field bg-surface-raised px-6 font-semibold hover:bg-white/15">
-              Чат
+            <Link to={`/chats/${process.id}`} className="w-fit font-semibold underline underline-offset-4">
+              Открыть чат с кандидатом
             </Link>
           )}
         </div>
-      )}
+      </section>
+
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-3 lg:mt-[2.875rem] lg:gap-[1.5rem]">
+        <a href={resumeUrl} target="_blank" rel="noreferrer" className={cx(BUTTON, "bg-dark-button lg:px-[3.75rem]")}>
+          PDF Резюме
+        </a>
+        {!terminal && !process && (
+          <>
+            <button type="button" className={cx(BUTTON, "bg-dark-button")} onClick={() => setDialog("invite")}>
+              Пригласить
+            </button>
+            <button type="button" className={cx(BUTTON, "bg-danger")} onClick={() => setDialog("reject_saved")}>
+              Отклонить
+            </button>
+          </>
+        )}
+        {allowed.has("interview_propose") && (
+          <button type="button" className={cx(BUTTON, "bg-dark-button")} onClick={() => setDialog("interview_propose")}>
+            Собеседование
+          </button>
+        )}
+        {allowed.has("reject") && (
+          <button type="button" className={cx(BUTTON, "bg-danger")} onClick={() => setDialog("reject")}>
+            Отклонить
+          </button>
+        )}
+        {allowed.has("offer_send") && (
+          <button type="button" className={cx(BUTTON, "bg-accent-gradient lg:w-[28.9375rem]")} onClick={() => setDialog("offer_send")}>
+            Взять на работу
+          </button>
+        )}
+      </div>
 
       {dialog && (
         <ActionDialog
@@ -155,7 +167,7 @@ export function RecruitmentPanel({ draftId, candidateId, process, vacancySalary,
           }}
         />
       )}
-    </Panel>
+    </>
   );
 }
 
@@ -178,15 +190,15 @@ function ContactsBlock({ process }: { process: RecruitmentView }) {
   }, [process.id, visible]);
 
   if (!visible) {
-    return <p className="text-sm text-muted">Контакты кандидата откроются после принятия приглашения.</p>;
+    return <p className="text-on-chip/70">Контакты кандидата откроются после принятия приглашения.</p>;
   }
-  if (error) return <p className="text-sm text-danger-soft">Контакты недоступны: {error}</p>;
-  if (!contacts) return <p className="text-sm text-muted">Загружаем контакты…</p>;
+  if (error) return <p className="text-danger">Контакты недоступны: {error}</p>;
+  if (!contacts) return <p className="text-on-chip/70">Загружаем контакты…</p>;
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-field bg-surface-raised p-4 text-sm">
-      <dt className="text-muted">Имя</dt>
+    <dl className="grid w-fit grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-[1.25rem] bg-black/5 px-4 py-3">
+      <dt className="text-on-chip/60">Имя</dt>
       <dd>{contacts.display_name}</dd>
-      <dt className="text-muted">Email</dt>
+      <dt className="text-on-chip/60">Email</dt>
       <dd>
         <a className="underline" href={`mailto:${contacts.email}`}>
           {contacts.email}
@@ -194,7 +206,7 @@ function ContactsBlock({ process }: { process: RecruitmentView }) {
       </dd>
       {contacts.phone && (
         <>
-          <dt className="text-muted">Телефон</dt>
+          <dt className="text-on-chip/60">Телефон</dt>
           <dd>
             <a className="underline" href={`tel:${contacts.phone}`}>
               {contacts.phone}
@@ -258,6 +270,7 @@ function ActionDialog({ kind, draftId, candidateId, process, interviewId, vacanc
   // One retry key per dialog instance: resubmitting after a network error replays, never duplicates.
   const [idempotencyKey] = useState(newIdempotencyKey);
   const set = (key: string) => (event: { target: { value: string } }) => setValues((previous) => ({ ...previous, [key]: event.target.value }));
+  const choose = (key: string) => (next: string) => setValues((previous) => ({ ...previous, [key]: next }));
   const value = (key: string) => values[key] ?? "";
   const rub = (key: string) => Math.round(Number(value(key).replace(",", ".")) * 1000);
 
@@ -385,7 +398,7 @@ function ActionDialog({ kind, draftId, candidateId, process, interviewId, vacanc
         <SelectField
           label="Тип"
           value={value("kind")}
-          onChange={set("kind")}
+          onChange={choose("kind")}
           options={INTERVIEW_KINDS.map((key) => ({ value: key, label: INTERVIEW_KIND_LABEL[key] }))}
         />
         <TextField label={`Дата и время (${localTimeZone()})`} type="datetime-local" value={value("startsAt")} onChange={set("startsAt")} />
@@ -394,7 +407,7 @@ function ActionDialog({ kind, draftId, candidateId, process, interviewId, vacanc
           <SelectField
             label="Формат"
             value={value("format")}
-            onChange={set("format")}
+            onChange={choose("format")}
             options={[
               { value: "remote", label: "Онлайн" },
               { value: "onsite", label: "Очно" },
@@ -410,7 +423,7 @@ function ActionDialog({ kind, draftId, candidateId, process, interviewId, vacanc
         <SelectField
           label="Результат"
           value={value("outcome")}
-          onChange={set("outcome")}
+          onChange={choose("outcome")}
           options={INTERVIEW_OUTCOMES.map((key) => ({ value: key, label: INTERVIEW_OUTCOME_LABEL[key] }))}
         />
         <TextArea label="Обратная связь кандидату" value={value("feedback")} onChange={set("feedback")} rows={4} />

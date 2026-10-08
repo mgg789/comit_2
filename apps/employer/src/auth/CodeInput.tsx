@@ -88,7 +88,7 @@ export function CodeInput({ value, onChange, onComplete, disabled, invalid }: Co
           aria-invalid={invalid || undefined}
           placeholder="_"
           className={cx(
-            "glass h-14 w-11 rounded-pill border border-glass-border text-center text-2xl font-medium text-text sm:h-[63px] sm:w-[60px]",
+            "glass h-14 w-11 rounded-pill text-center text-2xl font-medium text-text sm:h-[3.9375rem] sm:w-[3.75rem]",
             "placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-primary/70 disabled:opacity-50",
             invalid && "ring-2 ring-danger",
           )}

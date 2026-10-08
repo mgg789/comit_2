@@ -68,3 +68,12 @@ export function formatInterviewTime(interview: InterviewView): string {
   const time = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: interview.time_zone }).format(date);
   return `${day} в ${time}`;
 }
+
+/**
+ * Public candidate label. Matching publishes an anonymous `Candidate <uuid>` (names and contacts stay
+ * private until an invitation is accepted, TZ §2.2); show it as a short, readable handle instead.
+ */
+export function candidateLabel(displayName: string, candidateId: string): string {
+  if (!displayName.startsWith("Candidate ")) return displayName;
+  return `Кандидат ${candidateId.replace(/-/g, "").slice(0, 4).toUpperCase()}`;
+}

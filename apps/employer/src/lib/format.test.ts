@@ -1,6 +1,6 @@
 import type { AgentsDraftView } from "@comit/shared";
 import { describe, expect, it } from "vitest";
-import { formatSalaryRange, topRequirements, vacancyBadge, vacancyTitle } from "./format";
+import { candidateLabel, formatSalaryRange, topRequirements, vacancyBadge, vacancyTitle } from "./format";
 
 function draft(patch: Partial<AgentsDraftView>): AgentsDraftView {
   return {
@@ -50,5 +50,12 @@ describe("vacancyTitle", () => {
   it("falls back for untitled drafts", () => {
     expect(vacancyTitle(draft({ fields: { title: "  " } }))).toBe("Вакансия без названия");
     expect(vacancyTitle(draft({ fields: { title: "Go-разработчик" } }))).toBe("Go-разработчик");
+  });
+});
+
+describe("candidateLabel", () => {
+  it("turns the anonymous matching label into a short handle and keeps real names", () => {
+    expect(candidateLabel("Candidate 5e39d59e-cf2f-4f41-890b-0f24ee8eaf1f", "5e39d59e-cf2f-4f41-890b-0f24ee8eaf1f")).toBe("Кандидат 5E39");
+    expect(candidateLabel("Анна Орлова", "x")).toBe("Анна Орлова");
   });
 });

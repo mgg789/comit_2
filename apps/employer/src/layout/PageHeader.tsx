@@ -1,4 +1,4 @@
-import { Icon } from "@comit/ui-kit";
+import { Icon, type IconName } from "@comit/ui-kit";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -11,21 +11,44 @@ interface PageHeaderProps {
   actions?: ReactNode;
 }
 
-/** Page title row from the design: round back arrow + wide display heading + inline actions. */
+/** Page title row (design: 66px back button, 20px gap, 40px Murs Gothic title, 32px below). */
 export function PageHeader({ title, backTo, backLabel = "Назад", actions }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-4 sm:mb-8 sm:gap-5">
+    <div className="mb-6 flex flex-wrap items-center gap-4 lg:mb-[2rem] lg:gap-[1.25rem]">
       {backTo && (
         <Link
           to={backTo}
           aria-label={backLabel}
-          className="glass inline-flex size-12 shrink-0 items-center justify-center rounded-pill border border-glass-border text-text transition-colors duration-150 hover:bg-white/10 sm:size-[66px]"
+          className="glass inline-flex size-12 shrink-0 items-center justify-center rounded-pill text-text transition-colors duration-150 hover:bg-white/10 lg:size-[4.125rem]"
         >
-          <Icon name="arrow-left" size={26} />
+          <Icon name="arrow-left" size={30} />
         </Link>
       )}
-      <h1 className="font-display text-2xl leading-none sm:text-[40px]">{title}</h1>
+      <h1 className="font-display text-2xl leading-none lg:text-[2.5rem]">{title}</h1>
       {actions}
     </div>
+  );
+}
+
+/** Gradient pill action from the design («Добавить вакансию», «Редактировать»): 51px tall, white disc on the right. */
+export function HeaderAction({ to, onClick, children, icon }: { to?: string; onClick?: () => void; children: ReactNode; icon: IconName }) {
+  const className =
+    "bg-accent-gradient inline-flex h-11 cursor-pointer items-center gap-[0.625rem] rounded-[1.6875rem] pr-[0.25rem] pl-[1.25rem] text-base font-semibold text-text transition-[filter] duration-150 hover:brightness-110 lg:h-[3.1875rem] lg:text-[1.25rem]";
+  const content = (
+    <>
+      {children}
+      <span className="inline-flex size-9 items-center justify-center rounded-full bg-light text-on-light lg:size-[2.6875rem]">
+        <Icon name={icon} size={20} />
+      </span>
+    </>
+  );
+  return to ? (
+    <Link to={to} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={className}>
+      {content}
+    </button>
   );
 }

@@ -1,33 +1,36 @@
 import type { AgentsDraftView, InterviewView, RecruitmentView, SavedCard } from "@comit/shared";
-import { Avatar, Button, MatchBadge, Panel, ProgressBar, StateMessage, cx } from "@comit/ui-kit";
+import { ACTION_ROW_BUTTON, ActionRow, Avatar, Button, CountBadge, MatchBadge, Panel, ProgressBar, StateMessage, cx } from "@comit/ui-kit";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, describeError, isUnauthorized } from "../api";
 import { useSession } from "../auth/session";
-import { PageHeader } from "../layout/PageHeader";
+import { HeaderAction, PageHeader } from "../layout/PageHeader";
 import { GRADE_LABEL, matchPercent, requirementWeightLabel } from "../lib/explain";
-import { SPECIALIZATION_LABEL, WORK_TYPE_LABEL, formatInterviewTime, vacancyBadge, vacancyTitle } from "../lib/format";
+import { SPECIALIZATION_LABEL, WORK_TYPE_LABEL, candidateLabel, formatInterviewTime, vacancyBadge, vacancyTitle } from "../lib/format";
 import { useResource } from "../lib/use-resource";
 import { FeedDeck } from "./FeedDeck";
+import { PortraitGlow } from "./PortraitGlow";
 import { VacancyFormDialog } from "./VacancyFormDialog";
 
 /** Poll interval while a publication handoff is in flight. */
 const PUBLICATION_POLL_MS = 3000;
 
-/** Vacancy workspace (Figma «СТРАНИЦА ВАКАНСИИ»): data and requirements, feed, liked candidates, interviews. */
+/**
+ * Vacancy workspace (Figma «СТРАНИЦА ВАКАНСИИ»): 948px left column of #191917 panels starting under the
+ * title text, the swipe deck on the right.
+ */
 export function VacancyPage() {
   const { draftId = "" } = useParams();
   const navigate = useNavigate();
   const vacancy = useResource(() => api.getVacancy(draftId), [draftId]);
-  const vacancyData = vacancy.data;
+  const draft = vacancy.data;
   // Matching-side lists exist only after the first accepted publication.
-  const everPublished = vacancyData?.publication?.status === "accepted" || vacancyData?.business_status === "closed";
+  const everPublished = draft?.publication?.status === "accepted" || draft?.business_status === "closed";
   const saved = useResource(
     () => (everPublished ? api.getSaved(draftId, 30) : Promise.resolve({ items: [], limit: 30, offset: 0, has_more: false })),
     [draftId, everPublished],
   );
   const [editing, setEditing] = useState(false);
-  const draft = vacancy.data;
   const publishing = draft !== undefined && (draft.state === "creating" || draft.publication?.status === "pending");
 
   useEffect(() => {
@@ -66,14 +69,14 @@ export function VacancyPage() {
         backTo="/vacancies"
         actions={
           !draft.archived && (
-            <Button variant="accent" size="sm" shape="pill" onClick={() => setEditing(true)}>
+            <HeaderAction icon="pencil" onClick={() => setEditing(true)}>
               Редактировать
-            </Button>
+            </HeaderAction>
           )
         }
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,680px)_minmax(0,1fr)] lg:gap-10">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[59.25rem_minmax(0,1fr)] lg:gap-x-[2.125rem] lg:pl-[5.375rem]">
+        <div className="flex min-w-0 flex-col gap-6 lg:gap-[2rem]">
           <VacancyDataPanel draft={draft} onChanged={vacancy.reload} onEdit={() => setEditing(true)} />
           {everPublished && (
             <>
@@ -82,7 +85,7 @@ export function VacancyPage() {
             </>
           )}
         </div>
-        <div className="lg:sticky lg:top-40">
+        <div className="lg:sticky lg:top-[2rem] lg:pt-[1rem]">
           {open && draft.publication?.status === "accepted" ? (
             <FeedDeck draftId={draftId} onLiked={saved.reload} />
           ) : (
@@ -122,17 +125,13 @@ function PublicationState({ draft, publishing, onEdit }: { draft: AgentsDraftVie
     <StateMessage
       kind={failed ? "error" : "empty"}
       title={failed ? "Публикация не прошла" : "Вакансия ещё не опубликована"}
-      description={
-        failed
-          ? "Проверьте поля и опубликуйте снова — черновик сохранён."
-          : "Подбор и лента кандидатов начнутся после публикации."
-      }
+      description={failed ? "Проверьте поля и опубликуйте снова — черновик сохранён." : "Подбор и лента кандидатов начнутся после публикации."}
       action={<Button onClick={onEdit}>{failed ? "Проверить и опубликовать" : "Заполнить и опубликовать"}</Button>}
     />
   );
 }
 
-/** «Данные вакансии»: mandatory terms and weighted requirements, plus close/archive controls. */
+/** «Данные вакансии» (design 948 wide, #191917, radius 30): terms in 67px fields and weighted requirements. */
 function VacancyDataPanel({ draft, onChanged, onEdit }: { draft: AgentsDraftView; onChanged: () => void; onEdit: () => void }) {
   const { expire } = useSession();
   const navigate = useNavigate();
@@ -168,41 +167,41 @@ function VacancyDataPanel({ draft, onChanged, onEdit }: { draft: AgentsDraftView
   }
 
   return (
-    <Panel tone="solid" className="flex flex-col gap-5 p-5 sm:p-6">
+    <Panel tone="dialog" className="flex flex-col p-5 lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[2rem]">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl sm:text-2xl">Данные вакансии</h2>
-          <p className="mt-1 text-lg text-subtle">{subtitle}</p>
+          <h2 className="font-display text-2xl leading-none lg:text-[2rem]">Данные вакансии</h2>
+          <p className="mt-3 text-lg font-semibold tracking-[-0.0255rem] text-white/60 lg:mt-[1.25rem] lg:text-[1.5rem]">{subtitle}</p>
         </div>
-        <span className="rounded-chip bg-surface-raised px-3 py-1.5 text-sm">{badge.label}</span>
+        <span className="rounded-chip bg-field px-3 py-1.5 text-sm lg:text-[1.125rem]">{badge.label}</span>
       </header>
-      <dl className="grid grid-cols-2 gap-x-5 gap-y-3">
-        <ReadonlyValue label="Вилка З/П от, тыс ₽" value={fields.zp_min == null ? "—" : String(Math.round(fields.zp_min / 1000))} />
-        <ReadonlyValue label="до, тыс ₽" value={fields.zp_max == null ? "—" : String(Math.round(fields.zp_max / 1000))} />
+      <dl className="mt-6 grid grid-cols-2 gap-x-[1.625rem] gap-y-4 lg:mt-[2rem] lg:gap-y-[1.6875rem]">
+        <ReadonlyValue label="Вилка З/П от, тыс ₽" value={fields.zp_min == null ? "—" : String(Math.round(fields.zp_min / 1000))} muted />
+        <ReadonlyValue label="до, тыс ₽" value={fields.zp_max == null ? "—" : String(Math.round(fields.zp_max / 1000))} muted />
         <ReadonlyValue value={fields.type ? WORK_TYPE_LABEL[fields.type] : "Формат не указан"} />
         <ReadonlyValue value={fields.city ?? "Город не указан"} />
         {fields.daily && <ReadonlyValue className="col-span-2" value={fields.daily} />}
       </dl>
       {requirements.length > 0 ? (
-        <ul className="flex flex-col gap-4">
+        <ul className="mt-6 flex flex-col gap-5 lg:mt-[2.5rem] lg:gap-[1.5rem]">
           {requirements.map(([key, level]) => (
-            <li key={key} className="flex flex-col gap-2">
-              <div className="flex justify-between gap-3 text-lg">
+            <li key={key} className="flex flex-col gap-3 lg:gap-[1.25rem]">
+              <div className="flex justify-between gap-3 text-lg font-medium tracking-[-0.045rem] lg:text-[1.5rem]">
                 <span>{key}</span>
                 <span>{requirementWeightLabel(level)}</span>
               </div>
-              <ProgressBar value={level / 7} label={`${key}: вес ${level} из 7`} />
+              <ProgressBar value={level / 7} label={`${key}: вес ${level} из 7`} className="h-3 bg-field lg:h-[1rem]" />
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted">
+        <p className="mt-6 text-base text-white/60 lg:mt-[2.5rem] lg:text-[1.25rem]">
           Требования к навыкам не заданы: подбор идёт по направлению и рейтингу кандидатов в категории.
         </p>
       )}
-      {fields.bio && <p className="text-base whitespace-pre-line text-subtle">{fields.bio}</p>}
+      {fields.bio && <p className="mt-6 text-base whitespace-pre-line text-subtle lg:text-[1.25rem]">{fields.bio}</p>}
       {draft.missing_requirements && draft.missing_requirements.length > 0 && (
-        <p className="text-sm text-danger-soft">
+        <p className="mt-4 text-sm text-danger-soft">
           Для публикации не хватает полей.{" "}
           <button type="button" className="cursor-pointer underline" onClick={onEdit}>
             Заполнить
@@ -210,7 +209,7 @@ function VacancyDataPanel({ draft, onChanged, onEdit }: { draft: AgentsDraftView
         </p>
       )}
       {!draft.archived && (
-        <footer className="flex flex-wrap gap-3 border-t border-white/10 pt-4">
+        <footer className="mt-6 flex flex-wrap gap-3 border-t border-white/10 pt-4 lg:mt-[2rem]">
           {confirm === null ? (
             <>
               {draft.business_status === "open" && (
@@ -246,45 +245,55 @@ function VacancyDataPanel({ draft, onChanged, onEdit }: { draft: AgentsDraftView
   );
 }
 
-function ReadonlyValue({ label, value, className }: { label?: string; value: string; className?: string }) {
+function ReadonlyValue({ label, value, muted, className }: { label?: string; value: string; muted?: boolean; className?: string }) {
   return (
-    <div className={cx("flex flex-col gap-2", className)}>
-      {label && <dt className="text-base font-semibold">{label}</dt>}
-      <dd className="rounded-field bg-field px-4 py-3 text-base">{value}</dd>
+    <div className={cx("flex flex-col gap-3 lg:gap-[1rem]", className)}>
+      {label && <dt className="text-lg font-semibold tracking-[-0.0255rem] lg:text-[1.5rem]">{label}</dt>}
+      <dd
+        className={cx(
+          "flex h-12 items-center rounded-chip bg-field px-4 text-base font-medium tracking-[-0.0375rem] lg:h-[4.1875rem] lg:px-[1.25rem] lg:text-[1.25rem]",
+          muted ? "text-subtle" : "text-text",
+        )}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
 
-/** «Понравились в ленте»: the vacancy's saved shortlist with server match percent. */
+/** «Понравились в ленте»: saved shortlist tiles (design 308×229, radius 20) with the server match percent. */
 function SavedStrip({ draftId, saved, status }: { draftId: string; saved: SavedCard[]; status: "loading" | "ready" | "error" }) {
   return (
-    <Panel tone="solid" className="flex flex-col gap-4 p-5 sm:p-6">
-      <h2 className="flex items-center gap-2 font-display text-xl sm:text-2xl">
+    <Panel tone="dialog" className="flex flex-col gap-5 p-5 lg:gap-[1.875rem] lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[2.5rem]">
+      <h2 className="flex items-center gap-3 font-display text-2xl leading-none lg:text-[2rem]">
         Понравились в ленте
-        {saved.length > 0 && <span className="inline-flex size-7 items-center justify-center rounded-full bg-light font-sans text-sm text-on-light">{saved.length}</span>}
+        {saved.length > 0 && <CountBadge value={saved.length} />}
       </h2>
-      {status === "loading" && saved.length === 0 && <p className="text-sm text-muted">Загружаем…</p>}
-      {status === "error" && <p className="text-sm text-danger-soft">Не удалось загрузить список.</p>}
-      {status === "ready" && saved.length === 0 && <p className="text-sm text-muted">Лайкнутые в ленте кандидаты появятся здесь.</p>}
+      {status === "loading" && saved.length === 0 && <p className="text-base text-white/60">Загружаем…</p>}
+      {status === "error" && <p className="text-base text-danger-soft">Не удалось загрузить список.</p>}
+      {status === "ready" && saved.length === 0 && <p className="text-base text-white/60 lg:text-[1.25rem]">Лайкнутые в ленте кандидаты появятся здесь.</p>}
       {saved.length > 0 && (
-        <ul className="-mx-1 flex snap-x gap-4 overflow-x-auto px-1 pb-2">
-          {saved.map((entry) => (
-            <li key={entry.candidate_id} className="shrink-0 snap-start">
-              <Link
-                to={`/candidates/${entry.candidate_id}?vacancy=${draftId}`}
-                className="relative flex h-[164px] w-[220px] flex-col justify-end overflow-hidden rounded-[20px] bg-surface-raised p-4 transition-transform duration-150 hover:-translate-y-0.5"
-              >
-                <Avatar name={entry.card?.display_name ?? entry.candidate_id} size={220} shape="square" className="absolute inset-0 opacity-60" />
-                {entry.card && <MatchBadge percent={matchPercent(entry.card.explanation)} className="absolute top-0 left-0" />}
-                <span className="relative font-display text-xl leading-tight">{entry.card?.display_name ?? "Кандидат"}</span>
-                {entry.card && (
-                  <span className="relative text-sm font-semibold text-subtle">
-                    {SPECIALIZATION_LABEL[entry.card.category.specialization]} {GRADE_LABEL[entry.card.category.grade]}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
+        <ul className="-mx-1 flex snap-x gap-[1.625rem] overflow-x-auto px-1 pb-1">
+          {saved.map((entry) => {
+            const name = entry.card ? candidateLabel(entry.card.display_name, entry.candidate_id) : "Кандидат";
+            return (
+              <li key={entry.candidate_id} className="shrink-0 snap-start">
+                <Link
+                  to={`/candidates/${entry.candidate_id}?vacancy=${draftId}`}
+                  className="relative flex h-[10rem] w-[13rem] flex-col justify-end overflow-hidden rounded-[1.25rem] bg-surface-dialog p-4 transition-transform duration-150 hover:-translate-y-0.5 lg:h-[14.3125rem] lg:w-[19.25rem] lg:px-[1.625rem] lg:pb-[1.75rem]"
+                >
+                  <PortraitGlow name={name} />
+                  {entry.card && <MatchBadge percent={matchPercent(entry.card.explanation)} className="absolute top-0 left-0" />}
+                  <span className="relative font-display text-xl leading-none tracking-[0.035rem] lg:text-[1.75rem]">{name}</span>
+                  {entry.card && (
+                    <span className="relative mt-2 text-sm font-extrabold tracking-[0.0225rem] text-white/70 lg:mt-[0.75rem] lg:text-[1.125rem]">
+                      {SPECIALIZATION_LABEL[entry.card.category.specialization].toLowerCase()} {GRADE_LABEL[entry.card.category.grade].toLowerCase()}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Panel>
@@ -293,10 +302,13 @@ function SavedStrip({ draftId, saved, status }: { draftId: string; saved: SavedC
 
 type UpcomingInterview = { process: RecruitmentView; interview: InterviewView };
 
-/** «Назначенные собеседования»: proposed/scheduled interviews of this vacancy's processes. */
+/** «Назначенные собеседования»: proposed/scheduled interviews as light 120px rows (design). */
 function InterviewsPanel({ draftId, saved }: { draftId: string; saved: SavedCard[] }) {
   const processes = useResource(() => api.getEmployerRecruitment(draftId, 50), [draftId]);
-  const names = useMemo(() => new Map(saved.flatMap((entry) => (entry.card ? [[entry.candidate_id, entry.card.display_name] as const] : []))), [saved]);
+  const names = useMemo(
+    () => new Map(saved.flatMap((entry) => (entry.card ? [[entry.candidate_id, candidateLabel(entry.card.display_name, entry.candidate_id)] as const] : []))),
+    [saved],
+  );
   const upcoming: UpcomingInterview[] = (processes.data?.items ?? [])
     .flatMap((process) =>
       process.interviews.filter((interview) => interview.state === "scheduled" || interview.state === "proposed").map((interview) => ({ process, interview })),
@@ -304,37 +316,35 @@ function InterviewsPanel({ draftId, saved }: { draftId: string; saved: SavedCard
     .sort((left, right) => Date.parse(left.interview.starts_at) - Date.parse(right.interview.starts_at));
 
   return (
-    <Panel tone="solid" className="flex flex-col gap-4 p-5 sm:p-6">
-      <h2 className="flex items-center gap-2 font-display text-xl sm:text-2xl">
+    <Panel tone="dialog" className="flex flex-col gap-5 p-5 lg:gap-[1.875rem] lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[2.5rem]">
+      <h2 className="flex items-center gap-3 font-display text-2xl leading-none lg:text-[2rem]">
         Назначенные собеседования
-        {upcoming.length > 0 && <span className="inline-flex size-7 items-center justify-center rounded-full bg-light font-sans text-sm text-on-light">{upcoming.length}</span>}
+        {upcoming.length > 0 && <CountBadge value={upcoming.length} />}
       </h2>
-      {processes.status === "error" && <p className="text-sm text-danger-soft">Не удалось загрузить собеседования.</p>}
+      {processes.status === "error" && <p className="text-base text-danger-soft">Не удалось загрузить собеседования.</p>}
       {processes.status === "ready" && upcoming.length === 0 && (
-        <p className="text-sm text-muted">Пока нет. Пригласите кандидата из «Понравились в ленте» и предложите время.</p>
+        <p className="text-base text-white/60 lg:text-[1.25rem]">Пока нет. Пригласите кандидата из «Понравились в ленте» и предложите время.</p>
       )}
-      <ul className="flex flex-col gap-4">
+      <ul className="flex flex-col gap-4 lg:gap-[2rem]">
         {upcoming.map(({ process, interview }) => {
           const name = names.get(process.candidate_id) ?? "Кандидат";
           return (
-            <li key={interview.id} className="flex flex-wrap items-center gap-4 rounded-[20px] bg-light p-4 text-on-light">
-              <Avatar name={name} size={52} />
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-lg leading-tight">{name}</p>
-                <p className="text-base first-letter:uppercase">
-                  {formatInterviewTime(interview)}
-                  {interview.state === "proposed" && " · ждёт подтверждения"}
-                </p>
-              </div>
-              {process.chat_available ? (
-                <Link to={`/chats/${process.id}`} className="inline-flex h-12 items-center rounded-field bg-dark-button px-6 font-semibold text-white hover:brightness-125">
-                  Перейти в чат
-                </Link>
-              ) : (
-                <Link to={`/resumes`} className="inline-flex h-12 items-center rounded-field bg-dark-button px-6 font-semibold text-white hover:brightness-125">
-                  К процессу
-                </Link>
-              )}
+            <li key={interview.id}>
+              <ActionRow
+                leading={<Avatar name={name} size={70} />}
+                title={name}
+                subtitle={
+                  <span className="first-letter:uppercase">
+                    {formatInterviewTime(interview)}
+                    {interview.state === "proposed" && " · ждёт подтверждения"}
+                  </span>
+                }
+                action={
+                  <Link to={process.chat_available ? `/chats/${process.id}` : `/candidates/${process.candidate_id}?vacancy=${draftId}`} className={ACTION_ROW_BUTTON}>
+                    {process.chat_available ? "Перейти в чат" : "К процессу"}
+                  </Link>
+                }
+              />
             </li>
           );
         })}

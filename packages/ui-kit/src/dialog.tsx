@@ -39,7 +39,7 @@ export function Dialog({ title, showTitle = false, onClose, children, className 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-md sm:py-12">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-md sm:items-center sm:py-8">
       <button type="button" aria-label="Закрыть" tabIndex={-1} className="fixed inset-0 cursor-default" onClick={onClose} />
       <div
         ref={panel}
@@ -47,7 +47,7 @@ export function Dialog({ title, showTitle = false, onClose, children, className 
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={cx("relative w-full max-w-[480px] rounded-card bg-surface p-5 shadow-2xl outline-none", className)}
+        className={cx("relative w-full max-w-[30.25rem] rounded-[2rem] bg-surface-dialog p-5 shadow-2xl outline-none lg:px-[1.6875rem] lg:pt-[1.6875rem] lg:pb-[1.25rem]", className)}
       >
         <h2 id={titleId} className={showTitle ? "mb-4 text-2xl font-semibold" : "sr-only"}>
           {title}

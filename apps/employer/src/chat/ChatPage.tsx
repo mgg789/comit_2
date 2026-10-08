@@ -120,7 +120,7 @@ function ChatRoom({ process, name }: { process: RecruitmentView; name: string })
     <>
       <div className="flex flex-wrap items-center gap-4">
         <PageHeader title="К вакансии" backTo={`/vacancies/${process.draft_id}`} />
-        <div className="mb-6 flex min-w-0 flex-1 items-center gap-3 rounded-pill bg-light py-1.5 pr-6 pl-1.5 text-on-light sm:mb-8 lg:max-w-[700px]">
+        <div className="mb-6 flex min-w-0 flex-1 items-center gap-3 rounded-pill bg-light py-1.5 pr-6 pl-1.5 text-on-light sm:mb-8 lg:max-w-[43.75rem]">
           <Avatar name={name} size={44} shape="circle" />
           <div className="min-w-0">
             <p className="truncate font-display text-base">{name}</p>
@@ -129,8 +129,8 @@ function ChatRoom({ process, name }: { process: RecruitmentView; name: string })
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-[700px] flex-col gap-4">
-        <div ref={list} aria-live="polite" className="flex max-h-[calc(100dvh-380px)] min-h-[240px] flex-col gap-4 overflow-y-auto pr-1">
+      <div className="mx-auto flex max-w-[43.75rem] flex-col gap-4">
+        <div ref={list} aria-live="polite" className="flex max-h-[calc(100dvh-380px)] min-h-[15rem] flex-col gap-4 overflow-y-auto pr-1">
           {status === "loading" && <StateMessage kind="loading" title="Загружаем переписку" />}
           {status === "error" && (
             <StateMessage kind="error" title={error?.unconfigured ? "Чат не настроен" : "Чат недоступен"} description={error?.message} />
@@ -158,7 +158,7 @@ function ChatRoom({ process, name }: { process: RecruitmentView; name: string })
 function Bubble({ message, mine, processId }: { message: ChatMessage; mine: boolean; processId: string }) {
   const time = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.created_at));
   return (
-    <div className={cx("flex max-w-[80%] flex-col gap-2 rounded-[15px] px-4 py-3", mine ? "self-end bg-surface-raised text-text" : "self-start bg-light text-on-light")}>
+    <div className={cx("flex max-w-[80%] flex-col gap-2 rounded-[0.9375rem] px-4 py-3", mine ? "self-end bg-surface-raised text-text" : "self-start bg-light text-on-light")}>
       {message.text && <p className="whitespace-pre-wrap break-words">{message.text}</p>}
       {message.files.map((file) => (
         <AttachmentLink key={file.id} file={file} processId={processId} />
@@ -258,7 +258,7 @@ function Composer({ processId, onSent }: { processId: string; onSent: (message: 
           ))}
         </ul>
       )}
-      <div className="glass flex items-center gap-3 rounded-pill border border-glass-border p-1.5">
+      <div className="glass flex items-center gap-3 rounded-pill p-1.5">
         <input
           ref={fileInput}
           type="file"
@@ -296,7 +296,7 @@ function Composer({ processId, onSent }: { processId: string; onSent: (message: 
           type="submit"
           aria-label="Отправить"
           disabled={busy}
-          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-glass-border text-text hover:bg-white/10 disabled:opacity-50"
+          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text hover:bg-white/10 disabled:opacity-50"
         >
           {busy ? <Spinner size={18} /> : <Icon name="arrow-left" size={22} className="rotate-180" />}
         </button>

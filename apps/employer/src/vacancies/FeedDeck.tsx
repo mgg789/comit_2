@@ -1,11 +1,12 @@
 import type { FeedCard, FeedPage } from "@comit/shared";
 import { ApiError } from "@comit/api-client";
-import { Button, Chip, MatchBadge, StateMessage, cx } from "@comit/ui-kit";
+import { Button, Chip, Icon, MatchBadge, StateMessage, cx } from "@comit/ui-kit";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { api, describeError, errorDetail, isUnauthorized, newIdempotencyKey } from "../api";
 import { useSession } from "../auth/session";
 import { CLAIM_STATUS_LABEL, GRADE_LABEL, describeFeature, filterFactorLabels, matchPercent, scoreChannels } from "../lib/explain";
-import { SPECIALIZATION_LABEL, formatSalaryRange } from "../lib/format";
+import { SPECIALIZATION_LABEL, candidateLabel, formatSalaryRange } from "../lib/format";
+import { PortraitGlow } from "./PortraitGlow";
 
 /** Cards requested per portion; the next page is fetched when fewer than REFILL_AT remain. */
 const PAGE_SIZE = 20;
@@ -205,7 +206,7 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
   return (
     <section aria-label="Лента кандидатов" className="flex flex-col items-center gap-4">
       <div
-        className="relative w-full max-w-[400px] outline-none"
+        className="relative w-full max-w-[31.8125rem] outline-none"
         tabIndex={0}
         aria-keyshortcuts="ArrowLeft ArrowRight"
         onKeyDown={(event) => {
@@ -213,39 +214,11 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
           if (event.key === "ArrowLeft") void decide("dislike");
         }}
       >
-        {cards[2] && <div aria-hidden className="absolute inset-0 translate-x-3 -translate-y-4 rotate-6 rounded-card bg-surface-raised/80" />}
-        {cards[1] && <div aria-hidden className="absolute inset-0 -translate-x-3 -translate-y-2 -rotate-6 rounded-card bg-surface-raised" />}
+        {cards[2] && <div aria-hidden className="glass-deck absolute inset-0 -translate-x-[1.5rem] -translate-y-[0.75rem] -rotate-[12.75deg] rounded-[1.25rem]" />}
+        {cards[1] && <div aria-hidden className="glass-deck absolute inset-0 translate-x-[1.5rem] -translate-y-[0.5rem] rotate-[8.5deg] rounded-[1.25rem]" />}
         <SwipeCard key={top.exposure_id} card={top} disabled={busy} onSwipe={(action) => void decide(action)} />
       </div>
-      <div className="flex items-center gap-5">
-        <button
-          type="button"
-          onClick={() => void decide("dislike")}
-          disabled={busy}
-          aria-label="Пропустить (←)"
-          className="inline-flex size-14 cursor-pointer items-center justify-center rounded-field bg-surface-raised text-3xl text-text transition-colors duration-150 hover:bg-danger disabled:opacity-50"
-        >
-          ×
-        </button>
-        <a
-          href={top.resume_url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-14 items-center justify-center rounded-field bg-surface-raised px-5 font-semibold text-text transition-colors duration-150 hover:bg-white/15"
-        >
-          PDF резюме
-        </a>
-        <button
-          type="button"
-          onClick={() => void decide("like")}
-          disabled={busy}
-          aria-label="Нравится (→)"
-          className="inline-flex size-14 cursor-pointer items-center justify-center rounded-field bg-surface-raised text-3xl text-text transition-colors duration-150 hover:bg-success-strong disabled:opacity-50"
-        >
-          +
-        </button>
-      </div>
-      <p className="text-center text-xs text-muted">Свайп или ← / → · осталось в порции: {cards.length}</p>
+      <p className="text-center text-sm text-muted">Свайп или ← / → · в порции ещё {cards.length - 1}</p>
       {actionError && (
         <p role="alert" className="text-center text-sm text-danger-soft">
           {actionError}
@@ -255,7 +228,11 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
   );
 }
 
-/** Draggable top card; releases past SWIPE_THRESHOLD commit like (right) or dislike (left). */
+/**
+ * Draggable top card (design 509×603 glass): label, chips, three explanation boxes, and the 78px
+ * action row — skip, like (save to shortlist), PDF résumé. Releases past SWIPE_THRESHOLD commit
+ * like (right) or dislike (left).
+ */
 function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: boolean; onSwipe: (action: "like" | "dislike") => void }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -279,9 +256,12 @@ function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: bool
   }
 
   const { explanation, category } = card;
+  const name = candidateLabel(card.display_name, card.candidate_id);
   const factors = filterFactorLabels(card.filter_factors);
   const features = explanation.top_matched_features.slice(0, 3);
   const fsp = card.external_evidence?.filter((item) => item.kind === "fsp") ?? [];
+  const actionButton =
+    "inline-flex size-16 cursor-pointer items-center justify-center rounded-[1.25rem] bg-surface-button text-text transition-colors duration-150 disabled:opacity-50 lg:size-[4.9rem]";
   return (
     <article
       onPointerDown={onPointerDown}
@@ -290,16 +270,16 @@ function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: bool
       onPointerCancel={onPointerUp}
       style={{ transform: `translateX(${dx}px) rotate(${dx / 20}deg)` }}
       className={cx(
-        "relative flex touch-pan-y flex-col gap-3 overflow-hidden rounded-card border border-glass-border bg-surface p-5 select-none",
+        "glass-deck relative flex min-h-[32rem] touch-pan-y flex-col overflow-hidden rounded-[1.25rem] px-5 pt-6 pb-5 select-none lg:min-h-[37.6875rem] lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[1.5rem]",
         !dragging && "transition-transform duration-200",
       )}
     >
-      <div aria-hidden className="bg-accent-gradient pointer-events-none absolute inset-x-0 top-0 h-40 opacity-40" />
+      <PortraitGlow name={name} />
       <div className="relative flex items-start justify-between gap-3">
-        <h3 className="font-display text-2xl leading-tight">{card.display_name}</h3>
+        <h3 className="truncate font-display text-2xl leading-none lg:text-[2rem]">{name}</h3>
         <MatchBadge percent={matchPercent(explanation)} shape="pill" className="shrink-0" />
       </div>
-      <div className="relative flex flex-wrap gap-2">
+      <div className="relative mt-4 flex flex-wrap gap-[0.625rem] lg:mt-[1.4rem]">
         <Chip>{SPECIALIZATION_LABEL[category.specialization]}</Chip>
         <Chip>
           {GRADE_LABEL[category.grade]}
@@ -314,57 +294,51 @@ function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: bool
         {card.hypothesis_pair_id && <Chip tone="info">Сравнение предпочтений</Chip>}
       </div>
 
-      <section className="relative rounded-field bg-surface-raised p-3">
-        <h4 className="mb-2 text-sm font-semibold text-subtle">Почему в подборке</h4>
-        <ul className="flex flex-wrap gap-1.5 text-xs">
+      <section className="relative mt-4 rounded-[1.25rem] bg-field p-4 lg:mt-[1.4rem] lg:min-h-[10.0625rem] lg:p-[1.25rem]">
+        <h4 className="sr-only">Почему в подборке</h4>
+        <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-medium text-white/60 lg:text-[1.125rem]">
           {factors.map((factor) => (
-            <li key={factor} className="rounded-chip bg-white/10 px-2.5 py-1">
-              {factor}
-            </li>
+            <li key={factor}>• {factor}</li>
           ))}
           {card.strict_filter_warnings?.map((warning) => (
-            <li key={warning} className="rounded-chip bg-danger/30 px-2.5 py-1">
-              {warning}
+            <li key={warning} className="text-danger-soft">
+              • {warning}
             </li>
           ))}
         </ul>
-      </section>
-
-      {features.length > 0 && (
-        <section className="relative rounded-field bg-surface-raised p-3">
-          <h4 className="mb-2 text-sm font-semibold text-subtle">Совпадение по требованиям</h4>
-          <ul className="flex flex-col gap-1 text-sm">
+        {features.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-1 text-sm font-medium text-white/80 lg:text-[1.125rem]">
             {features.map((feature) => (
               <li key={`${feature.group}:${feature.key}`}>{describeFeature(feature)}</li>
             ))}
           </ul>
-        </section>
-      )}
-
-      <section className="relative rounded-field bg-surface-raised p-3">
-        <h4 className="mb-2 text-sm font-semibold text-subtle">Из чего сложилась оценка</h4>
-        <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
-          {scoreChannels(explanation).map((channel) => (
-            <div key={channel.key} className="contents">
-              <dt className="text-muted">{channel.label}</dt>
-              <dd>+{Math.round(channel.value * 100)}</dd>
-            </div>
-          ))}
-          <dt className="text-muted">Ожидания по ЗП</dt>
-          <dd>{formatSalaryRange(card.salary.from_rub, card.salary.to_rub)}</dd>
-          {fsp.map((item) => (
-            <div key={item.subject} className="contents">
-              <dt className="text-muted">ФСП: {item.subject}</dt>
-              <dd>{CLAIM_STATUS_LABEL[item.status]}</dd>
-            </div>
-          ))}
-        </dl>
-        {explanation.semantic_unavailable_reason && (
-          <p className="mt-2 text-xs text-muted" title={explanation.semantic_unavailable_reason}>
-            Смысловая близость не учтена: нет описания или несовместимая модель эмбеддингов.
-          </p>
         )}
       </section>
+
+      <section className="relative mt-[0.5625rem] flex min-h-[3.5rem] items-center rounded-[1.25rem] bg-field px-4 text-sm font-medium text-white/60 lg:min-h-[4.4375rem] lg:px-[1.25rem] lg:text-[1.125rem]">
+        <h4 className="sr-only">Из чего сложилась оценка</h4>
+        <p>{scoreChannels(explanation).map((channel) => `${channel.label} +${Math.round(channel.value * 100)}`).join(" · ")}</p>
+      </section>
+      <section className="relative mt-[0.5625rem] flex min-h-[3.5rem] items-center rounded-[1.25rem] bg-field px-4 text-sm font-medium text-white/60 lg:min-h-[4.4375rem] lg:px-[1.25rem] lg:text-[1.125rem]">
+        <h4 className="sr-only">Ожидания и подтверждения</h4>
+        <p>
+          Ожидания {formatSalaryRange(card.salary.from_rub, card.salary.to_rub)}
+          {fsp.map((item) => ` · ФСП ${item.subject}: ${CLAIM_STATUS_LABEL[item.status]}`).join("")}
+          {explanation.semantic_unavailable_reason && " · без смысловой близости"}
+        </p>
+      </section>
+
+      <div className="relative mt-auto flex justify-center gap-[2.125rem] pt-5">
+        <button type="button" onClick={() => onSwipe("dislike")} disabled={disabled} aria-label="Пропустить (←)" className={cx(actionButton, "hover:bg-danger")}>
+          <Icon name="close" size={36} />
+        </button>
+        <button type="button" onClick={() => onSwipe("like")} disabled={disabled} aria-label="В шортлист (→)" className={cx(actionButton, "hover:bg-success-strong")}>
+          <Icon name="plus" size={36} />
+        </button>
+        <a href={card.resume_url} target="_blank" rel="noreferrer" aria-label="PDF резюме" className={cx(actionButton, "hover:bg-white/15")}>
+          <Icon name="resumes" size={36} />
+        </a>
+      </div>
     </article>
   );
 }

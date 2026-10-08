@@ -3,7 +3,7 @@ import { cx } from "./cx";
 import { Icon, type IconName } from "./icon";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "dark";
-export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonSize = "sm" | "md" | "lg" | "xl";
 export type ButtonShape = "chip" | "field" | "pill";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -32,9 +32,11 @@ const SIZE: Record<ButtonSize, string> = {
   sm: "h-10 px-4 text-sm",
   md: "h-12 px-6 text-base",
   lg: "h-14 px-8 text-lg",
+  /** Design form submit / primary actions: 67px tall, 20px text. */
+  xl: "h-14 px-8 text-lg tracking-[-0.0375rem] lg:h-[4.1875rem] lg:px-[2.5rem] lg:text-[1.25rem]",
 };
 
-const DEFAULT_SHAPE: Record<ButtonSize, ButtonShape> = { sm: "chip", md: "field", lg: "pill" };
+const DEFAULT_SHAPE: Record<ButtonSize, ButtonShape> = { sm: "chip", md: "field", lg: "pill", xl: "chip" };
 
 const SHAPE: Record<ButtonShape, string> = {
   chip: "rounded-chip",
@@ -83,7 +85,7 @@ export function IconButton({ icon, label, size = 56, iconSize = 24, tone = "glas
       aria-label={label}
       title={label}
       {...rest}
-      style={{ width: size, height: size }}
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }}
       className={cx(
         "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-pill text-subtle transition-colors duration-150",
         "hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50",
@@ -104,7 +106,7 @@ export function Spinner({ size = 20, className }: { size?: number; className?: s
     <span
       role="status"
       aria-label="Загрузка"
-      style={{ width: size, height: size }}
+      style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }}
       className={cx("inline-block animate-spin rounded-full border-2 border-current border-r-transparent", className)}
     />
   );

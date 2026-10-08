@@ -1,11 +1,19 @@
 /**
  * Comit design tokens — dark "glass" theme from the COMIT Figma file (employer screens, 08.10).
  * Every color, radius and font used by the apps comes from here; theme.css exposes them to Tailwind.
- * Brand display fonts (Murs Gothic, Moon Walk) are licensed files not yet in the repo:
- * until they land, the display stack falls back to self-hosted Unbounded (OFL) so the demo stays offline.
+ * Brand font from the design team: Murs Gothic Wide Dark (headings), self-hosted so the demo stays
+ * offline. Inter Variable is the body face; the COMIT wordmark is a vector asset (brand/wordmark.svg).
  */
 @import "@fontsource-variable/inter/index.css";
-@import "@fontsource/unbounded/800.css";
+
+@font-face {
+  font-family: "Murs Gothic";
+  src: url("./assets/fonts/murs-gothic-wide-dark.woff2") format("woff2");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 :root {
   color-scheme: dark;
@@ -14,7 +22,10 @@
   --comit-bg: #010101;
   --comit-surface: #1b1b1b;
   --comit-surface-raised: #2a2a2a;
-  --comit-field: #2f2f2f;
+  --comit-field: #2f2f2d;
+  --comit-surface-dialog: #191917;
+  --comit-surface-button: #252525;
+  --comit-segment: #302f2d;
   --comit-glass: rgba(255, 255, 255, 0.06);
   --comit-glass-card: rgba(255, 255, 255, 0.05);
   --comit-glass-border: rgba(255, 255, 255, 0.12);
@@ -37,26 +48,35 @@
   --comit-accent-gradient: linear-gradient(174deg, #397ee4 4.5%, #9663c3 112%);
   --comit-chip-info: #bfe2ff;
   --comit-success: #68cc58;
-  --comit-success-strong: #3fc41f;
+  --comit-success-strong: #33c200;
   --comit-success-soft: #dcf7d7;
   --comit-success-text: #1d7a12;
   --comit-warning: #f6be4f;
-  --comit-danger: #ff3b3b;
+  --comit-danger: #ff383c;
   --comit-danger-soft: #f48b80;
 
   /* Shape and motion */
-  --comit-radius: 15px;
-  --comit-radius-card: 30px;
-  --comit-radius-chip: 20px;
-  --comit-radius-pill: 97px;
-  --comit-space-unit: 4px;
-  --comit-blur-glass: 100px;
+  --comit-radius: 0.9375rem;
+  --comit-radius-card: 1.875rem;
+  --comit-radius-chip: 1.25rem;
+  --comit-radius-pill: 6.0625rem;
+  --comit-space-unit: 0.25rem;
+  --comit-blur-glass: 6.25rem;
   --comit-shadow-pill: 0 0 7px rgba(0, 0, 0, 0.4);
-  --comit-shadow-tab-glow: inset 0 -12px 24px -12px rgba(95, 107, 240, 0.55);
+
+  /* Liquid glass (Figma glass surfaces): diagonal sheen, light rim brighter at top-left, soft depth. */
+  --comit-glass-fill: linear-gradient(135deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.035) 45%, rgba(255, 255, 255, 0.06) 100%);
+  --comit-glass-card-fill: linear-gradient(160deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.03) 55%, rgba(255, 255, 255, 0.045) 100%);
+  --comit-glass-rim:
+    inset 0.0625rem 0.0625rem 0 rgba(255, 255, 255, 0.24), inset -0.0625rem -0.0625rem 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 1.25rem rgba(255, 255, 255, 0.035), 0 0.5rem 1.75rem rgba(0, 0, 0, 0.28);
+  --comit-glass-filter: blur(var(--comit-blur-glass)) saturate(160%);
+  --comit-tab-fill: linear-gradient(180deg, rgba(22, 23, 46, 0.55) 0%, rgba(40, 42, 102, 0.55) 100%);
+  --comit-tab-glow: inset 0 -0.9rem 1.6rem -0.9rem rgba(95, 107, 240, 0.85);
   --comit-motion-fast: 150ms;
   --comit-motion-reveal: 300ms;
 
   /* Typography */
   --comit-font-sans: "Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --comit-font-display: "Murs Gothic", "Unbounded", "Inter Variable", system-ui, sans-serif;
+  --comit-font-display: "Murs Gothic", "Inter Variable", system-ui, sans-serif;
 }

@@ -3,6 +3,7 @@ import { SPECIALIZATIONS, type Specialization } from "@comit/shared";
 import { Button, Dialog, ProgressBar, SelectField, TextArea, TextField } from "@comit/ui-kit";
 import { useState, type FormEvent } from "react";
 import { api, describeError, isUnauthorized } from "../api";
+import { openAgent } from "../agent/AgentOverlay";
 import { useSession } from "../auth/session";
 import { SPECIALIZATION_LABEL, WORK_TYPES, WORK_TYPE_LABEL } from "../lib/format";
 
@@ -68,7 +69,7 @@ function toFields(values: FormValues): AgentsDraftFields_Input {
 type Step = "idle" | "creating" | "approving" | "publishing";
 
 const STEP_LABEL: Record<Step, string> = {
-  idle: "Опубликовать вакансию",
+  idle: "Отправить заявку",
   creating: "Сохраняем черновик…",
   approving: "Проверяем поля…",
   publishing: "Публикуем…",
@@ -115,6 +116,7 @@ export function VacancyFormDialog({ initial, onChanged, onPublished, onClose }: 
   const filled = REQUIRED.filter((key) => values[key].trim()).length + (values.bio.trim() ? 1 : 0);
   const progress = filled / (REQUIRED.length + 1);
   const set = (key: keyof FormValues) => (event: { target: { value: string } }) => setValues((previous) => ({ ...previous, [key]: event.target.value }));
+  const choose = (key: keyof FormValues) => (next: string) => setValues((previous) => ({ ...previous, [key]: next }));
   const fieldError = (key: keyof FormValues) => (touched ? errors[key] : undefined);
 
   async function submit(event: FormEvent) {
@@ -161,46 +163,68 @@ export function VacancyFormDialog({ initial, onChanged, onPublished, onClose }: 
   const busy = step !== "idle";
   return (
     <Dialog title={initial ? "Редактирование вакансии" : "Новая вакансия"} onClose={onClose}>
-      <form onSubmit={submit} noValidate className="flex flex-col gap-3">
-        <div className="mb-2 flex flex-col gap-3">
-          <div className="flex items-end justify-between">
-            <span className="text-lg font-semibold">Уже заполнено</span>
-            <span className="font-display text-2xl">{Math.round(progress * 100)}%</span>
-          </div>
-          <ProgressBar value={progress} label="Заполненность вакансии" />
+      <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+        <div role="tablist" aria-label="Способ заполнения" className="grid h-14 grid-cols-2 gap-2 rounded-[1.5625rem] bg-segment p-1.5 lg:h-[4.125rem] lg:gap-[2rem] lg:px-[0.5rem] lg:py-[0.375rem]">
+          <button type="button" role="tab" aria-selected className="rounded-chip bg-white text-base font-semibold tracking-[-0.034rem] text-black lg:text-[1.125rem]">
+            Вручную
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={false}
+            onClick={() => {
+              onClose();
+              openAgent(initial ? `Помоги отредактировать вакансию «${initial.fields.title ?? ""}»` : "Помоги создать вакансию");
+            }}
+            className="cursor-pointer rounded-chip text-base font-semibold tracking-[-0.034rem] text-white hover:bg-white/5 lg:text-[1.125rem]"
+          >
+            С AI-агентом
+          </button>
         </div>
 
-        <TextField placeholder="Название должности" aria-label="Название должности" value={values.title} onChange={set("title")} error={fieldError("title")} maxLength={200} />
-        <SelectField
-          aria-label="Направление"
-          placeholder="Направление"
-          value={values.specialization}
-          onChange={set("specialization")}
-          options={SPECIALIZATIONS.map((value) => ({ value, label: SPECIALIZATION_LABEL[value] }))}
-          error={fieldError("specialization")}
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <TextField label="Вилка З/П от, тыс ₽" inputMode="decimal" placeholder="180" value={values.salaryFrom} onChange={set("salaryFrom")} error={fieldError("salaryFrom")} />
-          <TextField label="до, тыс ₽" inputMode="decimal" placeholder="240" value={values.salaryTo} onChange={set("salaryTo")} error={fieldError("salaryTo")} />
+        <div className="mt-2 flex flex-col gap-3 lg:mt-[1.25rem] lg:gap-[1.25rem]">
+          <div className="flex items-end justify-between">
+            <span className="text-lg font-medium tracking-[-0.0375rem] lg:text-[1.25rem]">Уже заполнено</span>
+            <span className="font-display text-2xl tracking-[-0.0875rem] lg:text-[1.75rem]">{Math.round(progress * 100)}%</span>
+          </div>
+          <ProgressBar value={progress} label="Заполненность вакансии" className="h-4 bg-field lg:h-[1.25rem]" />
         </div>
-        <TextField placeholder="Город" aria-label="Город" value={values.city} onChange={set("city")} error={fieldError("city")} autoComplete="address-level2" />
-        <SelectField
-          aria-label="Формат работы"
-          placeholder="Формат работы"
-          value={values.workType}
-          onChange={set("workType")}
-          options={WORK_TYPES.map((value) => ({ value, label: WORK_TYPE_LABEL[value] }))}
-          error={fieldError("workType")}
-        />
-        <TextField placeholder="График, например 5/2 с 10 до 19" aria-label="График работы" value={values.daily} onChange={set("daily")} error={fieldError("daily")} maxLength={500} />
-        <TextArea placeholder="Описание проекта" aria-label="Описание проекта" value={values.bio} onChange={set("bio")} rows={4} />
+
+        <div className="mt-2 flex flex-col gap-4 lg:mt-[0.75rem]">
+          <TextField placeholder="Название должности" aria-label="Название должности" value={values.title} onChange={set("title")} error={fieldError("title")} maxLength={200} />
+          <div className="grid grid-cols-2 gap-[0.78rem]">
+            <SelectField
+              aria-label="Направление"
+              placeholder="Направление"
+              value={values.specialization}
+              onChange={choose("specialization")}
+              options={SPECIALIZATIONS.map((value) => ({ value, label: SPECIALIZATION_LABEL[value] }))}
+              error={fieldError("specialization")}
+            />
+            <TextField placeholder="График" aria-label="График работы, например 5/2 с 10 до 19" title="Например: 5/2 с 10 до 19" value={values.daily} onChange={set("daily")} error={fieldError("daily")} maxLength={500} />
+          </div>
+          <div className="grid grid-cols-2 gap-[0.78rem]">
+            <TextField label="Вилка З/П от, тыс ₽" inputMode="decimal" placeholder="180" value={values.salaryFrom} onChange={set("salaryFrom")} error={fieldError("salaryFrom")} />
+            <TextField label="до, тыс ₽" inputMode="decimal" placeholder="240" value={values.salaryTo} onChange={set("salaryTo")} error={fieldError("salaryTo")} />
+          </div>
+          <TextField placeholder="Город" aria-label="Город" value={values.city} onChange={set("city")} error={fieldError("city")} autoComplete="address-level2" />
+          <SelectField
+            aria-label="Формат работы"
+            placeholder="Формат работы"
+            value={values.workType}
+            onChange={choose("workType")}
+            options={WORK_TYPES.map((value) => ({ value, label: WORK_TYPE_LABEL[value] }))}
+            error={fieldError("workType")}
+          />
+          <TextArea placeholder="Описание проекта" aria-label="Описание проекта" value={values.bio} onChange={set("bio")} rows={4} />
+        </div>
 
         {error && (
           <p role="alert" className="text-sm text-danger-soft">
             {error}
           </p>
         )}
-        <Button type="submit" size="lg" shape="field" className="mt-2 w-full" loading={busy}>
+        <Button type="submit" size="xl" className="mt-2 w-full lg:mt-[0.75rem]" loading={busy}>
           {STEP_LABEL[step]}
         </Button>
       </form>

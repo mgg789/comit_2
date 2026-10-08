@@ -10,6 +10,9 @@
   --color-surface: var(--comit-surface);
   --color-surface-raised: var(--comit-surface-raised);
   --color-field: var(--comit-field);
+  --color-surface-dialog: var(--comit-surface-dialog);
+  --color-surface-button: var(--comit-surface-button);
+  --color-segment: var(--comit-segment);
   --color-glass: var(--comit-glass);
   --color-glass-card: var(--comit-glass-card);
   --color-glass-border: var(--comit-glass-border);
@@ -43,7 +46,6 @@
   --blur-glass: var(--comit-blur-glass);
 
   --shadow-pill: var(--comit-shadow-pill);
-  --shadow-tab-glow: var(--comit-shadow-tab-glow);
 
   --font-sans: var(--comit-font-sans);
   --font-display: var(--comit-font-display);
@@ -53,6 +55,16 @@
   /* Background lives on <html> only: a body background would paint over the fixed -z-10 Backdrop. */
   html {
     background: var(--comit-bg);
+  }
+  /*
+   * Fluid desktop scale: the design is drawn at 1920px, all sizes are rem, and 1rem tracks the
+   * viewport (16px at 1920, 12px at 1440) so proportions match the mockups at any desktop width.
+   * Below 1024px the base stays 16px and layouts switch to their mobile variants.
+   */
+  @media (min-width: 1024px) {
+    html {
+      font-size: clamp(11px, calc(100vw / 120), 16px);
+    }
   }
   body {
     color: var(--comit-text);
@@ -65,8 +77,34 @@
   background-image: var(--comit-accent-gradient);
 }
 
+/* Liquid glass for pills, round buttons, badges and floating panels. */
 @utility glass {
-  background-color: var(--comit-glass);
-  backdrop-filter: blur(var(--comit-blur-glass));
-  -webkit-backdrop-filter: blur(var(--comit-blur-glass));
+  background-image: var(--comit-glass-fill);
+  box-shadow: var(--comit-glass-rim);
+  backdrop-filter: var(--comit-glass-filter);
+  -webkit-backdrop-filter: var(--comit-glass-filter);
+}
+
+/* Large glass tiles (vacancy cards): fainter fill, same rim. */
+@utility glass-card {
+  background-image: var(--comit-glass-card-fill);
+  box-shadow: var(--comit-glass-rim);
+  backdrop-filter: var(--comit-glass-filter);
+  -webkit-backdrop-filter: var(--comit-glass-filter);
+}
+
+/* Status tab bar: indigo glass with the blue glow along the bottom edge from the design. */
+@utility glass-tab {
+  background-image: var(--comit-tab-fill);
+  box-shadow: var(--comit-glass-rim), var(--comit-tab-glow);
+  backdrop-filter: var(--comit-glass-filter);
+  -webkit-backdrop-filter: var(--comit-glass-filter);
+}
+
+/* Swipe-deck cards (design: rgba(255,255,255,.07), backdrop blur 500, soft black halo) with the glass rim. */
+@utility glass-deck {
+  background-color: rgba(255, 255, 255, 0.07);
+  box-shadow: var(--comit-glass-rim), 0 0 1.47rem rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(31.25rem) saturate(150%);
+  -webkit-backdrop-filter: blur(31.25rem) saturate(150%);
 }

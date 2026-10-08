@@ -24,27 +24,46 @@ export function budgetUsage(budget: AgentsOrganizationBudget): number {
   return Math.min(1, Math.max(0, used / limit));
 }
 
+const OPEN_EVENT = "comit:open-agent";
+
+/** Open the global agent from anywhere in the cabinet, optionally with a draft request in the composer. */
+export function openAgent(prompt?: string): void {
+  window.dispatchEvent(new CustomEvent<string | undefined>(OPEN_EVENT, { detail: prompt }));
+}
+
 /** Floating orb button (bottom-right on every cabinet page) that opens the employer's global AI agent. */
 export function AgentLauncher() {
   const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const prompt = event instanceof CustomEvent && typeof event.detail === "string" ? event.detail : "";
+      setDraft(prompt);
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+  }, []);
+
   return (
     <>
-      {open && <AgentOverlay />}
+      {open && <AgentOverlay initialDraft={draft} />}
       <button
         type="button"
         aria-label={open ? "Закрыть AI-агента" : "Открыть AI-агента"}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="glass fixed right-4 bottom-4 z-50 inline-flex size-20 cursor-pointer items-center justify-center rounded-full border border-glass-border transition-transform duration-150 hover:scale-105 sm:right-10 sm:bottom-10 sm:size-[104px]"
+        className="glass fixed right-4 bottom-4 z-50 inline-flex size-20 cursor-pointer items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 sm:right-10 sm:bottom-10 sm:size-[6.5rem]"
       >
-        {open ? <span className="text-4xl text-text">×</span> : <img src={agentOrbUrl} alt="" className="size-14 sm:size-[63px]" />}
+        {open ? <span className="text-4xl text-text">×</span> : <img src={agentOrbUrl} alt="" className="size-14 sm:size-[3.9375rem]" />}
       </button>
     </>
   );
 }
 
 /** Global agent chat over a blurred cabinet (Figma «AI-АГЕНТ»). The agent advises and acts only through employer-authorized tools. */
-function AgentOverlay() {
+function AgentOverlay({ initialDraft }: { initialDraft: string }) {
   const { expire } = useSession();
   const [messages, setMessages] = useState<AgentsOrganizationMessage[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -98,7 +117,7 @@ function AgentOverlay() {
 
   return (
     <div role="dialog" aria-modal="true" aria-label="AI-агент компании" className="fixed inset-0 z-40 flex flex-col bg-black/70 px-4 pt-24 pb-6 backdrop-blur-xl sm:pt-28">
-      <div ref={list} aria-live="polite" className="mx-auto flex w-full max-w-[700px] flex-1 flex-col gap-6 overflow-y-auto pb-4">
+      <div ref={list} aria-live="polite" className="mx-auto flex w-full max-w-[43.75rem] flex-1 flex-col gap-6 overflow-y-auto pb-4">
         {status === "loading" && <StateMessage kind="loading" title="Подключаем агента" />}
         {status === "error" && <StateMessage kind="error" title="Агент недоступен" description={error} />}
         {status === "ready" && visible.length === 0 && (
@@ -111,7 +130,7 @@ function AgentOverlay() {
         <PendingQuestions />
         {visible.map((message) =>
           message.role === "user" ? (
-            <p key={message.message_id} className="max-w-[85%] self-end rounded-[24px] bg-light px-5 py-3 text-lg text-on-light">
+            <p key={message.message_id} className="max-w-[85%] self-end rounded-[1.5rem] bg-light px-5 py-3 text-lg text-on-light">
               {message.content}
             </p>
           ) : (
@@ -125,8 +144,9 @@ function AgentOverlay() {
           ),
         )}
       </div>
-      <div className="mx-auto w-full max-w-[700px]">
+      <div className="mx-auto w-full max-w-[43.75rem]">
         <AgentComposer
+          initialText={initialDraft}
           onQueued={() => void pull().catch(() => undefined)}
           onSettled={() => void pull().catch(() => undefined)}
         />
@@ -134,7 +154,7 @@ function AgentOverlay() {
       </div>
       <div className="fixed right-4 bottom-28 flex flex-col items-end gap-3 sm:right-12 sm:bottom-40">
         {panel === "budget" && <BudgetPopover />}
-        <div className="glass flex flex-col gap-1 rounded-pill border border-glass-border p-1.5">
+        <div className="glass flex flex-col gap-1 rounded-pill p-1.5">
           <button
             type="button"
             aria-pressed={panel === "budget"}
@@ -179,7 +199,7 @@ function BudgetPopover() {
   }, []);
   const usage = budget ? budgetUsage(budget) : 0;
   return (
-    <div className="glass w-64 rounded-[24px] border border-glass-border p-4">
+    <div className="glass w-64 rounded-[1.5rem] p-4">
       {error && <p className="text-sm text-danger-soft">{error}</p>}
       {!budget && !error && <Spinner />}
       {budget && (
@@ -208,7 +228,7 @@ function PendingQuestions() {
   useEffect(load, [load]);
   if (items.length === 0) return null;
   return (
-    <section className="flex flex-col gap-3 rounded-[24px] border border-warning/40 bg-warning/10 p-4">
+    <section className="flex flex-col gap-3 rounded-[1.5rem] border border-warning/40 bg-warning/10 p-4">
       <h3 className="font-semibold">Агент ждёт вашего ответа</h3>
       {items.map((item) => (
         <form
@@ -243,9 +263,9 @@ function PendingQuestions() {
   );
 }
 
-function AgentComposer({ onQueued, onSettled }: { onQueued: () => void; onSettled: () => void }) {
+function AgentComposer({ initialText, onQueued, onSettled }: { initialText: string; onQueued: () => void; onSettled: () => void }) {
   const { expire } = useSession();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [thinking, setThinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pendingKey = useRef<string | null>(null);
@@ -283,7 +303,7 @@ function AgentComposer({ onQueued, onSettled }: { onQueued: () => void; onSettle
           <Spinner size={14} /> Агент думает…
         </p>
       )}
-      <div className="glass flex items-center gap-3 rounded-pill border border-glass-border p-1.5 pl-5">
+      <div className="glass flex items-center gap-3 rounded-pill p-1.5 pl-5">
         <label htmlFor="agent-input" className="sr-only">
           Сообщение агенту
         </label>
@@ -301,7 +321,7 @@ function AgentComposer({ onQueued, onSettled }: { onQueued: () => void; onSettle
           type="submit"
           aria-label="Отправить"
           disabled={thinking || !text.trim()}
-          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-glass-border text-text hover:bg-white/10 disabled:opacity-50"
+          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text hover:bg-white/10 disabled:opacity-50"
         >
           <Icon name="arrow-left" size={22} className="rotate-180" />
         </button>

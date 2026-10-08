@@ -65,8 +65,8 @@ export function ResumesPage() {
           const reached = funnelStep(process.state, process.interviews.length > 0);
           const closed = TERMINAL_STATES.has(process.state) && process.state !== "hired";
           return (
-            <li key={process.id} className="flex flex-col gap-4 rounded-[20px] bg-light p-4 text-on-light lg:flex-row lg:items-center lg:gap-6">
-              <div className="flex min-w-0 items-center gap-4 lg:w-[340px] lg:shrink-0">
+            <li key={process.id} className="flex flex-col gap-4 rounded-[1.25rem] bg-light p-4 text-on-light lg:flex-row lg:items-center lg:gap-6">
+              <div className="flex min-w-0 items-center gap-4 lg:w-[21.25rem] lg:shrink-0">
                 <Avatar name={name} size={52} />
                 <div className="min-w-0">
                   <p className="truncate font-display text-lg leading-tight sm:text-xl">{name}</p>

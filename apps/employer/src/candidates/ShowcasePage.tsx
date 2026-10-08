@@ -118,7 +118,7 @@ export function ShowcasePage() {
       <PageHeader
         title="Соискатели"
         actions={
-          <form onSubmit={submit} role="search" className="bg-accent-gradient flex h-[51px] items-center gap-2 rounded-pill pr-1 pl-5">
+          <form onSubmit={submit} role="search" className="bg-accent-gradient flex h-[3.1875rem] items-center gap-2 rounded-pill pr-1 pl-5">
             <label className="sr-only" htmlFor="showcase-q">
               Поиск: имя, роль, стек
             </label>
@@ -129,7 +129,7 @@ export function ShowcasePage() {
               placeholder="Поиск: имя, роль, стек"
               className="w-48 bg-transparent text-lg text-white outline-none placeholder:text-white/80 sm:w-64"
             />
-            <button type="submit" aria-label="Искать" className="inline-flex size-[43px] cursor-pointer items-center justify-center rounded-full bg-light text-on-light">
+            <button type="submit" aria-label="Искать" className="inline-flex size-[2.6875rem] cursor-pointer items-center justify-center rounded-full bg-light text-on-light">
               <Icon name="magnifier" size={22} />
             </button>
           </form>
@@ -141,10 +141,7 @@ export function ShowcasePage() {
           aria-label="Специализация"
           placeholder="Специализация"
           value={draftQuery.specialization}
-          onChange={(event) => {
-            const value = event.target.value;
-            setDraftQuery((previous) => ({ ...previous, specialization: isSpecialization(value) ? value : "" }));
-          }}
+          onChange={(value) => setDraftQuery((previous) => ({ ...previous, specialization: isSpecialization(value) ? value : "" }))}
           options={SPECIALIZATIONS.map((value) => ({ value, label: SPECIALIZATION_LABEL[value] }))}
         />
         <SelectField
@@ -152,10 +149,7 @@ export function ShowcasePage() {
           aria-label="Грейд"
           placeholder="Грейд"
           value={draftQuery.grade}
-          onChange={(event) => {
-            const value = event.target.value;
-            setDraftQuery((previous) => ({ ...previous, grade: isGrade(value) ? value : "" }));
-          }}
+          onChange={(value) => setDraftQuery((previous) => ({ ...previous, grade: isGrade(value) ? value : "" }))}
           options={GRADES.map((value) => ({ value, label: GRADE_LABEL[value] }))}
         />
         <div className="hidden lg:block" />
@@ -164,7 +158,7 @@ export function ShowcasePage() {
           aria-label="Вакансия"
           placeholder={openVacancies.length ? "Вакансия (фильтры и лайк)" : "Нет открытых вакансий"}
           value={draftQuery.vacancyId}
-          onChange={(event) => setDraftQuery((previous) => ({ ...previous, vacancyId: event.target.value }))}
+          onChange={(value) => setDraftQuery((previous) => ({ ...previous, vacancyId: value }))}
           options={openVacancies.map((vacancy) => ({ value: vacancy.draft_id, label: vacancyTitle(vacancy) }))}
         />
         <Button type="submit" size="md">
@@ -252,8 +246,8 @@ function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; 
   const facts = [`${SPECIALIZATION_LABEL[candidate.category.specialization]} ${GRADE_LABEL[candidate.category.grade]}`, candidate.city, formatSalaryRange(candidate.salary.from_rub, candidate.salary.to_rub)];
   const profileLink = `/candidates/${candidate.candidate_id}${vacancy ? `?vacancy=${vacancy.draft_id}` : ""}`;
   return (
-    <div className="flex flex-col gap-4 rounded-[20px] border border-glass-border bg-surface p-4 sm:flex-row sm:items-center">
-      <Link to={profileLink} className="flex min-w-0 items-center gap-4 sm:w-[360px] sm:shrink-0">
+    <div className="flex flex-col gap-4 rounded-[1.25rem] border border-glass-border bg-surface p-4 sm:flex-row sm:items-center">
+      <Link to={profileLink} className="flex min-w-0 items-center gap-4 sm:w-[22.5rem] sm:shrink-0">
         <Avatar name={candidate.display_name} size={52} />
         <div className="min-w-0">
           <p className="truncate font-display text-lg leading-tight sm:text-xl">{candidate.display_name}</p>
@@ -276,7 +270,7 @@ function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; 
           target="_blank"
           rel="noreferrer"
           aria-label={`PDF резюме: ${candidate.display_name}`}
-          className="inline-flex size-[52px] items-center justify-center rounded-field border-2 border-white/40 text-text hover:border-white/80"
+          className="inline-flex size-[3.25rem] items-center justify-center rounded-field border-2 border-white/40 text-text hover:border-white/80"
         >
           <Icon name="resumes" size={24} />
         </a>
@@ -286,7 +280,7 @@ function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; 
           title={vacancy ? (liked ? "Уже в шортлисте вакансии" : `В шортлист «${vacancyTitle(vacancy)}»`) : "Выберите вакансию в фильтре"}
           aria-label={liked ? "В шортлисте" : "Добавить в шортлист вакансии"}
           onClick={() => void like(null)}
-          className="bg-accent-gradient inline-flex size-[52px] cursor-pointer items-center justify-center rounded-field text-3xl text-white transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className="bg-accent-gradient inline-flex size-[3.25rem] cursor-pointer items-center justify-center rounded-field text-3xl text-white transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {liked ? "♥" : "+"}
         </button>

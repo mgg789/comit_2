@@ -1,53 +1,61 @@
-import { Button } from "@comit/ui-kit";
+import { ACTION_ROW_BUTTON, ActionRow, Backdrop, LogoTile, Wordmark } from "@comit/ui-kit";
+import employersIcon from "./assets/employers.svg";
+import seekersIcon from "./assets/seekers.svg";
+import showcaseIcon from "./assets/showcase.svg";
+
+/** Entry points of the shared start screen (Figma «MAIN», node 770:1788), in design order. */
+const ENTRIES = [
+  {
+    title: "Вакансии и резюме",
+    description: "Общая витрина вакансий и резюме",
+    action: "К витрине COMIT",
+    href: "/employer/candidates",
+    icon: showcaseIcon,
+  },
+  {
+    title: "Для соискателей",
+    description: "Разместите резюме и найдите работу",
+    action: "К поиску работы",
+    href: "/candidate/",
+    icon: seekersIcon,
+  },
+  {
+    title: "Для работадателей",
+    description: "Находите сотрудников на COMIT",
+    action: "К панели управления",
+    href: "/employer/",
+    icon: employersIcon,
+  },
+] as const;
 
 /**
- * Welcome face and vacancy showcase — lowest priority surface (context/70-mvp-scope.md).
- * Kept minimal on purpose until the core mechanics are demo-ready.
+ * Common start screen on «/» for every visitor: brand block and three entry cards.
+ * Sizes are the 1920 artboard values in rem, so the fluid root scale keeps the proportions.
  */
 export default function App() {
   return (
-    <main className="min-h-screen bg-[var(--comit-bg)] text-[var(--comit-text)]">
-      <div className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-20">
-        <header className="flex flex-col gap-3">
-          <h1 className="text-4xl font-bold">
-            Comit — платформа подбора ИТ-специалистов с обратной механикой
-          </h1>
-          <p className="text-[var(--comit-text-muted)]">
-            Кандидаты попадают в категории через обязательное тестирование, а работодатели сами
-            находят нужную категорию и выходят на конкретного человека с предложением и уровнем
-            заработной платы. Условия видны до начала общения.
-          </p>
-        </header>
-        <section className="flex flex-wrap gap-4">
-          <Button onClick={() => (window.location.href = "/candidate/")}>
-            Я соискатель
-          </Button>
-          <Button variant="secondary" onClick={() => (window.location.href = "/employer/")}>
-            Я работодатель
-          </Button>
-        </section>
-        <section className="grid gap-4 sm:grid-cols-3">
-          {[
-            {
-              title: "Категория по тесту",
-              text: "Специализация и грейд подтверждаются обязательным тестированием, а не самоописанным резюме.",
-            },
-            {
-              title: "Верифицированный профиль",
-              text: "Очки рейтинга начисляются только за подтверждаемые факты, включая достижения ФСП.",
-            },
-            {
-              title: "ЗП и обратная связь",
-              text: "Зарплата обязательна в каждом предложении, а обратная связь — контракт, а не вежливость.",
-            },
-          ].map((card) => (
-            <article key={card.title} className="flex flex-col gap-2 rounded-xl bg-surface p-5 shadow-sm">
-              <h2 className="font-semibold">{card.title}</h2>
-              <p className="text-sm leading-6 text-[var(--comit-text-muted)]">{card.text}</p>
-            </article>
-          ))}
-        </section>
+    <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-10 lg:py-[6rem]">
+      <Backdrop variant="auth" />
+      <div className="flex flex-col items-center gap-6 sm:flex-row lg:gap-[4.375rem]">
+        <LogoTile size={300} className="hidden sm:inline-flex" />
+        <LogoTile size={140} className="sm:hidden" />
+        <h1 className="text-text">
+          <Wordmark height={144} className="hidden sm:inline-block" />
+          <Wordmark height={64} className="sm:hidden" />
+        </h1>
       </div>
+      <nav aria-label="Разделы COMIT" className="mt-10 flex w-full max-w-[55.5rem] flex-col gap-4 lg:mt-[6.0625rem] lg:gap-[2.125rem]">
+        {ENTRIES.map((entry) => (
+          <a key={entry.title} href={entry.href} className="group block rounded-[2rem] transition-transform duration-150 hover:-translate-y-0.5">
+            <ActionRow
+              leading={<img src={entry.icon} alt="" className="size-12 shrink-0 lg:size-[4.25rem]" />}
+              title={entry.title}
+              subtitle={entry.description}
+              action={<span className={ACTION_ROW_BUTTON}>{entry.action}</span>}
+            />
+          </a>
+        ))}
+      </nav>
     </main>
   );
 }

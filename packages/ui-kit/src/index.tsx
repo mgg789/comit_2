@@ -16,7 +16,7 @@ export {
   type IconButtonProps,
 } from "./controls";
 export { Dialog } from "./dialog";
-export { Avatar, Backdrop, Chip, Logo, MatchBadge, Panel, ProgressBar, StateMessage, StatusDot, type ChipTone } from "./display";
+export { ACTION_ROW_BUTTON, ActionRow, Avatar, Backdrop, Chip, CountBadge, Logo, LogoTile, Wordmark, MatchBadge, Panel, ProgressBar, StateMessage, StatusDot, type ChipTone } from "./display";
 export {
   SelectField,
   TextArea,
@@ -27,4 +27,4 @@ export {
   type TextFieldProps,
 } from "./fields";
 export { default as agentOrbUrl } from "./assets/brand/agent-orb.png";
-export { default as addArrowUrl } from "./assets/brand/add-arrow.svg";
+export { default as plusDiscUrl } from "./assets/brand/plus-disc.svg";
