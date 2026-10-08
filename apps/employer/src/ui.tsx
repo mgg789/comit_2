@@ -322,7 +322,7 @@ export function Backdrop() {
             <feDisplacementMap
               in="SourceGraphic"
               in2="smooth"
-              scale="24"
+              scale="42"
               xChannelSelector="R"
               yChannelSelector="G"
             />

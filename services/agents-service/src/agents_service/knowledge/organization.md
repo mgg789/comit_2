@@ -14,11 +14,14 @@ Current interface map (source: apps/employer/src/App.tsx and nginx routes):
 - `/employer/` is the employer workspace shell; the visible heading is
   “Кабинет работодателя”. Its “На витрину” button opens `/`.
 - `/candidate/` is the candidate application and `/testing/` the testing application.
-- The employer shell currently lists planned features. It does not yet render
-  the global agent chat, vacancy editor, statistics, Tinder cards or recruitment chats.
-  Do not invent buttons, menu positions or claim that these screens are already present.
+- The employer application renders authenticated vacancy management, resumes,
+  candidate showcase, statistics, settings, recruitment chats and the persistent
+  global assistant overlay. `employer-ui` is the detailed current screen manual;
+  `knowledge_pages_list` lists all help pages. UI features and registered agent
+  capabilities are separate: lifecycle withdrawal/close/delete are manual UI/API
+  actions, not organization assistant tools.
 
-Available backend workflows can be executed through tools despite absent screens:
+Available backend workflows exposed through tools:
 - Vacancies: list/get/create/edit, approve an exact revision, publish its summary hash.
 - Organization/vacancy statistics and recruitment processes are owner scoped.
 - Showcase search/detail and vacancy feed provide allowed candidate context.

@@ -6,7 +6,7 @@ export const api = createApiClient();
 
 /** Resolve packaged design assets under both the Vite and nginx mount paths. */
 export function asset(name: string): string {
-  return `${import.meta.env.BASE_URL}design/${name}`;
+  return `${import.meta.env?.BASE_URL ?? "/employer/"}design/${name}`;
 }
 
 /** Human-readable errors without dumping private upstream response payloads. */
@@ -15,6 +15,8 @@ export function errorText(error: unknown): string {
     const detail = error.body && typeof error.body === "object" && "detail" in error.body ? error.body.detail : null;
     const lifecycleMessages: Record<string, string> = {
       organization_turn_active: "Агент ещё обрабатывает предыдущее сообщение. Дождитесь ответа и отправьте следующее.",
+      agent_temporarily_unavailable: "Не удалось связаться с AI. Сообщение сохранено в поле ввода — попробуйте отправить его ещё раз через несколько секунд.",
+      agent_provider_rejected: "Провайдер AI отклонил подключение. Нужна проверка настройки AI на этом стенде.",
       vacancy_lifecycle_pending: "Действие сохранено и завершается в сервисах. Подбор и новые сообщения уже заблокированы. Попробуйте повторить действие позже.",
       vacancy_lifecycle_conflict: "Вакансия изменилась до подтверждения. Обновите страницу и выберите действие заново.",
       vacancy_not_published: "Действие доступно только для опубликованной вакансии.",

@@ -5,7 +5,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type {
   AccountView,
   AgentsOrganizationBudget,
@@ -20,7 +20,7 @@ import type {
   RecruitmentView,
   SendChatMessage,
 } from "@comit/shared";
-import { AgentReply, CopyMessage, groupAgentMessages } from "./agent-messages";
+import { AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } from "./agent-messages";
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
@@ -667,6 +667,8 @@ function ProcessCommand({
 /** Global durable assistant overlays the current page and remains independent of route changes. */
 export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const { preferences } = useEmployerPreferences();
+  const systemReducedMotion = useReducedMotion();
+  const reducedMotion = systemReducedMotion || preferences.reducedMotion;
   const [outgoing, setOutgoing] = useState<AgentsOrganizationMessage | null>(null);
   const [now, setNow] = useState(Date.now());
   const [messages, setMessages] = useState<AgentsOrganizationMessage[]>([]);
@@ -702,6 +704,19 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const history = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  useEffect(() => {
+    // The overlay owns scrolling, including its side gutters and touch gestures.
+    const bodyOverflow = document.body.style.overflow;
+    const rootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = rootOverflow;
+    };
+  }, []);
   useEffect(() => {
     if (!sending && (!turn || turn.status === "succeeded" || turn.status === "failed")) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -760,6 +775,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let active = true;
     let cursor = 0;
+    let recovered = false;
+    let lastUserTurn: string | null = null;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
@@ -772,7 +789,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             ...page.items.filter((item) => !seen.has(item.message_id)),
           ];
         });
-        cursor = page.next_sequence ?? cursor;
+        const progress = agentHistoryProgress(page, cursor);
+        cursor = progress.cursor;
         if (page.items.length > 0) {
           api
             .getOrganizationBudget()
@@ -788,19 +806,24 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             .catch(() => {});
         }
         // Recover the durable turn after reopening the overlay or reloading the page.
-        if (!activeTurn.current) {
-          const latestUser = [...page.items].reverse().find((item) => item.role === "user" && item.turn_id);
-          if (latestUser?.turn_id) activeTurn.current = latestUser.turn_id;
+        const latestUser = [...page.items].reverse().find((item) => item.role === "user" && item.turn_id);
+        if (latestUser?.turn_id) lastUserTurn = latestUser.turn_id;
+        if (!recovered && !progress.hasMore) {
+          recovered = true;
+          if (!activeTurn.current) activeTurn.current = lastUserTurn;
         }
+        let finished = false;
         if (activeTurn.current) {
           const value = await api.getOrganizationTurn(activeTurn.current);
           if (!active) return;
           setTurn(value);
-          if (value.status === "succeeded" || value.status === "failed")
+          if (value.status === "succeeded" || value.status === "failed") {
             activeTurn.current = null;
+            finished = true;
+          }
         }
         setLoading(false);
-        timer = setTimeout(poll, page.items.length === 100 ? 50 : 2500);
+        timer = setTimeout(poll, progress.hasMore || finished ? 50 : activeTurn.current ? 1000 : 2500);
       } catch (reason) {
         if (active) {
           setError(errorText(reason));
@@ -838,8 +861,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     };
   }, []);
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, outgoing?.message_id]);
+    const scroller = history.current;
+    if (scroller && followLatest.current) scroller.scrollTo({ top: scroller.scrollHeight, behavior: reducedMotion ? "instant" : "smooth" });
+  }, [messages.length, outgoing?.message_id, turn?.status, historyBottom, reducedMotion]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -875,6 +899,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       return;
     }
     setSending(true);
+    followLatest.current = true;
     setError(null);
     setTurn(null);
     setNow(Date.now());
@@ -973,24 +998,32 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       : null;
   return (
     <motion.section
-      className="organization-overlay"
+      className={`organization-overlay${reducedMotion ? " reduce-motion" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label="AI-агент"
       initial={{ opacity: 0, backdropFilter: "blur(0rem)" }}
       animate={{ opacity: 1, backdropFilter: "blur(10rem)" }}
       exit={{ opacity: 0, backdropFilter: "blur(0rem)" }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: reducedMotion ? 0 : 0.25 }}
     >
       <div
+        ref={history}
         className="organization-history"
         aria-live="polite"
+        onWheel={(event) => { if (event.deltaY < 0) followLatest.current = false; }}
+        onTouchMove={() => { followLatest.current = false; }}
+        onScroll={() => {
+          const scroller = history.current;
+          if (scroller && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80) followLatest.current = true;
+        }}
         style={
           historyBottom == null
             ? undefined
-            : { bottom: historyBottom, height: "auto" }
+            : { paddingBottom: historyBottom }
         }
       >
+        <div className="organization-history-content">
         {loading && showLoading && <State loading />}
         <AnimatePresence initial={false}>
           {visible.map((row) => {
@@ -998,11 +1031,12 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             return <motion.article
               className={`organization-message ${group ? "assistant" : "user"}`}
               key={group ? row.id : row.message_id}
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
-              {group && <AssistantAvatar />}
+              initial={reducedMotion ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0 : 0.28 }}>
+              {group && <motion.div className="agent-avatar-wrap" initial={reducedMotion ? false : { opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }} transition={{ duration: reducedMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}><AssistantAvatar /></motion.div>}
               <div className="organization-message-body">
                 {group ? <AgentReply group={row} active={thinking && row.id === currentId} now={now}
-                  failed={row.id === turn?.turn_id && turn.status === "failed"} /> : <>
+                  reducedMotion={!!reducedMotion} failed={row.id === turn?.turn_id && turn.status === "failed"} /> : <>
                   <p>{row.content}</p>
                   {row.attachments?.map((file) => <button className="message-file" key={file.document_id}
                     onClick={async () => {
@@ -1049,6 +1083,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           </div>
         )}
         <div ref={end} />
+        </div>
       </div>
       {!loading && !visible.length && (
         <div className="assistant-welcome">
@@ -1065,7 +1100,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0, y: "100vh" }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: "100vh" }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: reducedMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}
       >
         <AnimatePresence initial={false}>
           {!!uploadedDocuments.length && (

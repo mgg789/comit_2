@@ -836,6 +836,9 @@ function CandidateDeck({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controls = useAnimationControls();
+  const systemReducedMotion = useReducedMotion();
+  const { preferences } = useEmployerPreferences();
+  const reducedMotion = systemReducedMotion || preferences.reducedMotion;
   const [feedState, setFeedState] = useState<"updating" | "empty">("updating");
   const [feedTick, setFeedTick] = useState(0);
   const refreshLock = useRef(false);
@@ -897,6 +900,13 @@ function CandidateDeck({
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [card?.exposure_id, draftId]);
+  useEffect(() => {
+    if (!card) return;
+    const angle = index % 2 ? -12 : 9;
+    controls.set({ x: 0, y: reducedMotion ? 0 : 24, opacity: 1, rotate: reducedMotion ? 0 : angle, scale: reducedMotion ? 1 : 0.96 });
+    void controls.start({ y: reducedMotion ? 0 : [24, -24, 0], rotate: reducedMotion ? 0 : [angle, angle / 2, 0],
+      scale: reducedMotion ? 1 : [0.96, 1.025, 1], transition: { duration: reducedMotion ? 0 : 0.5, ease: "easeInOut" } });
+  }, [card?.exposure_id, controls, reducedMotion]);
   const decide = async (action: "like" | "dislike") => {
     if (!card || lock.current) return;
     lock.current = true;
@@ -907,6 +917,7 @@ function CandidateDeck({
       setError(
         "Повторите прежнее действие: результат предыдущего запроса пока не подтверждён.",
       );
+      await controls.start({ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1, transition: { duration: reducedMotion ? 0 : 0.2 } });
       setPending(false);
       lock.current = false;
       return;
@@ -920,10 +931,11 @@ function CandidateDeck({
         idempotency_key: identity.key,
       });
       await controls.start({
-        x: action === "like" ? 550 : -550,
+        x: action === "like" ? window.innerWidth : -window.innerWidth,
+        y: 0,
         opacity: 0,
         rotate: action === "like" ? 18 : -18,
-        transition: { duration: 0.25 },
+        transition: { duration: reducedMotion ? 0 : 0.28 },
       });
       if (action === "like") onLiked();
       const page = resource.data;
@@ -944,8 +956,8 @@ function CandidateDeck({
       setIndex((value) => value + 1);
     } catch (reason) {
       setError(errorText(reason));
+      await controls.start({ x: 0, y: 0, opacity: 1, rotate: 0, scale: 1, transition: { duration: reducedMotion ? 0 : 0.2 } });
     } finally {
-      controls.set({ x: 0, opacity: 1, rotate: 0 });
       setPending(false);
       lock.current = false;
     }
@@ -1001,16 +1013,18 @@ function CandidateDeck({
   return (
     <div>
       <div className="candidate-deck" ref={visible}>
+        <div className={`candidate-stack-card deck-tone-${(index + 2) % 3} stack-far`} style={{ transform: `rotate(${(index + 2) % 2 ? -12 : 9}deg)` }} aria-hidden="true" />
+        <div className={`candidate-stack-card deck-tone-${(index + 1) % 3} stack-near`} style={{ transform: `rotate(${(index + 1) % 2 ? -12 : 9}deg)` }} aria-hidden="true" />
         <motion.div
           key={card.exposure_id}
-          className="candidate-swipe"
+          className={`candidate-swipe deck-tone-${index % 3}`}
           animate={controls}
-          drag={pending ? false : "x"}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.7}
+          drag={!pending}
+          dragMomentum={false}
+          onDragStart={() => controls.stop()}
           onDragEnd={(_, info) => {
-            if (Math.abs(info.offset.x) > 90 || Math.abs(info.velocity.x) > 600)
-              void decide(info.offset.x > 0 ? "like" : "dislike");
+            const bounds = visible.current?.closest(".selection-stack")?.getBoundingClientRect() || visible.current?.getBoundingClientRect();
+            if (bounds) void decide(info.point.x >= bounds.left + bounds.width / 2 ? "like" : "dislike");
           }}
         >
           <h2>{card.display_name}</h2>
@@ -1051,37 +1065,16 @@ function CandidateDeck({
             Рейтинг подбора: {card.explanation.score.toFixed(3)} · ранг{" "}
             {card.rank}
           </div>
-          <div className="candidate-controls">
-            <Action
-              aria-label="Пропустить кандидата"
-              disabled={pending}
-              onClick={() => void decide("dislike")}
-            >
-              ×
+          <div className="candidate-controls" onPointerDown={(event) => event.stopPropagation()}>
+            <Action aria-label="Пропустить кандидата" disabled={pending} onClick={() => void decide("dislike")}>
+              <img className="deck-icon" src={asset("swipe.svg")} alt="" />
             </Action>
-            <Action
-              aria-label="Сохранить кандидата"
-              disabled={pending}
-              onClick={() => void decide("like")}
-            >
-              <img
-                className="deck-icon"
-                src={asset("b59c95d115df082750c73998ecdbaee2e504f7ae.svg")}
-                alt=""
-              />
+            <Action aria-label="Открыть резюме" disabled={pending}
+              onClick={() => navigate(`/resume/${card.candidate_id}?draft=${draftId}&from=vacancy`)}>
+              <img className="deck-icon" src={asset("19847931f7f73800e0a10424c71729ddc8c55930.svg")} alt="" />
             </Action>
-            <Action
-              aria-label="Открыть резюме"
-              disabled={pending}
-              onClick={() =>
-                navigate(`/resume/${card.candidate_id}?draft=${draftId}`)
-              }
-            >
-              <img
-                className="deck-icon"
-                src={asset("19847931f7f73800e0a10424c71729ddc8c55930.svg")}
-                alt=""
-              />
+            <Action aria-label="Сохранить кандидата" disabled={pending} onClick={() => void decide("like")}>
+              <img className="deck-icon" src={asset("heart.svg")} alt="" />
             </Action>
           </div>
         </motion.div>
@@ -1324,7 +1317,7 @@ export function VacancyDetail({
                       className="saved-resume"
                       onClick={() =>
                         navigate(
-                          `/resume/${item.candidate_id}?draft=${draftId}`,
+                          `/resume/${item.candidate_id}?draft=${draftId}&from=vacancy`,
                         )
                       }
                     >

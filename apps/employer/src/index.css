@@ -266,8 +266,8 @@ small {
   border: 1px solid transparent;
   border-radius: 30rem;
   background-clip: padding-box;
-  backdrop-filter: blur(22rem) saturate(1.35);
-  -webkit-backdrop-filter: blur(22rem) saturate(1.35);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   box-shadow:
     inset 0 1px 0 var(--employer-paint-ffffff38),
     inset 1px 0 0 var(--employer-paint-ffffff14),
@@ -276,7 +276,7 @@ small {
 }
 @supports (backdrop-filter: url("#glass-refraction")) {
   .glass {
-    backdrop-filter: url("#glass-refraction") blur(18rem) saturate(1.35);
+    backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5);
   }
 }
 /* Filter only the backdrop surface: transformed controls keep foreground sharp. */
@@ -296,8 +296,8 @@ small {
   pointer-events: none;
   border-radius: inherit;
   background: var(--employer-glass);
-  backdrop-filter: blur(22rem) saturate(1.35);
-  -webkit-backdrop-filter: blur(22rem) saturate(1.35);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   box-shadow:
     inset 0 1px 0 var(--employer-paint-ffffff38),
     inset 1px 0 0 var(--employer-paint-ffffff14),
@@ -306,7 +306,7 @@ small {
 }
 @supports (backdrop-filter: url("#glass-refraction")) {
   .glass.glass-surface::before {
-    backdrop-filter: url("#glass-refraction") blur(18rem) saturate(1.35);
+    backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5);
   }
 }
 .agent-launcher.glass-surface {
@@ -521,7 +521,8 @@ small {
   transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .account-tools .plain-icon:hover > .icon-search,
-.account-tools .plain-icon:hover > .icon-bell {
+.account-tools .plain-icon:hover > .icon-bell,
+.account-tools .plain-icon:hover > .icon-message {
   transform: scale(1.09);
 }
 .account-tools .plain-icon:hover > .icon-chevron {
@@ -1452,8 +1453,14 @@ textarea::placeholder {
   margin-left: 86rem;
 }
 .detail-stack {
+  min-width: 0;
+  width: 100%;
   display: grid;
   gap: 32rem;
+}
+.detail-stack > * {
+  min-width: 0;
+  max-width: 100%;
 }
 .detail-fields {
   margin-top: 32rem;
@@ -1509,6 +1516,8 @@ textarea::placeholder {
   border-radius: 97rem;
 }
 .saved-row {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   overflow-x: auto;
   gap: 24rem;
@@ -1517,6 +1526,7 @@ textarea::placeholder {
 .saved-card {
   width: 306rem;
   min-width: 306rem;
+  flex-shrink: 0;
   border-radius: 20rem;
   background: var(--employer-paint-272727);
   border: 0;
@@ -1575,31 +1585,23 @@ textarea::placeholder {
   position: relative;
   width: 510rem;
   max-width: 100%;
-  touch-action: pan-y;
+  isolation: isolate;
 }
-.candidate-deck::before,
-.candidate-deck::after {
-  content: "";
+.candidate-stack-card {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    150deg,
-    var(--employer-paint-aaa0dd),
-    var(--employer-paint-212938)
-  );
   border-radius: 22rem;
-  transform: rotate(9deg);
-  z-index: -1;
+  pointer-events: none;
 }
-.candidate-deck::after {
-  transform: rotate(-12deg);
-  background: linear-gradient(
-    150deg,
-    var(--employer-paint-73744b),
-    var(--employer-paint-384851)
-  );
-}
+.stack-far { transform: rotate(9deg); z-index: 0; }
+.stack-near { transform: rotate(-12deg); z-index: 1; }
+.deck-tone-0 { background: linear-gradient(145deg, var(--employer-deck-neutral-start), var(--employer-deck-neutral-end)); }
+.deck-tone-1 { background: linear-gradient(150deg, var(--employer-paint-aaa0dd), var(--employer-paint-212938)); }
+.deck-tone-2 { background: linear-gradient(150deg, var(--employer-paint-73744b), var(--employer-paint-384851)); }
 .candidate-swipe {
+  position: relative;
+  z-index: 2;
+  touch-action: none;
   padding: 30rem;
   border-radius: 22rem;
   min-height: 600rem;
@@ -1607,12 +1609,8 @@ textarea::placeholder {
   display: flex;
   flex-direction: column;
   gap: 12rem;
-  background: linear-gradient(
-    145deg,
-    var(--employer-paint-c6bed673),
-    var(--employer-paint-b7996440)
-  );
-  backdrop-filter: blur(35rem);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   border: 1px solid var(--employer-border);
 }
 .candidate-swipe:active {
@@ -2126,3 +2124,8 @@ textarea::placeholder {
     scroll-behavior: auto !important;
   }
 }
+
+@supports (backdrop-filter: url("#glass-refraction")) {
+  .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
+}
+.deck-icon { width: 34rem; height: 34rem; filter: brightness(0) invert(1); }

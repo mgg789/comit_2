@@ -215,6 +215,7 @@ export default function App() {
       <Resume
         candidateId={pieces[1]}
         draftId={draftQuery}
+        fromVacancy={new URLSearchParams(query).get("from") === "vacancy"}
         navigate={navigate}
       />
     );

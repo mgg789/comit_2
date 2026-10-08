@@ -8,6 +8,7 @@ import uuid
 
 import httpx
 import pytest
+
 from agents_service.database import migrate
 from agents_service.models import SchemaSnapshot
 from agents_service.organization_tools import OrganizationToolError, ToolRegistry
@@ -129,6 +130,53 @@ def test_knowledge_page_rejects_path_escape(tmp_path):
     with pytest.raises(OrganizationToolError, match="invalid_tool_arguments"):
         registry.dispatch("00000000-0000-4000-8000-000000000001", "knowledge_page_read",
                            {"page": "../secrets"}, "knowledge-2")
+
+
+def test_knowledge_catalog_lists_safe_pages_and_rejects_external_symlink(tmp_path):
+    """Discovery is deterministic and never exposes content outside the package root."""
+    root = tmp_path / "knowledge"
+    root.mkdir()
+    (root / "z-last.md").write_text("# Last page\n\ncontent", encoding="utf-8")
+    (root / "a-first.md").write_text("# First page", encoding="utf-8")
+    (root / "Bad slug.md").write_text("# Invalid slug", encoding="utf-8")
+    (root / "invalid-utf8.md").write_bytes(b"\xff")
+    outside = tmp_path / "outside.md"
+    outside.write_text("private fixture", encoding="utf-8")
+    (root / "outside.md").symlink_to(outside)
+    registry = ToolRegistry("postgresql://unused", knowledge_root=root)
+    owner = "00000000-0000-4000-8000-000000000001"
+    assert registry.dispatch(owner, "knowledge_pages_list", {}, "catalog") == {
+        "pages": [{"page": "a-first", "title": "First page"}, {"page": "z-last", "title": "Last page"}],
+        "untrusted": True,
+    }
+    for slug in ("outside", "missing", "invalid-utf8"):
+        with pytest.raises(OrganizationToolError, match="knowledge_page_not_found"):
+            registry.dispatch(owner, "knowledge_page_read", {"page": slug}, "read")
+    with pytest.raises(OrganizationToolError, match="invalid_tool_arguments"):
+        registry.dispatch(owner, "knowledge_pages_list", {"root": str(tmp_path)}, "invalid")
+
+
+def test_packaged_employer_help_is_discoverable_and_matches_executable_capabilities():
+    """The shipped manual is accessible without a DB/provider and distinguishes UI-only lifecycle actions."""
+    registry = ToolRegistry("postgresql://unused")
+    owner = "00000000-0000-4000-8000-000000000001"
+    catalog = registry.catalog()
+    names = {item["name"] for item in catalog}
+    assert {"knowledge_pages_list", "knowledge_page_read"} <= names
+    assert not {"vacancy_withdraw", "vacancy_close", "vacancy_delete"} & names
+    assert "employer-ui" in next(item["description"] for item in catalog if item["name"] == "knowledge_page_read")
+    pages = registry.dispatch(owner, "knowledge_pages_list", {}, "catalog")
+    assert {item["page"] for item in pages["pages"]} == {"employer-ui", "organization", "vacancy"}
+    for page in pages["pages"]:
+        result = registry.dispatch(owner, "knowledge_page_read", {"page": page["page"]}, "help")
+        assert result["untrusted"] is True
+        assert result["content"].startswith("# ")
+    manual = registry.dispatch(owner, "knowledge_page_read", {"page": "employer-ui"}, "ui")["content"]
+    for route in ("/vacancies", "/resumes", "/showcase", "/chat", "/statistics", "/settings"):
+        assert route in manual
+    assert "NOT registered assistant" in manual
+    organization = registry.dispatch(owner, "knowledge_page_read", {"page": "organization"}, "org")["content"]
+    assert "does not yet render" not in organization
 
 
 @pytest.mark.integration

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { AgentsOrganizationMessage } from "@comit/shared";
+import type { AgentsOrganizationMessage, AgentsOrganizationMessagePage } from "@comit/shared";
 import { asset } from "./runtime";
 import { useEmployerPreferences } from "./preferences";
 
@@ -11,6 +11,12 @@ export interface AgentReplyGroup {
   id: string;
   messages: AgentsOrganizationMessage[];
   startedAt: string | null;
+}
+
+/** Advance past consumed rows; a null continuation ends paging even for a full page. */
+export function agentHistoryProgress(page: AgentsOrganizationMessagePage, cursor: number) {
+  return { cursor: page.next_sequence ?? page.items.at(-1)?.sequence ?? cursor,
+    hasMore: page.next_sequence != null };
 }
 
 /** Project ordered history into user bubbles and one assistant bubble per turn. */
@@ -85,23 +91,28 @@ export function CopyMessage({ text }: { text: string }) {
   </motion.button>;
 }
 
-/** Collapse public tool-round narration and show only the final assistant answer normally. */
-export function AgentReply({ group, active, now, failed = false }: {
-  group: AgentReplyGroup; active: boolean; now: number; failed?: boolean;
+/** Show a measured non-interactive time pill and the final answer, without intermediate narration. */
+export function AgentReply({ group, active, now, failed = false, reducedMotion = false }: {
+  group: AgentReplyGroup; active: boolean; now: number; failed?: boolean; reducedMotion?: boolean;
 }) {
-  const final = [...group.messages].reverse().find((item) => !item.tool_calls?.length && item.content);
-  const steps = group.messages.filter((item) => item !== final && item.content);
+  const final = active ? undefined : [...group.messages].reverse().find((item) => !item.tool_calls?.length && item.content);
   const start = group.startedAt ? Date.parse(group.startedAt) : NaN;
   const finishedAt = final?.created_at || group.messages.at(-1)?.created_at;
   const finish = finishedAt ? Date.parse(finishedAt) : NaN;
   const seconds = Number.isFinite(start) ? ((active ? now : Number.isFinite(finish) ? finish : now) - start) / 1000 : 1;
+  const label = Number.isFinite(start) && Number.isFinite(finish) ? thoughtLabel(seconds) : "Ход выполнения";
   return <>
-    {(active || steps.length > 0 || Number.isFinite(start)) && <details className={`agent-thought ${active ? "thinking" : ""}`}>
-      <summary>{Number.isFinite(start) && (active || Number.isFinite(finish)) ? thoughtLabel(seconds, active) : active ? "Думаю" : "Ход выполнения"}{active && <span className="thinking-dots" aria-hidden="true">…</span>}</summary>
-      {steps.length ? steps.map((step) => <AgentMarkdown key={step.message_id} text={step.content || ""} />)
-        : <p>Шагов с публичным описанием пока нет</p>}
-    </details>}
-    {final && <><AgentMarkdown text={final.content || ""} /><CopyMessage text={final.content || ""} /></>}
+    <div className="agent-reply-header">
+      {active ? <div className="agent-thinking" role="status" aria-label="Агент думает">
+        <span className="agent-think-dot" /><span className="agent-think-dot" /><span className="agent-think-dot" />
+      </div> : Number.isFinite(start) && Number.isFinite(finish) ? <p className="agent-thought-label">{label}</p> : null}
+    </div>
+    {final && <motion.div className="agent-final-answer" initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: reducedMotion ? 0 : 0.28 }}>
+      <AgentMarkdown text={final.content || ""} />
+      <div className="agent-answer-actions">
+        <CopyMessage text={final.content || ""} />
+      </div>
+    </motion.div>}
     {failed && <p role="status">Не удалось завершить ответ. Можно отправить запрос ещё раз.</p>}
   </>;
 }

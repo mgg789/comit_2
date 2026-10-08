@@ -527,7 +527,10 @@ export function Resume({
   candidateId,
   draftId,
   navigate,
-}: Navigation & { candidateId: string; draftId?: string }) {
+  fromVacancy = false,
+}: Navigation & { candidateId: string; draftId?: string; fromVacancy?: boolean }) {
+  const backTitle = fromVacancy && draftId ? "К вакансии" : "К людям";
+  const backPath = draftId ? `/vacancy/${draftId}${fromVacancy ? "" : "/resumes"}` : "/showcase";
   const profile = useResource(
     () => api.getPublicCandidate(candidateId),
     [candidateId],
@@ -642,10 +645,8 @@ export function Resume({
     return (
       <>
         <PageTitle
-          title="К людям"
-          back={() =>
-            navigate(draftId ? `/vacancy/${draftId}/resumes` : "/showcase")
-          }
+          title={backTitle}
+          back={() => navigate(backPath)}
         />
         <State {...profile} retry={profile.refresh} />
       </>
@@ -662,10 +663,8 @@ export function Resume({
   return (
     <Reveal className="discovery-resume">
       <PageTitle
-        title="К людям"
-        back={() =>
-          navigate(draftId ? `/vacancy/${draftId}/resumes` : "/showcase")
-        }
+        title={backTitle}
+        back={() => navigate(backPath)}
       />
       <header className="discovery-resume-hero">
         <h1>{candidate.display_name}</h1>

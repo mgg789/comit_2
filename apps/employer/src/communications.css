@@ -210,12 +210,7 @@
   display: grid;
   place-items: center;
   line-height: 1;
-  background: linear-gradient(
-    95deg,
-    var(--employer-paint-0564a5) 0%,
-    var(--employer-paint-008ed4) 50%,
-    var(--employer-paint-99c7e2) 100%
-  );
+  background: var(--employer-gradient);
   box-shadow: inset 0 0 15rem var(--employer-paint-fff4);
   cursor: pointer;
   transition: transform 0.15s;
@@ -306,21 +301,27 @@
   inset: 0;
   z-index: 50;
   background: var(--employer-paint-0008);
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 .organization-history {
   position: absolute;
+  inset: 0;
   top: 82rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 996rem;
-  height: calc(100dvh - 262rem);
-  padding: 8rem 0 42rem;
-  overflow: auto;
+  padding: 8rem 48rem 220rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: var(--employer-paint-333) transparent;
+}
+.organization-history-content {
+  width: 100%;
+  max-width: 1036rem;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 30rem;
+  gap: 28rem;
 }
 .organization-message {
   position: relative;
@@ -346,13 +347,15 @@
 }
 .organization-message.user {
   align-self: flex-end;
-  max-width: 90%;
+  max-width: min(720rem, 90%);
+  font-size: 18rem;
+  line-height: 1.25;
 }
 .organization-message.user p {
   background: var(--employer-paint-fff);
   color: var(--employer-paint-000);
   border-radius: 30rem;
-  padding: 14rem 24rem;
+  padding: 18rem 24rem;
 }
 .organization-message.user .copy-message {
   margin-left: auto;
@@ -539,8 +542,8 @@
   font-size: 54rem;
   font-weight: 400;
   padding: 0 !important;
-  backdrop-filter: blur(22rem) saturate(1.35);
-  -webkit-backdrop-filter: blur(22rem) saturate(1.35);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
 }
 .agent-close .icon {
   width: 28rem;
@@ -853,10 +856,10 @@
     height: 16rem;
   }
   .organization-history {
-    width: calc(100% - 32rem);
     top: 80rem;
-    height: calc(100dvh - 240rem);
-    padding-bottom: 24rem;
+    padding: 0 16rem 200rem;
+  }
+  .organization-history-content {
     gap: 20rem;
   }
   .organization-message {
@@ -997,13 +1000,20 @@
 .organization-message.assistant {
   margin-left: 0;
   width: 100%;
-  gap: 18rem;
+  gap: 20rem;
 }
-.organization-message.assistant > .assistant-avatar {
+.agent-avatar-wrap {
+  width: 60rem;
+  flex-shrink: 0;
+}
+.agent-avatar-wrap > .assistant-avatar {
   margin-left: 0;
 }
 .organization-message.assistant > .organization-message-body {
-  width: calc(100% - 78rem);
+  min-width: 0;
+  flex: 1;
+  width: calc(100% - 80rem);
+  padding-right: 0;
 }
 @media (max-width: 760px) {
   .communication-composer-wrap:not(.organization-composer) {
@@ -1034,15 +1044,29 @@
 .agent-markdown td, .agent-markdown th { padding: 8rem 12rem; border: 1px solid var(--employer-border); }
 .agent-markdown a { color: var(--employer-blue); text-decoration: underline; }
 .agent-markdown blockquote { border-left: 2px solid var(--employer-border); margin: 12rem 0; padding-left: 16rem; color: var(--comit-text-muted); }
-.agent-thought { margin-bottom: 16rem; color: var(--comit-text-muted); font-size: 16rem; }
-.agent-thought summary { cursor: pointer; padding: 8rem 0; }
-.agent-thought .agent-markdown { margin: 10rem 0; }
-.thinking-dots { animation: thought-pulse 1.2s ease-in-out infinite; }
-@keyframes thought-pulse { 50% { opacity: .35; } }
-.copy-message { position: relative; transition: opacity 150ms; }
+.agent-reply-header { min-height: 60rem; display: flex; align-items: center; }
+.organization-message .agent-thought-label { width: fit-content; border-radius: 40rem; background: var(--employer-paint-fff); color: var(--employer-paint-000); padding: 16rem 24rem; font-size: 16rem; line-height: 1; font-weight: 500; }
+.agent-final-answer { margin-top: 16rem; }
+.agent-thinking { display: flex; width: 182rem; height: 44rem; gap: 6rem; align-items: center; justify-content: center; border-radius: 40rem; background: var(--employer-paint-fff); }
+.agent-think-dot { width: 6rem; height: 6rem; border-radius: 50%; background: var(--employer-paint-000); animation: agent-think 1.1s infinite ease-in-out; }
+.agent-think-dot:nth-child(2) { animation-delay: .15s; }
+.agent-think-dot:nth-child(3) { animation-delay: .3s; }
+@keyframes agent-think { 0%, 70%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-4rem); } }
+.reduce-motion .agent-think-dot { animation: none; opacity: .7; }
+@media (max-width: 760px) {
+  .agent-avatar-wrap { width: 30rem; }
+  .organization-message.assistant { gap: 12rem; }
+  .agent-reply-header { min-height: 30rem; }
+  .agent-thinking { width: 140rem; height: 34rem; }
+  .organization-message .agent-thought-label { font-size: 13rem; padding: 12rem 16rem; }
+  .organization-message.user { font-size: 15rem; }
+}
+.copy-message { position: relative; display: grid; place-items: center; line-height: 1; transition: opacity 150ms; }
 .copy-message:hover { opacity: 1; }
-.copy-message img { display: block; width: 24px; height: 24px; }
+.copy-message img { display: block; width: 24rem; height: 24rem; }
+.agent-answer-actions { display: flex; gap: 12rem; align-items: center; margin-top: 16rem; }
+.agent-answer-actions .copy-message { margin-top: 0; width: 40rem; height: 40rem; border-radius: 10rem; }
 .copy-message > span:first-child:not(.copy-feedback) { font-size: 22rem; }
-.copy-feedback { position: absolute; left: 32rem; top: 0; width: max-content; font-size: 14rem; color: var(--comit-text-muted); }
-.organization-message.user .copy-feedback { left: auto; right: 32rem; }
-@media (prefers-reduced-motion: reduce) { .thinking-dots { animation: none; } }
+.copy-feedback { position: absolute; left: calc(100% + 8rem); top: 50%; transform: translateY(-50%); width: max-content; font-size: 14rem; line-height: 1; color: var(--comit-text-muted); }
+.organization-message.user .copy-feedback { left: auto; right: calc(100% + 8rem); }
+@media (prefers-reduced-motion: reduce) { .agent-think-dot { animation: none; opacity: .7; } }

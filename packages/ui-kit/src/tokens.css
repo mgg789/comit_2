@@ -32,11 +32,14 @@
   --employer-ink: #272930;
   --employer-blue: #bfe2ff;
   --employer-violet: #a49bf7;
-  --employer-glass: rgb(255 255 255 / 6%);
+  --employer-glass: rgb(255 255 255 / 18%);
+  --employer-glass-blur: 48rem;
+  --employer-deck-neutral-start: rgb(198 190 214 / 82%);
+  --employer-deck-neutral-end: rgb(183 153 100 / 70%);
   --employer-card: rgb(255 255 255 / 5%);
   --employer-border: rgb(255 255 255 / 18%);
   --employer-line: rgb(255 255 255 / 14%);
-  --employer-gradient: linear-gradient(100deg, #0064b5, #00467f 50%, #bfe2ff);
+  --employer-gradient: linear-gradient(173.6267465362488deg, #397ee4 4.5062%, #9663c3 112.06%);
   --employer-success: #69cd55;
   --employer-warning: #ffc655;
   --employer-danger: #ff7789;
