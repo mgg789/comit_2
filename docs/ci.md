@@ -15,12 +15,12 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
-| `web-and-api` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
-| `python` | python:3.12-bookworm | `pip install -e services/*[dev]` → `pytest services/*/tests` (без БД: PG-тесты скипаются) |
-| `regression` | python:3.12-bookworm + service `postgres:16-alpine` | `pip install -e services/*[dev]` → `pytest services/*/tests` с `PIPELINE_TEST_DATABASE_URL` |
+| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
+| `python` | python:3.12-bookworm | `pip install -e` matching/testing/integration engines `[dev]` → `pytest` их `tests/` (без БД: PG-тесты скипаются) |
+| `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов → `pytest` с `PIPELINE_TEST_DATABASE_URL` |
 | `smoke` | хост (нужен docker) | изолированный compose-проект `comit-ci`, порты 38xxx → `./tests/smoke.sh` → `down -v` |
 
-- Джобы `web-and-api`, `python` и `regression` выполняются в контейнерах — хосту не нужны node/python.
+- Джобы `js`, `python` и `regression` выполняются в контейнерах — хосту не нужны node/python.
 - Smoke не может идти параллельно сам с собой (порты): `concurrency: smoke-host`, без cancel.
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 
@@ -30,7 +30,7 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 (durable pipeline, combine-хранилище, гонки публикаций) в ней молча пропускаются.
 Джоба `regression` на `mgg-regression-1` закрывает этот пробел:
 
-- Поднимает disposable Postgres 16 как GitHub Actions service container; база
+- Поднимает disposable Postgres 16 с pgvector (`pgvector/pgvector:pg16`, нужен миграциям matching) как GitHub Actions service container; база
   `matching_test` живёт только внутри джобы, учётка тестовая (`comit`/`comit-regression`).
 - Через `PIPELINE_TEST_DATABASE_URL=...@postgres:5432/matching_test` активирует
   integration-тесты (`pytest.mark.integration`), помеченные этим env.
@@ -42,7 +42,9 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 без PG и модели, выполняется уже в обычной джобе `python`. Протокол обновления
 снимка — [matching.md](matching.md#регрессия-скоринга-golden).
 
-Локально: `make regression` (полный набор; с экспортированным
+Тесты `services/verification-engine` в CI-джобы пока не входят; их запускает `make regression`.
+
+Локально: `make regression` (полный набор, включая verification-engine; с экспортированным
 `PIPELINE_TEST_DATABASE_URL` — вместе с PG-тестами), `make regression-golden-update`
 (перегенерация golden).
 

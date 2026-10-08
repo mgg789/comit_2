@@ -41,16 +41,17 @@ web (nginx: welcome | candidate | employer | testing)
         ▼
 api-core (Fastify) ──────── PostgreSQL 16 + pgvector
         ▲
-services: matching-engine | testing-engine | integration-engine  (Python/FastAPI)
+services: matching-engine | testing-engine | integration-engine | verification-engine  (Python/FastAPI)
 ```
 
 - **api-core** — транзакционное ядро: auth, профили, вакансии, приглашения/статусы, рейтинговый ledger, правила видимости ТЗ §2.2.
 - **matching-engine** — «комбайн»: строгий фильтр → гибридный скоринг (фичи + эмбеддинг) → top-k → реранкер; реакции ленты обучают vacancy-local preference-модель (отдельный training-consent обязателен).
 - **testing-engine** — параметризованные blueprint'ы заданий, устойчивые к утечке; адаптивный грейд-тест.
-- **integration-engine** — верификация данных из внешних источников; хостит мок-реестр ФСП (реального API на хакатоне нет).
-- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek), opt-in overlay `infra/docker-compose.agents.yml`.
+- **integration-engine** — хостит мок-реестр ФСП и демо-привязку ФСП-профиля (реального API на хакатоне нет).
+- **verification-engine** — проверка внешних фактов профиля: ФСП (через мок integration-engine), публичный Git-репозиторий, резюме hh.ru; внутренний порт 8105 без публикации на хост.
+- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek) и глобальный агент работодателя (один чат на аккаунт, фоновые поручения через `organization-worker`), opt-in overlay `infra/docker-compose.agents.yml`.
 
-Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`.
+Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`, `docs/verification.md`.
 
 В цикле 1 реализован серверный поток: подтверждённые/заявленные профили → пул
 с двумя векторами и PDF; вакансии с необязательными группами требований → ready;
@@ -59,8 +60,9 @@ services: matching-engine | testing-engine | integration-engine  (Python/FastAPI
 по упакованному hash-pinned артефакту: quality gate остался failed, модель только
 сортирует main top-k, хвост не отсекается. Персонализация — vacancy-local
 preference-поправка на непоказанный суффикс ленты; в ленту встроено ограниченное
-исследование гипотез (2 research-карточки на 18 обычных). UI тиндера — следующий
-этап. Запуск пяти worker и настоящие локальные backend/HTTP проверки —
+исследование гипотез (2 research-карточки на 18 обычных). Feed-refill-worker
+добирает ленту из reserve того же rerank-run. UI тиндера — следующий этап.
+Запуск шести worker и настоящие локальные backend/HTTP проверки —
 в [runbook](docs/runbook.md); входные сценарии — `data/seed/matching-scenarios.json`.
 
 ## Карта репозитория
@@ -75,7 +77,8 @@ preference-поправка на непоказанный суффикс лен�
 | `services/matching-engine` | Python/FastAPI: подбор и объяснимость |
 | `services/testing-engine` | Python/FastAPI: тестирование (blueprints/) |
 | `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
-| `services/agents-service` | Python/FastAPI: черновик вакансии, форма + агент |
+| `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
+| `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
 | `infra/` | docker-compose (dev/prod), Dockerfiles, nginx, postgres init |
 | `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
 | `tests/` | сквозной smoke-гейт и acceptance-сценарии |
@@ -85,7 +88,7 @@ preference-поправка на непоказанный суффикс лен�
 ## CI/CD
 
 GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, лейбл `ci`):
-- **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо, pytest matching/testing/integration engines, smoke в изолированном compose-проекте;
+- **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо, pytest matching/testing/integration engines, полный Python-набор с PostgreSQL на раннере `regression`, smoke в изолированном compose-проекте;
 - **Deploy** — на push в `main`: сборка и подъём prod-стека на сервере в `/home/mgg/comit` + health-проверки.
 
 Ветки: работа в `dev`, стабильные состояния — PR в `main` (подробности и правила — `AGENTS.md`).
@@ -97,6 +100,7 @@ GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, л
 - `docs/architecture.md` — сервисы, потоки, порты
 - `docs/api.md` — контракты api-core
 - `docs/ci.md`, `docs/deploy.md`, `docs/runbook.md` — процессы
+- подсистемы: [`verification.md`](docs/verification.md), [`recruitment.md`](docs/recruitment.md), [`chat.md`](docs/chat.md), [`candidate-showcase.md`](docs/candidate-showcase.md), [`employer-statistics.md`](docs/employer-statistics.md), [`feed-refill.md`](docs/feed-refill.md), [`preference-learning.md`](docs/preference-learning.md), [`api-operations.md`](docs/api-operations.md)
 - `context/tz/00-fsp-tz-2026.md` — канон требований (ТЗ), `context/tz/01-hh-research-apr-sep-2026.md` — исследовательская база проблем
 
 ## Лицензия
