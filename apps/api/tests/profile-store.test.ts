@@ -118,3 +118,49 @@ test("training consent is optional, versioned, preserved on field edits and inde
     await pool.end();
   }
 });
+
+test("declared fsp_id is verified server-side, confirms algorithms and rides the snapshot", { skip: !databaseUrl }, async () => {
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    await pool.query(await readFile(new URL("../migrations/001_accounts.sql", import.meta.url), "utf8"));
+    const { migrate } = await import("../src/auth/migrate.js");
+    await migrate(pool);
+    await pool.query("TRUNCATE candidate_profile_outbox, candidate_profile_evidence, candidate_profiles, accounts CASCADE");
+    await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "candidate-fsp@example.test"]);
+    const registry = new Map([["fsp-001", { fsp_id: "fsp-001", rank: "I", rating: 1876,
+      events: [{ title: "Кубок ФСП", year: 2025, place: 7 }], certificates: ["Школа ФСП"] }]]);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: unknown) => {
+      const url = String(input);
+      const id = url.split("/fsp/participants/")[1] ?? "";
+      const body = registry.get(decodeURIComponent(id));
+      return { ok: Boolean(body), status: body ? 200 : 404, json: async () => body } as Response;
+    }) as typeof fetch;
+    try {
+      const store = new CandidateProfileStore(pool);
+      const view = await store.save(candidateId, {
+        expected_revision: 0,
+        fields: { city: "Москва", domains: [{ key: "algorithms", level: 6 }], fsp_id: "fsp-001" },
+        consent: { processing: true, pool: true, version: "profile-v1" },
+      });
+      assert.equal(view.evidence["fsp:fsp-001"]?.status, "confirmed");
+      assert.equal(view.evidence["domains:algorithms"]?.status, "confirmed");
+      assert.deepEqual(view.evidence["domains:algorithms"]?.verified_value, { key: "algorithms", level: 6 });
+      const payload = (await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 ORDER BY source_revision DESC LIMIT 1", [candidateId])).rows[0]?.payload;
+      assert.equal(payload.fsp.fsp_id, "fsp-001");
+      assert.equal(payload.fsp.rank, "I");
+      assert.equal(payload.fsp.rating, 1876);
+      assert.equal(payload.domains[0].status, "confirmed");
+      const absent = await store.save(candidateId, {
+        expected_revision: 1,
+        fields: { fsp_id: "fsp-none" },
+      });
+      assert.equal(absent.evidence["fsp:fsp-none"]?.status, "pending");
+      assert.equal(absent.evidence["domains:algorithms"]?.status, "self_reported");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  } finally {
+    await pool.end();
+  }
+});

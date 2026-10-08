@@ -147,6 +147,31 @@ class NarrativeClaim(Contract):
     )
 
 
+class FspEvent(Contract):
+    """One FSP competition entry; place is absent when the event had no ranking."""
+
+    title: str = Field(min_length=1, max_length=300)
+    year: int = Field(ge=1970, le=2100)
+    place: int | None = Field(default=None, ge=1)
+
+
+class FspProfileSnapshot(Contract):
+    """Server-verified FSP registry block carried inside the candidate snapshot.
+
+    The registry display name is deliberately excluded: it is a personal name,
+    while public artifacts show only rank, rating, events and certificates.
+    """
+
+    fsp_id: str = Field(min_length=1, max_length=100)
+    rank: str = Field(min_length=1, max_length=20)
+    rating: int = Field(ge=0, le=10000)
+    events: list[FspEvent] = Field(default_factory=list, max_length=100)
+    certificates: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        default_factory=list, max_length=100
+    )
+    verified_at: Annotated[str, Field(min_length=20, max_length=40)]
+
+
 class CandidateProfile(Contract):
     """Complete or draft input; contacts remain private until downstream acceptance."""
 
@@ -175,6 +200,7 @@ class CandidateProfile(Contract):
     preferences: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(
         default_factory=list, max_length=100
     )
+    fsp: FspProfileSnapshot | None = None
     metadata: dict[str, JsonValue] = Field(default_factory=dict, max_length=100)
 
     @model_validator(mode="after")

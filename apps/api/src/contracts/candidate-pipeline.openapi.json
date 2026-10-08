@@ -3607,6 +3607,16 @@
             "maxItems": 100,
             "title": "Preferences"
           },
+          "fsp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FspProfileSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "metadata": {
             "additionalProperties": {
               "$ref": "#/components/schemas/JsonValue"
@@ -4885,6 +4895,98 @@
         "type": "object",
         "title": "FeedRequest",
         "description": "Open one immutable feed session for a vacancy owned by the caller."
+      },
+      "FspEvent": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 1970.0,
+            "title": "Year"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "year"
+        ],
+        "title": "FspEvent",
+        "description": "One FSP competition entry; place is absent when the event had no ranking."
+      },
+      "FspProfileSnapshot": {
+        "properties": {
+          "fsp_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Fsp Id"
+          },
+          "rank": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Rank"
+          },
+          "rating": {
+            "type": "integer",
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Rating"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/FspEvent"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Events"
+          },
+          "certificates": {
+            "items": {
+              "type": "string",
+              "maxLength": 300,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Certificates"
+          },
+          "verified_at": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 20,
+            "title": "Verified At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fsp_id",
+          "rank",
+          "rating",
+          "verified_at"
+        ],
+        "title": "FspProfileSnapshot",
+        "description": "Server-verified FSP registry block carried inside the candidate snapshot.\n\nThe registry display name is deliberately excluded: it is a personal name,\nwhile public artifacts show only rank, rating, events and certificates."
       },
       "GradeResult": {
         "properties": {

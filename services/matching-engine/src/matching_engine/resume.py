@@ -63,6 +63,15 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
             add(label, heading)
             for skill in skills:
                 add(f"{skill.key}: {skill.level}/7 - {_STATUS[skill.status]}")
+    if profile.fsp:
+        add("Спортивный профиль (ФСП)", heading)
+        add(f"ID ФСП: {profile.fsp.fsp_id}; ранг: {profile.fsp.rank}; "
+            f"рейтинг: {profile.fsp.rating}", redact=False)
+        for event in profile.fsp.events:
+            place = f" - место {event.place}" if event.place is not None else ""
+            add(f"• {event.title} ({event.year}){place}")
+        for certificate in profile.fsp.certificates:
+            add(f"• Сертификат: {certificate}")
     for label, claims in (("Проекты", profile.projects), ("Опыт работы", profile.experience),
                           ("Достижения", profile.achievements)):
         if claims:

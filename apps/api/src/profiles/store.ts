@@ -10,6 +10,7 @@ import type {
   JsonValue,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
+import { verifyFsp } from "./fsp.js";
 import {
   canonicalJson,
   projectCandidateIntake,
@@ -26,7 +27,7 @@ const KEY = /^[a-z][a-z0-9_-]*$/;
 const FIELD_NAMES = new Set([
   "display_name", "phone", "city", "work_types", "relocation_ready", "relocation_cities", "salary",
   "primary_direction", "declared_grade", "domains", "stacks", "soft_skills", "description", "projects",
-  "experience", "achievements", "preferences",
+  "experience", "achievements", "preferences", "fsp_id",
 ]);
 const FORBIDDEN_NAMES = new Set([
   "id", "candidate_id", "email", "email_verified", "revision", "status", "evidence", "consent", "consents",
@@ -271,6 +272,51 @@ function evidenceRows(fields: CandidateProfileFields, previous: Map<string, Evid
   });
 }
 
+/**
+ * Server-derived FSP evidence: registry verification of the declared fsp_id and,
+ * when verified, confirmation of the declared algorithms domain — FSP competition
+ * achievements are objective skill evidence (TZ §1). A registry outage keeps a
+ * previous identical confirmed row so flapping never demotes evidence; definitive
+ * registry absence is recorded as pending, which is a normal TZ §2 state.
+ */
+async function fspEvidenceRows(fields: CandidateProfileFields, previous: Map<string, EvidenceDbRow>): Promise<Array<{
+  key: string; inputHash: string; status: string; verifiedValue: JsonValue; provenance: string[]; checkedAt: Date | string | null;
+}>> {
+  const fspId = fields.fsp_id;
+  if (typeof fspId !== "string" || fspId.length === 0) return [];
+  const result = await verifyFsp(fspId);
+  const inputHash = createHash("sha256").update(canonicalJson({ fsp_id: fspId }), "utf8").digest("hex");
+  const prior = previous.get(`fsp:${fspId}`);
+  if (!result.ok && result.reason === "unavailable" && prior?.input_hash === inputHash && prior.status === "confirmed") {
+    return [{ key: `fsp:${fspId}`, inputHash, status: prior.status, verifiedValue: prior.verified_value, provenance: prior.provenance, checkedAt: prior.checked_at }];
+  }
+  const now = new Date();
+  const rows: Array<{ key: string; inputHash: string; status: string; verifiedValue: JsonValue; provenance: string[]; checkedAt: Date | string | null }> = [{
+    key: `fsp:${fspId}`,
+    inputHash,
+    status: result.ok ? "confirmed" : "pending",
+    verifiedValue: result.ok ? {
+      rank: result.payload.rank, rating: result.payload.rating,
+      events: result.payload.events, certificates: result.payload.certificates,
+      verified_at: result.payload.verified_at,
+    } : null,
+    provenance: result.ok ? ["fsp-registry"] : [`fsp-registry:${result.reason}`],
+    checkedAt: result.ok ? now : null,
+  }];
+  if (result.ok) {
+    const skill = (fields.domains ?? []).find(entry => entry.key === "algorithms");
+    if (skill) rows.push({
+      key: "domains:algorithms",
+      inputHash: createHash("sha256").update(canonicalJson(skill), "utf8").digest("hex"),
+      status: "confirmed",
+      verifiedValue: { key: skill.key, level: skill.level } as JsonValue,
+      provenance: [`fsp-registry: rank ${result.payload.rank}, rating ${result.payload.rating}`],
+      checkedAt: now,
+    });
+  }
+  return rows;
+}
+
 async function accountFor(client: PoolClient, accountId: string, lock = true): Promise<AccountRow> {
   if (!uuid(accountId)) throw invalid("invalid_account_id");
   const row = (await client.query<AccountRow>(
@@ -424,8 +470,11 @@ export class CandidateProfileStore {
       const profile = inserted.rows[0];
       if (!profile) throw new Error("profile insert returned no row");
       const previous = new Map((current ? await evidenceFor(client, accountId) : []).map(row => [row.evidence_key, row]));
+      const baseRows = evidenceRows(fields, previous);
+      const fspRows = await fspEvidenceRows(fields, previous);
+      const rows = [...baseRows.filter(row => !fspRows.some(extra => extra.key === row.key)), ...fspRows];
       await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id = $1", [accountId]);
-      for (const row of evidenceRows(fields, previous)) {
+      for (const row of rows) {
         await client.query(
           `INSERT INTO candidate_profile_evidence(candidate_id, evidence_key, input_hash, status, verified_value, provenance, checked_at)
            VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,

@@ -40,6 +40,15 @@ export interface PipelineNarrative {
   details?: Record<string, JsonValue>;
   provenance?: string[];
 }
+/** Server-verified FSP registry block; the registry display name never enters snapshots. */
+export interface FspSnapshot {
+  fsp_id: string;
+  rank: string;
+  rating: number;
+  events: Array<{ title: string; year: number; place: number | null }>;
+  certificates: string[];
+  verified_at: string;
+}
 /** Trusted upstream profile snapshot, with a monotonically increasing source revision. */
 export interface CandidateIntake {
   source_revision: number;
@@ -69,6 +78,7 @@ export interface CandidateIntake {
   experience?: PipelineNarrative[];
   achievements?: PipelineNarrative[];
   preferences?: string[];
+  fsp?: FspSnapshot | null;
   metadata?: Record<string, JsonValue>;
 }
 /** Progress is safe to expose after the API has checked candidate ownership. */

@@ -29,6 +29,8 @@ export const candidateProfileFieldsSchema = object({
   domains: array(skill, 1000), stacks: array(skill, 1000), soft_skills: array(skill, 1000), description: text(10000),
   projects: array(narrative, 100), experience: array(narrative, 100), achievements: array(narrative, 100),
   preferences: array({ ...text(1000), minLength: 1 }, 100),
+  /** Declared FSP registry ID; the verified payload is derived server-side and never client-supplied. */
+  fsp_id: nullable(text(100)),
 });
 
 /** CAS revision zero creates a profile; explicit consent never accepts client-supplied timestamps. */

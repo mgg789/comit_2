@@ -42,6 +42,8 @@ export interface CandidateProfileFields {
   experience?: CandidateDeclaredNarrative[];
   achievements?: CandidateDeclaredNarrative[];
   preferences?: string[];
+  /** Declared FSP registry ID; the verified payload is derived server-side. */
+  fsp_id?: string | null;
 }
 
 /** Explicit profile consent, separate from registration consent; timestamps are server-owned. */

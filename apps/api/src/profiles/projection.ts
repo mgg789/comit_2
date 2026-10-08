@@ -1,5 +1,5 @@
 /** Pure source-profile projection helpers. Matching receives only this snapshot. */
-import type { CandidateClaimEvidence, CandidateDeclaredNarrative, CandidateIntake, CandidateProfileFields, ClaimStatus, JsonValue } from "@comit/shared";
+import type { CandidateClaimEvidence, CandidateDeclaredNarrative, CandidateIntake, CandidateProfileFields, ClaimStatus, FspSnapshot, JsonValue } from "@comit/shared";
 
 type ProjectionSkill = NonNullable<CandidateIntake["domains"]>[number];
 type ProjectionNarrative = NonNullable<CandidateIntake["projects"]>[number];
@@ -142,6 +142,8 @@ function narratives(fields: CandidateProfileFields, group: "projects" | "experie
  * Build the exact matching intake from the API-owned source row.
  * Email is copied only from a verified account; declared grade is deliberately
  * self-reported and has no invented test session or approval timestamp.
+ * The FSP block is copied only from a server-confirmed registry evidence row;
+ * the registry display name never enters the snapshot.
  */
 export function projectCandidateIntake(
   account: ProjectionAccount,
@@ -152,6 +154,25 @@ export function projectCandidateIntake(
 ): CandidateIntake {
   const map = evidenceMap(evidenceRows);
   const declaredGrade = fields.declared_grade ?? null;
+  const fspRow = typeof fields.fsp_id === "string" && fields.fsp_id.length > 0
+    ? map.get(`fsp:${fields.fsp_id}`)
+    : undefined;
+  let fsp: FspSnapshot | null = null;
+  if (fspRow?.status === "confirmed" && fspRow.verified_value !== null
+      && typeof fspRow.verified_value === "object" && !Array.isArray(fspRow.verified_value)
+      && typeof fields.fsp_id === "string") {
+    const payload = fspRow.verified_value as Record<string, JsonValue>;
+    fsp = {
+      fsp_id: fields.fsp_id,
+      rank: typeof payload["rank"] === "string" ? payload["rank"] : "",
+      rating: typeof payload["rating"] === "number" ? payload["rating"] : 0,
+      events: Array.isArray(payload["events"])
+        ? payload["events"] as FspSnapshot["events"] : [],
+      certificates: Array.isArray(payload["certificates"])
+        ? payload["certificates"] as string[] : [],
+      verified_at: typeof payload["verified_at"] === "string" ? payload["verified_at"] : "",
+    };
+  }
   const intake = {
     source_revision: revision,
     ...(fields.display_name !== undefined ? { display_name: fields.display_name } : {}),
@@ -181,6 +202,7 @@ export function projectCandidateIntake(
     experience: narratives(fields, "experience", map),
     achievements: narratives(fields, "achievements", map),
     preferences: fields.preferences ?? [],
+    ...(fsp ? { fsp } : {}),
   };
   return intake;
 }
