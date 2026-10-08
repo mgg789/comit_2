@@ -1,0 +1,202 @@
+{
+ "version": "hypothesis-validation-v1",
+ "report_hash": "ba2621d9f00505dd27301a4c9c7661ad73499eba110e7f9471dd6f0d7de5f5ce",
+ "manifest_hash": "e98a5fba760859a0bc8f025771d5013fd2cf2ea8f0eeb2c5385531c7552b5a75",
+ "live_policy_hash": "0a60b0ff643d295cec1007b9f7ae8664aa426c87391328110204e70cbf4014a3",
+ "generated": "2026-10-08",
+ "scope": "prevalence + decisive funnel + verdict power; evaluation-only, runtime policy untouched",
+ "prevalence": {
+  "rerank-hard-benchmark-v7": {
+   "live": {
+    "total": 0,
+    "by_family": {},
+    "scenario": {
+     "contrast": null,
+     "nuisance_distance": null,
+     "nuisance_component": null,
+     "utility": null
+    }
+   },
+   "contrast_010": {
+    "total": 5,
+    "by_family": {
+     "H3": 1,
+     "H4": 1,
+     "H8": 3
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": null,
+     "nuisance_component": null,
+     "utility": null
+    }
+   },
+   "contrast_010_nuisance_030": {
+    "total": 5,
+    "by_family": {
+     "H3": 1,
+     "H4": 1,
+     "H8": 3
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": 0.3,
+     "nuisance_component": 0.4,
+     "utility": null
+    }
+   },
+   "relaxed_all": {
+    "total": 5,
+    "by_family": {
+     "H3": 1,
+     "H4": 1,
+     "H8": 3
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": 0.3,
+     "nuisance_component": 0.4,
+     "utility": 0.6
+    }
+   }
+  },
+  "rerank-grounded-cohort-v9": {
+   "live": {
+    "total": 3,
+    "by_family": {
+     "H2": 3
+    },
+    "scenario": {
+     "contrast": null,
+     "nuisance_distance": null,
+     "nuisance_component": null,
+     "utility": null
+    }
+   },
+   "contrast_010": {
+    "total": 19,
+    "by_family": {
+     "H1": 1,
+     "H2": 8,
+     "H4": 4,
+     "H8": 6
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": null,
+     "nuisance_component": null,
+     "utility": null
+    }
+   },
+   "contrast_010_nuisance_030": {
+    "total": 35,
+    "by_family": {
+     "H1": 1,
+     "H2": 12,
+     "H4": 6,
+     "H7": 4,
+     "H8": 12
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": 0.3,
+     "nuisance_component": 0.4,
+     "utility": null
+    }
+   },
+   "relaxed_all": {
+    "total": 36,
+    "by_family": {
+     "H1": 1,
+     "H2": 12,
+     "H4": 7,
+     "H7": 4,
+     "H8": 12
+    },
+    "scenario": {
+     "contrast": 0.1,
+     "nuisance_distance": 0.3,
+     "nuisance_component": 0.4,
+     "utility": 0.6
+    }
+   }
+  }
+ },
+ "funnel": {
+  "rerank-hard-benchmark-v7": {
+   "live": {
+    "pairs_per_pass": 0.0,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": null
+   },
+   "contrast_010": {
+    "pairs_per_pass": 0.06,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 1344
+   },
+   "contrast_010_nuisance_030": {
+    "pairs_per_pass": 0.06,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 1344
+   },
+   "relaxed_all": {
+    "pairs_per_pass": 0.06,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 1344
+   }
+  },
+  "rerank-grounded-cohort-v9": {
+   "live": {
+    "pairs_per_pass": 0.01,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 11200
+   },
+   "contrast_010": {
+    "pairs_per_pass": 0.05,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 1769
+   },
+   "contrast_010_nuisance_030": {
+    "pairs_per_pass": 0.08,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 960
+   },
+   "relaxed_all": {
+    "pairs_per_pass": 0.09,
+    "assumed_decisive_rate": 0.25,
+    "pool_passes_for_batch": 934
+   }
+  }
+ },
+ "verdict_power_at_20_decisive": {
+  "0.5": {
+   "supported": 0.0025,
+   "not_supported": 0.002,
+   "unclear": 0.9955,
+   "not_testable": 0.0
+  },
+  "0.65": {
+   "supported": 0.0495,
+   "not_supported": 0.0,
+   "unclear": 0.9505,
+   "not_testable": 0.0
+  },
+  "0.8": {
+   "supported": 0.406,
+   "not_supported": 0.0,
+   "unclear": 0.594,
+   "not_testable": 0.0
+  },
+  "0.95": {
+   "supported": 0.9875,
+   "not_supported": 0.0,
+   "unclear": 0.0125,
+   "not_testable": 0.0
+  }
+ },
+ "reading": {
+  "prevalence": "live policy finds 0-3 comparable pairs per full pool pass; MIN_CONTRAST=0.15 is the binding constraint, nuisance bounds second",
+  "funnel": "at the explicit assumption q=0.25 decisive rate, one frozen 20-decisive batch needs ~1600 pool passes live / ~134 relaxed",
+  "power": "the frozen 20-pair batch separates only strong effects: p=0.95 -> 98.75% supported, p=0.8 -> 40.6%, moderate effects stay unclear; false verdicts capped at the per-side Bonferroni budget"
+ }
+}
