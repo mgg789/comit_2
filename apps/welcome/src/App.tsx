@@ -41,7 +41,7 @@ export default function App() {
               text: "Зарплата обязательна в каждом предложении, а обратная связь — контракт, а не вежливость.",
             },
           ].map((card) => (
-            <article key={card.title} className="flex flex-col gap-2 rounded-xl bg-white p-5 shadow-sm">
+            <article key={card.title} className="flex flex-col gap-2 rounded-xl bg-surface p-5 shadow-sm">
               <h2 className="font-semibold">{card.title}</h2>
               <p className="text-sm leading-6 text-[var(--comit-text-muted)]">{card.text}</p>
             </article>

@@ -15,7 +15,7 @@ export default function App() {
             одинаковой сложностью. Каркас — наполнение в спринте S2.
           </p>
         </header>
-        <section className="flex flex-col gap-3 rounded-xl bg-white p-6 shadow-sm">
+        <section className="flex flex-col gap-3 rounded-xl bg-surface p-6 shadow-sm">
           <h2 className="text-lg font-semibold">Что здесь будет</h2>
           <ul className="list-disc pl-5 text-sm leading-6">
             <li>Грейд-тест на заявленный уровень с адаптивным движением вверх/вниз</li>

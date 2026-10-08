@@ -1,36 +1,50 @@
-import { Button } from "@comit/ui-kit";
+import { Backdrop, Button, StateMessage } from "@comit/ui-kit";
+import { Navigate, Route, Routes } from "react-router";
+import { LoginPage } from "./auth/LoginPage";
+import { useSession } from "./auth/session";
+import { AppShell } from "./layout/AppShell";
+import { NewVacancyRoute, VacanciesPage } from "./vacancies/VacanciesPage";
 
-/** Skeleton shell of the employer app; LHH-style inverse mechanics lands in S3–S4 (context/70-mvp-scope.md). */
+/** Employer cabinet (LHH inverse mechanics): the session gate decides between sign-in and the cabinet routes. */
 export default function App() {
+  const { state } = useSession();
+
+  if (state.status === "loading") {
+    return (
+      <main className="flex min-h-dvh items-center justify-center">
+        <Backdrop />
+        <StateMessage kind="loading" title="Проверяем вход" />
+      </main>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <main className="flex min-h-dvh items-center justify-center">
+        <Backdrop />
+        <StateMessage
+          kind="error"
+          title="Сервис входа недоступен"
+          description="Не удалось проверить сессию. Проверьте соединение и повторите."
+          action={
+            <Button variant="secondary" onClick={state.retry}>
+              Повторить
+            </Button>
+          }
+        />
+      </main>
+    );
+  }
+  if (state.status === "anonymous") return <LoginPage />;
+
   return (
-    <main className="min-h-screen bg-[var(--comit-bg)] text-[var(--comit-text)]">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6 px-6 py-16">
-        <header className="flex flex-col gap-2">
-          <p className="text-sm font-semibold uppercase tracking-widest text-[var(--comit-text-muted)]">
-            Comit
-          </p>
-          <h1 className="text-3xl font-bold">Кабинет работодателя</h1>
-          <p className="text-[var(--comit-text-muted)]">
-            Категории кандидатов, подборка с объяснением попадания, тиндер-разбор и приглашения.
-            Каркас — наполнение в спринтах S3–S4.
-          </p>
-        </header>
-        <section className="flex flex-col gap-3 rounded-xl bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold">Что здесь будет</h2>
-          <ul className="list-disc pl-5 text-sm leading-6">
-            <li>Профиль компании и описание потребности (стек, специализация, грейд)</li>
-            <li>Подборка кандидатов с обоснованием попадания — не чёрный ящик</li>
-            <li>Поиск по банку кандидатов с фильтрами (специализация, грейд, стек, ФСП)</li>
-            <li>Тиндер-разбор: лайк/скип обучает вектор вакансии</li>
-            <li>Приглашения с обязательной ЗП «от–до»; контакты — только после принятия</li>
-          </ul>
-        </section>
-        <footer>
-          <Button variant="secondary" onClick={() => (window.location.href = "/")}>
-            На витрину
-          </Button>
-        </footer>
-      </div>
-    </main>
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<Navigate to="/vacancies" replace />} />
+        <Route path="vacancies" element={<VacanciesPage />}>
+          <Route path="new" element={<NewVacancyRoute />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/vacancies" replace />} />
+      </Route>
+    </Routes>
   );
 }

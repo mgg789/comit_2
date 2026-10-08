@@ -1,33 +1,29 @@
-import type { ButtonHTMLAttributes } from "react";
-
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-}
-
-/** Single button component for all four apps; extend with variants as the design system grows. */
-export function Button({ variant = "primary", style, ...rest }: ButtonProps) {
-  return (
-    <button
-      {...rest}
-      style={{
-        borderRadius: "var(--comit-radius)",
-        border: "none",
-        padding: "10px 18px",
-        cursor: "pointer",
-        fontWeight: 600,
-        color: variant === "primary" || variant === "danger" ? "#fff" : "var(--comit-text)",
-        background:
-          variant === "primary"
-            ? "var(--comit-primary)"
-            : variant === "danger"
-              ? "var(--comit-danger)"
-              : variant === "secondary"
-                ? "var(--comit-accent)"
-                : "transparent",
-        ...style,
-      }}
-    />
-  );
-}
+/// <reference path="./assets.d.ts" />
+/**
+ * @comit/ui-kit — shared components for all four apps (dark "glass" theme of the COMIT Figma file).
+ * Styling relies on Tailwind utilities generated through theme.css; import tokens.css + theme.css in each app.
+ */
+export { cx } from "./cx";
+export { Icon, ICONS, type IconName, type IconProps } from "./icon";
+export {
+  Button,
+  IconButton,
+  Spinner,
+  type ButtonProps,
+  type ButtonSize,
+  type ButtonVariant,
+  type IconButtonProps,
+} from "./controls";
+export { Dialog } from "./dialog";
+export { Avatar, Backdrop, Chip, Logo, MatchBadge, Panel, ProgressBar, StateMessage, StatusDot, type ChipTone } from "./display";
+export {
+  SelectField,
+  TextArea,
+  TextField,
+  type SelectFieldProps,
+  type SelectOption,
+  type TextAreaProps,
+  type TextFieldProps,
+} from "./fields";
+export { default as agentOrbUrl } from "./assets/brand/agent-orb.png";
+export { default as addArrowUrl } from "./assets/brand/add-arrow.svg";

@@ -5,13 +5,16 @@
   "type": "module",
   "exports": {
     ".": "./src/index.tsx",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./theme.css": "./src/theme.css"
   },
   "scripts": {
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/unbounded": "^5.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

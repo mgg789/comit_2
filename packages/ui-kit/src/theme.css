@@ -1,0 +1,72 @@
+/**
+ * Tailwind 4 bridge for Comit tokens. Import right after `@import "tailwindcss";` in every app:
+ * utilities such as bg-glass, text-muted, rounded-card, font-display resolve to tokens.css values,
+ * and @source makes Tailwind generate the classes used inside ui-kit components.
+ */
+@source "./";
+
+@theme inline {
+  --color-bg: var(--comit-bg);
+  --color-surface: var(--comit-surface);
+  --color-surface-raised: var(--comit-surface-raised);
+  --color-field: var(--comit-field);
+  --color-glass: var(--comit-glass);
+  --color-glass-card: var(--comit-glass-card);
+  --color-glass-border: var(--comit-glass-border);
+  --color-light: var(--comit-light);
+  --color-light-strong: var(--comit-light-strong);
+  --color-dark-button: var(--comit-dark-button);
+
+  --color-text: var(--comit-text);
+  --color-muted: var(--comit-text-muted);
+  --color-subtle: var(--comit-text-subtle);
+  --color-faint: var(--comit-text-faint);
+  --color-on-light: var(--comit-text-on-light);
+  --color-on-chip: var(--comit-text-on-chip);
+
+  --color-primary: var(--comit-primary);
+  --color-accent: var(--comit-accent);
+  --color-chip-info: var(--comit-chip-info);
+  --color-success: var(--comit-success);
+  --color-success-strong: var(--comit-success-strong);
+  --color-success-soft: var(--comit-success-soft);
+  --color-success-text: var(--comit-success-text);
+  --color-warning: var(--comit-warning);
+  --color-danger: var(--comit-danger);
+  --color-danger-soft: var(--comit-danger-soft);
+
+  --radius-field: var(--comit-radius);
+  --radius-card: var(--comit-radius-card);
+  --radius-chip: var(--comit-radius-chip);
+  --radius-pill: var(--comit-radius-pill);
+
+  --blur-glass: var(--comit-blur-glass);
+
+  --shadow-pill: var(--comit-shadow-pill);
+  --shadow-tab-glow: var(--comit-shadow-tab-glow);
+
+  --font-sans: var(--comit-font-sans);
+  --font-display: var(--comit-font-display);
+}
+
+@layer base {
+  /* Background lives on <html> only: a body background would paint over the fixed -z-10 Backdrop. */
+  html {
+    background: var(--comit-bg);
+  }
+  body {
+    color: var(--comit-text);
+    font-family: var(--comit-font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@utility bg-accent-gradient {
+  background-image: var(--comit-accent-gradient);
+}
+
+@utility glass {
+  background-color: var(--comit-glass);
+  backdrop-filter: blur(var(--comit-blur-glass));
+  -webkit-backdrop-filter: blur(var(--comit-blur-glass));
+}

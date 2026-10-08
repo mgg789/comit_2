@@ -100,6 +100,7 @@ GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, л
 - `docs/architecture.md` — сервисы, потоки, порты
 - `docs/api.md` — контракты api-core
 - `docs/ci.md`, `docs/deploy.md`, `docs/runbook.md` — процессы
+- фронтенд: [`web-employer.md`](docs/web-employer.md) — кабинет работодателя
 - подсистемы: [`verification.md`](docs/verification.md), [`recruitment.md`](docs/recruitment.md), [`chat.md`](docs/chat.md), [`candidate-showcase.md`](docs/candidate-showcase.md), [`employer-statistics.md`](docs/employer-statistics.md), [`feed-refill.md`](docs/feed-refill.md), [`preference-learning.md`](docs/preference-learning.md), [`api-operations.md`](docs/api-operations.md)
 - `context/tz/00-fsp-tz-2026.md` — канон требований (ТЗ), `context/tz/01-hh-research-apr-sep-2026.md` — исследовательская база проблем
 
