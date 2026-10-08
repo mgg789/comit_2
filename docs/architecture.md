@@ -43,6 +43,8 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
+Публичная стартовая страница `apps/welcome` и её переходы описаны в [welcome-ui.md](welcome-ui.md); кабинет и настройки работодателя — в [employer-ui.md](employer-ui.md).
+
 Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор
 (`context/80`, решение Q3); account/draft gateway уже даёт owner boundary, но
 public hiring chat и frontend остаются отдельными этапами; matching selection

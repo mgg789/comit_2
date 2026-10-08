@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
 import type { AccountView, AgentsDraftView } from "@comit/shared";
@@ -6,6 +6,8 @@ import { api, asset, errorText, useRoute } from "./runtime";
 import { Action, Backdrop, Icon, Reveal, State } from "./ui";
 import { Login } from "./login";
 import { LegalDocument } from "./legal";
+import { Settings } from "./settings";
+import { useEmployerPreferences } from "./preferences";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
 import { Vacancies, VacancyDetail, VacancyEditor } from "./vacancies";
 import {
@@ -24,6 +26,35 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [agent, setAgent] = useState(false);
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const accountToolsRef = useRef<HTMLDivElement>(null);
+  const [accountAction, setAccountAction] = useState<
+    "logout" | "logout-all" | "delete" | null
+  >(null);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
+  const { preferences } = useEmployerPreferences();
+  function confirmAccountAction(action: "logout" | "logout-all" | "delete") {
+    setMenu(false);
+    setAccountActionError(null);
+    setAccountAction(action);
+  }
+  async function logoutConfirmed() {
+    if (accountBusy || !accountAction || accountAction === "delete") return;
+    setAccountBusy(true);
+    setAccountActionError(null);
+    try {
+      await api.logout("employer", accountAction === "logout-all");
+      setAccount(null);
+      setAgent(false);
+      setEditor(null);
+      setAccountAction(null);
+    } catch (error) {
+      setAccountActionError(errorText(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
   const [editor, setEditor] = useState<AgentsDraftView | "new" | null>(null);
   const [checkpoint, setCheckpoint] = useState(0);
   async function checkAccount() {
@@ -120,20 +151,36 @@ export default function App() {
     window.scrollTo(0, 0);
   }, [route]);
   useEffect(() => {
+    if (!menu) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !menuRef.current?.contains(event.target) &&
+        !accountToolsRef.current?.contains(event.target)
+      ) setMenu(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [menu]);
+  useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (accountBusy) return;
+        setAccountAction(null);
         setAgent(false);
         setMenu(false);
       }
     };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, []);
+  }, [accountBusy]);
   const [path, query = ""] = route.split("?");
   const pieces = (path || "/vacancies").split("/").filter(Boolean);
   const draftQuery = new URLSearchParams(query).get("draft") || undefined;
   const selected =
-    pieces[0] === "statistics"
+    pieces[0] === "settings"
+      ? "settings"
+      : pieces[0] === "statistics"
       ? "statistics"
       : pieces[0] === "resumes" ||
           pieces[0] === "resume" ||
@@ -143,7 +190,15 @@ export default function App() {
           ? "candidates"
           : "vacancies";
   let screen;
-  if (pieces[0] === "vacancy" && pieces[1])
+  if (pieces[0] === "settings" && account)
+    screen = (
+      <Settings
+        account={account}
+        onConfirmLogoutAll={() => confirmAccountAction("logout-all")}
+        onConfirmDelete={() => confirmAccountAction("delete")}
+      />
+    );
+  else if (pieces[0] === "vacancy" && pieces[1])
     screen =
       pieces[2] === "resumes" ? (
         <VacancyResumes draftId={pieces[1]} navigate={navigate} />
@@ -186,8 +241,8 @@ export default function App() {
       <Vacancies navigate={navigate} onCreate={() => setEditor("new")} />
     );
   return (
-    <MotionConfig reducedMotion="user">
-      <div className={`employer-app ${account ? "" : "is-login"}`}>
+    <MotionConfig reducedMotion={preferences.reducedMotion ? "always" : "user"}>
+      <div className={`employer-app ${account ? "" : "is-login"} ${preferences.reducedMotion ? "reduce-motion" : ""}`}>
         <Backdrop />
         {pieces[0] === "legal" ? (
           <LegalDocument name={pieces[1] || "privacy-policy"} />
@@ -232,15 +287,14 @@ export default function App() {
                       label: "Статистика",
                       path: "/statistics",
                     },
-                    { id: "settings", label: "Аккаунт" },
+                    { id: "settings", label: "Настройки", path: "/settings" },
                   ] as const
                 ).map((item) => (
                   <button
                     key={item.id}
                     className={`nav-item glass ${selected === item.id ? "selected" : ""}`}
                     onClick={() => {
-                      if ("path" in item) navigate(item.path);
-                      else setMenu((value) => !value);
+                      navigate(item.path);
                     }}
                     aria-label={item.label}
                     aria-current={selected === item.id ? "page" : undefined}
@@ -262,7 +316,7 @@ export default function App() {
                   </button>
                 ))}
               </nav>
-              <div className="account-tools glass">
+              <div className="account-tools glass" ref={accountToolsRef}>
                 <button
                   className="plain-icon"
                   aria-label="Поиск кандидатов"
@@ -298,13 +352,13 @@ export default function App() {
               <AnimatePresence>
                 {menu && (
                   <motion.div
+                    ref={menuRef}
                     className="account-menu glass"
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                   >
                     <p>{account.email}</p>
-                    <small>Кабинет работодателя</small>
                     <Action
                       onClick={() => {
                         navigate("/chat");
@@ -314,28 +368,62 @@ export default function App() {
                       Мои чаты
                     </Action>
                     <Action
-                      onClick={async () => {
-                        try {
-                          await api.logout("employer");
-                          setAccount(null);
-                          setAgent(false);
-                          setEditor(null);
-                        } catch (error) {
-                          setAuthError(errorText(error));
-                        }
-                      }}
+                      onClick={() => confirmAccountAction("logout")}
                     >
                       Выйти
                     </Action>
-                    {authError && (
-                      <p className="form-error" role="alert">
-                        {authError}
-                      </p>
-                    )}
+                    <Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action>
                   </motion.div>
                 )}
               </AnimatePresence>
             </header>
+            <AnimatePresence>
+              {accountAction && (
+                <motion.div
+                  className="modal-shade"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={(event) => {
+                    if (event.target === event.currentTarget && !accountBusy)
+                      setAccountAction(null);
+                  }}
+                >
+                  <section
+                    className="modal account-confirmation glass"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="account-confirmation-title"
+                  >
+                    <h2 id="account-confirmation-title">
+                      {accountAction === "delete"
+                        ? "Удалить аккаунт?"
+                        : accountAction === "logout-all"
+                          ? "Выйти на всех устройствах?"
+                          : "Выйти из аккаунта?"}
+                    </h2>
+                    <p>
+                      {accountAction === "delete"
+                        ? "Удаление аккаунта пока недоступно: сервисы ещё не поддерживают удаление связанных вакансий, переписки и данных подбора. Аккаунт и его данные сохранятся."
+                        : accountAction === "logout-all"
+                          ? "Все сессии будут завершены. Для возвращения понадобится код из письма."
+                          : "Для возвращения понадобится код из письма."}
+                    </p>
+                    {accountActionError && (
+                      <p role="alert" className="form-error">{accountActionError}</p>
+                    )}
+                    <div className="account-confirmation-actions">
+                      <Action disabled={accountBusy} onClick={() => setAccountAction(null)}>{accountAction === "delete" ? "Закрыть" : "Отмена"}</Action>
+                      {accountAction !== "delete" && (
+                        <Action variant="primary" disabled={accountBusy} onClick={() => void logoutConfirmed()}>
+                          {accountBusy ? "Выходим…" : "Выйти"}
+                        </Action>
+                      )}
+                    </div>
+                  </section>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <main className="main-content">
               <AnimatePresence mode="wait">
                 <Reveal key={`${route}:${checkpoint}`}>{screen}</Reveal>

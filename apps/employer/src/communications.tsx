@@ -23,6 +23,7 @@ import type {
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
+import { useEmployerPreferences } from "./preferences";
 
 const stateNames: Record<RecruitmentView["state"], string> = {
   sent: "Приглашение отправлено",
@@ -663,6 +664,7 @@ function ProcessCommand({
 
 /** Global durable assistant overlays the current page and remains independent of route changes. */
 export function OrganizationAgent({ onClose }: { onClose: () => void }) {
+  const { preferences } = useEmployerPreferences();
   const [messages, setMessages] = useState<AgentsOrganizationMessage[]>([]);
   const [questions, setQuestions] = useState<AgentsPendingAnswer[]>([]);
   const [turn, setTurn] = useState<AgentsOrganizationTurn | null>(null);
@@ -677,7 +679,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [showReasoning, setShowReasoning] = useState(false);
   const [reasoningEffort, setReasoningEffort] = useState<
     "off" | "medium" | "max"
-  >("off");
+  >(preferences.reasoningEffort);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<
     AgentsDocumentView[]
@@ -1172,6 +1174,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             onKeyDown={(event) => {
               if (
                 event.key !== "Enter" ||
+                !preferences.submitWithEnter ||
                 event.shiftKey ||
                 event.nativeEvent.isComposing
               )

@@ -1,0 +1,34 @@
+.settings-screen { padding-bottom: 40rem; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24rem; }
+.settings-card { padding: 30rem; border-radius: 30rem; min-width: 0; }
+.settings-card h2 { font-family: var(--employer-display); font-size: 28rem; margin: 0 0 12rem; }
+.settings-description { color: var(--comit-text-muted); font-size: 18rem; line-height: 1.5; margin: 0 0 24rem; }
+.settings-facts { display: grid; gap: 18rem; margin: 0; }
+.settings-facts > div { display: flex; gap: 20rem; justify-content: space-between; font-size: 20rem; }
+.settings-facts dt { color: var(--comit-text-muted); }
+.settings-facts dd { text-align: right; margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.settings-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 16rem; margin-bottom: 12rem; }
+.settings-card-heading h2 { margin: 0; }
+.settings-card-heading .action { padding: 12rem 18rem; font-size: 18rem; }
+.settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 24rem; margin-top: 24rem; cursor: pointer; }
+.settings-toggle strong, .settings-security-row strong { display: block; font-size: 20rem; font-weight: 500; }
+.settings-toggle small { display: block; color: var(--comit-text-muted); font-size: 16rem; margin-top: 6rem; }
+.settings-toggle input { appearance: none; flex-shrink: 0; width: 52rem; height: 30rem; min-height: 30rem; border-radius: 30rem; padding: 3rem; background: var(--employer-paint-2e2e2d); border: 1px solid var(--comit-text-muted); cursor: pointer; }
+.settings-toggle input::before { content: ""; display: block; width: 22rem; height: 22rem; border-radius: 50%; background: var(--comit-text); transition: transform 160ms; }
+.settings-toggle input:checked { background: var(--employer-blue); border-color: var(--employer-blue); }
+.settings-toggle input:checked::before { transform: translateX(22rem); }
+.settings-toggle input:focus-visible { outline: 2px solid var(--comit-text); outline-offset: 4px; }
+.settings-local { font-size: 16rem; margin: 24rem 0 0; }
+.settings-security-row { display: flex; align-items: center; justify-content: space-between; gap: 18rem; margin-top: 24rem; }
+.settings-security-row .settings-description { font-size: 16rem; margin: 8rem 0 0; }
+.settings-security-row .action { flex-shrink: 0; font-size: 18rem; padding: 16rem 20rem; }
+.settings-danger { color: var(--employer-danger); }
+@media (max-width: 1100px) { .settings-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .settings-card { padding: 24rem; }
+  .settings-facts > div { flex-direction: column; gap: 6rem; }
+  .settings-facts dd { text-align: left; }
+  .settings-security-row { align-items: flex-start; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { .settings-toggle input::before { transition: none; } }
+[data-reduced-motion="true"] .settings-toggle input::before { transition: none; }

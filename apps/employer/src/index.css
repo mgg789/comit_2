@@ -551,6 +551,32 @@ small {
 .account-menu p {
   overflow-wrap: anywhere;
 }
+.account-confirmation {
+  width: min(560rem, 100%);
+  display: grid;
+  gap: 24rem;
+  font-size: 20rem;
+}
+.account-confirmation h2 {
+  font-size: 30rem;
+}
+.account-confirmation p {
+  line-height: 1.5;
+}
+.account-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 14rem;
+}
+.employer-app.reduce-motion *,
+.employer-app.reduce-motion *::before,
+.employer-app.reduce-motion *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
 .main-content {
   margin: 90rem 80rem 80rem;
   min-height: 700rem;
