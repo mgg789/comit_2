@@ -156,8 +156,17 @@ PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.ven
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine vacancy-worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine combine-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine rerank-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine preference-worker
 PORT=38080 pnpm --filter @comit/api start
 ```
+
+`preference-worker` выполняет автоматические operational fits vacancy-local
+моделей по реакциям ленты (40 уникальных реакций на первый fit, 16 свежих на
+повтор); он требует миграций 009/011 и training-v1 consent каждого участника.
+Без активной модели лента отдаёт baseline-порядок; rollback/reset — через
+employer preference routes. Research-показы гипотез включаются управлением
+vacancy (`/hypotheses/{pause|resume|reset}`).
 
 `/healthz` означает живой процесс; matching `/ready` проверяет token, миграции/БД
 и наличие pinned модели. Не считать healthz доказательством готового пула.
