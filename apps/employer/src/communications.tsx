@@ -775,6 +775,11 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             })
             .catch(() => {});
         }
+        // Recover the durable turn after reopening the overlay or reloading the page.
+        if (!activeTurn.current) {
+          const latestUser = [...page.items].reverse().find((item) => item.role === "user" && item.turn_id);
+          if (latestUser?.turn_id) activeTurn.current = latestUser.turn_id;
+        }
         if (activeTurn.current) {
           const value = await api.getOrganizationTurn(activeTurn.current);
           if (!active) return;

@@ -14,6 +14,7 @@ export function errorText(error: unknown): string {
   if (error instanceof ApiError) {
     const detail = error.body && typeof error.body === "object" && "detail" in error.body ? error.body.detail : null;
     const lifecycleMessages: Record<string, string> = {
+      organization_turn_active: "Агент ещё обрабатывает предыдущее сообщение. Дождитесь ответа и отправьте следующее.",
       vacancy_lifecycle_pending: "Действие сохранено и завершается в сервисах. Подбор и новые сообщения уже заблокированы. Попробуйте повторить действие позже.",
       vacancy_lifecycle_conflict: "Вакансия изменилась до подтверждения. Обновите страницу и выберите действие заново.",
       vacancy_not_published: "Действие доступно только для опубликованной вакансии.",

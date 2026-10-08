@@ -360,3 +360,15 @@
 .deck-feedback { display: flex; flex-direction: column; align-items: stretch; }
 .deck-feedback > p { margin: 0; }
 .deck-feedback > .action { align-self: center; margin-top: 30rem; }
+
+/* Keep exiting panels visible until their fade ends; inert removes interactions immediately. */
+.vacancy-review-panel { transition: visibility 0s linear 350ms; }
+.vacancy-review-panel[aria-hidden="false"] { transition-delay: 0s; }
+.vacancy-info { display: flex; flex-direction: column; }
+.vacancy-info > .vacancy-review-actions { margin-top: auto; padding-top: 24rem; }
+.radar-remove-mark img { transform: translate(-50%, -50%) rotate(45deg) scale(.38); }
+@media (prefers-reduced-motion: reduce) { .vacancy-review-panel { transition: none; } }
+
+.vacancy-review-tabs > button { transition: background 300ms cubic-bezier(.22, 1, .36, 1), color 250ms ease; }
+.vacancy-editor[data-reduced-motion="true"] .vacancy-review-panel,
+.vacancy-editor[data-reduced-motion="true"] .vacancy-review-tabs > button { transition: none; }

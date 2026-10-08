@@ -9,6 +9,7 @@
 }
 
 .skill-radar__hint {
+  text-align: center;
   color: var(--comit-text-muted);
   font-size: var(--employer-caption-text-min);
   line-height: 1.5;

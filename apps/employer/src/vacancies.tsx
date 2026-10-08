@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
+import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
 import type {
   AgentsDraftFields_Input,
@@ -12,6 +12,7 @@ import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import "./vacancies.css";
 import { SkillRadar, gradeLabel } from "./skill-radar";
+import { useEmployerPreferences } from "./preferences";
 
 type Navigate = (path: string) => void;
 const formats = { onsite: "Офис", remote: "Удалённо", hybrid: "Гибрид" };
@@ -265,6 +266,9 @@ export function VacancyEditor({
   onSaved: (draft: AgentsDraftView) => void;
   onAgent: () => void;
 }) {
+  const systemReduceMotion = useReducedMotion();
+  const { preferences } = useEmployerPreferences();
+  const reduceMotion = systemReduceMotion || preferences.reducedMotion;
   const [current, setCurrent] = useState(draft);
   const [title, setTitle] = useState(draft?.fields.title || "");
   const [specialization, setSpecialization] = useState<(typeof classes)[number]>(
@@ -459,6 +463,7 @@ export function VacancyEditor({
     >
       <motion.section
         className="modal vacancy-editor"
+        data-reduced-motion={reduceMotion ? "true" : "false"}
         role="dialog"
         aria-modal="true"
         aria-label={confirm ? "Подтверждение публикации" : "Новая вакансия"}
@@ -495,7 +500,7 @@ export function VacancyEditor({
                 id="vacancy-panel-info" role="tabpanel" aria-labelledby="vacancy-tab-info"
                 aria-hidden={reviewTab !== "info"} inert={reviewTab !== "info"}
                 initial={false} animate={{ opacity: reviewTab === "info" ? 1 : 0, x: reviewTab === "info" ? 0 : -12 }}
-                transition={{ duration: 0.25 }}>
+                transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
                 <h3>{current?.summary?.fields.title}</h3>
                 <dl className="vacancy-info-fields">
                   <div><dt>Зарплата</dt><dd>{salary(current?.summary?.fields.zp_min, current?.summary?.fields.zp_max)}</dd></div>
@@ -505,6 +510,7 @@ export function VacancyEditor({
                   <div><dt>Тип</dt><dd>{formats[work]}</dd></div>
                   <div><dt>Описание проекта</dt><dd>{current?.summary?.fields.bio || "Не указано"}</dd></div>
                 </dl>
+                {error && <p role="alert" className="form-error">{error}</p>}
             {published ? (
               <div role="status" className="inline-notice">
                 Подготавливаем подбор кандидатов. После готовности окно закроется.
@@ -530,7 +536,7 @@ export function VacancyEditor({
                     id={`vacancy-panel-${panel.id}`} role="tabpanel" aria-labelledby={`vacancy-tab-${panel.id}`}
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
-                    transition={{ duration: 0.25 }}>
+                    transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
                     <SkillRadar removeIcon={<span className="radar-remove-mark"><img src={asset("skill-radar-remove-source.svg")} alt="" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
@@ -765,7 +771,7 @@ export function VacancyEditor({
             </form>
           </>
         )}
-        {error && (
+        {error && !confirm && (
           <p role="alert" className="form-error">
             {error}
           </p>
