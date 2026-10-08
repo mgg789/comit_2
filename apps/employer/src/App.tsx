@@ -25,6 +25,14 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [agent, setAgent] = useState(false);
+  const afterAgentClose = useRef<(() => void) | null>(null);
+  function leaveAgent(action: () => void) {
+    setMenu(false);
+    if (agent || afterAgentClose.current) {
+      afterAgentClose.current = action;
+      setAgent(false);
+    } else action();
+  }
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const accountToolsRef = useRef<HTMLDivElement>(null);
@@ -322,20 +330,20 @@ export default function App() {
                 <button
                   className="plain-icon"
                   aria-label="Поиск кандидатов"
-                  onClick={() => {
+                  onClick={() => leaveAgent(() => {
                     if (pieces[0] === "showcase")
                       window.dispatchEvent(
                         new Event("employer:focus-candidate-search"),
                       );
                     else navigate("/showcase?search=1");
-                  }}
+                  })}
                 >
                   <Icon name="search" />
                 </button>
                 <button
                   className="plain-icon"
                   aria-label="Переписка и приглашения"
-                  onClick={() => navigate("/chat")}
+                  onClick={() => leaveAgent(() => navigate("/chat"))}
                 >
                   <Icon name="message" />
                 </button>
@@ -363,8 +371,7 @@ export default function App() {
                     <p>{account.email}</p>
                     <Action
                       onClick={() => {
-                        navigate("/chat");
-                        setMenu(false);
+                        leaveAgent(() => navigate("/chat"));
                       }}
                     >
                       Мои чаты
@@ -462,7 +469,11 @@ export default function App() {
                 />
               )}
             </AnimatePresence>
-            <AnimatePresence>
+            <AnimatePresence onExitComplete={() => {
+              const action = afterAgentClose.current;
+              afterAgentClose.current = null;
+              action?.();
+            }}>
               {agent && <OrganizationAgent onClose={() => setAgent(false)} />}
             </AnimatePresence>
           </>

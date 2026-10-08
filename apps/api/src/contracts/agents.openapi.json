@@ -2347,6 +2347,87 @@
           }
         }
       },
+      "delete": {
+        "summary": "Clear Messages",
+        "description": "Clear only an idle owner's conversation; provider availability is irrelevant.",
+        "operationId": "clear_messages_internal_organization_agent_messages_delete",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationMessagesClearRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationContext"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Active work or context revision conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationClearConflict"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "summary": "Message",
         "description": "Queue one idempotent user message for the background worker.",
@@ -5548,6 +5629,25 @@
         "title": "OrganizationChat",
         "description": "Owner-scoped global employer conversation and its presence projection."
       },
+      "OrganizationClearConflict": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "enum": [
+              "organization_chat_busy",
+              "context_revision_conflict"
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OrganizationClearConflict",
+        "description": "Public reasons why the confirmed conversation cannot currently be cleared."
+      },
       "OrganizationContext": {
         "properties": {
           "owner_id": {
@@ -5840,6 +5940,23 @@
         ],
         "title": "OrganizationMessageRequest",
         "description": "Request to queue a user message in the sole owner chat."
+      },
+      "OrganizationMessagesClearRequest": {
+        "properties": {
+          "expected_context_revision": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Expected Context Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_context_revision"
+        ],
+        "title": "OrganizationMessagesClearRequest",
+        "description": "Clear idle conversation history using the context revision shown to its owner."
       },
       "OrganizationTask": {
         "properties": {

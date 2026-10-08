@@ -1,15 +1,42 @@
 """Explicit service, migration and worker commands; serving never migrates."""
 
 import argparse
+import logging
 import os
 import signal
 import threading
+from typing import Protocol
 
+import psycopg
 import uvicorn
 
 from agents_service.database import migrate
 from agents_service.main import create_app
 from agents_service.store import Store
+
+logger = logging.getLogger(__name__)
+
+
+class PollingWorker(Protocol):
+    """Common durable polling interface for both agent workers."""
+
+    def run(self, stop: threading.Event, poll_seconds: float = 2.0) -> None:
+        """Poll until shutdown; caller retries transient database disconnections."""
+        ...
+
+
+def _run_with_database_retry(worker: PollingWorker, stop: threading.Event, poll_seconds: float) -> None:
+    """Resume durable polling after transient PostgreSQL connection failures."""
+    retry_seconds = 1.0
+    while not stop.is_set():
+        try:
+            worker.run(stop, poll_seconds=poll_seconds)
+            return
+        except (psycopg.OperationalError, psycopg.InterfaceError):
+            logger.warning("worker_database_temporarily_unavailable; retrying in %ss", retry_seconds)
+            if stop.wait(retry_seconds):
+                return
+            retry_seconds = min(retry_seconds * 2, 30.0)
 
 
 def main() -> None:
@@ -38,7 +65,7 @@ def main() -> None:
         stop = threading.Event()
         for signum in (signal.SIGINT, signal.SIGTERM):
             signal.signal(signum, lambda _signal, _frame: stop.set())
-        worker.run(stop, poll_seconds=float(os.getenv("AGENTS_POLL_SECONDS", "2")))
+        _run_with_database_retry(worker, stop, poll_seconds=float(os.getenv("AGENTS_POLL_SECONDS", "2")))
         return
     from agents_service.worker import Worker
     worker = Worker(Store(database_url), lease_seconds=int(os.getenv("AGENTS_LEASE_SECONDS", "300")))
@@ -48,7 +75,7 @@ def main() -> None:
     stop = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):
         signal.signal(signum, lambda _signal, _frame: stop.set())
-    worker.run(stop, poll_seconds=float(os.getenv("AGENTS_POLL_SECONDS", "2")))
+    _run_with_database_retry(worker, stop, poll_seconds=float(os.getenv("AGENTS_POLL_SECONDS", "2")))
 
 
 if __name__ == "__main__":

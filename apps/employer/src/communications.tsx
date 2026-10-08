@@ -6,6 +6,7 @@ import {
   type FormEvent,
 } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ApiError } from "@comit/api-client";
 import type {
   AccountView,
   AgentsOrganizationBudget,
@@ -682,6 +683,11 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [documentError, setDocumentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const [historyGeneration, setHistoryGeneration] = useState(0);
+  const stopHistory = useRef<() => void>(() => {});
   const [showReasoning, setShowReasoning] = useState(false);
   const [reasoningEffort, setReasoningEffort] = useState<
     "off" | "medium" | "max"
@@ -778,6 +784,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     let recovered = false;
     let lastUserTurn: string | null = null;
     let timer: ReturnType<typeof setTimeout>;
+    const stop = () => { active = false; clearTimeout(timer); };
+    stopHistory.current = stop;
     const poll = async () => {
       try {
         const page = await api.getOrganizationMessages(cursor, 100);
@@ -855,22 +863,48 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         if (active) setQuestions(value.filter((item) => !item.answered));
       })
       .catch(() => {});
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, []);
+    return stop;
+  }, [historyGeneration]);
   useEffect(() => {
     const scroller = history.current;
     if (scroller && followLatest.current) scroller.scrollTo({ top: scroller.scrollHeight, behavior: reducedMotion ? "instant" : "smooth" });
   }, [messages.length, outgoing?.message_id, turn?.status, historyBottom, reducedMotion]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        if (confirmClear) { event.stopPropagation(); if (!clearing) setConfirmClear(false); }
+        else onClose();
+      }
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
-  }, [onClose]);
+  }, [onClose, confirmClear, clearing]);
+  async function clearHistory() {
+    if (clearing) return;
+    setClearing(true);
+    setClearError(null);
+    try {
+      const context = await api.getOrganizationContext();
+      await api.clearOrganizationMessages({ expected_context_revision: context.revision });
+      stopHistory.current();
+      activeTurn.current = null;
+      pending.current = null;
+      followLatest.current = true;
+      setMessages([]);
+      setQuestions([]);
+      setOutgoing(null);
+      setTurn(null);
+      setError(null);
+      setLoading(true);
+      setConfirmClear(false);
+      setHistoryGeneration(value => value + 1);
+    } catch (reason) {
+      const code = reason instanceof ApiError && reason.body && typeof reason.body === "object" && "detail" in reason.body ? reason.body.detail : "";
+      setClearError(code === "organization_chat_busy"
+        ? "Агент ещё работает или ждёт завершения операции. Завершите задания и попробуйте снова."
+        : code === "context_revision_conflict" ? "Переписка изменилась. Попробуйте очистить её ещё раз." : errorText(reason));
+    } finally { setClearing(false); }
+  }
   async function send(event: FormEvent) {
     event.preventDefault();
     if (
@@ -1243,9 +1277,10 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       >
         <button
           type="button"
-          title="Очистка истории пока недоступна"
-          aria-label="Очистка истории недоступна"
-          disabled
+          title="Очистить историю AI"
+          aria-label="Очистить историю AI"
+          disabled={loading || clearing}
+          onClick={() => { setClearError(null); setConfirmClear(true); }}
         >
           <img
             src={asset("cb79bcac8a5b1ef4846052c9915814f7ef84aea8.svg")}
@@ -1379,6 +1414,18 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           </motion.div>
         )}
       </AnimatePresence>
+      {confirmClear && <div className="communication-modal" onClick={() => { if (!clearing) setConfirmClear(false); }}>
+        <section className="agent-clear-dialog glass" role="dialog" aria-modal="true" aria-label="Очистить историю AI"
+          onClick={event => event.stopPropagation()}>
+          <h2>Очистить переписку?</h2>
+          <p>Сообщения исчезнут. Документы, память ассистента, бюджет и результаты работы сохранятся.</p>
+          {clearError && <p role="alert">{clearError}</p>}
+          <div className="actions">
+            <Action disabled={clearing} onClick={() => setConfirmClear(false)}>Отмена</Action>
+            <Action variant="primary" disabled={clearing} onClick={() => void clearHistory()}>{clearing ? "Очищаем…" : "Очистить"}</Action>
+          </div>
+        </section>
+      </div>}
       <Action
         className="agent-close circle glass glass-surface"
         aria-label="Закрыть AI-агента"

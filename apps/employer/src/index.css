@@ -274,11 +274,6 @@ small {
     inset 0 -1px 0 var(--employer-paint-ffffff0f),
     0 10rem 40rem var(--employer-paint-00000014);
 }
-@supports (backdrop-filter: url("#glass-refraction")) {
-  .glass {
-    backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5);
-  }
-}
 /* Filter only the backdrop surface: transformed controls keep foreground sharp. */
 .glass.glass-surface {
   position: relative;
@@ -303,11 +298,6 @@ small {
     inset 1px 0 0 var(--employer-paint-ffffff14),
     inset 0 -1px 0 var(--employer-paint-ffffff0f),
     0 10rem 40rem var(--employer-paint-00000014);
-}
-@supports (backdrop-filter: url("#glass-refraction")) {
-  .glass.glass-surface::before {
-    backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5);
-  }
 }
 .agent-launcher.glass-surface {
   position: fixed;
@@ -550,6 +540,7 @@ small {
   z-index: 30;
 }
 .account-menu p {
+  text-align: center;
   overflow-wrap: anywhere;
 }
 .account-confirmation {

@@ -19,6 +19,8 @@ let messages = Array.from({ length: 100 }, (_, index) => ({
 let polls = 0;
 let sends = 0;
 let cursorReads = [];
+let clears = 0;
+let clearBusy = true;
 await context.route("**/api/**", async (route) => {
   const request = route.request();
   const url = new URL(request.url());
@@ -29,6 +31,14 @@ await context.route("**/api/**", async (route) => {
   if (path === "/employer/vacancies") return reply({ items: [], next_cursor: null });
   if (path.endsWith("/presence") || path.endsWith("/chat")) return reply({ chat_id: "synthetic-chat", status: "active" });
   if (path.endsWith("/budget")) return reply({ limit_micro_usd: "1000000", available_micro_usd: "900000", used_micro_usd: "100000", reserved_micro_usd: "0", window_days: 7, pricing_configured: true });
+  if (path.endsWith("/context")) return reply({ revision: 1, current_summary: {} });
+  if (path.endsWith("/messages") && request.method() === "DELETE") {
+    clears++;
+    assert.equal(request.postDataJSON().expected_context_revision, 1);
+    if (clearBusy) return reply({ detail: "organization_chat_busy" }, 409);
+    messages = [];
+    return reply({ revision: 2, current_summary: {} });
+  }
   if (path.endsWith("/pending-answers")) return reply([]);
   if (path.endsWith("/messages") && request.method() === "GET") {
     const cursor = Number(url.searchParams.get("after_sequence") || 0);
@@ -107,14 +117,39 @@ try {
     assert.equal(overflow, false, `viewport ${width} must not overflow horizontally`);
     await page.screenshot({ path: `${output}/answer-${width}.png` });
   }
+  await page.getByRole("button", { name: "Очистить историю AI", exact: true }).click();
+  const clearDialog = page.getByRole("dialog", { name: "Очистить историю AI", exact: true });
+  await clearDialog.waitFor();
+  await page.keyboard.press("Escape");
+  await clearDialog.waitFor({ state: "hidden" });
+  assert.equal(clears, 0);
+  assert.equal(await page.getByRole("dialog", { name: "AI-агент", exact: true }).count(), 1);
+  await page.getByRole("button", { name: "Очистить историю AI", exact: true }).click();
+  await clearDialog.getByRole("button", { name: "Очистить", exact: true }).click();
+  await clearDialog.getByText("Агент ещё работает", { exact: false }).waitFor();
+  assert.equal(await page.locator(".organization-message").count(), 102);
+  clearBusy = false;
+  await clearDialog.getByRole("button", { name: "Очистить", exact: true }).click();
+  await clearDialog.waitFor({ state: "hidden" });
+  await page.getByText("Чем могу помочь?", { exact: true }).waitFor();
+  assert.equal(await page.locator(".organization-message").count(), 0);
+  assert.equal(clears, 2);
   await page.keyboard.press("Escape");
   await page.getByRole("dialog", { name: "AI-агент", exact: true }).waitFor({ state: "hidden" });
   assert.equal(await page.evaluate(() => document.body.style.overflow), "");
   const chatButton = page.getByRole("button", { name: "Переписка и приглашения", exact: true });
   await chatButton.hover();
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.account-tools .icon-message')).transform !== "none");
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.getByRole("button", { name: "Открыть AI-агента", exact: true }).click();
+  await page.getByRole("dialog", { name: "AI-агент", exact: true }).waitFor();
+  await chatButton.click();
+  await page.waitForFunction(() => location.hash.startsWith("#/chat"));
+  assert.equal(await page.getByRole("dialog", { name: "AI-агент", exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Открыть меню аккаунта", exact: true }).click();
+  assert.equal(await page.locator(".account-menu p").evaluate(node => getComputedStyle(node).textAlign), "center");
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ result: "passed", checks: ["full terminal-page recovery", "left/right/center scroll", "background lock and restoration", "three-dot waiting", "non-interactive time pill", "no ratings", "copy feedback alignment", "header chat hover", "real answer Markdown", "optimistic replacement", "1920/1024/390"], screenshots: output }));
+  console.log(JSON.stringify({ result: "passed", checks: ["full terminal-page recovery", "left/right/center scroll", "background lock and restoration", "three-dot waiting", "non-interactive time pill", "no ratings", "copy feedback alignment", "header chat hover", "real answer Markdown", "optimistic replacement", "1920/1024/390", "clear cancel/Escape/busy/success", "AI removed before chat navigation", "centered account email"], screenshots: output }));
 } finally {
   await browser.close();
 }

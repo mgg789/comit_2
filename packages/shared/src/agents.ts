@@ -83,6 +83,9 @@ export type AgentsOrganizationBudget = { "limit_micro_usd": string; "spent_micro
 /** Owner-scoped global employer conversation and its presence projection. */
 export type AgentsOrganizationChat = { "chat_id": string; "owner_id": string; "status"?: "active" | "closed"; "presence"?: boolean; "last_seen_at"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); };
 
+/** Public reasons why the confirmed conversation cannot currently be cleared. */
+export type AgentsOrganizationClearConflict = { "detail": "organization_chat_busy" | "context_revision_conflict"; };
+
 /** Current compact context summary, kept separate from editable memory. */
 export type AgentsOrganizationContext = { "owner_id": string; "current_summary"?: Record<string, AgentsJsonValue>; "revision": number; "updated_at"?: (string | null); };
 
@@ -100,6 +103,9 @@ export type AgentsOrganizationMessagePage = { "items": Array<AgentsOrganizationM
 
 /** Request to queue a user message in the sole owner chat. */
 export type AgentsOrganizationMessageRequest = { "message": string; "idempotency_key": string; "reasoning_effort"?: "off" | "medium" | "max"; };
+
+/** Clear idle conversation history using the context revision shown to its owner. */
+export type AgentsOrganizationMessagesClearRequest = { "expected_context_revision": number; };
 
 /** Explicit employer-authorized delegated task and its candidate references. */
 export type AgentsOrganizationTask = { "task_id": string; "chat_id": string; "owner_id": string; "kind": "schedule_interview" | "inquiry" | "stand_in"; "instruction": string; "conversation_refs"?: Record<string, AgentsJsonValue>; "status"?: "queued" | "processing" | "retrying" | "waiting" | "waiting_employer" | "succeeded" | "failed" | "stopped"; "stop_reason"?: (string | null); "result"?: (Record<string, AgentsJsonValue> | null); "error_code"?: (string | null); "idempotency_key": string; "lease_token"?: (string | null); "lease_until"?: (string | null); "created_at"?: (string | null); "updated_at"?: (string | null); "next_run_at"?: (string | null); };

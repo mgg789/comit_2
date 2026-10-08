@@ -111,13 +111,27 @@ class OrganizationStore:
     def append_message(self, owner_id: UUID, *, role: str, content: str, turn_id: UUID | None = None,
                        tool_calls: list[dict[str, Any]] | None = None, tool_call_id: str | None = None,
                        name: str | None = None, attachments: list[dict[str, Any]] | None = None,
-                       idempotency_key: str | None = None) -> OrganizationMessage:
+                       idempotency_key: str | None = None, task_id: UUID | None = None,
+                       task_lease_token: UUID | None = None) -> OrganizationMessage:
         """Append a message with a monotonic chat sequence and optional idempotency key."""
         if role not in {"system", "user", "assistant", "tool"}:
             raise ValueError("invalid organization message role")
         chat = self.get_or_create_chat(owner_id)
         with self._db() as db, db.transaction():
             db.execute("SELECT chat_id FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (owner_id,))
+            if turn_id is not None:
+                live = db.execute("SELECT 1 FROM agents_service.organization_turns WHERE owner_id=%s AND chat_id=%s AND turn_id=%s",
+                                  (owner_id, chat.chat_id, turn_id)).fetchone()
+                if live is None:
+                    raise OrganizationConflict("organization_turn_not_found")
+            if task_id is not None:
+                live = db.execute("""SELECT 1 FROM agents_service.organization_tasks
+                    WHERE owner_id=%s AND chat_id=%s AND task_id=%s AND lease_token=%s
+                        AND status NOT IN ('stopped','failed')""", (owner_id, chat.chat_id, task_id, task_lease_token)).fetchone()
+                if live is None:
+                    raise OrganizationConflict("organization_task_lease_lost")
+            elif task_lease_token is not None:
+                raise ValueError("task_id_required")
             if idempotency_key:
                 existing = db.execute("SELECT * FROM agents_service.organization_messages WHERE chat_id=%s AND idempotency_key=%s",
                                       (chat.chat_id, idempotency_key)).fetchone()
@@ -158,6 +172,40 @@ class OrganizationStore:
         page = rows[:limit]
         return OrganizationMessagePage(items=[self._message(row) for row in page],
                                        next_sequence=page[-1]["sequence"] if len(rows) > limit else None)
+
+    def clear_messages(self, owner_id: UUID, expected_context_revision: int) -> OrganizationContext:
+        """Clear idle owner history atomically; preserve memory, vault, tasks and financial receipts.
+
+        Busy work and ambiguous effects fail closed. Incrementing the authoritative
+        context revision fences old provider requests and stale context writes.
+        Terminal task leases are invalidated so delayed worker reports cannot return.
+        """
+        chat = self.get_or_create_chat(owner_id)
+        with self._db() as db, db.transaction():
+            db.execute("SELECT chat_id FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (owner_id,))
+            context = db.execute("SELECT * FROM agents_service.organization_context WHERE owner_id=%s FOR UPDATE", (owner_id,)).fetchone()
+            if context is None or context["revision"] != expected_context_revision:
+                raise OrganizationConflict("context_revision_conflict")
+            turns = db.execute("SELECT status FROM agents_service.organization_turns WHERE owner_id=%s FOR UPDATE", (owner_id,)).fetchall()
+            tasks = db.execute("SELECT status FROM agents_service.organization_tasks WHERE owner_id=%s FOR UPDATE", (owner_id,)).fetchall()
+            reservations = db.execute("SELECT reservation_id FROM agents_service.organization_usage_reservations WHERE owner_id=%s AND status='reserved' FOR UPDATE", (owner_id,)).fetchall()
+            providers = db.execute("SELECT request_hash FROM agents_service.organization_provider_calls WHERE owner_id=%s AND status='in_flight' FOR UPDATE", (owner_id,)).fetchall()
+            effects = db.execute("""SELECT j.call_id FROM agents_service.organization_tool_journal j
+                JOIN agents_service.organization_turns t ON t.turn_id=j.turn_id
+                WHERE t.owner_id=%s AND j.status='started' FOR UPDATE OF j""", (owner_id,)).fetchall()
+            if (any(row["status"] in {"queued", "processing", "retrying"} for row in turns)
+                    or any(row["status"] not in {"succeeded", "failed", "stopped"} for row in tasks)
+                    or reservations or providers or effects):
+                raise OrganizationConflict("organization_chat_busy")
+            db.execute("UPDATE agents_service.organization_tasks SET lease_token=NULL,lease_until=NULL WHERE owner_id=%s", (owner_id,))
+            db.execute("DELETE FROM agents_service.organization_pending_answers WHERE chat_id=%s", (chat.chat_id,))
+            db.execute("DELETE FROM agents_service.organization_messages WHERE chat_id=%s", (chat.chat_id,))
+            # Journals cascade from turns; usage reservations/ledger and provider receipts have no turn FK.
+            db.execute("DELETE FROM agents_service.organization_turns WHERE owner_id=%s AND chat_id=%s", (owner_id, chat.chat_id))
+            row = db.execute("""UPDATE agents_service.organization_context SET current_summary='{}'::jsonb,
+                revision=revision+1,updated_at=now() WHERE owner_id=%s RETURNING *""", (owner_id,)).fetchone()
+            assert row is not None
+            return OrganizationContext.model_validate(dict(row))
 
     def create_turn(self, owner_id: UUID, message: str, idempotency_key: str, *, task_id: UUID | None = None,
                     task_lease_token: UUID | None = None, reasoning_effort: OrganizationReasoningEffort = "off") -> OrganizationTurn:
@@ -303,13 +351,21 @@ class OrganizationStore:
                 raise OrganizationNotFound("organization_tool_journal_not_found")
             return OrganizationToolJournal.model_validate(dict(row))
 
-    def create_task(self, owner_id: UUID, request: OrganizationTaskRequest, *, source_turn_id: UUID | None = None) -> OrganizationTask:
+    def create_task(self, owner_id: UUID, request: OrganizationTaskRequest, *, source_turn_id: UUID | None = None,
+                    source_lease_token: UUID | None = None) -> OrganizationTask:
         """Persist an employer-authorized task with candidate/conversation references."""
         from .organization_delegation import normalize_task_scope
         refs = normalize_task_scope(request.kind, request.conversation_refs)
         chat = self.get_or_create_chat(owner_id)
         with self._db() as db, db.transaction():
             db.execute("SELECT owner_id FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (owner_id,))
+            if source_turn_id is not None:
+                source = db.execute("""SELECT 1 FROM agents_service.organization_turns
+                    WHERE owner_id=%s AND chat_id=%s AND turn_id=%s AND status='processing'
+                    AND lease_token=%s AND lease_until>now() FOR UPDATE""",
+                                    (owner_id, chat.chat_id, source_turn_id, source_lease_token)).fetchone()
+                if source is None:
+                    raise OrganizationConflict("organization_lease_lost")
             existing = db.execute("SELECT * FROM agents_service.organization_tasks WHERE owner_id=%s AND idempotency_key=%s FOR UPDATE",
                                   (owner_id, request.idempotency_key)).fetchone()
             if existing:
@@ -461,6 +517,12 @@ class OrganizationStore:
         key = f"task:{task.task_id}:question:{(task.result or {}).get('generation',0)}:{hashlib.sha256(prompt.encode()).hexdigest()}"
         with self._db() as db, db.transaction():
             db.execute("SELECT chat_id FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (task.owner_id,))
+            live = db.execute("""SELECT 1 FROM agents_service.organization_tasks
+                WHERE owner_id=%s AND task_id=%s AND lease_token=%s
+                    AND status IN ('queued','processing','retrying','waiting','waiting_employer')""",
+                              (task.owner_id, task.task_id, task.lease_token)).fetchone()
+            if live is None:
+                raise OrganizationConflict("organization_task_lease_lost")
             existing = db.execute("SELECT message_id FROM agents_service.organization_messages WHERE chat_id=%s AND idempotency_key=%s", (task.chat_id, key)).fetchone()
             if existing:
                 return

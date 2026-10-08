@@ -120,7 +120,7 @@ class WorkflowToolRegistry:
                         "availability": [value.model_dump(mode="json") for value in args.availability],
                         **({"expires_at": args.expires_at.isoformat()} if args.expires_at else {})},
                     idempotency_key=idempotency_key)
-                task = self.store.create_task(owner, request, source_turn_id=source.turn_id)
+                task = self.store.create_task(owner, request, source_turn_id=source.turn_id, source_lease_token=source.lease_token)
                 return {"result": task.model_dump(mode="json"), "authorization_source_turn_id": str(source.turn_id)}
             if name == "task_status":
                 return {"result": self.store.get_task(owner, args.task_id).model_dump(mode="json")}
@@ -165,7 +165,8 @@ class WorkflowToolRegistry:
             progress.update({"report": args.report, "outcome": args.outcome})
             self.store.update_task(owner, task.task_id, status=status, result=progress, lease_token=task.lease_token)
             self.store.append_message(owner, role="assistant", content=args.report,
-                                      idempotency_key=f"task:{task.task_id}:report:{idempotency_key}")
+                                      idempotency_key=f"task:{task.task_id}:report:{idempotency_key}",
+                                      task_id=task.task_id, task_lease_token=task.lease_token)
             if status == "waiting_employer":
                 self.store.ask_owner(self.store.get_task(owner, task.task_id), args.report[:2000],
                                      availability=task.kind == "schedule_interview")
@@ -318,8 +319,10 @@ class OrganizationWorkflows:
             progress = dict(current.result or progress)
             processes = dict(progress.get("processes", processes))
         if task.kind == "schedule_interview" and all_scheduled:
-            report = "Собеседования подтверждены кандидатами: " + ", ".join(refs["process_ids"])
-            self.store.append_message(task.owner_id, role="assistant", content=report, idempotency_key=f"task:{task.task_id}:scheduled")
+            report = "Собеседования подтверждены кандидатами. Всего: " + str(len(refs["process_ids"]))
+            self.store.append_message(task.owner_id, role="assistant", content=report,
+                                      idempotency_key=f"task:{task.task_id}:scheduled",
+                                      task_id=task.task_id, task_lease_token=task.lease_token)
             self.store.update_task(task.owner_id, task.task_id, status="succeeded", result={**progress, "report": report}, lease_token=task.lease_token)
         else:
             self._wait(task, progress)

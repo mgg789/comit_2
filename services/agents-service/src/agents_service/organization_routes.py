@@ -10,12 +10,14 @@ from .organization_delegation import AvailabilitySlot
 from .organization_models import (
     OrganizationBudget,
     OrganizationChat,
+    OrganizationClearConflict,
     OrganizationContext,
     OrganizationContract,
     OrganizationMemory,
     OrganizationMemoryPatch,
     OrganizationMessagePage,
     OrganizationMessageRequest,
+    OrganizationMessagesClearRequest,
     OrganizationTask,
     OrganizationTaskRequest,
     OrganizationTurn,
@@ -66,6 +68,15 @@ def register_organization_routes(app: FastAPI, owner_dependency, database_depend
                  limit: int = Query(50, ge=1, le=200)) -> OrganizationMessagePage:
         """Read a stable keyset page of owner messages."""
         return _store(database).list_messages(owner_id, after_sequence=after_sequence, limit=limit)
+
+    @app.delete("/internal/organization-agent/messages", response_model=OrganizationContext,
+                responses={409: {"model": OrganizationClearConflict, "description": "Active work or context revision conflict"}})
+    def clear_messages(request: OrganizationMessagesClearRequest, owner_id: Owner, database: Database) -> OrganizationContext:
+        """Clear only an idle owner's conversation; provider availability is irrelevant."""
+        try:
+            return _store(database).clear_messages(owner_id, request.expected_context_revision)
+        except OrganizationConflict as error:
+            raise HTTPException(409, str(error)) from error
 
     @app.post("/internal/organization-agent/messages", response_model=OrganizationTurn, status_code=202)
     def message(request: OrganizationMessageRequest, owner_id: Owner, database: Database) -> OrganizationTurn:

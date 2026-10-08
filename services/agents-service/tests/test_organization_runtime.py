@@ -2,9 +2,11 @@
 
 import json
 import os
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+
 from agents_service.database import connect
 from agents_service.organization_runtime import (
     OrganizationRuntime,
@@ -72,6 +74,42 @@ def test_provider_tool_calls_are_structurally_parsed() -> None:
         "content": "", "tool_calls": [{"id": "call-1", "function": {"name": "call_tool", "arguments": json.dumps({"name": "x"})}}]
     }}]})
     assert content == "" and calls[0]["id"] == "call-1"
+
+
+def test_messages_use_plain_russian_and_authoritative_context_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Prompt favors plain Russian, and clear-history revisions change provider input metadata."""
+    owner_id = uuid4()
+
+    class ContextStore:
+        context = SimpleNamespace(current_summary={}, revision=7)
+
+        def get_context(self, _owner_id):
+            return self.context
+
+        def get_memory(self, _owner_id):
+            return SimpleNamespace(value={})
+
+    store = ContextStore()
+    runtime = object.__new__(OrganizationRuntime)
+    runtime.store = store
+    runtime._history_until_turn = lambda _turn: []
+    runtime._authoritative_task_refs = lambda _owner_id: []
+
+    def compact_context(*_args):
+        store.context = SimpleNamespace(current_summary={"covered_sequence": 0}, revision=8)
+
+    runtime._compact_context = compact_context
+    turn = SimpleNamespace(owner_id=owner_id, turn_id=uuid4(), task_id=None, reasoning_history={}, provider_result=None)
+    monkeypatch.setenv("AGENT_CONTEXT_COMPACTION_BYTES", "1")
+
+    messages = runtime._messages(turn, pricing=None)
+
+    assert "По умолчанию отвечай работодателю на русском простыми словами" in messages[0]["content"]
+    assert "Не показывай внутренние названия инструментов и переменных, UUID" in messages[0]["content"]
+    initial_context = json.loads(messages[0]["content"].split("\n", 1)[1])
+    compact_context_payload = json.loads(messages[1]["content"])
+    assert initial_context["authoritative_context_revision"] == 7
+    assert compact_context_payload["authoritative_context_revision"] == 8
 
 
 def test_round_budget_is_total_across_one_turn() -> None:

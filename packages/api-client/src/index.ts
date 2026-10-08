@@ -5,6 +5,7 @@
  */
 import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
+  AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
   AgentsOrganizationContext, AgentsOrganizationMemory, AgentsOrganizationMemoryPatch,
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
@@ -38,6 +39,8 @@ export interface ApiClient {
   getOrganizationChat(): Promise<AgentsOrganizationChat>;
   /** Page durable global messages after a server sequence, including background reports. */
   getOrganizationMessages(afterSequence?: number, limit?: number): Promise<AgentsOrganizationMessagePage>;
+  /** Clear idle history using owner-confirmed context CAS; memory, vault and billing stay intact. */
+  clearOrganizationMessages(body: AgentsOrganizationMessagesClearRequest): Promise<AgentsOrganizationContext>;
   /** Queue a model turn with a stable retry key; acceptance does not claim completion. */
   sendOrganizationMessage(body: AgentsOrganizationMessageRequest): Promise<AgentsOrganizationTurn>;
   /** Poll a queued turn under the employer session. */
@@ -262,6 +265,7 @@ export function createApiClient({
   return {
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
     getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),
+    clearOrganizationMessages: body => request("DELETE", "/employer/organization-agent/messages", body),
     sendOrganizationMessage: body => request("POST", "/employer/organization-agent/messages", body),
     getOrganizationTurn: turnId => request("GET", `/employer/organization-agent/turns/${encodeURIComponent(turnId)}`),
     getOrganizationTasks: () => request("GET", "/employer/organization-agent/tasks"),

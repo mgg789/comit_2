@@ -463,6 +463,7 @@
   margin-top: 8rem;
 }
 .organization-composer .communication-composer {
+  background: var(--employer-composer-glass);
   height: auto;
   min-height: 80rem;
   border-radius: 40rem;
@@ -829,6 +830,7 @@
     padding: 6rem;
   }
   .organization-composer .communication-composer {
+  background: var(--employer-composer-glass);
     height: auto;
     min-height: 58rem;
     border-radius: 29rem;
@@ -1070,3 +1072,11 @@
 .copy-feedback { position: absolute; left: calc(100% + 8rem); top: 50%; transform: translateY(-50%); width: max-content; font-size: 14rem; line-height: 1; color: var(--comit-text-muted); }
 .organization-message.user .copy-feedback { left: auto; right: calc(100% + 8rem); }
 @media (prefers-reduced-motion: reduce) { .agent-think-dot { animation: none; opacity: .7; } }
+
+.agent-clear-dialog {
+  width: min(560rem, calc(100vw - 40rem));
+  padding: 32rem;
+  display: grid;
+  gap: 18rem;
+}
+.agent-clear-dialog .actions { display: flex; justify-content: flex-end; gap: 12rem; }

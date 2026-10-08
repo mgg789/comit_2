@@ -9,10 +9,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    WithJsonSchema,
+    field_serializer,
+)
 
 
 class OrganizationContract(BaseModel):
@@ -194,6 +201,12 @@ class OrganizationMessageRequest(OrganizationContract):
     reasoning_effort: OrganizationReasoningEffort = "off"
 
 
+class OrganizationMessagesClearRequest(OrganizationContract):
+    """Clear idle conversation history using the context revision shown to its owner."""
+
+    expected_context_revision: int = Field(strict=True, ge=1, le=2**53 - 1)
+
+
 class OrganizationTaskRequest(OrganizationContract):
     """Explicit employer authorization for a background delegated task."""
 
@@ -210,13 +223,25 @@ class OrganizationMemoryPatch(OrganizationContract):
     value: dict[str, JsonValue]
 
 
+# Pin the established wire schema independently of Pydantic Decimal schema changes.
+BudgetDecimal = Annotated[Decimal, WithJsonSchema(
+    {"type": "string", "pattern": r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"}, mode="serialization",
+)]
+
+
+class OrganizationClearConflict(OrganizationContract):
+    """Public reasons why the confirmed conversation cannot currently be cleared."""
+
+    detail: Literal["organization_chat_busy", "context_revision_conflict"]
+
+
 class OrganizationBudget(OrganizationContract):
     """Rolling seven-day budget projection in exact decimal micro-USD."""
 
-    limit_micro_usd: Decimal
-    spent_micro_usd: Decimal
-    reserved_micro_usd: Decimal
-    available_micro_usd: Decimal
+    limit_micro_usd: BudgetDecimal
+    spent_micro_usd: BudgetDecimal
+    reserved_micro_usd: BudgetDecimal
+    available_micro_usd: BudgetDecimal
     window_days: int = 7
     pricing_configured: bool
 

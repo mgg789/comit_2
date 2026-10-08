@@ -32,7 +32,8 @@
   --employer-ink: #272930;
   --employer-blue: #bfe2ff;
   --employer-violet: #a49bf7;
-  --employer-glass: rgb(255 255 255 / 18%);
+  --employer-glass: linear-gradient(145deg, rgb(52 53 54 / 82%), rgb(34 35 36 / 94%));
+  --employer-composer-glass: linear-gradient(145deg, rgb(49 50 51 / 98%), rgb(37 38 39 / 98%));
   --employer-glass-blur: 48rem;
   --employer-deck-neutral-start: rgb(198 190 214 / 82%);
   --employer-deck-neutral-end: rgb(183 153 100 / 70%);

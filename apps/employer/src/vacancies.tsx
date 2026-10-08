@@ -1394,7 +1394,7 @@ export function VacancyDetail({
           </section>
           <div className="vacancy-lifecycle-actions">
             {status !== "closed" && <Action className="glass-surface" disabled={lifecyclePending}
-              onClick={() => { setError(null); setLifecycle("close"); }}>Закрыть</Action>}
+              onClick={() => { setError(null); setLifecycle("close"); }}>Закрыть вакансию</Action>}
             {(status === "draft" || status === "closed") && <Action className="glass-surface" disabled={lifecyclePending}
               onClick={() => { setError(null); setLifecycle("delete"); }}>Удалить</Action>}
           </div>
