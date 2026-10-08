@@ -4,6 +4,189 @@
 .vacancy-editor .form-error {
   margin-top: 16rem;
 }
+.vacancy-editor .invite-fields > input,
+.vacancy-editor .form-row > input,
+.vacancy-editor .field > input,
+.vacancy-editor .custom-select-trigger,
+.vacancy-editor .action {
+  height: 66rem;
+  min-height: 66rem;
+  box-sizing: border-box;
+}
+.vacancy-editor .invite-fields > input,
+.vacancy-editor .form-row > input,
+.vacancy-editor .field > input,
+.vacancy-editor .custom-select-trigger {
+  padding-top: 14rem;
+  padding-bottom: 14rem;
+}
+.vacancy-editor .action.glass {
+  filter: none;
+}
+.vacancy-editor .action.glass-surface:hover:not(:disabled) {
+  box-shadow: none;
+  filter: none;
+}
+.vacancy-editor .form-row.skill-row {
+  align-items: end;
+  gap: 14rem;
+  font-size: 20rem;
+}
+.vacancy-editor .remove-skill {
+  align-self: end;
+}
+.vacancy-skill-section {
+  min-width: 0;
+  overflow: hidden;
+}
+.stack-toggle .icon { transition: transform 250ms; }
+.stack-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.vacancy-skill-fields {
+  display: grid;
+  gap: 16rem;
+  padding: 20rem 0;
+  border-top: 1px solid var(--employer-paint-ffffff14);
+  border-bottom: 1px solid var(--employer-paint-ffffff14);
+}
+.vacancy-review-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6rem;
+  padding: 6rem;
+  margin-top: 24rem;
+  border-radius: 25rem;
+  background: var(--employer-paint-2e2e2d);
+}
+.vacancy-review-tabs > button {
+  min-width: 0;
+  min-height: 48rem;
+  padding: 10rem 8rem;
+  border: 0;
+  border-radius: 20rem;
+  background: transparent;
+  color: var(--comit-text-muted);
+  font-size: 18rem;
+  line-height: 1.2;
+  transition: background 0.16s, color 0.16s;
+}
+.vacancy-review-tabs > button[aria-selected="true"] {
+  background: var(--comit-text);
+  color: var(--employer-ink);
+}
+.vacancy-review-tabs > button:focus-visible {
+  outline: 2px solid var(--employer-blue);
+  outline-offset: 2px;
+}
+.vacancy-review-panels {
+  display: grid;
+  margin: 24rem 0;
+  min-width: 0;
+}
+.vacancy-review-panel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow-wrap: anywhere;
+}
+.vacancy-review-panel.active,
+.vacancy-review-panel[data-active="true"],
+.vacancy-review-panel[aria-hidden="false"] {
+  visibility: visible;
+  pointer-events: auto;
+}
+.vacancy-info {
+  display: grid;
+  align-content: start;
+  gap: 22rem;
+}
+.vacancy-info h3 {
+  margin: 0;
+  font-size: 26rem;
+  line-height: 1.25;
+}
+.vacancy-info-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rem 24rem;
+  margin: 0;
+}
+.vacancy-info-fields > div {
+  display: grid;
+  align-content: start;
+  gap: 6rem;
+  min-width: 0;
+}
+.vacancy-info-fields dt {
+  font-size: 16rem;
+  color: var(--comit-text-muted);
+}
+.vacancy-info-fields dd {
+  margin: 0;
+  font-size: 20rem;
+  line-height: 1.4;
+}
+.vacancy-info > p,
+.vacancy-info-description {
+  margin: 0;
+  font-size: 18rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.vacancy-review-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rem;
+  margin-top: 24rem;
+}
+.vacancy-review-actions > .action {
+  width: 100%;
+  min-width: 0;
+}
+.vacancy-review-actions .review-publish {
+  grid-column: 1 / -1;
+}
+.vacancy-review-skills {
+  display: grid;
+  align-content: start;
+  gap: 20rem;
+}
+.review-skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.review-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rem;
+  max-width: 100%;
+  padding: 8rem 14rem;
+  border: 1px solid var(--employer-paint-ffffff14);
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  font-size: 16rem;
+}
+.review-skill-chip button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28rem;
+  height: 28rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--comit-text-muted);
+  font-size: 22rem;
+}
+.review-skill-chip button:hover:not(:disabled) {
+  background: var(--employer-paint-ffffff14);
+  color: var(--comit-text);
+}
 .summary-copy {
   display: grid;
   gap: 20rem;
@@ -98,6 +281,39 @@
   transform: rotate(0deg);
 }
 @media (max-width: 760px) {
+  .vacancy-editor .invite-fields > input,
+  .vacancy-editor .form-row > input,
+  .vacancy-editor .field > input,
+  .vacancy-editor .custom-select-trigger,
+  .vacancy-editor .action {
+    height: max(66rem, 44px);
+    min-height: max(66rem, 44px);
+    font-size: max(16rem, 14px);
+  }
+  .vacancy-review-tabs > button {
+    min-height: 44px;
+    font-size: max(14rem, 12px);
+  }
+  .vacancy-editor .action.circle {
+    width: max(66rem, 44px);
+    padding: 0;
+  }
+  .vacancy-info-fields dt {
+    font-size: max(16rem, 12px);
+  }
+  .vacancy-info-fields dd,
+  .vacancy-info > p,
+  .vacancy-info-description {
+    font-size: max(18rem, 14px);
+  }
+  .review-skill-chip {
+    font-size: max(16rem, 14px);
+  }
+  .review-skill-chip button {
+    width: 44px;
+    height: 44px;
+    font-size: max(22rem, 20px);
+  }
   .vacancy-editor {
     width: 100%;
     max-width: 484rem;

@@ -91,6 +91,15 @@ export default function App() {
   useEffect(() => {
     let dialog: HTMLElement | null = null;
     let prior: HTMLElement | null = null;
+    const focusable = (root: HTMLElement) => Array.from(
+      root.querySelectorAll<HTMLElement>(
+        'button,input:not([type="hidden"]):not([type="file"]),textarea,select,a[href],[tabindex="0"]',
+      ),
+    ).filter((item) =>
+      item.tabIndex >= 0 && !item.matches(":disabled") &&
+      !item.closest('[inert],[aria-hidden="true"]') &&
+      item.getClientRects().length > 0 && getComputedStyle(item).visibility !== "hidden",
+    );
     const update = () => {
       const next =
         Array.from(
@@ -106,11 +115,7 @@ export default function App() {
               ? document.activeElement
               : null;
         dialog = next;
-        next
-          .querySelector<HTMLElement>(
-            'input:not([type="hidden"]),textarea,button,select',
-          )
-          ?.focus();
+        focusable(next)[0]?.focus();
       } else {
         dialog = null;
         prior?.focus();
@@ -119,11 +124,7 @@ export default function App() {
     };
     const trap = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !dialog) return;
-      const items = Array.from(
-        dialog.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled):not([type="file"]),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]',
-        ),
-      ).filter((item) => item.getClientRects().length > 0);
+      const items = focusable(dialog);
       const first = items[0],
         last = items.at(-1);
       if (!first || !last) return;
