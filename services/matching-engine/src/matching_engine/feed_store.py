@@ -353,6 +353,9 @@ class FeedStore:
                                ("pool-n1-v1", Jsonb(initial_snapshot), initial_snapshot_hash, session_id))
             cards = connection.execute("""SELECT * FROM rerank_pipeline.cards WHERE run_id=%s
                 AND (%s OR kind='recommended') ORDER BY position""", (rerank["run_id"], request.include_reserve)).fetchall()
+            if not cards:
+                connection.execute("""UPDATE feed_pipeline.sessions SET refill_state='exhausted',
+                    exhausted_at=clock_timestamp() WHERE session_id=%s""", (session_id,))
             for source in cards:
                 exposure = uuid4()
                 card = {**source["card"], "batch_id": str(batch_id), "source_main_run_id": str(rerank["main_run_id"]),

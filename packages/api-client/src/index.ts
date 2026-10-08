@@ -10,7 +10,7 @@ import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, 
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
   EmployerStatisticsQuery, EmployerStatistics,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
+  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
   AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
@@ -118,6 +118,15 @@ export interface ApiClient {
   likeShowcaseCandidate(draftId: string, body: ShowcaseLikeRequest): Promise<ShowcaseLikeReceipt>;
   /** Queue main top-k selection for an owned published vacancy draft. */
   requestSelection(draftId: string, body: CombineRequest): Promise<CombineStatus>;
+  /** Read publication preparation and the actual background selection state. */
+  getVacancyPipeline(draftId: string): Promise<AgentsMatchingStatus>;
+  retryVacancyPreparation(draftId: string): Promise<VacancyPipelineStatus>;
+  getSelectionStatus(draftId: string): Promise<CombineStatus>;
+  retrySelection(draftId: string): Promise<CombineStatus>;
+  getRerankStatus(draftId: string): Promise<RerankStatus>;
+  retryRerank(draftId: string): Promise<RerankStatus>;
+  /** Force one deduplicated retry of the current session's tail. */
+  refillFeed(draftId: string, sessionId: string): Promise<FeedRefillStatus | null>;
   /** Return the current contact-free selection page and public authorised PDF links. */
   getSelection(draftId: string, limit?: number, offset?: number): Promise<SelectionPage>;
   /** Open an owned vacancy portion from current rerank. */
@@ -299,6 +308,13 @@ export function createApiClient({
     getPublicCandidate: candidateId => request("GET", `/employer/candidates/${encodeURIComponent(candidateId)}`),
     likeShowcaseCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/showcase-likes`, body),
     requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),
+    getVacancyPipeline: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/pipeline`),
+    retryVacancyPreparation: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/retry`),
+    getSelectionStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`),
+    retrySelection: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine/retry`),
+    getRerankStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/rerank`),
+    retryRerank: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/rerank/retry`),
+    refillFeed: (draftId, sessionId) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}/refill`, { force: true }),
     getSelection: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/selections?limit=${limit}&offset=${offset}`),
     openFeed: (draftId, body = {}) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed`, body),
     getFeed: (draftId, sessionId, cursor, limit = 50) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),

@@ -18,6 +18,27 @@ activation_revision, approval_receipt_hash и activation_kind; `manual_override`
 
 > Правило (ТЗ §3.5): все методы описаны через OpenAPI; эндпоинты документированы — запросы, ответы, коды ошибок.
 
+## Письмо входа
+
+Письмо OTP передаётся SMTP как multipart text/html: текстовый fallback сохраняет
+роль и абсолютный срок действия UTC; HTML повторяет макет Figma `325:15652` с
+динамическим шестизначным кодом, включая ведущие нули. Логотип и фон встроены как
+PNG MIME parts с CID; внешние адреса изображений и tracking links отсутствуют.
+Табличная разметка, inline CSS и сплошные фоновые цвета обеспечивают fallback для
+клиентов без градиентов, фоновых картинок и пользовательских шрифтов. `pnpm
+--filter @comit/api build` копирует bundled assets в `dist/auth/email-assets`.
+Обязательные TLS, timeouts и безопасные категории SMTP failures не изменены.
+
+## Подготовка ленты
+
+Работодатель читает подготовку опубликованной вакансии по
+`GET /api/employer/vacancy-drafts/{id}/pipeline` (существующий `AgentsMatchingStatus`,
+upstream `GET /internal/vacancy-drafts/{id}/pipeline`) и повторяет её через
+`POST .../retry` (`VacancyPipelineStatus` matching-engine). Статус
+rerank доступен через `GET .../rerank` (`RerankStatus`), явное восстановление —
+`POST .../rerank/retry`. Gateway проверяет сессию и принадлежность вакансии;
+подробности автоматического пополнения приведены в [matching](matching.md).
+
 ## Живые спецификации
 
 | Сервис | Спецификация |

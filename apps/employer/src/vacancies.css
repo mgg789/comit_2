@@ -327,3 +327,32 @@
 .radar-add .icon { width: 24rem; height: 24rem; }
 .small-heading .vacancy-count { transform: translateY(3rem); }
 .vacancy-lifecycle-actions { display: flex; flex-wrap: wrap; gap: 14rem; }
+
+/* Cards grow with wrapped terms and always reserve their own footer. */
+.vacancy-card { height: auto; min-height: 355rem; }
+.vacancy-card .salary-row { min-width: 0; }
+.vacancy-card .salary-row strong { min-width: 0; overflow-wrap: anywhere; font-size: clamp(22rem, 1.7vw, 32rem); }
+.vacancy-card .tags { max-height: none; }
+.vacancy-card .tag { max-width: 100%; overflow-wrap: anywhere; }
+.vacancy-card .vacancy-footer { flex-shrink: 0; margin-top: auto; padding-top: 18rem; min-height: 64rem; }
+.vacancy-card .salary-row { margin-bottom: 18rem; }
+.vacancy-card .card-arrow { flex-shrink: 0; }
+.vacancy-card .card-arrow .icon { translate: calc(-2rem + 3px) 0; }
+.page-heading > .vacancy-publication { margin-left: auto; min-height: 51rem; padding: 12rem 24rem; border-radius: 999rem; }
+.vacancy-review-panels { min-height: 540rem; margin-bottom: 0; }
+.vacancy-review-skills { align-content: stretch; }
+.vacancy-review-skills > .skill-radar { height: 100%; min-height: 540rem; }
+@media (max-width: 760px) {
+  .page-heading > .vacancy-publication { min-height: 44px; font-size: max(16rem, 14px); }
+  .vacancy-card .salary-row strong { font-size: max(24rem, 18px); }
+  .vacancy-review-panels, .vacancy-review-skills > .skill-radar { min-height: 500rem; }
+}
+
+.radar-remove-mark { position: relative; display: block; width: 16px; height: 16px; }
+.radar-remove-mark img { position: absolute; left: 50%; top: 50%; max-width: none; transform: translate(-50%, -50%) rotate(45deg) scale(.28); }
+
+.vacancy-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20rem; align-items: start; }
+.vacancy-column { min-width: 0; }
+.vacancy-column > .filter-tab { margin: 0 0 30rem; box-sizing: border-box; }
+.vacancy-column-cards { display: grid; gap: 24rem; }
+@media (max-width: 700px) { .vacancy-columns { grid-template-columns: 1fr; gap: 30rem; } }

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { MailDeliveryError, MailConfigurationError, SmtpMailer, createConfiguredMailer, createSmtpMailer } from "../src/auth/mail.js";
+import type { MailTransport } from "../src/auth/mail.js";
 import { MailWorker, type MailJob, type MailJobStore } from "../src/auth/mail-worker.js";
 
 const job: MailJob = {
@@ -19,7 +20,7 @@ test("SMTP config fails closed and defaults only documented values", () => {
 });
 
 test("mailer renders Russian role and expiry without links or challenge id", async () => {
-  let sent: { to: string; text: string; from: string } | undefined;
+  let sent: Parameters<MailTransport["sendMail"]>[0] | undefined;
   const mailer = createSmtpMailer({ SMTP_HOST: "smtp.test", SMTP_USER: "u", SMTP_PASSWORD: "p" }, {
     sendMail: async options => { sent = options; }, verify: async () => true,
   });
@@ -32,6 +33,29 @@ test("mailer renders Russian role and expiry without links or challenge id", asy
   assert.equal(sent?.text.includes(job.challenge_id), false);
   assert.equal(sent?.text.includes("http://"), false);
   assert.equal(sent?.text.includes("https://"), false);
+  assert.match(sent?.html ?? "", /Код входа в приложение/);
+  assert.match(sent?.html ?? "", /123456/);
+  assert.match(sent?.html ?? "", /UTC/);
+  assert.equal(sent?.html.includes(job.challenge_id), false);
+  assert.equal(sent?.html.includes("https://"), false);
+  assert.equal(sent?.attachments.length, 2);
+  for (const attachment of sent?.attachments ?? []) {
+    assert.equal(attachment.contentType, "image/png");
+    assert.equal(attachment.contentDisposition, "inline");
+    assert.equal(attachment.content.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.ok(sent?.html.includes(`cid:${attachment.cid}`));
+  }
+});
+
+test("HTML preserves leading zeroes and employer role without sending SMTP", async () => {
+  let sent: Parameters<MailTransport["sendMail"]>[0] | undefined;
+  const mailer = createSmtpMailer({ SMTP_HOST: "smtp.test", SMTP_USER: "u", SMTP_PASSWORD: "p" }, {
+    sendMail: async options => { sent = options; }, verify: async () => true,
+  });
+  await mailer.send({ ...job, role: "employer", code: "001234" });
+  assert.match(sent?.html ?? "", /001234/);
+  assert.match(sent?.html ?? "", /для работодателя/);
+  assert.match(sent?.text ?? "", /для работодателя: 001234/);
 });
 
 test("mailer sanitizes rejected and unavailable provider failures", async () => {

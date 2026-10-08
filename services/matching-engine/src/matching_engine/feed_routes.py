@@ -15,6 +15,8 @@ from matching_engine.feed_models import (
     FeedImpressionRequest,
     FeedListPage,
     FeedPage,
+    FeedRefillRequest,
+    FeedRefillStatus,
     FeedRequest,
     SavedCard,
     ShowcaseLikeConflict,
@@ -116,6 +118,13 @@ def feed_router(repository: FeedStore | None, require_internal: Callable) -> API
             return store.page(owner_id, vacancy_id, session_id, cursor, limit)
         except ValueError as exception:
             raise HTTPException(status_code=422, detail=str(exception)) from exception
+
+    @router.post("/internal/vacancies/{vacancy_id}/feed/{session_id}/refill", response_model=FeedRefillStatus | None)
+    def refill_feed(vacancy_id: UUID, session_id: UUID, payload: FeedRefillRequest,
+                    services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)]) -> FeedRefillStatus | None:
+        """Deduplicate owned tail replenishment; force retries terminal sources once."""
+        store, owner_id = services
+        return store.request_refill(owner_id, vacancy_id, session_id, force=payload.force)
 
     @router.get("/internal/vacancies/{vacancy_id}/saved", response_model=FeedListPage[SavedCard])
     def saved(vacancy_id: UUID, services: Annotated[tuple[FeedStore, UUID], Depends(owner_store)],

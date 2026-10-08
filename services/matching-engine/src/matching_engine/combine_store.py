@@ -382,6 +382,8 @@ class CombineStore:
                 ORDER BY r.vacancy_id""").fetchall()
             for vacancy in vacancies:
                 self._queue(connection, vacancy["vacancy_id"])
+                from matching_engine.feed_refill import FeedRefillStore
+                FeedRefillStore(self.database_url).enqueue_vacancy_locked(connection, vacancy["vacancy_id"])
         else:
             try:
                 self._queue(connection, event["vacancy_id"])

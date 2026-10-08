@@ -105,6 +105,12 @@ class FeedPage(Contract):
     pool_change_fraction: float = Field(default=0, ge=0, le=1)
 
 
+class FeedRefillRequest(Contract):
+    """Allow an explicit user refresh to retry an exhausted or failed feed once."""
+
+    force: bool = False
+
+
 class FeedRefillStatus(Contract):
     """Durable tail refill job state exposed without mutable card contents."""
 

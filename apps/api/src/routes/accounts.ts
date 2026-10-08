@@ -305,9 +305,12 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   });
   const publicRoutes = [
     { method: "GET", suffix: "/ready", upstream: "/ready", response: "VacancyReady" },
+    { method: "POST", suffix: "/retry", upstream: "/retry", response: "VacancyPipelineStatus" },
     { method: "POST", suffix: "/combine", upstream: "/combine", body: "CombineRequest", response: "CombineStatus" },
     { method: "GET", suffix: "/combine", upstream: "/combine", response: "CombineStatus" },
     { method: "POST", suffix: "/combine/retry", upstream: "/combine/retry", response: "CombineStatus" },
+    { method: "GET", suffix: "/rerank", upstream: "/rerank", response: "RerankStatus" },
+    { method: "POST", suffix: "/rerank/retry", upstream: "/rerank/retry", response: "RerankStatus" },
     { method: "GET", suffix: "/selections", upstream: "/selections", response: "SelectionPage" },
     { method: "GET", suffix: "/candidates/:candidate_id/resume.pdf", upstream: "/selections" },
   ] as const;

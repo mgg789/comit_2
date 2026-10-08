@@ -151,10 +151,17 @@ class FeedRefillStore:
                        reason: str | None = None) -> FeedRefillStatus | None:
         """Queue refill while the caller already owns the pipeline transaction lock."""
         session = self._session(connection, owner_id, vacancy_id, session_id)
-        current = connection.execute("SELECT business_status,state FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
+        current = connection.execute("""SELECT v.business_status,v.state,v.revision,r.schema_version,r.schema_hash
+            FROM vacancy_pipeline.vacancies v LEFT JOIN vacancy_pipeline.ready r
+                ON r.vacancy_id=v.vacancy_id AND r.revision=v.revision
+            WHERE v.vacancy_id=%s AND v.owner_id=%s""",
                                      (vacancy_id, owner_id)).fetchone()
         if current is None or current["business_status"] != "open" or current["state"] != "ready":
             raise ConflictError("vacancy_inactive")
+        if (current["revision"] != session["vacancy_revision"]
+                or current["schema_version"] != session["schema_version"]
+                or current["schema_hash"] != session["schema_hash"]):
+            raise ConflictError("feed vacancy revision is stale")
         if session["expires_at"] <= connection.execute("SELECT now() AS value").fetchone()["value"]:
             raise ConflictError("feed session expired")
         source = connection.execute("SELECT vacancy_snapshot FROM matching_pipeline.runs WHERE run_id=%s",
@@ -164,10 +171,33 @@ class FeedRefillStore:
         previous = list(session["pool_snapshot"] or [])
         fraction = pool_change_fraction(previous, current)
         low_water = self._remaining(connection, session_id) <= FEED_LOW_WATER
-        if session["refill_state"] == "exhausted" and fraction < POOL_CHANGE_THRESHOLD and not force:
+        pending = connection.execute("""SELECT * FROM feed_pipeline.refill_jobs
+            WHERE session_id=%s AND state IN ('queued','running','retrying')
+            ORDER BY created_at DESC LIMIT 1""", (session_id,)).fetchone()
+        if pending is not None:
+            return _status(pending)
+        if session["refill_state"] == "failed":
+            failed = connection.execute("""SELECT requested_pool_snapshot FROM feed_pipeline.refill_jobs
+                WHERE session_id=%s AND state='failed' ORDER BY created_at DESC LIMIT 1""", (session_id,)).fetchone()
+            if failed is not None:
+                fraction = pool_change_fraction(list(failed["requested_pool_snapshot"] or []), current)
+        if session["refill_state"] in ("exhausted", "failed") and fraction < POOL_CHANGE_THRESHOLD and not force:
             return None
         if not force and not low_water and fraction < POOL_CHANGE_THRESHOLD:
             return None
+        if force:
+            from matching_engine.rerank_store import RerankStore
+
+            main = CombineStore(self.database_url)._queue(connection, vacancy_id)
+            if main["state"] == "failed":
+                connection.execute("""UPDATE matching_pipeline.runs SET state='queued',attempts=0,error_code=NULL,
+                    available_at=now(),lease_token=NULL,lease_until=NULL,updated_at=now() WHERE run_id=%s""",
+                                   (main["run_id"],))
+            elif main["state"] == "ready":
+                rerank = RerankStore.queue(connection, main)
+                if rerank["state"] == "failed":
+                    connection.execute("""UPDATE rerank_pipeline.runs SET state='queued',attempts=0,error_code=NULL,
+                        available_at=now(),lease_token=NULL,lease_until=NULL WHERE run_id=%s""", (rerank["run_id"],))
         change = fraction >= POOL_CHANGE_THRESHOLD
         why = reason or ("low_water_pool_change" if low_water and change else "pool_change" if change else "low_water")
         if why not in ("low_water", "pool_change", "low_water_pool_change"):
@@ -186,6 +216,22 @@ class FeedRefillStore:
         connection.execute("UPDATE feed_pipeline.sessions SET refill_state='queued' WHERE session_id=%s", (session_id,))
         return _status(row)
 
+    def enqueue_vacancy_locked(self, connection: psycopg.Connection, vacancy_id: UUID) -> None:
+        """React to pool events for live sessions without waiting for a page request.
+
+        The N1/low-water guards and partial unique index remain authoritative;
+        inactive, superseded and expired sessions never receive new work.
+        """
+        sessions = connection.execute("""SELECT s.session_id,s.owner_id FROM feed_pipeline.sessions s
+            JOIN vacancy_pipeline.vacancies v ON v.vacancy_id=s.vacancy_id AND v.owner_id=s.owner_id
+                AND v.revision=s.vacancy_revision AND v.state='ready' AND v.business_status='open'
+            JOIN vacancy_pipeline.ready r ON r.vacancy_id=v.vacancy_id AND r.revision=v.revision
+                AND r.schema_version=s.schema_version AND r.schema_hash=s.schema_hash
+            WHERE s.vacancy_id=%s AND s.expires_at>clock_timestamp()
+                AND s.source<>'showcase' ORDER BY s.session_id""", (vacancy_id,)).fetchall()
+        for session in sessions:
+            self.enqueue_locked(connection, session["owner_id"], vacancy_id, session["session_id"])
+
     def status(self, owner_id: UUID, vacancy_id: UUID, session_id: UUID) -> FeedRefillStatus | None:
         """Read the latest refill job for an owned session."""
         with connect(self.database_url) as connection:
@@ -203,6 +249,11 @@ class FeedRefillStore:
             connection.execute("""UPDATE feed_pipeline.refill_jobs SET state='failed',error_code='lease_exhausted',
                 lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp()
                 WHERE state='running' AND lease_until<=clock_timestamp() AND attempts>=%s""", (max_attempts,))
+            connection.execute("""UPDATE feed_pipeline.sessions s SET refill_state='failed'
+                WHERE EXISTS (SELECT 1 FROM feed_pipeline.refill_jobs j WHERE j.session_id=s.session_id
+                    AND j.state='failed') AND NOT EXISTS (SELECT 1 FROM feed_pipeline.refill_jobs j
+                    WHERE j.session_id=s.session_id AND j.state IN ('queued','running','retrying'))
+                    AND s.refill_state IN ('queued','running')""")
             row = connection.execute("""SELECT * FROM feed_pipeline.refill_jobs
                 WHERE ((state IN ('queued','retrying') AND available_at<=clock_timestamp())
                     OR (state='running' AND lease_until<=clock_timestamp())) AND attempts<%s
@@ -213,6 +264,7 @@ class FeedRefillStore:
             row = connection.execute("""UPDATE feed_pipeline.refill_jobs SET state='running',attempts=attempts+1,
                 lease_token=%s,lease_until=clock_timestamp()+(%s*interval '1 second'),updated_at=clock_timestamp()
                 WHERE job_id=%s RETURNING *""", (token, lease_seconds, row["job_id"])).fetchone()
+            connection.execute("UPDATE feed_pipeline.sessions SET refill_state='running' WHERE session_id=%s", (row["session_id"],))
             return RefillJob(row["job_id"], token, row["session_id"], row["owner_id"], row["vacancy_id"], row["reason"], row["attempts"])
 
     @staticmethod
@@ -350,7 +402,13 @@ class FeedRefillStore:
                 connection.execute("UPDATE feed_pipeline.refill_jobs SET state='stale',error_code='session_source_changed',lease_token=NULL,lease_until=NULL WHERE job_id=%s", (job.job_id,))
                 return False
             blocked = self._blocked(connection, session)
-            cards, main, rerank = self._cards(connection, session, blocked)
+            try:
+                cards, main, rerank = self._cards(connection, session, blocked)
+            except RefillNotReady:
+                # Source queue intents must survive this expected deferred result.
+                # No batch/exposure has been written at this point.
+                connection.commit()
+                raise
             cards = cards[:FEED_REFILL_BATCH]
             current_snapshot = pool_snapshot(connection, VacancyReady.model_validate(main["vacancy_snapshot"]))
             current_hash = pool_snapshot_hash(current_snapshot)
@@ -396,16 +454,16 @@ class FeedRefillStore:
     def fail(self, job: RefillJob, error_code: str, max_attempts: int = 5, retry_base_seconds: int = 30) -> None:
         """Persist a bounded retry without exposing worker input or exception text."""
         with connect(self.database_url) as connection:
-            connection.execute("""UPDATE feed_pipeline.refill_jobs SET state=CASE WHEN attempts>=%s THEN 'failed' ELSE 'retrying' END,
+            row = connection.execute("""UPDATE feed_pipeline.refill_jobs SET state=CASE WHEN attempts>=%s THEN 'failed' ELSE 'retrying' END,
                 error_code=%s,available_at=clock_timestamp()+(%s*power(2,least(attempts-1,10))*interval '1 second'),
                 lease_token=NULL,lease_until=NULL,updated_at=clock_timestamp()
-                WHERE job_id=%s AND state='running' AND lease_token=%s""",
-                (max_attempts, error_code, retry_base_seconds, job.job_id, job.lease_token))
+                WHERE job_id=%s AND state='running' AND lease_token=%s RETURNING state,session_id""",
+                (max_attempts, error_code, retry_base_seconds, job.job_id, job.lease_token)).fetchone()
+            if row is not None:
+                connection.execute("UPDATE feed_pipeline.sessions SET refill_state=%s WHERE session_id=%s",
+                                   ("failed" if row["state"] == "failed" else "queued", row["session_id"]))
 
-    def defer(self, job: RefillJob, error_code: str, retry_base_seconds: int = 30) -> None:
-        """Return a source-not-ready job to the durable queue without failing it."""
-        with connect(self.database_url) as connection:
-            connection.execute("""UPDATE feed_pipeline.refill_jobs SET state='retrying',error_code=%s,
-                available_at=clock_timestamp()+(%s*interval '1 second'),lease_token=NULL,lease_until=NULL,
-                updated_at=clock_timestamp() WHERE job_id=%s AND state='running' AND lease_token=%s""",
-                               (error_code, retry_base_seconds, job.job_id, job.lease_token))
+    def defer(self, job: RefillJob, error_code: str, retry_base_seconds: int = 30,
+              max_attempts: int = 5) -> None:
+        """Bound source-readiness retries, exposing terminal failure without a busy loop."""
+        self.fail(job, error_code, max_attempts, retry_base_seconds)

@@ -49,6 +49,13 @@ function vacancyDate(draft: AgentsDraftView): string {
     : `${label} ${new Intl.DateTimeFormat("ru-RU").format(date)}`;
 }
 
+/** Vacancy cards show salary in whole rubles, matching the backend currency unit. */
+function vacancySalary(from?: number | null, to?: number | null): string {
+  if (from == null || to == null) return "Зарплата не указана";
+  const format = (value: number) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
+  return `${format(from)}–${format(to)}р`;
+}
+
 /** Keep a circular badge for counts up to 99, widening only the capped value. */
 function CountBadge({ count }: { count: number }) {
   return (
@@ -58,7 +65,7 @@ function CountBadge({ count }: { count: number }) {
   );
 }
 
-/** Own vacancies with complete cursor pagination; filter counts reflect all loaded pages. */
+/** Own vacancies with complete cursor pagination; status columns reflect all loaded pages. */
 export function Vacancies({
   navigate,
   onCreate,
@@ -77,14 +84,13 @@ export function Vacancies({
     } while (cursor);
     return items;
   });
-  const [filter, setFilter] = useState("draft");
   const [query, setQuery] = useState("");
   const items = resource.data || [];
   const matches = (draft: AgentsDraftView, name: string) =>
     !draft.archived && draft.business_status === name;
   const filtered = items.filter(
     (draft) =>
-      matches(draft, filter) &&
+      !draft.archived &&
       `${draft.fields.title || ""} ${draft.fields.city || ""} ${draft.fields.bio || ""}`
         .toLocaleLowerCase("ru")
         .includes(query.trim().toLocaleLowerCase("ru")),
@@ -108,38 +114,21 @@ export function Vacancies({
           </span>
         </label>
       </PageTitle>
-      <div
-        className="vacancy-filters"
-        role="tablist"
-        aria-label="Статус вакансий"
-      >
-        {[
-          ["draft", "Черновики"],
-          ["open", "Открытые"],
-          ["closed", "Закрытые"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            className="filter-tab"
-            role="tab"
-            aria-selected={filter === key}
-            onClick={() => setFilter(key!)}
-          >
-            {label} ({items.filter((draft) => matches(draft, key!)).length})
-          </button>
-        ))}
-      </div>
       {resource.loading || resource.error ? (
         <State
           loading={resource.loading}
           error={resource.error}
           retry={resource.refresh}
         />
-      ) : !filtered.length ? (
-        <State empty="В этом разделе пока нет вакансий" />
       ) : (
-        <div className="vacancy-grid">
-          {filtered.map((draft) => (
+        <div className="vacancy-columns">
+          {[["draft", "Черновики"], ["open", "Открытые"], ["closed", "Закрытые"]].map(([key, label]) => (
+            <section className="vacancy-column" key={key} aria-labelledby={`vacancies-${key}`}>
+              <h2 className="filter-tab" id={`vacancies-${key}`}>
+                {label} ({filtered.filter((draft) => matches(draft, key!)).length})
+              </h2>
+              <div className="vacancy-column-cards">
+          {filtered.filter((draft) => matches(draft, key!)).map((draft) => (
             <motion.article
               layout
               key={draft.draft_id}
@@ -163,7 +152,7 @@ export function Vacancies({
               </div>
               <div className="salary-row">
                 <strong>
-                  {salary(draft.fields.zp_min, draft.fields.zp_max)}
+                  {vacancySalary(draft.fields.zp_min, draft.fields.zp_max)}
                 </strong>
                 <small>за месяц, на руки</small>
               </div>
@@ -182,6 +171,9 @@ export function Vacancies({
                 onClick={() => navigate(`/vacancy/${draft.draft_id}`)}
               />
             </motion.article>
+          ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
@@ -539,7 +531,7 @@ export function VacancyEditor({
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
                     transition={{ duration: 0.25 }}>
-                    <SkillRadar ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                    <SkillRadar removeIcon={<span className="radar-remove-mark"><img src={asset("skill-radar-remove-source.svg")} alt="" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
@@ -788,6 +780,39 @@ export function VacancyEditor({
   );
 }
 
+/** Read actual pipeline states; unavailable services become the neutral empty state. */
+async function feedPreparation(draftId: string, retry = false): Promise<boolean> {
+  const pipeline = await api.getVacancyPipeline(draftId);
+  if (pipeline.state !== "ready") {
+    if (retry && pipeline.state === "failed") {
+      await api.retryVacancyPreparation(draftId);
+      return true;
+    }
+    return ["queued", "processing", "retrying"].includes(pipeline.state);
+  }
+  let main;
+  try { main = await api.getSelectionStatus(draftId); }
+  catch (reason) {
+    if (!(reason instanceof ApiError) || reason.status !== 404) throw reason;
+    if (retry) await api.requestSelection(draftId, { idempotency_key: crypto.randomUUID() });
+    return true;
+  }
+  if (main.state === "failed") {
+    if (retry) { await api.retrySelection(draftId); return true; }
+    return false;
+  }
+  if (["queued", "processing", "retrying"].includes(main.state)) return true;
+  if (main.state !== "ready" || !main.selected_count) return false;
+  try {
+    const rerank = await api.getRerankStatus(draftId);
+    if (retry && rerank.state === "failed") { await api.retryRerank(draftId); return true; }
+    return ["queued", "processing", "retrying"].includes(rerank.state);
+  } catch (reason) {
+    if (reason instanceof ApiError && reason.status === 404) return true;
+    throw reason;
+  }
+}
+
 function CandidateDeck({
   draftId,
   navigate,
@@ -805,7 +830,11 @@ function CandidateDeck({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controls = useAnimationControls();
-  const selectionKey = useRef(crypto.randomUUID());
+  const [feedState, setFeedState] = useState<"updating" | "empty">("updating");
+  const [feedTick, setFeedTick] = useState(0);
+  const refreshLock = useRef(false);
+  const mounted = useRef(true);
+  const waitStarted = useRef(Date.now());
   const decisions = useRef(
     new Map<string, { action: "like" | "dislike"; key: string }>(),
   );
@@ -915,47 +944,52 @@ function CandidateDeck({
       lock.current = false;
     }
   };
-  const rerun = async () => {
-    setPending(true);
-    setError(null);
+  async function updateFeed(force = false) {
+    if (refreshLock.current) return;
+    refreshLock.current = true;
+    if (force) { waitStarted.current = Date.now(); setFeedState("updating"); }
     try {
-      await api.getVacancyReady(draftId);
-      await api.requestSelection(draftId, {
-        idempotency_key: selectionKey.current,
-      });
-      selectionKey.current = crypto.randomUUID();
-      setError("Подбор запущен. Обновите ленту, когда обработка завершится.");
+      const page = resource.data;
+      if (force && page) await api.refillFeed(draftId, page.session_id);
+      else if (force) await feedPreparation(draftId, true);
+      const next = page
+        ? await api.getFeed(draftId, page.session_id, page.next_cursor || page.cursor || undefined, 24)
+        : await api.openFeed(draftId, { limit: 24 });
+      if (!mounted.current) return;
+      resource.setData(next);
+      setIndex(0);
+      const preparing = next.refill_state === "queued" || next.refill_state === "running";
+      setFeedState(preparing && Date.now() - waitStarted.current < 90000 ? "updating" : "empty");
     } catch (reason) {
-      setError(errorText(reason));
+      if (mounted.current && reason instanceof ApiError && [409, 410].includes(reason.status) && resource.data) {
+        resource.setData(null);
+        setIndex(0);
+      }
+      let preparing = false;
+      try { preparing = await feedPreparation(draftId); } catch { /* Dependencies degrade to the neutral empty state. */ }
+      if (mounted.current) setFeedState(preparing && Date.now() - waitStarted.current < 90000 ? "updating" : "empty");
     } finally {
-      setPending(false);
+      refreshLock.current = false;
+      if (mounted.current) setFeedTick((value) => value + 1);
     }
-  };
-  if (resource.loading || resource.error)
+  }
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => {
+    if (resource.loading || card) return;
+    // Preserve the immutable session and poll its tail instead of opening new sessions.
+    const timer = window.setTimeout(() => void updateFeed(), feedState === "updating" ? 2000 : 15000);
+    return () => window.clearTimeout(timer);
+  }, [resource.loading, resource.data, resource.error, card, feedState, feedTick, draftId]);
+  if (resource.loading || !card)
     return (
       <div className="deck-state">
-        <State
-          loading={resource.loading}
-          error={resource.error}
-          retry={resource.refresh}
-        />
-        <Action disabled={pending} onClick={() => void rerun()}>
-          Запустить подбор
-        </Action>
-        {error && <p className="form-error">{error}</p>}
-      </div>
-    );
-  if (!card)
-    return (
-      <div className="deck-state">
-        <State
-          empty="Вы просмотрели текущую подборку"
-          retry={resource.refresh}
-        />
-        <Action disabled={pending} onClick={() => void rerun()}>
-          Обновить подбор
-        </Action>
-        {error && <p className="inline-notice">{error}</p>}
+        <section className="panel deck-feedback" role="status">
+          <p>{resource.loading || feedState === "updating" ? "Обновляем ленту" : "Не можем найти подходящих кандидатов"}</p>
+          {!resource.loading && feedState === "empty" && <Action className="glass-surface" onClick={() => void updateFeed(true)}>Обновить</Action>}
+        </section>
       </div>
     );
   return (
@@ -1052,8 +1086,8 @@ function CandidateDeck({
         Контакты открываются после принятия приглашения.
       </p>
       {error && (
-        <p role="alert" className="form-error deck-note">
-          {error}
+        <p role="status" className="deck-note">
+          Не удалось сохранить действие. Попробуйте ещё раз
         </p>
       )}
     </div>
@@ -1195,7 +1229,7 @@ export function VacancyDetail({
           </span>
         </Action>
         {(status === "draft" || status === "open") && (
-          <Action className="glass-surface" disabled={lifecyclePending}
+          <Action variant="primary" className="vacancy-publication" disabled={lifecyclePending}
             onClick={() => { setError(null); setLifecycle(status === "open" ? "withdraw" : "publish"); }}>
             {status === "open" ? "Отозвать" : "Опубликовать"}
           </Action>

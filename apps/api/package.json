@@ -6,7 +6,7 @@
   "files": ["dist", "migrations"],
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/auth/email-assets','dist/auth/email-assets',{recursive:true})\"",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "start": "node dist/server.js",

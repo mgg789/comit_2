@@ -3243,6 +3243,104 @@
         }
       }
     },
+    "/internal/vacancies/{vacancy_id}/feed/{session_id}/refill": {
+      "post": {
+        "tags": [
+          "employer-feed"
+        ],
+        "summary": "Refill Feed",
+        "description": "Deduplicate owned tail replenishment; force retries terminal sources once.",
+        "operationId": "refill_feed_internal_vacancies__vacancy_id__feed__session_id__refill_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Owner-ID",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedRefillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/FeedRefillStatus"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Refill Feed Internal Vacancies  Vacancy Id  Feed  Session Id  Refill Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/vacancies/{vacancy_id}/saved": {
       "get": {
         "tags": [
@@ -5276,6 +5374,116 @@
         ],
         "title": "FeedPage",
         "description": "Stable position-cursor page from one 24-hour immutable session."
+      },
+      "FeedRefillRequest": {
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "FeedRefillRequest",
+        "description": "Allow an explicit user refresh to retry an exhausted or failed feed once."
+      },
+      "FeedRefillStatus": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Session Id"
+          },
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "low_water",
+              "pool_change",
+              "low_water_pool_change"
+            ],
+            "title": "Reason"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "ready",
+              "retrying",
+              "failed",
+              "stale"
+            ],
+            "title": "State"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count",
+            "default": 0
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "session_id",
+          "vacancy_id",
+          "reason",
+          "state",
+          "created_at"
+        ],
+        "title": "FeedRefillStatus",
+        "description": "Durable tail refill job state exposed without mutable card contents."
       },
       "FeedRequest": {
         "properties": {

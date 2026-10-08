@@ -213,8 +213,21 @@ export interface FeedPage {
   next_cursor: string | null;
   has_more: boolean;
   items: FeedCard[];
+  /** Durable tail preparation, distinct from an exhausted candidate pool. */
+  refill_state?: "active" | "queued" | "running" | "exhausted" | "failed";
+  refill_job_id?: string | null;
+  pool_change_fraction?: number;
   /** Monotonic session order revision for the session's current card order. */
   order_revision: number;
+}
+
+/** Owner-scoped result of requesting another bounded feed batch. */
+export interface FeedRefillStatus {
+  job_id: string; session_id: string; vacancy_id: string;
+  reason: "low_water" | "pool_change" | "low_water_pool_change";
+  state: "queued" | "running" | "ready" | "retrying" | "failed" | "stale";
+  attempt_count: number; batch_id: string | null; error_code: string | null;
+  created_at: string; completed_at: string | null;
 }
 
 /** Current vacancy-local preference control and its durable fitting job state. */

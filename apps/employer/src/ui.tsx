@@ -27,6 +27,7 @@ const icons = {
   "vacancy-chevron": "vacancy-card-chevron.svg",
   edit: "vacancy-edit-pencil.svg",
   bell: "29795c078097fdcbdd8d396900a5dfd4a5309de8.svg",
+  message: "message-circle.svg",
   logo: "dec04dda54551634f35985932f0a53e8bcda20f5.svg",
   back: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
   clock: "8af299778072944cf9ce5dadca62d1ec4137e491.svg",

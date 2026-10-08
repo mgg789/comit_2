@@ -16,13 +16,14 @@ export interface SkillRadarProps {
   disabled?: boolean;
   onChange: (key: string, value: number) => void;
   onRemove?: (key: string) => void;
+  removeIcon?: ReactNode;
   children?: ReactNode;
   ariaLabel: string;
 }
 
 const GRADES = ["intern", "junior", "junior+", "middle", "middle+", "senior", "senior+"];
-const CENTER = { x: 360, y: 210 };
-const RADIUS = 132;
+const CENTER = { x: 450, y: 330 };
+const RADIUS = 200;
 
 function gradeValue(value: number): number {
   return Number.isFinite(value) ? Math.max(1, Math.min(7, Math.round(value))) : 1;
@@ -59,7 +60,7 @@ function wrapLabel(label: string, characters: number): string[] {
  * Dragging projects SVG coordinates onto the selected axis; keyboard handles provide
  * the same 1–7 scale. The parent supplies stable unique keys and optional add UI children.
  */
-export function SkillRadar({ axes, disabled = false, onChange, onRemove, children, ariaLabel }: SkillRadarProps) {
+export function SkillRadar({ axes, disabled = false, onChange, onRemove, removeIcon, children, ariaLabel }: SkillRadarProps) {
   const id = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ key: string; pointerId: number; x: number; y: number } | null>(null);
@@ -67,7 +68,6 @@ export function SkillRadar({ axes, disabled = false, onChange, onRemove, childre
   const { preferences } = useEmployerPreferences();
   const reducedMotion = systemReducedMotion || preferences.reducedMotion;
   const transition = reducedMotion ? { duration: 0 } : { type: "spring" as const, stiffness: 410, damping: 35 };
-  const dense = axes.length > 12;
   const points = axes.map((axis, index) => {
     const unit = direction(index, axes.length);
     const radius = (gradeValue(axis.value) / 7) * RADIUS;
@@ -75,38 +75,6 @@ export function SkillRadar({ axes, disabled = false, onChange, onRemove, childre
   });
   const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
     + (points.length > 2 ? " Z" : "");
-  const packedLabels = points.length > 2 || points.some((point) => point.label.length > 24);
-  const labelPositions = new Map<string, { x: number; y: number; height: number; fontSize: number; lines: string[]; alignment: string }>();
-  if (packedLabels) {
-    // Pack full labels on each side, independently of axis ordering. Reserve the
-    // bottom-right corner for the parent's add button; leader lines retain attribution.
-    for (const side of [-1, 1]) {
-      const group = points.filter((point) => (point.unit.x < 0 ? -1 : 1) === side)
-        .sort((a, b) => a.unit.y - b.unit.y);
-      if (!group.length) continue;
-      const availableHeight = side < 0 ? 384 : 324;
-      let fontSize = dense ? 13 : 15;
-      const measure = () => group.map((point) => {
-        const lines = wrapLabel(point.label, Math.max(1, Math.floor(148 / (fontSize * 0.7))));
-        return { point, lines, height: Math.max(28, lines.length * fontSize * 1.2) + 6 };
-      });
-      let labels = measure();
-      while (labels.reduce((sum, label) => sum + label.height, 0) > availableHeight && fontSize > 8) {
-        fontSize -= 0.5;
-        labels = measure();
-      }
-      const totalHeight = labels.reduce((sum, label) => sum + label.height, 0);
-      const gap = Math.max(0, (availableHeight - totalHeight) / (group.length + 1));
-      let y = 16 + gap;
-      for (const label of labels) {
-        labelPositions.set(label.point.key, {
-          x: side < 0 ? 20 : 520, y, height: label.height, fontSize, lines: label.lines,
-          alignment: side < 0 ? "end" : "start",
-        });
-        y += label.height + gap;
-      }
-    }
-  }
 
   function updateFromPointer(event: PointerEvent<SVGElement>) {
     const active = dragging.current;
@@ -156,7 +124,7 @@ export function SkillRadar({ axes, disabled = false, onChange, onRemove, childre
       <p className="skill-radar__hint" id={`${id}-hint`}>
         Перетащите точки: intern ближе к центру, senior+ — на внешнем круге.
       </p>
-      <svg ref={svgRef} className={`skill-radar__chart${dense ? " skill-radar__chart--dense" : ""}`} viewBox="0 0 720 420"
+      <svg ref={svgRef} className="skill-radar__chart" viewBox="0 0 900 660"
         role="group" aria-label={ariaLabel} aria-describedby={`${id}-hint`}
         onPointerMove={updateFromPointer} onPointerUp={finishPointer} onPointerCancel={finishPointer}
         onLostPointerCapture={(event) => {
@@ -177,28 +145,26 @@ export function SkillRadar({ axes, disabled = false, onChange, onRemove, childre
           fill={`url(#${id}-fill)`} initial={false} animate={{ d: path }} transition={transition} aria-hidden="true" />
         {points.map((point) => {
           const value = gradeValue(point.value);
-          const labelX = CENTER.x + point.unit.x * (RADIUS + 16);
-          const labelY = CENTER.y + point.unit.y * (RADIUS + 30);
-          const anchor = point.unit.x > 0.25 ? "start" : point.unit.x < -0.25 ? "end" : "middle";
-          const position = labelPositions.get(point.key) ?? {
+          const labelX = CENTER.x + point.unit.x * (RADIUS + 44);
+          const labelY = CENTER.y + point.unit.y * (RADIUS + 44);
+          const anchor = point.unit.x > 0.1 ? "start" : point.unit.x < -0.1 ? "end" : "middle";
+          const lines = wrapLabel(point.label, 13);
+          const height = Math.max(22, lines.length * 18 * 1.2);
+          const position = {
             x: labelX - (anchor === "end" ? 180 : anchor === "middle" ? 90 : 0),
-            y: labelY - 24,
-            height: 48,
-            fontSize: 15,
-            lines: wrapLabel(point.label, 14),
+            y: point.unit.y < -0.7 ? labelY - height : point.unit.y > 0.7 ? labelY : labelY - height / 2,
+            height,
+            lines,
             alignment: anchor,
           };
           return <g key={point.key}>
-            {packedLabels && <line className="skill-radar__label-guide" aria-hidden="true"
-              x1={CENTER.x + point.unit.x * RADIUS} y1={CENTER.y + point.unit.y * RADIUS}
-              x2={position.x + (position.alignment === "end" ? 180 : 0)} y2={position.y + position.height / 2} />}
             <foreignObject x={position.x} y={position.y} width={180} height={position.height} className="skill-radar__label-box">
-              <div className={`skill-radar__label skill-radar__label--${position.alignment}`} style={{ fontSize: position.fontSize }}>
+              <div className={`skill-radar__label skill-radar__label--${position.alignment}`}>
                 <span title={`${point.label}: ${gradeLabel(value)}`}>{position.lines.map((line, index) =>
                   <span className="skill-radar__label-line" key={index}>{line}</span>)}</span>
                 {onRemove && <button type="button" className="skill-radar__remove" disabled={disabled}
                   aria-label={`Удалить навык ${point.label}`} title={`Удалить ${point.label}`}
-                  onClick={() => { if (!disabled) onRemove(point.key); }}>×</button>}
+                  onClick={() => { if (!disabled) onRemove(point.key); }}>{removeIcon ?? "×"}</button>}
               </div>
             </foreignObject>
             <motion.g className="skill-radar__handle" initial={false} animate={{ x: point.x, y: point.y }} transition={transition}

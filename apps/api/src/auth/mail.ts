@@ -1,5 +1,6 @@
 /** Secure, bounded SMTP delivery for email verification challenges. */
 import nodemailer from "nodemailer";
+import { verificationHtml, type VerificationAttachment } from "./email-template.js";
 
 /** The two account roles that receive verification challenges. */
 export type MailRole = "candidate" | "employer";
@@ -20,6 +21,8 @@ export interface MailTransport {
     to: string;
     subject: string;
     text: string;
+    html: string;
+    attachments: VerificationAttachment[];
   }): Promise<unknown>;
   verify(): Promise<unknown>;
 }
@@ -184,11 +187,14 @@ export class SmtpMailer implements Mailer {
   async send(message: VerificationMail): Promise<void> {
     const text = messageText(message);
     try {
+      const { html, attachments } = verificationHtml(message, expiryText(message.expires_at));
       await this.transport.sendMail({
         from: this.config.from,
         to: message.email,
         subject: "Код подтверждения Comit",
         text,
+        html,
+        attachments,
       });
     } catch (error) {
       throw mapDeliveryError(error);

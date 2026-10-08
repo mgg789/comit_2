@@ -23,7 +23,7 @@ export type {
   CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
   ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
   RerankCard, RerankPage, RerankRequest, RerankStatus,
-  FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
+  FeedRequest, FeedCard, FeedPage, FeedRefillStatus, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
   PreferenceStatus, PreferenceCommand,
   HypothesisId, HypothesisSummary, HypothesisStatus,
 } from "./matching.js";

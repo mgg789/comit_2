@@ -336,7 +336,7 @@ export default function App() {
                   aria-label="Переписка и приглашения"
                   onClick={() => navigate("/chat")}
                 >
-                  <Icon name="bell" />
+                  <Icon name="message" />
                 </button>
                 <button
                   className="plain-icon"
