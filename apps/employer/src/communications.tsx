@@ -20,6 +20,7 @@ import type {
   RecruitmentView,
   SendChatMessage,
 } from "@comit/shared";
+import { AgentReply, CopyMessage, groupAgentMessages } from "./agent-messages";
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
@@ -666,6 +667,8 @@ function ProcessCommand({
 /** Global durable assistant overlays the current page and remains independent of route changes. */
 export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const { preferences } = useEmployerPreferences();
+  const [outgoing, setOutgoing] = useState<AgentsOrganizationMessage | null>(null);
+  const [now, setNow] = useState(Date.now());
   const [messages, setMessages] = useState<AgentsOrganizationMessage[]>([]);
   const [questions, setQuestions] = useState<AgentsPendingAnswer[]>([]);
   const [turn, setTurn] = useState<AgentsOrganizationTurn | null>(null);
@@ -699,6 +702,15 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!sending && (!turn || turn.status === "succeeded" || turn.status === "failed")) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [sending, turn?.status]);
+  useEffect(() => {
+    if (outgoing?.turn_id && messages.some((item) => item.role === "user" && item.turn_id === outgoing.turn_id)) setOutgoing(null);
+  }, [messages, outgoing?.turn_id]);
+
   useEffect(() => {
     if (!loading) {
       setShowLoading(false);
@@ -827,7 +839,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   }, []);
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+  }, [messages.length, outgoing?.message_id]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -838,7 +850,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   async function send(event: FormEvent) {
     event.preventDefault();
     if (
-      (!text.trim() && !uploadedDocuments.length) ||
+      (!pending.current && !text.trim() && !uploadedDocuments.length) ||
       sending ||
       uploadingDocument ||
       activeTurn.current
@@ -864,6 +876,11 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     }
     setSending(true);
     setError(null);
+    setTurn(null);
+    setNow(Date.now());
+    setOutgoing({ message_id: `local-${body.idempotency_key}`, chat_id: "", role: "user", content: body.message,
+      sequence: Number.MAX_SAFE_INTEGER, created_at: new Date().toISOString() });
+    setText("");
     pending.current = body;
     try {
       const value = await api.sendOrganizationMessage({
@@ -872,6 +889,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         reasoning_effort: body.reasoning_effort,
       });
       setTurn(value);
+      setOutgoing((item) => item ? { ...item, turn_id: value.turn_id } : null);
       activeTurn.current =
         value.status === "failed" || value.status === "succeeded"
           ? null
@@ -884,6 +902,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       );
       pending.current = null;
     } catch (reason) {
+      setOutgoing(null);
+      setText(body.message);
       setError(errorText(reason));
     } finally {
       setSending(false);
@@ -930,11 +950,13 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       if (documentInput.current) documentInput.current.value = "";
     }
   }
-  const visible = messages.filter(
-    (message) =>
-      (message.role === "assistant" || message.role === "user") &&
-      (message.content || message.attachments?.length),
-  );
+  const visible = groupAgentMessages(messages);
+  if (outgoing && !messages.some((item) => item.role === "user" && item.turn_id && item.turn_id === outgoing.turn_id)) visible.push(outgoing);
+  const thinking = sending || (!!turn && turn.status !== "succeeded" && turn.status !== "failed");
+  const currentId = turn?.turn_id || outgoing?.message_id;
+  if (currentId && (thinking || turn?.status === "failed") && !visible.some((row) => "messages" in row && row.id === currentId)) {
+    visible.push({ id: currentId, messages: [], startedAt: turn?.created_at || outgoing?.created_at || null });
+  }
   const percentage =
     budget && Number(budget.limit_micro_usd) > 0
       ? Math.max(
@@ -971,67 +993,28 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       >
         {loading && showLoading && <State loading />}
         <AnimatePresence initial={false}>
-          {visible.map((message) => (
-            <motion.article
-              className={`organization-message ${message.role}`}
-              key={message.message_id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {message.role === "assistant" && <AssistantAvatar />}
+          {visible.map((row) => {
+            const group = "messages" in row;
+            return <motion.article
+              className={`organization-message ${group ? "assistant" : "user"}`}
+              key={group ? row.id : row.message_id}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+              {group && <AssistantAvatar />}
               <div className="organization-message-body">
-                <p>{message.content}</p>
-                {message.attachments?.map((file) => (
-                  <button
-                    className="message-file"
-                    key={file.document_id}
+                {group ? <AgentReply group={row} active={thinking && row.id === currentId} now={now}
+                  failed={row.id === turn?.turn_id && turn.status === "failed"} /> : <>
+                  <p>{row.content}</p>
+                  {row.attachments?.map((file) => <button className="message-file" key={file.document_id}
                     onClick={async () => {
-                      try {
-                        const value = await api.downloadOrganizationDocument(
-                          file.document_id,
-                        );
-                        saveFile(value.document.name, value.content_base64);
-                      } catch (reason) {
-                        setError(errorText(reason));
-                      }
-                    }}
-                  >
-                    {file.name} ↓
-                  </button>
-                ))}
-                <button
-                  className="copy-message"
-                  aria-label="Скопировать сообщение"
-                  onClick={() =>
-                    navigator.clipboard
-                      .writeText(message.content || "")
-                      .catch(() => setError("Не удалось скопировать сообщение"))
-                  }
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <rect x="8" y="8" width="12" height="13" rx="2" />
-                    <path d="M15 5H5v11" />
-                  </svg>
-                </button>
+                      try { const value = await api.downloadOrganizationDocument(file.document_id); saveFile(value.document.name, value.content_base64); }
+                      catch (reason) { setError(errorText(reason)); }
+                    }}>{file.name} ↓</button>)}
+                  <CopyMessage text={row.content || ""} />
+                </>}
               </div>
-            </motion.article>
-          ))}
+            </motion.article>;
+          })}
         </AnimatePresence>
-        {turn && (
-          <div className="agent-turn-state" role="status">
-            {
-              {
-                queued: "Сообщение в очереди",
-                processing: "Думаю…",
-                retrying: "Повторяю запрос к AI…",
-                succeeded: "",
-                failed:
-                  "AI не смог выполнить запрос. Сообщение сохранено; повторите запрос.",
-              }[turn.status || "queued"]
-            }
-          </div>
-        )}
         {questions.length > 0 && (
           <div className="agent-questions agent-pending-questions panel glass">
             <h2>Вопросы от агента</h2>
@@ -1204,7 +1187,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               (!text.trim() && !uploadedDocuments.length)
             }
           >
-            {sending ? <span className="spinner" /> : <Icon name="send" />}
+            <Icon name="send" />
           </Action>
         </form>
         <p className="communication-attribution">

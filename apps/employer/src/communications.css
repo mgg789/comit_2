@@ -1019,3 +1019,30 @@
     height: 22rem;
   }
 }
+
+.agent-markdown { overflow-wrap: anywhere; line-height: 1.5; }
+.organization-message .agent-markdown p { white-space: normal; margin: 0 0 12rem; }
+.agent-markdown > :last-child { margin-bottom: 0; }
+.agent-markdown h1, .agent-markdown h2, .agent-markdown h3 { font-size: 1.15em; margin: 18rem 0 10rem; line-height: 1.3; }
+.agent-markdown ul, .agent-markdown ol { padding-left: 26rem; margin: 12rem 0; }
+.agent-markdown ul { list-style: disc; }
+.agent-markdown ol { list-style: decimal; }
+.agent-markdown li { margin: 4rem 0; }
+.agent-markdown pre { overflow-x: auto; padding: 16rem; border-radius: 12rem; background: var(--employer-card); white-space: pre; }
+.agent-markdown code { font-family: monospace; font-size: .9em; }
+.agent-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 14rem 0; }
+.agent-markdown td, .agent-markdown th { padding: 8rem 12rem; border: 1px solid var(--employer-border); }
+.agent-markdown a { color: var(--employer-blue); text-decoration: underline; }
+.agent-markdown blockquote { border-left: 2px solid var(--employer-border); margin: 12rem 0; padding-left: 16rem; color: var(--comit-text-muted); }
+.agent-thought { margin-bottom: 16rem; color: var(--comit-text-muted); font-size: 16rem; }
+.agent-thought summary { cursor: pointer; padding: 8rem 0; }
+.agent-thought .agent-markdown { margin: 10rem 0; }
+.thinking-dots { animation: thought-pulse 1.2s ease-in-out infinite; }
+@keyframes thought-pulse { 50% { opacity: .35; } }
+.copy-message { position: relative; transition: opacity 150ms; }
+.copy-message:hover { opacity: 1; }
+.copy-message img { display: block; width: 24px; height: 24px; }
+.copy-message > span:first-child:not(.copy-feedback) { font-size: 22rem; }
+.copy-feedback { position: absolute; left: 32rem; top: 0; width: max-content; font-size: 14rem; color: var(--comit-text-muted); }
+.organization-message.user .copy-feedback { left: auto; right: 32rem; }
+@media (prefers-reduced-motion: reduce) { .thinking-dots { animation: none; } }
