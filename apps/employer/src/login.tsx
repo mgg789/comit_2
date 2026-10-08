@@ -15,6 +15,8 @@ export function Login({
   const [consentError, setConsentError] = useState(false);
   const [receipt, setReceipt] = useState<EmailCodeReceipt | null>(null);
   const [code, setCode] = useState("");
+  const [codeFocused, setCodeFocused] = useState(false);
+  const [codePosition, setCodePosition] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -35,7 +37,7 @@ export function Login({
   }, []);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || !requireConsent()) return;
+    if (busy || !requireConsent() || (receipt && code.length !== 6)) return;
     setBusy(true);
     setError(null);
     try {
@@ -84,15 +86,20 @@ export function Login({
         </div>
       </motion.div>
       <motion.form
-        className="login-card glass"
+        className={`login-card glass ${receipt ? "otp-card" : ""}`}
         onSubmit={submit}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12, duration: 0.3 }}
       >
+        {receipt && <p className="otp-label">Код подтверждения</p>}
         <h1>
           {receipt ? (
-            "Введите код из письма"
+            <>
+              Мы отправили вам код на email:
+              <br />
+              <span>{email}</span>
+            </>
           ) : (
             <>
               Зарегистрируйтесь чтобы
@@ -102,46 +109,105 @@ export function Login({
             </>
           )}
         </h1>
-        <div className="login-email">
-          <div className="login-input-wrap">
-            <img
-              src={asset("c179aee8cef2e1b481a0ab48e2c6a5af19c286b9.svg")}
-              alt=""
-            />
-            <input
-              ref={input}
-              aria-label={receipt ? "Код из письма" : "Email"}
-              autoComplete={receipt ? "one-time-code" : "email"}
-              type={receipt ? "text" : "email"}
-              inputMode={receipt ? "numeric" : "email"}
-              placeholder={receipt ? "Код из письма" : "Введите почту"}
-              required
-              maxLength={receipt ? 6 : 254}
-              pattern={receipt ? "[0-9]{6}" : undefined}
-              value={receipt ? code : email}
-              onChange={(event) =>
-                receipt
-                  ? setCode(event.target.value.replace(/\D/g, ""))
-                  : setEmail(event.target.value)
-              }
-            />
+        {receipt ? (
+          <>
+            <div className="otp-digits">
+              <input
+                ref={input}
+                className="otp-native"
+                aria-label="Код подтверждения из письма, 6 цифр"
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                type="text"
+                required
+                pattern="[0-9]{6}"
+                value={code}
+                disabled={busy}
+                onFocus={() => setCodeFocused(true)}
+                onBlur={() => setCodeFocused(false)}
+                onSelect={(event) =>
+                  setCodePosition(
+                    Math.min(
+                      event.currentTarget.selectionStart ?? code.length,
+                      5,
+                    ),
+                  )
+                }
+                onChange={(event) =>
+                  setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+              />
+              {Array.from({ length: 6 }, (_, index) => (
+                <span
+                  className={`otp-digit glass ${codeFocused && codePosition === index ? "focused" : ""} ${code[index] ? "filled" : ""}`}
+                  key={index}
+                  aria-hidden="true"
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    const field = input.current;
+                    if (!field || busy) return;
+                    field.focus();
+                    const position = Math.min(index, code.length);
+                    field.setSelectionRange(
+                      position,
+                      Math.min(position + 1, code.length),
+                    );
+                    setCodePosition(Math.min(position, 5));
+                  }}
+                >
+                  {code[index] || "_"}
+                </span>
+              ))}
+            </div>
+            <Action
+              className="otp-submit"
+              type="submit"
+              disabled={busy || code.length !== 6}
+            >
+              Продолжить
+            </Action>
+            <p className="otp-note">
+              Проверьте папки Рассылки и Спам если не видите письмо во Входящих
+            </p>
+          </>
+        ) : (
+          <div className="login-email">
+            <div className="login-input-wrap">
+              <img
+                src={asset("c179aee8cef2e1b481a0ab48e2c6a5af19c286b9.svg")}
+                alt=""
+              />
+              <input
+                ref={input}
+                aria-label="Email"
+                autoComplete="email"
+                type="email"
+                inputMode="email"
+                placeholder="Введите почту"
+                required
+                disabled={busy}
+                maxLength={254}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+            <Action
+              type="submit"
+              className="circle"
+              disabled={busy}
+              onClick={(event) => {
+                if (!requireConsent()) event.preventDefault();
+              }}
+              aria-label="Получить код"
+            >
+              <img
+                className="login-submit-asset"
+                src={asset("4ecbfcd7e7f3629f251bb7b396bfec64aecee739.svg")}
+                alt=""
+              />
+            </Action>
           </div>
-          <Action
-            type="submit"
-            className="circle"
-            disabled={busy}
-            onClick={(event) => {
-              if (!requireConsent()) event.preventDefault();
-            }}
-            aria-label={receipt ? "Войти" : "Получить код"}
-          >
-            <img
-              className="login-submit-asset"
-              src={asset("4ecbfcd7e7f3629f251bb7b396bfec64aecee739.svg")}
-              alt=""
-            />
-          </Action>
-        </div>
+        )}
         {!receipt && (
           <button
             type="button"
@@ -161,9 +227,8 @@ export function Login({
           </button>
         )}
         {receipt && (
-          <>
-            <small>Код отправлен на {email}</small>
-            <Action
+          <div className="otp-resend">
+            <button
               type="button"
               disabled={!canResend || busy}
               onClick={() => {
@@ -174,28 +239,32 @@ export function Login({
               {canResend
                 ? "Отправить новый код"
                 : `Повторить через ${Math.max(0, Math.ceil((Date.parse(receipt.resend_after) - now) / 1000))} сек.`}
-            </Action>
-          </>
+            </button>
+          </div>
         )}
-        <div
-          className={`checkbox login-consent ${consentError ? "has-error" : ""}`}
-        >
-          <input
-            ref={consentInput}
-            type="checkbox"
-            aria-label="Согласие на обработку данных"
-            aria-invalid={consentError}
-            aria-describedby={consentError ? "consent-error" : undefined}
-            checked={consent}
-            onChange={(event) => {
-              setConsent(event.target.checked);
-              setConsentError(false);
-            }}
-          />
-          <a href="#/legal/processing-consent" target="_blank" rel="noopener">
-            Я согласен(а) на обработку данных и получение уведомления о доступе
-          </a>
-        </div>
+        {!receipt && (
+          <div
+            className={`checkbox login-consent ${consentError ? "has-error" : ""}`}
+          >
+            <input
+              ref={consentInput}
+              type="checkbox"
+              aria-label="Согласие на обработку данных"
+              aria-invalid={consentError}
+              aria-describedby={consentError ? "consent-error" : undefined}
+              checked={consent}
+              disabled={busy}
+              onChange={(event) => {
+                setConsent(event.target.checked);
+                setConsentError(false);
+              }}
+            />
+            <a href="#/legal/processing-consent" target="_blank" rel="noopener">
+              Я согласен(а) на обработку данных и получение уведомления о
+              доступе
+            </a>
+          </div>
+        )}
         {consentError && (
           <p id="consent-error" className="form-error" role="alert">
             Отметьте согласие на обработку данных, чтобы продолжить.
