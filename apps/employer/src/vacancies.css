@@ -356,3 +356,7 @@
 .vacancy-column > .filter-tab { margin: 0 0 30rem; box-sizing: border-box; }
 .vacancy-column-cards { display: grid; gap: 24rem; }
 @media (max-width: 700px) { .vacancy-columns { grid-template-columns: 1fr; gap: 30rem; } }
+
+.deck-feedback { display: flex; flex-direction: column; align-items: stretch; }
+.deck-feedback > p { margin: 0; }
+.deck-feedback > .action { align-self: center; margin-top: 30rem; }
