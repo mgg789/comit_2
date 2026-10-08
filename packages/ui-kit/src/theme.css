@@ -34,6 +34,9 @@
   --color-success-strong: var(--comit-success-strong);
   --color-success-soft: var(--comit-success-soft);
   --color-success-text: var(--comit-success-text);
+  --color-step-current: var(--comit-step-current);
+  --color-step-future-text: var(--comit-step-future-text);
+  --color-step-negative: var(--comit-step-negative);
   --color-warning: var(--comit-warning);
   --color-danger: var(--comit-danger);
   --color-danger-soft: var(--comit-danger-soft);

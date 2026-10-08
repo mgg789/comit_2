@@ -3,7 +3,7 @@ import { FUNNEL_STEPS, TERMINAL_STATES, funnelStep } from "./labels";
 
 describe("funnelStep", () => {
   it("places processes on the Резюме stepper", () => {
-    expect(FUNNEL_STEPS[funnelStep("sent", false)]).toBe("Приглашение");
+    expect(FUNNEL_STEPS[funnelStep("sent", false)]).toBe("Тиндер");
     expect(FUNNEL_STEPS[funnelStep("accepted", true)]).toBe("Собеседование");
     expect(FUNNEL_STEPS[funnelStep("offer_sent", true)]).toBe("Оффер");
     expect(FUNNEL_STEPS[funnelStep("hired", true)]).toBe("Приём");

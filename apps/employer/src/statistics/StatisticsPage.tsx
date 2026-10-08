@@ -49,7 +49,7 @@ export function StatisticsPage() {
 
   return (
     <>
-      <PageHeader title="Статистика" />
+      <PageHeader title="Статистика" backTo="/vacancies" backLabel="К вакансиям" />
       <div className="mb-6 flex flex-wrap gap-3">
         <SelectField aria-label="Период" value={days} onChange={setDays} options={PERIODS} containerClassName="w-40" />
         <SelectField

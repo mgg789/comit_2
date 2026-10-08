@@ -44,6 +44,8 @@ export function VacanciesPage() {
     <>
       <PageHeader
         title="Все вакансии"
+        backHref="/"
+        backLabel="На главную COMIT"
         actions={
           <HeaderAction to="new" icon="arrow-up-right">
             Добавить вакансию

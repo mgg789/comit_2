@@ -50,7 +50,10 @@
   --comit-success: #68cc58;
   --comit-success-strong: #33c200;
   --comit-success-soft: #dcf7d7;
-  --comit-success-text: #1d7a12;
+  --comit-success-text: #0a7347;
+  --comit-step-current: #daffe6;
+  --comit-step-future-text: #727478;
+  --comit-step-negative: #f67575;
   --comit-warning: #f6be4f;
   --comit-danger: #ff383c;
   --comit-danger-soft: #f48b80;

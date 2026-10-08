@@ -135,28 +135,36 @@ export function ActionRow({
   title,
   subtitle,
   action,
+  badge,
+  children,
   className,
 }: {
   leading: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
+  /** Pinned to the top-left corner (match percent tab). */
+  badge?: ReactNode;
+  /** Middle content between the text block and the action (e.g. the funnel stepper). */
+  children?: ReactNode;
   className?: string;
 }) {
   return (
     <div
       className={cx(
-        "flex flex-col gap-4 rounded-[2rem] bg-light p-5 text-on-chip sm:flex-row sm:items-center sm:gap-0 sm:p-0 sm:pr-[1.5rem] sm:pl-[1.5625rem] lg:min-h-[7.5rem]",
+        "relative flex flex-col gap-4 overflow-hidden rounded-[2rem] bg-light p-5 text-on-chip sm:flex-row sm:items-center sm:gap-0 sm:p-0 sm:pr-[1.5rem] sm:pl-[1.5625rem] lg:min-h-[7.5rem]",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-[1.5rem]">
+      {badge && <span className="absolute top-0 left-0">{badge}</span>}
+      <div className={cx("flex min-w-0 items-center gap-4 sm:gap-[1.5rem]", children ? "sm:w-[30rem] sm:shrink-0" : "flex-1")}>
         {leading}
         <div className="flex min-w-0 flex-col gap-1 lg:gap-[0.5rem]">
           <span className="truncate font-display text-xl leading-tight lg:text-[1.75rem]">{title}</span>
           {subtitle && <span className="truncate text-base font-semibold tracking-[-0.021rem] text-on-chip/80 lg:text-[1.25rem]">{subtitle}</span>}
         </div>
       </div>
+      {children && <div className="min-w-0 flex-1">{children}</div>}
       {action}
     </div>
   );
