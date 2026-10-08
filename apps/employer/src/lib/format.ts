@@ -1,4 +1,4 @@
-import type { AgentsDraftFields_Output, AgentsDraftView } from "@comit/shared";
+import type { AgentsDraftFields_Output, AgentsDraftView, InterviewView } from "@comit/shared";
 
 /** Whole rubles → "180к" (thousands, rounded) — the compact form used across the design. */
 export function formatThousands(rub: number): string {
@@ -12,6 +12,8 @@ export function formatSalaryRange(fromRub: number | null | undefined, toRub: num
   if (toRub == null || toRub === fromRub) return `${formatThousands(fromRub)} ₽`;
   return `${Math.round(fromRub / 1000)}–${formatThousands(toRub)} ₽`;
 }
+
+export const WORK_TYPES = ["onsite", "remote", "hybrid"] as const;
 
 export const WORK_TYPE_LABEL: Record<NonNullable<AgentsDraftFields_Output["type"]>, string> = {
   onsite: "Офис",
@@ -57,4 +59,12 @@ export function vacancyBadge(vacancy: AgentsDraftView): VacancyBadge {
 /** Title fallback for drafts created without one. */
 export function vacancyTitle(vacancy: AgentsDraftView): string {
   return vacancy.fields.title?.trim() || "Вакансия без названия";
+}
+
+/** Interview date in the interview's own IANA zone, e.g. «среда, 8 октября в 15:00». */
+export function formatInterviewTime(interview: InterviewView): string {
+  const date = new Date(interview.starts_at);
+  const day = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: interview.time_zone }).format(date);
+  const time = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: interview.time_zone }).format(date);
+  return `${day} в ${time}`;
 }

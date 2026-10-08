@@ -1,11 +1,15 @@
 import { Avatar, Backdrop, Icon, Logo, cx, type IconName } from "@comit/ui-kit";
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
+import { AgentLauncher } from "../agent/AgentOverlay";
 import { useAccount, useSession } from "../auth/session";
 
 /** Top-level sections of the employer cabinet, in Figma nav order. */
 export const NAV_ITEMS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: "/vacancies", label: "Вакансии", icon: "bars-sort" },
+  { to: "/resumes", label: "Резюме", icon: "resumes" },
+  { to: "/candidates", label: "Соискатели", icon: "people" },
+  { to: "/statistics", label: "Статистика", icon: "chart-line" },
 ];
 
 /** Authenticated layout: backdrop, sticky top navigation and the routed page. */
@@ -45,9 +49,10 @@ export function AppShell() {
           <AccountMenu />
         </div>
       </header>
-      <main className="mx-auto max-w-[1760px] px-4 pb-32 sm:px-10 xl:px-20">
+      <main className="mx-auto max-w-[1760px] px-4 pt-2 pb-32 sm:px-10 sm:pt-6 xl:px-20 xl:pt-14">
         <Outlet />
       </main>
+      <AgentLauncher />
     </div>
   );
 }
@@ -85,7 +90,7 @@ function AccountMenu() {
         onClick={() => setOpen((value) => !value)}
         className="glass inline-flex h-12 cursor-pointer items-center gap-2 rounded-pill border border-glass-border px-2 text-text sm:h-[66px] sm:gap-3 sm:px-4"
       >
-        <Avatar name={account.email} size={40} className="rounded-full" />
+        <Avatar name={account.email} size={40} shape="circle" />
         <Icon name="chevron-down" size={18} className={cx("transition-transform duration-150", open && "rotate-180")} />
       </button>
       {open && (

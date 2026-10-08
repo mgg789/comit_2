@@ -2,9 +2,11 @@ import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttribu
 import { cx } from "./cx";
 import { Icon } from "./icon";
 
+/** Shape and focus only; colors are added per tone so no two utilities fight over one property. */
 const FIELD =
-  "w-full rounded-field bg-field px-4 text-base text-text placeholder:text-subtle outline-none transition-shadow duration-150 " +
+  "w-full rounded-field px-4 text-base outline-none transition-shadow duration-150 " +
   "focus:ring-2 focus:ring-primary/70 aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-danger";
+const DARK_FIELD = "bg-field text-text placeholder:text-subtle";
 
 interface FieldFrameProps {
   label?: string;
@@ -54,7 +56,7 @@ export function TextField({ label, error, hint, containerClassName, className, .
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           {...rest}
-          className={cx(FIELD, "h-12 sm:h-[50px]", className)}
+          className={cx(FIELD, DARK_FIELD, "h-12 sm:h-[50px]", className)}
         />
       )}
     </FieldFrame>
@@ -78,7 +80,7 @@ export function TextArea({ label, error, hint, containerClassName, className, ..
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           {...rest}
-          className={cx(FIELD, "min-h-24 resize-y py-3", className)}
+          className={cx(FIELD, DARK_FIELD, "min-h-24 resize-y py-3", className)}
         />
       )}
     </FieldFrame>
@@ -129,8 +131,8 @@ export function SelectField({
             className={cx(
               FIELD,
               "h-12 cursor-pointer appearance-none pr-11 sm:h-[50px]",
-              tone === "light" && "bg-light text-on-light",
-              empty && (tone === "light" ? "text-faint" : "text-subtle"),
+              tone === "light" ? "bg-light" : "bg-field",
+              tone === "light" ? (empty ? "text-faint" : "text-on-light") : empty ? "text-subtle" : "text-text",
               className,
             )}
           >

@@ -100,12 +100,13 @@ export function ProgressBar({ value, label, className }: { value: number; label?
   );
 }
 
-/** Green match-percentage tab pinned to the top-left of candidate rows and cards. */
-export function MatchBadge({ percent, className }: { percent: number; className?: string }) {
+/** Green match-percentage label: `tab` is pinned to a tile's top-left corner, `pill` floats inline. */
+export function MatchBadge({ percent, shape = "tab", className }: { percent: number; shape?: "tab" | "pill"; className?: string }) {
   return (
     <span
       className={cx(
-        "inline-flex items-center rounded-t-[18px] rounded-br-[18px] bg-success-strong px-3.5 py-1 font-display text-lg leading-none text-white",
+        "inline-flex items-center bg-success-strong px-3.5 py-1 font-display text-lg leading-none text-white",
+        shape === "tab" ? "rounded-tl-[20px] rounded-br-[18px]" : "rounded-[18px]",
         className,
       )}
     >
@@ -114,8 +115,21 @@ export function MatchBadge({ percent, className }: { percent: number; className?
   );
 }
 
-/** Deterministic initials avatar: public candidate projections carry no photos. */
-export function Avatar({ name, size = 52, className }: { name: string; size?: number; className?: string }) {
+/**
+ * Deterministic initials avatar: public candidate projections carry no photos.
+ * `shape` sets the corner radius relative to size (rounded ≈ the design's 14px at 52px).
+ */
+export function Avatar({
+  name,
+  size = 52,
+  shape = "rounded",
+  className,
+}: {
+  name: string;
+  size?: number;
+  shape?: "rounded" | "circle" | "square";
+  className?: string;
+}) {
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -125,11 +139,17 @@ export function Avatar({ name, size = 52, className }: { name: string; size?: nu
   let hash = 0;
   for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   const hue = hash % 360;
+  const radius = shape === "circle" ? "50%" : shape === "square" ? 0 : Math.round(size * 0.27);
   return (
     <span
       aria-hidden
-      style={{ width: size, height: size, background: `linear-gradient(135deg, hsl(${hue} 70% 62%), hsl(${(hue + 50) % 360} 65% 45%))` }}
-      className={cx("inline-flex shrink-0 items-center justify-center rounded-[14px] font-semibold text-white", className)}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: radius,
+        background: `linear-gradient(135deg, hsl(${hue} 70% 62%), hsl(${(hue + 50) % 360} 65% 45%))`,
+      }}
+      className={cx("inline-flex shrink-0 items-center justify-center font-semibold text-white", className)}
     >
       <span style={{ fontSize: size * 0.36 }}>{initials || "?"}</span>
     </span>

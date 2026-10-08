@@ -4,7 +4,7 @@ import { Button, Dialog, ProgressBar, SelectField, TextArea, TextField } from "@
 import { useState, type FormEvent } from "react";
 import { api, describeError, isUnauthorized } from "../api";
 import { useSession } from "../auth/session";
-import { SPECIALIZATION_LABEL, WORK_TYPE_LABEL } from "../lib/format";
+import { SPECIALIZATION_LABEL, WORK_TYPES, WORK_TYPE_LABEL } from "../lib/format";
 
 type WorkType = keyof typeof WORK_TYPE_LABEL;
 
@@ -189,7 +189,7 @@ export function VacancyFormDialog({ initial, onChanged, onPublished, onClose }: 
           placeholder="Формат работы"
           value={values.workType}
           onChange={set("workType")}
-          options={(Object.keys(WORK_TYPE_LABEL) as WorkType[]).map((value) => ({ value, label: WORK_TYPE_LABEL[value] }))}
+          options={WORK_TYPES.map((value) => ({ value, label: WORK_TYPE_LABEL[value] }))}
           error={fieldError("workType")}
         />
         <TextField placeholder="График, например 5/2 с 10 до 19" aria-label="График работы" value={values.daily} onChange={set("daily")} error={fieldError("daily")} maxLength={500} />
@@ -200,7 +200,7 @@ export function VacancyFormDialog({ initial, onChanged, onPublished, onClose }: 
             {error}
           </p>
         )}
-        <Button type="submit" size="lg" className="mt-2 w-full rounded-field" loading={busy}>
+        <Button type="submit" size="lg" shape="field" className="mt-2 w-full" loading={busy}>
           {STEP_LABEL[step]}
         </Button>
       </form>

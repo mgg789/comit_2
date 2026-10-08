@@ -10,6 +10,7 @@ export {
   IconButton,
   Spinner,
   type ButtonProps,
+  type ButtonShape,
   type ButtonSize,
   type ButtonVariant,
   type IconButtonProps,

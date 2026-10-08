@@ -4,6 +4,7 @@ import { Icon, type IconName } from "./icon";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "accent" | "dark";
 export type ButtonSize = "sm" | "md" | "lg";
+export type ButtonShape = "chip" | "field" | "pill";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /**
@@ -12,6 +13,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    */
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** Corner radius; defaults by size (sm → chip, md → field, lg → pill). Use this instead of rounded-* classes. */
+  shape?: ButtonShape;
   /** Shows a spinner and blocks repeated submits while a request is in flight. */
   loading?: boolean;
 }
@@ -26,13 +29,21 @@ const VARIANT: Record<ButtonVariant, string> = {
 };
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: "h-10 px-4 text-sm rounded-chip",
-  md: "h-12 px-6 text-base rounded-field",
-  lg: "h-14 px-8 text-lg rounded-pill",
+  sm: "h-10 px-4 text-sm",
+  md: "h-12 px-6 text-base",
+  lg: "h-14 px-8 text-lg",
+};
+
+const DEFAULT_SHAPE: Record<ButtonSize, ButtonShape> = { sm: "chip", md: "field", lg: "pill" };
+
+const SHAPE: Record<ButtonShape, string> = {
+  chip: "rounded-chip",
+  field: "rounded-field",
+  pill: "rounded-pill",
 };
 
 /** Single button component for all apps; variants follow the COMIT Figma file. */
-export function Button({ variant = "primary", size = "md", loading = false, disabled, className, children, ...rest }: ButtonProps) {
+export function Button({ variant = "primary", size = "md", shape, loading = false, disabled, className, children, ...rest }: ButtonProps) {
   return (
     <button
       {...rest}
@@ -44,6 +55,7 @@ export function Button({ variant = "primary", size = "md", loading = false, disa
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         VARIANT[variant],
         SIZE[size],
+        SHAPE[shape ?? DEFAULT_SHAPE[size]],
         className,
       )}
     >
