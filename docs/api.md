@@ -468,3 +468,17 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 # Внешняя верификация
 
 Кандидатские `POST /candidate/profile/verifications/fsp`, `/repository` и `/hh` требуют authenticated candidate session и CAS `expected_revision`; account id не передаётся provider-сервису. Demo FSP flow: `POST /candidate/profile/fsp/demo/authorize` → GET/POST integration `/fsp/demo/authorize` → `POST /candidate/profile/fsp/demo/callback`; state candidate-bound, 120 секунд, callback allowlist и code одноразовые. Callback bulk-upsert-ит fixture achievements и binding `fsp_id`/`fsp_claim_id`. Account identity и ownership не выводятся из demo registry. Facts возвращаются в private profile view и доставляются matching через source outbox. Контракт провайдеров и деградация HH описаны в [verification.md](verification.md).
+
+## Глобальный агент работодателя
+
+Публичные account-scoped маршруты находятся под `/employer/organization-agent`;
+gateway получает владельца из employer session. Внутренние маршруты имеют
+префикс `/internal/organization-agent` и требуют `AGENTS_SERVICE_TOKEN`.
+Pydantic является источником DTO; `tests/generate_agents_contract.py` обновляет
+shared и OpenAPI, которые использует gateway. [Операционный контракт](agents.md).
+
+Файлы загружаются в `/documents` и читаются по ID; base64-транспорт ограничен
+7 MiB на gateway и 5 MiB исходных байтов. TXT/MD/PDF никогда не становятся
+публичными файлами кандидатов. Business bridge
+`POST /internal/organization-agent/tools/{tool}` принимает только доверенный
+сервисный вызов с owner scope и не выдаёт права принять интервью за кандидата.

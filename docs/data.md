@@ -358,3 +358,19 @@ consent_version/consent_accepted_at, а не подменяют их време�
 ## Статистика работодателя: чтение агрегатов
 
 API статистики читает общую PostgreSQL без новых таблиц и изменений исходных событий: source vacancy drafts, feed exposures/decisions/impressions и recruitment events. Один SQL-снимок, owner scope на всех источниках, таймаут 5 секунд; [определения метрик](employer-statistics.md). Приватные профили и learning features не входят в ответ.
+
+## Глобальный агент и приватный vault
+
+Новые миграции `005_organization_agent.sql`, `006_organization_documents.sql`
+и `007_organization_workflows.sql`
+в `agents-service` сохраняют глобальные чаты, сообщения, очередь, поручения,
+context/memory, журнал инструментов, вызовы провайдера, резервы и usage ledger.
+Уникальность чата задаётся `owner_id`; CAS применяется к memory.
+`organization_documents` хранит исходные байты и извлечённый текст, SHA-256,
+тип, имя и owner-scoped ключ повторной загрузки. Права чтения наследуются от
+аккаунта работодателя; файлы не входят в общую витрину.
+
+API миграции `009_organization_agent_tool_receipts.sql` и
+`010_organization_agent_read_receipts.sql` сохраняют immutable hash
+запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
+сохраняют checksum. [Потоки и ограничения](agents.md).

@@ -213,4 +213,8 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     # Separate session module shares this app's owner dependency and database store.
     from agents_service.session_routes import register_session_routes
     register_session_routes(app, owner, database, engine, capability_check=require_optional)
+    from agents_service.organization_routes import register_organization_routes
+    register_organization_routes(app, owner, database, capability_check=require_optional)
+    from agents_service.organization_documents import register_document_routes
+    register_document_routes(app, owner, database)
     return app

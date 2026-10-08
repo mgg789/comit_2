@@ -41,10 +41,10 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
-Чаты (движок-протокол Mike) — третий спринт, интегрируется в пост-отбор
-(`context/80`, решение Q3); account/draft gateway уже даёт owner boundary, но
-public hiring chat и frontend остаются отдельными этапами; matching selection
-gateway уже даёт owner boundary.
+Чаты на движке-протоколе Mike (QGramm) интегрированы в пост-отбор отдельным
+opt-in overlay: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию,
+доступ по приглашению и текущее согласие под DB-locks. Frontend и public hiring
+chat остаются отдельными этапами; matching selection gateway уже даёт owner boundary.
 
 ## Auth и ownership
 
@@ -65,21 +65,24 @@ Public employer draft/agent, candidate profile и candidate pipeline/PDF paths
 ## Ключевые потоки
 
 Актуальная серверная реализация: candidate worker → dual-vector pool/PDF;
-vacancy worker → ready; combine worker → main top-k; rerank worker →
-рекомендованный порядок/резерв либо явный fallback. Постановка R₀ атомарна с main
-publication; активная модель хранится в immutable PG registry/settings pointer.
-Обучение выполняет отдельный operator workflow; runtime использует JSON linear
-artifact без sklearn/LLM. Gated promotion не пройден; текущий R₀ включается
-ручным sort-only rollout при старте rerank-worker ([активация](rerank-activation.md)).
-Отдельные preference-worker и feed-refill-worker обновляют предпочтения вакансии и добор ленты.
+vacancy worker → ready; combine worker → main top-k; rerank worker → sort-only
+порядок активного R₀ либо явный main_fallback (упакованный hash-pinned артефакт
+активирован ручным решением оператора, quality gate остаётся failed, хвост не
+отсекается). Preference-worker автоматически обучает vacancy-local поправку по
+реакциям ленты и переставляет только непоказанный суффикс; каждый участник
+обучения требует отдельного training-v1 consent. Research-показы гипотез
+(2 карточки на 18 обычных доставок) добавляются после preference refresh;
+feed-refill-worker добирает ленту immutable batch-ами ([feed-refill.md](feed-refill.md)).
+Runtime использует JSON linear artifacts без sklearn/LLM; operator-обучение
+реранкера — отдельный workflow, численный activation gate не пройден.
 Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
 Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 
 1. Регистрация кандидата: email-подтверждение → CAS source profile → отдельные profile/pool consents → exact snapshot projection. Browser projection выдаёт self_reported; подготовленный trusted replacement producer позднее сможет заменить его через API source/evidence и новую outbox запись.
 2. Создание вакансии: строгие параметры + ЗП «от–до» (обязательна) + описание → вектор в `matching-engine` → ready/open → employer combine → Selection с объяснением.
-3. Тиндер: карточки из Selected с обоснованием → лайк/скип → коррекция вектора вакансии → следующая карточка.
-4. Приглашение: ЗП обязательна; статусы у обеих сторон; контакты раскрываются только после принятия (п. 2.2 ТЗ).
-5. Добор: события изменения пула → порог изменчивости → переотбор без Visited/Pending/Attractive.
+3. Тиндер-лента: порции из готового R₀ top-k с обоснованием → лайк → saved; скип → immutable структурный снимок и блокировка нового отбора до достаточного изменения профиля; непоказанный суффикс может переставляться preference-моделью, в порцию добавляются парные research-карточки.
+4. Приглашение: ЗП обязательна; статусы у обеих сторон; контакты раскрываются только после принятия (п. 2.2 ТЗ); после принятия доступен приватный чат QGramm.
+5. Переотбор: событие `candidate.ready` сравнивает профиль с исходным снимком dislike; при превышении порога (structural distance > 1.0, строгий N > K) кандидат возвращается через `visited_updated`. Автоматическое пополнение (добор) короткой выдачи не реализовано.
 
 ## Правила
 

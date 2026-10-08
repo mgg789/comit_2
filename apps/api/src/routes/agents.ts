@@ -38,16 +38,19 @@ export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayO
   for (const [path, operations] of Object.entries(spec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, operation] of Object.entries(operations)) {
-      if (!["get", "post", "patch", "delete"].includes(method)) continue;
+      if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
       const op = operation as {
         parameters?: Array<{ name: string; in: string; required?: boolean; schema: JsonSchemaValue }>;
         requestBody?: { content: { "application/json": { schema: JsonSchemaValue } } };
-        responses: { "200"?: { content?: { "application/json"?: { schema: JsonSchemaValue } } } };
+        responses: Record<string, { content?: { "application/json"?: { schema: JsonSchemaValue } } }>;
       };
-      const response = op.responses["200"]?.content?.["application/json"]?.schema;
+      const responses = Object.fromEntries(Object.entries(op.responses)
+        .filter(([status, definition]) => ["200", "202"].includes(status) && definition.content?.["application/json"]?.schema)
+        .map(([status, definition]) => [status, schema(definition.content!["application/json"]!.schema)]));
       const params = op.parameters?.filter(parameter => parameter.in === "path") ?? [];
       app.route({
         method: method.toUpperCase() as HTTPMethods,
+        ...(path === "/internal/organization-agent/documents" && method === "post" ? { bodyLimit: 7 * 1024 * 1024 } : {}),
         // Matching owns /internal/vacancies; editorial CRUD uses a distinct API namespace.
         url: path.replace(/^\/internal\/vacancies(?=\/|$)/, "/internal/agents/vacancies").replace(/\{([^}]+)\}/g, ":$1"),
         schema: {
@@ -59,7 +62,7 @@ export async function agentsRoutes(app: FastifyInstance, options: AgentsGatewayO
             "x-internal-token": { type: "string", minLength: 1 },
           } },
           ...(op.requestBody ? { body: schema(op.requestBody.content["application/json"].schema) } : {}),
-          ...(response ? { response: { 200: schema(response) } } : {}),
+          ...(Object.keys(responses).length ? { response: responses } : {}),
         },
         onRequest: async (request, reply) => {
           if (!token) return reply.code(503).send({ detail: "agents authentication is not configured" });
