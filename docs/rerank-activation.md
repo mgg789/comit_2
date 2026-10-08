@@ -8,6 +8,10 @@
 c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9
 ```
 
+Статус решения (08.10.2026): артефакт доведён до
+[mvp-prod-ready](rerank-mvp-status.md) с пересмотренным операторским gate;
+обычный promote() по-прежнему требует старых численных gates.
+
 Решение находится рядом, в `r0-c18f4bc1-manual-decision.json`. Оно фиксирует actor, reason, исходные gate/reviews, hash evaluation, отдельные hashes существующих assistant review/comparison и явное признание ограничений. Assistant review не считается независимым человеческим review. В sealed artifact остаются исходные `assistant_pairs=0`, `user_pairs=0`; отдельное evidence указывает фактически проведённые 20 assistant comparisons и ноль выявленных factual errors. Это не доказательство качества на реальных кандидатах.
 
 ## Активация и запуск
