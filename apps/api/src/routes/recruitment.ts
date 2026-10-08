@@ -56,7 +56,7 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     if (!response.ok) return invalid(response.status === 404 ? 404 : 503, "owned_vacancy_unavailable");
     const draft = await response.json() as AgentsDraftView;
     if (draft.owner_id !== ownerId || draft.draft_id !== draftId) return invalid(404, "owned_vacancy_unavailable");
-    if (draft.state !== "created" || draft.publication?.status !== "accepted") return invalid(409, "vacancy_not_published");
+    if (draft.archived || draft.business_status !== "open" || draft.state !== "created" || draft.publication?.status !== "accepted") return invalid(409, "vacancy_not_published");
     return draft;
   };
   const savedFor = async (ownerId: string, vacancyId: string, candidateId: string): Promise<SavedCard> => {

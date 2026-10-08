@@ -458,6 +458,7 @@ function RecruitmentThread({
             ))}
           </div>
         )}
+        {p.chat_available && !p.chat_writable && <p className="empty-note" role="status">Чат доступен только для чтения. Отправка сообщений и файлов сейчас недоступна.</p>}
         <form className="communication-composer glass" onSubmit={send}>
           <input
             ref={input}
@@ -469,17 +470,17 @@ function RecruitmentThread({
             className="attach-button"
             type="button"
             aria-label="Прикрепить файл до 8 МБ"
-            disabled={!p.chat_available || uploading || sending}
+            disabled={!p.chat_writable || uploading || sending}
             onClick={() => input.current?.click()}
           >
             {uploading ? "…" : "+"}
           </button>
           <input
             aria-label="Сообщение кандидату"
-            placeholder="Отправьте сообщение"
+            placeholder={p.chat_writable ? "Отправьте сообщение" : "Чат доступен только для чтения"}
             value={text}
             maxLength={16000}
-            disabled={!p.chat_available || sending}
+            disabled={!p.chat_writable || sending}
             onChange={(event) => {
               setText(event.target.value);
               retry.current = null;
@@ -489,7 +490,7 @@ function RecruitmentThread({
             className="circle send-button"
             type="submit"
             disabled={
-              !p.chat_available ||
+              !p.chat_writable ||
               sending ||
               uploading ||
               (!text.trim() && !files.length)

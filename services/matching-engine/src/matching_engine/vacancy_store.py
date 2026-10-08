@@ -14,7 +14,11 @@ from matching_engine.page_cursor import decode_cursor, encode_cursor
 from matching_engine.store import ConflictError, NotFoundError, Store, _schema
 from matching_engine.vacancy_features import build_strict_features, semantic_text
 from matching_engine.vacancy_models import (
+    VacancyDeactivate,
+    VacancyDelete,
+    VacancyDeleteReceipt,
     VacancyInput,
+    VacancyLifecycleReceipt,
     VacancyPipelineStatus,
     VacancyReady,
     VacancyReadyPage,
@@ -77,6 +81,13 @@ class VacancyStore:
         missing = missing_requirements(profile)
         with connect(self.database_url) as connection:
             connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            if connection.execute("SELECT 1 FROM vacancy_pipeline.tombstones WHERE vacancy_id=%s", (vacancy_id,)).fetchone():
+                raise ConflictError("vacancy_deleted")
+            fence = connection.execute("SELECT * FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
+            if fence and (fence["owner_id"] != profile.owner_id or fence["business_status"] == "closed" and profile.status != "closed"
+                    or profile.source_revision < fence["source_revision"] or
+                    profile.source_revision == fence["source_revision"] and profile.status != fence["business_status"]):
+                raise ConflictError("vacancy_lifecycle_fenced")
             schema = _schema(connection)
             build_strict_features(profile, schema)
             current = connection.execute(
@@ -84,6 +95,8 @@ class VacancyStore:
                 (vacancy_id,),
             ).fetchone()
             if current is not None:
+                if current["business_status"] == "closed" and profile.status != "closed":
+                    raise ConflictError("vacancy_closed")
                 if current["owner_id"] is not None and profile.owner_id != current["owner_id"]:
                     raise ConflictError("owner_id cannot be changed once assigned")
                 if profile.source_revision < current["source_revision"]:
@@ -123,6 +136,68 @@ class VacancyStore:
             if not missing:
                 self._enqueue(connection, vacancy_id, revision, schema.version)
             return self._status(connection, vacancy_id)
+
+    def deactivate(self, vacancy_id: UUID, request: VacancyDeactivate) -> VacancyLifecycleReceipt:
+        """Durably stop matching/refill before the source lifecycle CAS, preserving all history."""
+        with connect(self.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            deleted = connection.execute("SELECT * FROM vacancy_pipeline.tombstones WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
+            if deleted:
+                raise ConflictError("vacancy_deleted")
+            current = connection.execute("SELECT * FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s FOR UPDATE", (vacancy_id,)).fetchone()
+            fence = connection.execute("SELECT * FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
+            if fence and fence["owner_id"] == request.owner_id and fence["source_revision"] == request.source_revision and fence["business_status"] == request.status:
+                return VacancyLifecycleReceipt(vacancy_id=vacancy_id, source_revision=request.source_revision, status=request.status)
+            if current and (current["owner_id"] != request.owner_id or current["source_revision"] > request.source_revision or
+                    current["source_revision"] == request.source_revision and current["business_status"] != request.status):
+                raise ConflictError("vacancy_owner_or_revision_conflict")
+            if current and current["business_status"] == "closed" and request.status != "closed":
+                raise ConflictError("vacancy_closed")
+            if fence:
+                if fence["owner_id"] != request.owner_id or fence["source_revision"] > request.source_revision:
+                    raise ConflictError("vacancy_owner_or_revision_conflict")
+                if fence["business_status"] == "closed" and request.status != "closed":
+                    raise ConflictError("vacancy_closed")
+                if fence["source_revision"] == request.source_revision and fence["business_status"] != request.status:
+                    raise ConflictError("vacancy_lifecycle_revision_reused")
+            connection.execute("""INSERT INTO vacancy_pipeline.lifecycle_fences(vacancy_id,owner_id,source_revision,business_status)
+                VALUES (%s,%s,%s,%s) ON CONFLICT (vacancy_id) DO UPDATE SET
+                source_revision=EXCLUDED.source_revision,business_status=EXCLUDED.business_status""",
+                (vacancy_id, request.owner_id, request.source_revision, request.status))
+            published = connection.execute("DELETE FROM vacancy_pipeline.ready WHERE vacancy_id=%s RETURNING *", (vacancy_id,)).fetchone()
+            connection.execute("UPDATE vacancy_pipeline.vacancies SET business_status=%s,state='draft',updated_at=now() WHERE vacancy_id=%s", (request.status, vacancy_id))
+            connection.execute("""UPDATE vacancy_pipeline.jobs SET state='obsolete',lease_token=NULL,lease_until=NULL
+                WHERE vacancy_id=%s AND state IN ('queued','processing','retrying','failed')""", (vacancy_id,))
+            if published:
+                _event(connection, "vacancy.withdrawn", vacancy_id, published["revision"], published["schema_version"], "lifecycle_inactive")
+            return VacancyLifecycleReceipt(vacancy_id=vacancy_id, source_revision=request.source_revision, status=request.status)
+
+    def delete(self, vacancy_id: UUID, request: VacancyDelete) -> VacancyDeleteReceipt:
+        """Purge vacancy-owned matching/feed state while preserving a permanent replay fence."""
+        with connect(self.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            deleted = connection.execute("SELECT * FROM vacancy_pipeline.tombstones WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
+            if deleted:
+                if deleted["owner_id"] != request.owner_id or deleted["source_revision"] != request.source_revision:
+                    raise ConflictError("vacancy_owner_or_revision_conflict")
+                return VacancyDeleteReceipt(vacancy_id=vacancy_id, source_revision=request.source_revision)
+            current = connection.execute("SELECT * FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s FOR UPDATE", (vacancy_id,)).fetchone()
+            fence = connection.execute("SELECT * FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
+            if current and (current["owner_id"] != request.owner_id or current["source_revision"] >= request.source_revision):
+                raise ConflictError("vacancy_owner_or_revision_conflict")
+            if fence and (fence["owner_id"] != request.owner_id or fence["source_revision"] > request.source_revision):
+                raise ConflictError("vacancy_owner_or_revision_conflict")
+            status = fence["business_status"] if fence else current["business_status"] if current else "draft"
+            if status not in {"draft", "closed"}:
+                raise ConflictError("only_draft_or_closed_vacancy_can_be_deleted")
+            connection.execute("INSERT INTO vacancy_pipeline.tombstones(vacancy_id,owner_id,source_revision) VALUES (%s,%s,%s)",
+                               (vacancy_id, request.owner_id, request.source_revision))
+            for table in ("delivery_errors", "inbox"):
+                connection.execute(f"""DELETE FROM matching_pipeline.{table} WHERE source='vacancy' AND event_id IN
+                    (SELECT id FROM vacancy_pipeline.outbox WHERE vacancy_id=%s)""", (vacancy_id,))
+            connection.execute("DELETE FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s", (vacancy_id,))
+            connection.execute("DELETE FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,))
+            return VacancyDeleteReceipt(vacancy_id=vacancy_id, source_revision=request.source_revision)
 
     @staticmethod
     def _enqueue(connection, vacancy_id: UUID, revision: int, schema_version: int) -> None:
@@ -168,7 +243,7 @@ class VacancyStore:
                 (row["vacancy_id"],),
             ).fetchone()
             schema = _schema(connection)
-            if vacancy["revision"] != row["revision"] or schema.version != row["schema_version"]:
+            if vacancy is None or vacancy["business_status"] != "open" or vacancy["revision"] != row["revision"] or schema.version != row["schema_version"]:
                 connection.execute(
                     "UPDATE vacancy_pipeline.jobs SET state='obsolete',lease_token=NULL WHERE id=%s",
                     (row["id"],),
@@ -226,9 +301,11 @@ class VacancyStore:
             """, (job.id, job.lease_token)).fetchone()
             if lease is None:
                 return False
+            if current is None:
+                return False
             active = _schema(connection)
             vacancy = VacancyInput.model_validate(current["profile"])
-            if current["revision"] != job.revision or active.version != job.schema.version or missing_requirements(vacancy):
+            if current["business_status"] != "open" or current["revision"] != job.revision or active.version != job.schema.version or missing_requirements(vacancy):
                 connection.execute("""UPDATE vacancy_pipeline.jobs SET state='obsolete',lease_token=NULL,
                     lease_until=NULL WHERE id=%s""", (job.id,))
                 return False
@@ -390,6 +467,6 @@ def rebuild_for_schema(connection: psycopg.Connection, schema_version: int) -> N
     connection.execute("""UPDATE vacancy_pipeline.jobs SET state='obsolete',lease_token=NULL,lease_until=NULL
         WHERE state IN ('queued','processing','retrying','failed')""")
     connection.execute("""INSERT INTO vacancy_pipeline.jobs(vacancy_id,revision,schema_version,state)
-        SELECT vacancy_id,revision,%s,'queued' FROM vacancy_pipeline.vacancies""", (schema_version,))
+        SELECT vacancy_id,revision,%s,'queued' FROM vacancy_pipeline.vacancies WHERE business_status='open'""", (schema_version,))
     connection.execute("""UPDATE vacancy_pipeline.vacancies SET state=CASE
-        WHEN missing_requirements='[]'::jsonb THEN 'queued' ELSE 'draft' END,updated_at=now()""")
+        WHEN business_status='open' AND missing_requirements='[]'::jsonb THEN 'queued' ELSE 'draft' END,updated_at=now()""")

@@ -71,7 +71,7 @@ test("employer-only rejection permits null invitation terms and requires structu
     const view = { id: randomUUID(), owner_id: randomUUID(), candidate_id: randomUUID(), vacancy_id: randomUUID(),
       draft_id: randomUUID(), profile_revision: 1, revision: 1, state: "rejected", terms: null, invited_at: null,
       closure: { reason: "Required experience missing", actor: "employer", at },
-      interviews: [], offers: [], allowed_actions: [], chat_available: false, created_at: at, updated_at: at };
+      interviews: [], offers: [], allowed_actions: [], chat_available: false, chat_writable: false, created_at: at, updated_at: at };
     assert.equal((await app.inject({ method: "POST", url: "/snapshot", payload: view })).statusCode, 200);
     for (const payload of [{ ...view, closure: { ...view.closure, actor: "admin" } },
       { ...view, closure: { ...view.closure, email: "candidate@example.test" } },

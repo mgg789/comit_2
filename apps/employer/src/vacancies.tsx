@@ -52,7 +52,7 @@ function vacancyDate(draft: AgentsDraftView): string {
 /** Keep a circular badge for counts up to 99, widening only the capped value. */
 function CountBadge({ count }: { count: number }) {
   return (
-    <span className={`count${count > 99 ? " count-overflow" : ""}`}>
+    <span className={`count vacancy-count${count > 99 ? " count-overflow" : ""}`}>
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -249,7 +249,7 @@ function selectedRequirements(values?: SkillRequirements): SkillRequirements {
   return Object.fromEntries(Object.entries(values || {}).filter(([, level]) => level > 0));
 }
 const skillLabel = (key: string) =>
-  stackChoices.find(([value]) => value === key)?.[1] || key;
+  [...stackChoices, ...domainChoices, ...softChoices].find(([value]) => value === key)?.[1] || key;
 const classLabels = {
   backend: "Backend",
   frontend: "Frontend",
@@ -513,53 +513,6 @@ export function VacancyEditor({
                   <div><dt>Тип</dt><dd>{formats[work]}</dd></div>
                   <div><dt>Описание проекта</dt><dd>{current?.summary?.fields.bio || "Не указано"}</dd></div>
                 </dl>
-              </motion.div>
-              {requirementPanels.map((panel) => {
-                const label = (key: string) => panel.choices.find(([value]) => value === key)?.[1] || key;
-                const ordered = Object.entries(panel.values).sort(([a], [b]) => {
-                  const ai = panel.order.findIndex((key) => key === a), bi = panel.order.findIndex((key) => key === b);
-                  return (ai < 0 ? 1000 : ai) - (bi < 0 ? 1000 : bi) || a.localeCompare(b);
-                });
-                return (
-                  <motion.div key={panel.id} className="vacancy-review-panel vacancy-review-skills"
-                    id={`vacancy-panel-${panel.id}`} role="tabpanel" aria-labelledby={`vacancy-tab-${panel.id}`}
-                    aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
-                    initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
-                    transition={{ duration: 0.25 }}>
-                    <Select aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy || published}
-                      onChange={(event) => {
-                        const choice = panel.choices.find(([key]) => key === event.target.value);
-                        if (!choice) return;
-                        panel.setValues((values) => ({ ...values, [choice[0]]: 4 }));
-                        setReviewDirty(true);
-                      }}>
-                      <option value="">Добавить {panel.id === "stacks" ? "стек" : panel.id === "domens" ? "хард-навык" : "софт-навык"}</option>
-                      {panel.choices.filter(([key]) => panel.values[key] === undefined).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
-                    </Select>
-                    <SkillRadar ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
-                      axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
-                      onChange={(key, value) => {
-                        const chosen = skillLevels.find((level) => level === value);
-                        if (chosen === undefined) return;
-                        panel.setValues((values) => ({ ...values, [key]: chosen }));
-                        setReviewDirty(true);
-                      }} />
-                    <ul className="review-skill-chips">
-                      {ordered.map(([key]) => (
-                        <li className="review-skill-chip" key={key}>
-                          <span>{label(key)}</span>
-                          <button type="button" disabled={busy || published} aria-label={`Удалить требование ${label(key)}`}
-                            onClick={() => {
-                              panel.setValues((values) => { const next = { ...values }; delete next[key]; return next; });
-                              setReviewDirty(true);
-                            }}>×</button>
-                        </li>
-                      ))}
-                    </ul>
-                  </motion.div>
-                );
-              })}
-            </div>
             {published ? (
               <div role="status" className="inline-notice">
                 Подготавливаем подбор кандидатов. После готовности окно закроется.
@@ -573,6 +526,47 @@ export function VacancyEditor({
                 </Action>
               </div>
             )}
+              </motion.div>
+              {requirementPanels.map((panel) => {
+                const label = (key: string) => panel.choices.find(([value]) => value === key)?.[1] || key;
+                const ordered = Object.entries(panel.values).sort(([a], [b]) => {
+                  const ai = panel.order.findIndex((key) => key === a), bi = panel.order.findIndex((key) => key === b);
+                  return (ai < 0 ? 1000 : ai) - (bi < 0 ? 1000 : bi) || a.localeCompare(b);
+                });
+                return (
+                  <motion.div key={panel.id} className="vacancy-review-panel vacancy-review-skills"
+                    id={`vacancy-panel-${panel.id}`} role="tabpanel" aria-labelledby={`vacancy-tab-${panel.id}`}
+                    aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
+                    initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
+                    transition={{ duration: 0.25 }}>
+                    <SkillRadar ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                      axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
+                      onChange={(key, value) => {
+                        const chosen = skillLevels.find((level) => level === value);
+                        if (chosen === undefined) return;
+                        panel.setValues((values) => ({ ...values, [key]: chosen }));
+                        setReviewDirty(true);
+                      }}
+                      onRemove={(key) => {
+                        panel.setValues((values) => { const next = { ...values }; delete next[key]; return next; });
+                        setReviewDirty(true);
+                      }}>
+                    <Select className="radar-add" triggerIcon="plus" placement="right" aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy || published}
+                      onChange={(event) => {
+                        const choice = panel.choices.find(([key]) => key === event.target.value);
+                        if (!choice) return;
+                        panel.setValues((values) => ({ ...values, [choice[0]]: 4 }));
+                        setReviewDirty(true);
+                      }}>
+                      <option value="">Добавить {panel.id === "stacks" ? "стек" : panel.id === "domens" ? "хард-навык" : "софт-навык"}</option>
+                      {panel.choices.filter(([key]) => panel.values[key] === undefined).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+                    </Select>
+                    </SkillRadar>
+                  </motion.div>
+                );
+              })}
+            </div>
+
           </>
         ) : (
           <>
@@ -644,6 +638,7 @@ export function VacancyEditor({
                   <div className="form-grid vacancy-skill-fields">
                     <Select
                       aria-label="Добавить навык"
+                      triggerIcon="plus"
                       value=""
                       onChange={(event) => {
                         const choice = stackChoices.find(
@@ -1087,6 +1082,67 @@ export function VacancyDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inviteKey = useRef(crypto.randomUUID());
+  const [lifecycle, setLifecycle] = useState<"publish" | "withdraw" | "close" | "delete" | null>(null);
+  const lifecycleLock = useRef(false);
+  const status = draft.data?.business_status;
+  useEffect(() => {
+    if (draft.data?.state !== "creating") return;
+    let active = true;
+    let timer: number;
+    const poll = async () => {
+      try {
+        const latest = await api.getVacancy(draftId);
+        if (active) draft.setData(latest);
+      } catch {
+        if (active) timer = window.setTimeout(() => void poll(), 3000);
+      }
+    };
+    timer = window.setTimeout(() => void poll(), 1500);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [draft.data, draft.setData, draftId]);
+  const lifecyclePending = busy || draft.data?.state === "creating" || draft.data?.archived;
+  const lifecycleLabels = { publish: "Опубликовать", withdraw: "Отозвать", close: "Закрыть вакансию", delete: "Удалить вакансию" };
+  useEffect(() => {
+    if (!lifecycle) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !lifecycleLock.current) setLifecycle(null);
+    };
+    document.addEventListener("keydown", dismiss);
+    return () => document.removeEventListener("keydown", dismiss);
+  }, [lifecycle]);
+  async function confirmLifecycle() {
+    if (!lifecycle || !draft.data || lifecycleLock.current) return;
+    lifecycleLock.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = draft.data;
+      if (lifecycle === "publish") {
+        const approved = await api.approveVacancy(draftId, snapshot.revision);
+        if (!approved.summary) throw new Error("Не удалось получить подтверждённые данные вакансии");
+        await api.publishVacancy(draftId, {
+          expected_revision: approved.revision,
+          summary_hash: approved.summary.summary_hash,
+        });
+      } else if (lifecycle === "withdraw") {
+        await api.withdrawVacancy(draftId, snapshot.revision);
+      } else if (lifecycle === "close") {
+        await api.closeVacancy(draftId, snapshot.revision);
+      } else {
+        await api.archiveVacancy(draftId, snapshot.revision);
+        navigate("/vacancies");
+      }
+      setLifecycle(null);
+      saved.refresh();
+      processes.refresh();
+    } catch (reason) {
+      setError(reason instanceof Error && !("status" in reason) ? reason.message : errorText(reason));
+    } finally {
+      draft.refresh();
+      lifecycleLock.current = false;
+      setBusy(false);
+    }
+  }
   const fields = draft.data?.fields;
   const interviews = (processes.data?.items || []).flatMap((process) =>
     process.interviews
@@ -1130,7 +1186,7 @@ export function VacancyDetail({
       <PageTitle title="Вакансия" back={() => navigate("/vacancies")}>
         <Action
           variant="primary"
-          disabled={draft.data?.archived}
+          disabled={lifecyclePending || status === "closed"}
           onClick={() => draft.data && onEdit(draft.data)}
         >
           Редактировать
@@ -1138,6 +1194,12 @@ export function VacancyDetail({
             <Icon name="edit" />
           </span>
         </Action>
+        {(status === "draft" || status === "open") && (
+          <Action className="glass-surface" disabled={lifecyclePending}
+            onClick={() => { setError(null); setLifecycle(status === "open" ? "withdraw" : "publish"); }}>
+            {status === "open" ? "Отозвать" : "Опубликовать"}
+          </Action>
+        )}
       </PageTitle>
       <div className="detail-columns">
         <div className="detail-stack">
@@ -1175,11 +1237,11 @@ export function VacancyDetail({
                 ...Object.entries(fields.stacks || {}),
                 ...Object.entries(fields.domens || {}),
                 ...Object.entries(fields.soft_skills || {}),
-              ].map(([key, value]) => (
+              ].filter(([, value]) => value > 0).map(([key, value]) => (
                 <div className="skill-row" key={key}>
                   <header>
-                    <span>{key}</span>
-                    <span>Требуемый уровень {value}/7</span>
+                    <span>{skillLabel(key)}</span>
+                    <span>{gradeLabel(value)}</span>
                   </header>
                   <div className="skill-track">
                     <span style={{ width: `${(value / 7) * 100}%` }} />
@@ -1297,6 +1359,12 @@ export function VacancyDetail({
               ))
             )}
           </section>
+          <div className="vacancy-lifecycle-actions">
+            {status !== "closed" && <Action className="glass-surface" disabled={lifecyclePending}
+              onClick={() => { setError(null); setLifecycle("close"); }}>Закрыть</Action>}
+            {(status === "draft" || status === "closed") && <Action className="glass-surface" disabled={lifecyclePending}
+              onClick={() => { setError(null); setLifecycle("delete"); }}>Удалить</Action>}
+          </div>
         </div>
         <aside className="selection-stack">
           {draft.data?.business_status === "open" ? (
@@ -1312,6 +1380,26 @@ export function VacancyDetail({
         </aside>
       </div>
       <AnimatePresence>
+        {lifecycle && (
+          <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) setLifecycle(null); }}>
+            <section className="modal account-confirmation glass" role="dialog" aria-modal="true" aria-labelledby="vacancy-lifecycle-title">
+              <h2 id="vacancy-lifecycle-title">{lifecycleLabels[lifecycle]}?</h2>
+              <p>{lifecycle === "publish"
+                ? "Вакансия появится в подборе. Приглашения и переписка с кандидатами станут доступны."
+                : lifecycle === "withdraw"
+                  ? "Вакансия станет черновиком, подбор остановится. Лайки и история переписки сохранятся, чаты станут доступны только для чтения, назначенные собеседования отменятся. Возможна повторная публикация."
+                  : lifecycle === "close"
+                    ? "Вакансия закроется навсегда. Подбор и приглашения остановятся, чаты станут доступны только для чтения, собеседования отменятся. Лайки и история сохранятся. Повторная публикация невозможна."
+                    : "Вакансия, её подбор, лайки, приглашения и связанная переписка будут полностью удалены. Восстановить их нельзя."}</p>
+              {error && <p role="alert" className="form-error">{error}</p>}
+              <div className="account-confirmation-actions">
+                <Action disabled={busy} onClick={() => setLifecycle(null)}>Отмена</Action>
+                <Action variant="primary" disabled={busy} onClick={() => void confirmLifecycle()}>{busy ? "Выполняем…" : lifecycleLabels[lifecycle]}</Action>
+              </div>
+            </section>
+          </motion.div>
+        )}
         {invite && (
           <motion.div
             className="modal-shade"

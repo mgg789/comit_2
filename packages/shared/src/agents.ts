@@ -143,5 +143,8 @@ export type AgentsTaskAvailabilityRequest = { "availability": Array<AgentsAvaila
 /** Request for appending a user turn with both optimistic and idempotency guards. */
 export type AgentsUserTurnRequest = { "expected_revision": number; "idempotency_key": string; "message": string; };
 
+/** Minimal owner-scoped deletion receipt for durable lifecycle reconciliation. */
+export type AgentsVacancyDeletionReceipt = { "vacancy_id": string; "source_revision": number; "deleted"?: true; };
+
 /** ValidationError */
 export type AgentsValidationError = { "loc": Array<(string | number)>; "msg": string; "type": string; "input"?: unknown; "ctx"?: Record<string, unknown>; };

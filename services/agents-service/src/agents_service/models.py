@@ -169,6 +169,14 @@ class RevisionRequest(Contract):
     expected_revision: int = Field(strict=True, ge=1, le=SAFE_JSON_INTEGER)
 
 
+class VacancyDeletionReceipt(Contract):
+    """Minimal owner-scoped deletion receipt for durable lifecycle reconciliation."""
+
+    vacancy_id: UUID
+    source_revision: int
+    deleted: Literal[True] = True
+
+
 class CreateRequest(Contract):
     """Human publication confirmation for one exact approved summary."""
 

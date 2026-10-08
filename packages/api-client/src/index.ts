@@ -106,7 +106,9 @@ export interface ApiClient {
   publishVacancy(draftId: string, body: AgentsCreateRequest): Promise<AgentsDraftView>;
   /** Close and durably propagate a higher closed source revision. */
   closeVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
-  /** Archive a vacancy, retaining audit and closing any previous publication. */
+  /** Withdraw publication while preserving the historical shortlist and read-only chats. */
+  withdrawVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
+  /** Permanently delete a draft or closed vacancy and its scoped hiring/chat records. */
   archiveVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
   /** Discover public candidates without requiring any vacancy. */
   searchCandidates(body?: SearchRequest): Promise<SearchPage>;
@@ -291,6 +293,7 @@ export function createApiClient({
     approveVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/approve`, { expected_revision: expectedRevision }),
     publishVacancy: (draftId, body) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/publish`, body),
     closeVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/close`, { expected_revision: expectedRevision }),
+    withdrawVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/withdraw`, { expected_revision: expectedRevision }),
     archiveVacancy: (draftId, expectedRevision) => request("DELETE", `/employer/vacancies/${encodeURIComponent(draftId)}`, { expected_revision: expectedRevision }),
     searchCandidates: (body = {}) => request("POST", "/employer/candidates/search", body),
     getPublicCandidate: candidateId => request("GET", `/employer/candidates/${encodeURIComponent(candidateId)}`),

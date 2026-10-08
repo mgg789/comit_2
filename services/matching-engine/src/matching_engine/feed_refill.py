@@ -151,6 +151,10 @@ class FeedRefillStore:
                        reason: str | None = None) -> FeedRefillStatus | None:
         """Queue refill while the caller already owns the pipeline transaction lock."""
         session = self._session(connection, owner_id, vacancy_id, session_id)
+        current = connection.execute("SELECT business_status,state FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s AND owner_id=%s",
+                                     (vacancy_id, owner_id)).fetchone()
+        if current is None or current["business_status"] != "open" or current["state"] != "ready":
+            raise ConflictError("vacancy_inactive")
         if session["expires_at"] <= connection.execute("SELECT now() AS value").fetchone()["value"]:
             raise ConflictError("feed session expired")
         source = connection.execute("SELECT vacancy_snapshot FROM matching_pipeline.runs WHERE run_id=%s",

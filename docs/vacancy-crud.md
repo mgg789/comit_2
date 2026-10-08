@@ -13,15 +13,22 @@
 | `POST /employer/vacancies/:draft_id/approve` | Проверить ревизию и получить summary |
 | `POST /employer/vacancies/:draft_id/publish` | Подтвердить `{expected_revision, summary_hash}` и поставить публикацию в очередь |
 | `POST /employer/vacancies/:draft_id/close` | Закрыть `{expected_revision}` |
-| `DELETE /employer/vacancies/:draft_id` | Архивировать `{expected_revision}`, сохраняя аудит |
+| `POST /employer/vacancies/:draft_id/withdraw` | Снять открытую вакансию в черновик `{expected_revision}` |
+| `DELETE /employer/vacancies/:draft_id` | Физически удалить черновик или закрытую вакансию `{expected_revision}` |
 
 Создание и редактирование не публикуют автоматически. Для первоначальной публикации и для новой версии нужны существующие approve → summary → publish/Create. Контракт полей остаётся `AgentsDraftFields`; смена owner и произвольные поля не принимаются.
 
 PATCH опубликованной записи переводит её в редактирование с новой ревизией. Ранее принятый matching-снимок остаётся опубликованным до подтверждения новой версии; прямые действия работодателя через исходный черновик требуют актуального состояния `created/accepted`. Старый маршрут `/vacancy-drafts/:id` сохраняет ограничение на редактирование уже опубликованной записи; для ревизии используется новый `/vacancies/:id`.
 
-Закрытие фиксирует бизнес-статус `closed` сразу в источнике и создаёт существующее durable publication job с более высокой `source_revision` и `status=closed`. Снимок строится из последней опубликованной версии; незавершённые правки в него не попадают. Matching закроет своё представление после обработки очереди. Если публикация уже выполняется или завершилась ошибкой, закрытие возвращает 409: сначала нужно завершить или повторить существующую job. Ошибка закрытия сохраняет доступный для повторения журнал; записи не удаляются физически.
+Снятие (`withdraw`) переводит `open` в `draft`, увеличивает CAS-ревизию и отменяет устаревшие публикационные задания. Сохранённые кандидаты и предыдущие показы ленты остаются. Новую ленту и refill для неактивной вакансии matching не создаёт. Повторная публикация проходит approve → summary → publish; approve неизменённого снятого черновика создаёт новую ревизию, строго новее inactive fence.
 
-DELETE архивирует запись и одновременно ставит закрытие предыдущей публикации в очередь. Архив исчезает из списков, но остаётся доступным владельцу по UUID для проверки статуса и аудита. Его нельзя редактировать или публиковать. Для непубликовавшегося черновика matching job не требуется. Существующие приглашения, saved и visited не удаляются. Мутации используют CAS; после сетевого сбоя нужно прочитать запись и сверить ревизию. Повтор прежнего CAS может вернуть 409, не создавая вторую мутацию. Публикация сохраняет существующую идемпотентность по exact summary.
+Закрытие (`close`) окончательно: запрещены редактирование, approve и publish через любой редакторский маршрут, включая agent tools. Закрытие допускает незавершённую публикацию и инвалидирует её lease; новый durable job содержит `status=closed` и более высокую `source_revision`. Снимок строится из последней опубликованной версии, если она есть.
+
+DELETE разрешён только для `draft` и `closed`. Он удаляет исходную запись, связанные vacancy-agent sessions, сообщения, tool journal и jobs. Ответ совместим с `DraftView`: финальный снимок с `archived=true` и следующей ревизией; дальнейший GET возвращает 404. Withdraw/close сохраняют exact owner-scoped ответ CAS в `vacancy_lifecycle_receipts`; повтор того же expected revision и action возвращает этот ответ. `GET /internal/vacancies/:id/lifecycle/:expected_revision/:action` позволяет прочитать подтверждение без вывода из текущего статуса. Receipts удаляются вместе с вакансией. Сервис хранит только tombstone (`vacancy_id`, owner, source revision, время), без полей вакансии. `GET /internal/vacancies/:id/deletion` возвращает владельцу `{vacancy_id,source_revision,deleted:true}` для восстановления durable операции после неизвестного сетевого результата.
+
+Matching имеет отдельные owner-scoped маршруты: `POST /internal/vacancies/:id/deactivate` с `{owner_id,source_revision,status: "draft" | "closed"}` и `DELETE /internal/vacancies/:id` с `{owner_id,source_revision}`. Они используют общий pipeline lock, монотонный fence и идемпотентный результат. Deactivate убирает ready snapshot и leases, сохраняя saved/exposures. DELETE удаляет весь vacancy-owned graph matching/rerank/feed/preferences/hypotheses/learning и оставляет минимальный tombstone; старые intake и in-flight jobs не могут воскресить запись. Общие кандидаты, registry, модели и artifact receipts не удаляются. Gateway координирует сервисы через HTTP и durable retries; прямых межсервисных SQL-мутаций нет.
+
+Миграции lifecycle: agents `010_vacancy_lifecycle.sql`, matching `016_vacancy_lifecycle.sql`. Их требуется применить перед включением новых операций. API-owned recruitment/chat очищаются в gateway; agents/matching не обращаются к их таблицам.
 
 ## Страницы и поиск витрины
 

@@ -1394,6 +1394,144 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Delete",
+        "description": "Hard-delete owned matching records under a permanent monotonic replay fence.",
+        "operationId": "delete_internal_vacancies__vacancy_id__delete",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VacancyDelete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyDeleteReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{vacancy_id}/deactivate": {
+      "post": {
+        "tags": [
+          "vacancy-pipeline"
+        ],
+        "summary": "Deactivate",
+        "description": "Fence withdrawn/closed input before employer source mutation without deleting history.",
+        "operationId": "deactivate_internal_vacancies__vacancy_id__deactivate_post",
+        "parameters": [
+          {
+            "name": "vacancy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Vacancy Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VacancyDeactivate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyLifecycleReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/internal/vacancies/{vacancy_id}/ready": {
@@ -7783,6 +7921,86 @@
         "title": "StrictSchema",
         "description": "Version and hash identify both ordering and normalization of coordinates."
       },
+      "VacancyDeactivate": {
+        "properties": {
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "source_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Revision"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "closed"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "owner_id",
+          "source_revision",
+          "status"
+        ],
+        "title": "VacancyDeactivate",
+        "description": "Owner-scoped monotonic lifecycle fence supplied by the employer API."
+      },
+      "VacancyDelete": {
+        "properties": {
+          "owner_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Owner Id"
+          },
+          "source_revision": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "owner_id",
+          "source_revision"
+        ],
+        "title": "VacancyDelete",
+        "description": "Owner-scoped permanent deletion fence independent of publication availability."
+      },
+      "VacancyDeleteReceipt": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "source_revision": {
+            "type": "integer",
+            "title": "Source Revision"
+          },
+          "deleted": {
+            "type": "boolean",
+            "const": true,
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "source_revision"
+        ],
+        "title": "VacancyDeleteReceipt",
+        "description": "Minimal hard-deletion receipt without vacancy or candidate content."
+      },
       "VacancyInput": {
         "properties": {
           "source_revision": {
@@ -7996,6 +8214,36 @@
         ],
         "title": "VacancyInput",
         "description": "Canonical trusted snapshot; incomplete drafts persist without invented requirements."
+      },
+      "VacancyLifecycleReceipt": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "source_revision": {
+            "type": "integer",
+            "title": "Source Revision"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "closed"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "source_revision",
+          "status"
+        ],
+        "title": "VacancyLifecycleReceipt",
+        "description": "Durable inactive fence, including vacancies with no matching snapshot yet."
       },
       "VacancyPipelineStatus": {
         "properties": {

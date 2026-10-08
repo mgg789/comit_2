@@ -12,6 +12,14 @@ export function asset(name: string): string {
 /** Human-readable errors without dumping private upstream response payloads. */
 export function errorText(error: unknown): string {
   if (error instanceof ApiError) {
+    const detail = error.body && typeof error.body === "object" && "detail" in error.body ? error.body.detail : null;
+    const lifecycleMessages: Record<string, string> = {
+      vacancy_lifecycle_pending: "Действие сохранено и завершается в сервисах. Подбор и новые сообщения уже заблокированы. Попробуйте повторить действие позже.",
+      vacancy_lifecycle_conflict: "Вакансия изменилась до подтверждения. Обновите страницу и выберите действие заново.",
+      vacancy_not_published: "Действие доступно только для опубликованной вакансии.",
+      chat_read_only: "Этот чат доступен только для чтения.",
+    };
+    if (typeof detail === "string" && Object.hasOwn(lifecycleMessages, detail)) return lifecycleMessages[detail]!;
     if (
       error.body &&
       typeof error.body === "object" &&

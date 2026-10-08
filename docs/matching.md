@@ -503,3 +503,9 @@ fallback. Лайк для выбранной ready/open вакансии про�
 несоответствие требует явного подтверждения предупреждения, после которого
 создаёт обычные saved/attractive/exclusions. Источник manual не включается
 в обучение learned-cohort и не меняет активный preference control.
+
+## Lifecycle вакансии
+
+`POST /internal/vacancies/{id}/deactivate` принимает owner, следующую `source_revision` и `draft`/`closed`; matching сохраняет монотонный lifecycle fence, снимает ready и инвалидирует vacancy preparation leases. Feed/refill не расширяется при inactive статусе, история и saved сохраняются. Вакансия `closed` не может вернуться в `open`; снятая `draft` принимает новую публикацию только с большей ревизией.
+
+`DELETE /internal/vacancies/{id}` физически очищает vacancy-owned graph под pipeline lock и сохраняет минимальный tombstone. Повтор с тем же owner и source revision идемпотентен. Intake удалённого UUID всегда отклоняется. Миграция `016_vacancy_lifecycle.sql` добавляет fences и каскады только в графе вакансии; кандидаты и общие артефакты остаются.

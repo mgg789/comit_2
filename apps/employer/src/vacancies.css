@@ -53,7 +53,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6rem;
   padding: 6rem;
-  margin-top: 24rem;
+  margin-top: 0;
   border-radius: 25rem;
   background: var(--employer-paint-2e2e2d);
 }
@@ -150,42 +150,6 @@
   display: grid;
   align-content: start;
   gap: 20rem;
-}
-.review-skill-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rem;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-.review-skill-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10rem;
-  max-width: 100%;
-  padding: 8rem 14rem;
-  border: 1px solid var(--employer-paint-ffffff14);
-  border-radius: 20rem;
-  background: var(--employer-paint-2e2e2d);
-  font-size: 16rem;
-}
-.review-skill-chip button {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 28rem;
-  height: 28rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--comit-text-muted);
-  font-size: 22rem;
-}
-.review-skill-chip button:hover:not(:disabled) {
-  background: var(--employer-paint-ffffff14);
-  color: var(--comit-text);
 }
 .summary-copy {
   display: grid;
@@ -306,14 +270,6 @@
   .vacancy-info-description {
     font-size: max(18rem, 14px);
   }
-  .review-skill-chip {
-    font-size: max(16rem, 14px);
-  }
-  .review-skill-chip button {
-    width: 44px;
-    height: 44px;
-    font-size: max(22rem, 20px);
-  }
   .vacancy-editor {
     width: 100%;
     max-width: 484rem;
@@ -363,3 +319,11 @@
   height: 36rem;
   object-fit: contain;
 }
+
+/* The compact selector shares the chart panel rather than adding another row. */
+.radar-add { position: absolute; right: 14rem; bottom: 14rem; width: 48rem; }
+.radar-add .custom-select-trigger { width: 48rem; height: 48rem; min-height: 48rem; padding: 12rem; border-radius: 50%; justify-content: center; }
+.radar-add .custom-select-trigger > span:first-child { display: none; }
+.radar-add .icon { width: 24rem; height: 24rem; }
+.small-heading .vacancy-count { transform: translateY(3rem); }
+.vacancy-lifecycle-actions { display: flex; flex-wrap: wrap; gap: 14rem; }

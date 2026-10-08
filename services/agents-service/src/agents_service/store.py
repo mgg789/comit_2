@@ -27,6 +27,7 @@ from .models import (
     RevisionRequest,
     SchemaSnapshot,
     SummarySnapshot,
+    VacancyDeletionReceipt,
 )
 
 
@@ -206,6 +207,8 @@ class Store:
     ) -> Mapping[str, Any]:
         """Apply one locked patch inside an existing transaction."""
         row = self._get_row(connection, owner_id, draft_id, lock=True)
+        if row.get("business_status") == "closed" or row.get("deleted_at") is not None:
+            raise ConflictError("vacancy_not_editable")
         if row["revision"] != request.expected_revision:
             raise StaleRevisionError("draft revision is stale")
         if row["state"] in {"creating", "created", "failed"}:
@@ -326,7 +329,7 @@ class Store:
         """Stage published vacancy edits in the same transaction as the agent tool receipt."""
         owner, draft = _uuid(owner_id), _uuid(draft_id)
         row = self._get_row(connection, owner, draft, lock=True)
-        if row["deleted_at"] is not None or row["state"] in {"creating", "failed"}:
+        if row["deleted_at"] is not None or row["business_status"] == "closed" or row["state"] in {"creating", "failed"}:
             raise ConflictError("vacancy_not_editable")
         if row["revision"] != request.expected_revision:
             raise StaleRevisionError("draft revision is stale")
@@ -335,35 +338,90 @@ class Store:
         changed = self._patch_tx(connection, owner, draft, request, schema, source="manual", source_metadata=None)
         return self._view(changed)
 
-    def close(self, owner_id: UUID | str, draft_id: UUID | str, request: RevisionRequest, *, archive: bool = False) -> DraftView:
-        """CAS-close or archive while preserving audit and durably enqueueing a higher closed source revision."""
+    def _deactivate(self, owner_id: UUID | str, draft_id: UUID | str,
+                    request: RevisionRequest, status: str) -> DraftView:
+        """CAS-deactivate without deleting selections; freeze a higher inactive publication revision."""
+        owner, draft = _uuid(owner_id), _uuid(draft_id)
+        with connect(self.database_url) as connection:
+            row = self._get_row(connection, owner, draft, lock=True)
+            action = "withdraw" if status == "draft" else "close"
+            receipt = connection.execute("""SELECT response FROM agents_service.vacancy_lifecycle_receipts
+                WHERE draft_id=%s AND owner_id=%s AND expected_revision=%s AND action=%s""",
+                (draft, owner, request.expected_revision, action)).fetchone()
+            if receipt:
+                return DraftView.model_validate(receipt["response"])
+            if row["revision"] != request.expected_revision:
+                raise StaleRevisionError("draft revision is stale")
+            if row["deleted_at"] is not None or row["business_status"] == "closed":
+                raise ConflictError("vacancy_closed_or_deleted")
+            if status == "draft" and row["business_status"] != "open":
+                raise ConflictError("only_open_vacancy_can_be_withdrawn")
+            revision = row["revision"] + 1
+            connection.execute("""UPDATE agents_service.jobs SET state='obsolete',lease_token=NULL,lease_until=NULL
+                WHERE draft_id=%s AND state IN ('queued','processing','retrying','failed')""", (draft,))
+            publication = None
+            if row.get("published_fields") is not None or row["business_status"] == "open":
+                fields = self._canonical_fields(row.get("published_fields") or row["fields"])
+                payload = self._publication_payload(owner, revision, fields)
+                payload["status"] = status
+                job = self._enqueue_tx(connection, owner_id=owner, kind="publication", payload=payload,
+                    idempotency_key=f"{status}:{draft}:{revision}", draft_id=draft, session_id=None, max_attempts=5)
+                publication = {"status": "pending", "source_revision": revision, "job_id": str(job["job_id"])}
+            connection.execute("""UPDATE agents_service.drafts SET revision=%s,business_status=%s,state='editing',
+                summary=NULL,publication=%s,closed_at=CASE WHEN %s='closed' THEN now() ELSE closed_at END,
+                updated_at=now() WHERE owner_id=%s AND draft_id=%s""",
+                (revision, status, Jsonb(publication) if publication else None, status, owner, draft))
+            response = self._view(self._get_row(connection, owner, draft))
+            connection.execute("""INSERT INTO agents_service.vacancy_lifecycle_receipts
+                (draft_id,owner_id,expected_revision,action,response) VALUES (%s,%s,%s,%s,%s)""",
+                (draft, owner, request.expected_revision, action, Jsonb(response.model_dump(mode="json", by_alias=True))))
+            return response
+
+    def withdraw(self, owner_id: UUID | str, draft_id: UUID | str, request: RevisionRequest) -> DraftView:
+        """Withdraw an open vacancy to an editable draft while retaining saved candidates and history."""
+        return self._deactivate(owner_id, draft_id, request, "draft")
+
+    def close(self, owner_id: UUID | str, draft_id: UUID | str, request: RevisionRequest) -> DraftView:
+        """Close finally; closed vacancies cannot be edited, approved or republished."""
+        return self._deactivate(owner_id, draft_id, request, "closed")
+
+    def delete(self, owner_id: UUID | str, draft_id: UUID | str, request: RevisionRequest) -> DraftView:
+        """Hard-delete a draft/closed vacancy and owned records, returning its final removal snapshot."""
         owner, draft = _uuid(owner_id), _uuid(draft_id)
         with connect(self.database_url) as connection:
             row = self._get_row(connection, owner, draft, lock=True)
             if row["revision"] != request.expected_revision:
                 raise StaleRevisionError("draft revision is stale")
-            if row["state"] in {"creating", "failed"}:
-                raise ConflictError("publication_pending_or_failed")
-            if row["deleted_at"] is not None:
-                raise ConflictError("vacancy_archived")
+            if row["business_status"] not in {"draft", "closed"}:
+                raise ConflictError("only_draft_or_closed_vacancy_can_be_deleted")
             revision = row["revision"] + 1
-            publication = row.get("publication")
-            state = "editing"
-            if row.get("published_fields") is not None:
-                fields = self._canonical_fields(row["published_fields"])
-                payload = self._publication_payload(owner, revision, fields)
-                payload["status"] = "closed"
-                job = self._enqueue_tx(connection, owner_id=owner, kind="publication", payload=payload,
-                    idempotency_key=f"closure:{draft}:{revision}", draft_id=draft, session_id=None, max_attempts=5)
-                publication = {"status": "pending", "source_revision": revision, "job_id": str(job["job_id"])}
-                state = "creating"
-            connection.execute("""UPDATE agents_service.drafts SET revision=%s,business_status='closed',state=%s,
-                summary=NULL,publication=%s,
-                closed_at=CASE WHEN business_status='closed' THEN closed_at ELSE now() END,
-                deleted_at=CASE WHEN %s THEN now() ELSE deleted_at END,updated_at=now()
-                WHERE owner_id=%s AND draft_id=%s""", (revision, state, Jsonb(publication) if publication else None, archive, owner, draft))
-            changed = self._get_row(connection, owner, draft)
-        return self._view(changed)
+            receipt = self._view(row).model_copy(update={"revision": revision, "archived": True})
+            connection.execute("""INSERT INTO agents_service.vacancy_tombstones(vacancy_id,owner_id,source_revision)
+                VALUES (%s,%s,%s)""", (draft, owner, revision))
+            connection.execute("""DELETE FROM agents_service.jobs WHERE session_id IN
+                (SELECT session_id FROM agents_service.agent_sessions WHERE draft_id=%s)""", (draft,))
+            connection.execute("DELETE FROM agents_service.drafts WHERE owner_id=%s AND draft_id=%s", (owner, draft))
+            return receipt
+
+    def deletion(self, owner_id: UUID | str, draft_id: UUID | str) -> VacancyDeletionReceipt:
+        """Read an owned tombstone without retaining removed vacancy fields."""
+        with connect(self.database_url) as connection:
+            row = connection.execute("SELECT vacancy_id,source_revision FROM agents_service.vacancy_tombstones WHERE vacancy_id=%s AND owner_id=%s",
+                                     (_uuid(draft_id), _uuid(owner_id))).fetchone()
+            if row is None:
+                raise NotFoundError("deletion not found")
+            return VacancyDeletionReceipt(**row)
+
+    def lifecycle_receipt(self, owner_id: UUID | str, draft_id: UUID | str,
+                          expected_revision: int, action: str) -> DraftView:
+        """Read the exact durable command result rather than infer acknowledgement from current state."""
+        with connect(self.database_url) as connection:
+            row = connection.execute("""SELECT response FROM agents_service.vacancy_lifecycle_receipts
+                WHERE draft_id=%s AND owner_id=%s AND expected_revision=%s AND action=%s""",
+                (_uuid(draft_id), _uuid(owner_id), expected_revision, action)).fetchone()
+            if row is None:
+                raise NotFoundError("lifecycle receipt not found")
+            return DraftView.model_validate(row["response"])
 
     def patch(
         self,
@@ -404,6 +462,8 @@ class Store:
     ) -> Mapping[str, Any]:
         """Approve one draft while retaining the caller's transaction boundary."""
         row = self._get_row(connection, owner_id, draft_id, lock=True)
+        if row.get("business_status") == "closed" or row.get("deleted_at") is not None:
+            raise ConflictError("vacancy_not_editable")
         if row["revision"] != request.expected_revision:
             raise StaleRevisionError("draft revision is stale")
         if row["state"] == "summary":
@@ -419,20 +479,23 @@ class Store:
         missing = self._missing(fields)
         if missing:
             raise InvalidDraftError("missing requirements: " + ",".join(missing))
+        # A withdrawn snapshot is fenced at its source revision; even unchanged
+        # fields need a fresh approved revision before publishing open input again.
+        revision = row["revision"] + int(row["business_status"] == "draft" and row.get("publication") is not None)
         summary_data = {
-            "revision": row["revision"],
+            "revision": revision,
             "fields": fields.model_dump(by_alias=True),
             "strict_schema_version": schema.version,
             "strict_schema_hash": schema.schema_hash,
         }
         digest = _body_hash(summary_data)
         summary = SummarySnapshot(
-            revision=row["revision"], summary_hash=digest, fields=fields,
+            revision=revision, summary_hash=digest, fields=fields,
             strict_schema_version=schema.version, strict_schema_hash=schema.schema_hash,
         )
         connection.execute(
-            "UPDATE agents_service.drafts SET state='summary', summary=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
-            (Jsonb(summary.model_dump(by_alias=True)), owner_id, draft_id),
+            "UPDATE agents_service.drafts SET revision=%s,state='summary', summary=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
+            (revision, Jsonb(summary.model_dump(by_alias=True)), owner_id, draft_id),
         )
         return self._get_row(connection, owner_id, draft_id)
 
@@ -526,6 +589,8 @@ class Store:
         owner, draft = _uuid(owner_id), _uuid(draft_id)
         row = self._get_row(connection, owner, draft, lock=True)
         existing_pub = row.get("publication") or {}
+        if row.get("business_status") == "closed":
+            raise ConflictError("vacancy_closed")
         if row.get("deleted_at") is not None:
             raise ConflictError("vacancy_archived")
         if row["state"] in {"creating", "created", "failed"}:

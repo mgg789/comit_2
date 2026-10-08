@@ -15,6 +15,7 @@ import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore } from "../statistics/store.js";
 import { statisticsRoutes } from "../routes/statistics.js";
 import { organizationAgentToolsRoutes } from "../routes/organization-agent-tools.js";
+import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
 export async function authDomain(app: FastifyInstance): Promise<void> {
@@ -40,11 +41,23 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   const store = new AuthStore(pool, config.secret, { accountConsentVersion: config.consentVersion });
   let mailConfigured = true;
   try { readSmtpConfig(); } catch { mailConfigured = false; }
-  const options = { config, store, mailConfigured, profiles: new ProfileStore(pool), transport: correlatedFetch() };
+  const vacancyLifecycle = new VacancyLifecycle(pool, correlatedFetch());
+  const options = { config, store, mailConfigured, profiles: new ProfileStore(pool), transport: correlatedFetch(), vacancyLifecycle };
+  let resuming = false;
+  const resume = async () => {
+    if (resuming) return;
+    resuming = true;
+    try { await vacancyLifecycle.resume(); } catch { app.log.warn({ code: "vacancy_lifecycle_retry" }, "Vacancy lifecycle reconciliation deferred"); }
+    finally { resuming = false; }
+  };
+  const interval = setInterval(() => { void resume(); }, 5000);
+  interval.unref();
+  app.addHook("onClose", async () => { clearInterval(interval); });
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
   await app.register(accountRoutes, options);
-  const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret);
+  const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
+    (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client));
   await app.register(recruitmentRoutes, { ...options, recruitment });
   await app.register(chatRoutes, { ...options, recruitment });
   const statistics = new EmployerStatisticsStore(pool);

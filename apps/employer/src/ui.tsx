@@ -52,8 +52,13 @@ export function Icon({
 export function Select({
   children,
   className = "",
+  triggerIcon = "chevron",
+  placement = "bottom",
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement>) {
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  triggerIcon?: keyof typeof icons;
+  placement?: "bottom" | "right";
+}) {
   const native = useRef<HTMLSelectElement>(null);
   const anchor = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -94,6 +99,16 @@ export function Select({
     const available = window.innerHeight - rect.bottom - 12;
     const height = Math.min(320, options.length * 44 + 56);
     const above = available < Math.min(height, 180) && rect.top > available;
+    if (placement === "right") {
+      const width = Math.min(280, window.innerWidth - 16);
+      const left = rect.right + 8 + width <= window.innerWidth - 8
+        ? rect.right + 8 : Math.max(8, rect.left - width - 8);
+      const top = Math.max(8, Math.min(rect.top, window.innerHeight - height - 8));
+      setGeometry({ left, top, width, maxHeight: window.innerHeight - top - 8 });
+      setActive(Math.max(0, selected));
+      setOpen(true);
+      return;
+    }
     setGeometry({
       left: Math.max(
         8,
@@ -164,7 +179,7 @@ export function Select({
         }}
       >
         <span>{options[selected]?.label ?? options[0]?.label}</span>
-        <Icon name="chevron" />
+        <Icon name={triggerIcon} />
       </button>
       {open &&
         createPortal(
@@ -196,6 +211,8 @@ export function Select({
                   (control) =>
                     control.getClientRects().length > 0 &&
                     !control.closest(".custom-select-menu") &&
+                    !control.closest('[inert], [aria-hidden="true"]') &&
+                    getComputedStyle(control).visibility !== "hidden" &&
                     control.tabIndex >= 0,
                 );
                 const current = anchor.current

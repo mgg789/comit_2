@@ -101,6 +101,8 @@ export interface RecruitmentView {
   allowed_actions: RecruitmentAction["action"][];
   /** An invited, consented process has a configured chat backend; individual calls may still return 503. */
   chat_available: boolean;
+  /** Writing requires a live publication; historical chat remains readable when false. */
+  chat_writable: boolean;
   created_at: string;
   updated_at: string;
 }

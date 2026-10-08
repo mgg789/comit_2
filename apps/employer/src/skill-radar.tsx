@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type PointerEvent } from "react";
+import { useId, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import "./skill-radar.css";
 import { useEmployerPreferences } from "./preferences";
@@ -15,12 +15,14 @@ export interface SkillRadarProps {
   axes: SkillRadarAxis[];
   disabled?: boolean;
   onChange: (key: string, value: number) => void;
+  onRemove?: (key: string) => void;
+  children?: ReactNode;
   ariaLabel: string;
 }
 
 const GRADES = ["intern", "junior", "junior+", "middle", "middle+", "senior", "senior+"];
-const CENTER = { x: 360, y: 300 };
-const RADIUS = 178;
+const CENTER = { x: 360, y: 210 };
+const RADIUS = 132;
 
 function gradeValue(value: number): number {
   return Number.isFinite(value) ? Math.max(1, Math.min(7, Math.round(value))) : 1;
@@ -36,26 +38,28 @@ function direction(index: number, count: number): { x: number; y: number } {
   return { x: Math.cos(angle), y: Math.sin(angle) };
 }
 
-function labelLines(label: string): string[] {
-  const pieces = label.trim().split(/\s+/).flatMap((word) => word.match(/.{1,18}/gu) ?? []);
+function wrapLabel(label: string, characters: number): string[] {
+  const chunks = label.trim().split(/\s+/).flatMap((word) => {
+    const letters = Array.from(word);
+    return Array.from({ length: Math.ceil(letters.length / characters) }, (_, index) =>
+      letters.slice(index * characters, (index + 1) * characters).join(""));
+  });
   const lines: string[] = [];
-  for (const piece of pieces) {
+  for (const chunk of chunks) {
     const last = lines.length - 1;
-    if (last >= 0 && (lines[last]?.length ?? 0) + piece.length < 18) {
-      lines[last] += ` ${piece}`;
-    } else {
-      lines.push(piece);
-    }
+    if (last >= 0 && (lines[last]?.length ?? 0) + chunk.length + 1 <= characters) {
+      lines[last] += ` ${chunk}`;
+    } else lines.push(chunk);
   }
-  return lines.length > 3 ? [...lines.slice(0, 2), `${lines[2]}…`] : lines;
+  return lines.length ? lines : [label];
 }
 
 /**
  * Radial grade editor preserving the caller's axis order, including one or two skills.
- * Dragging projects SVG coordinates onto the selected axis; keyboard and range inputs
- * provide the same 1–7 scale. The parent must provide unique, stable axis keys.
+ * Dragging projects SVG coordinates onto the selected axis; keyboard handles provide
+ * the same 1–7 scale. The parent supplies stable unique keys and optional add UI children.
  */
-export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: SkillRadarProps) {
+export function SkillRadar({ axes, disabled = false, onChange, onRemove, children, ariaLabel }: SkillRadarProps) {
   const id = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ key: string; pointerId: number; x: number; y: number } | null>(null);
@@ -71,6 +75,38 @@ export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: Skil
   });
   const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ")
     + (points.length > 2 ? " Z" : "");
+  const packedLabels = points.length > 2 || points.some((point) => point.label.length > 24);
+  const labelPositions = new Map<string, { x: number; y: number; height: number; fontSize: number; lines: string[]; alignment: string }>();
+  if (packedLabels) {
+    // Pack full labels on each side, independently of axis ordering. Reserve the
+    // bottom-right corner for the parent's add button; leader lines retain attribution.
+    for (const side of [-1, 1]) {
+      const group = points.filter((point) => (point.unit.x < 0 ? -1 : 1) === side)
+        .sort((a, b) => a.unit.y - b.unit.y);
+      if (!group.length) continue;
+      const availableHeight = side < 0 ? 384 : 324;
+      let fontSize = dense ? 13 : 15;
+      const measure = () => group.map((point) => {
+        const lines = wrapLabel(point.label, Math.max(1, Math.floor(148 / (fontSize * 0.7))));
+        return { point, lines, height: Math.max(28, lines.length * fontSize * 1.2) + 6 };
+      });
+      let labels = measure();
+      while (labels.reduce((sum, label) => sum + label.height, 0) > availableHeight && fontSize > 8) {
+        fontSize -= 0.5;
+        labels = measure();
+      }
+      const totalHeight = labels.reduce((sum, label) => sum + label.height, 0);
+      const gap = Math.max(0, (availableHeight - totalHeight) / (group.length + 1));
+      let y = 16 + gap;
+      for (const label of labels) {
+        labelPositions.set(label.point.key, {
+          x: side < 0 ? 20 : 520, y, height: label.height, fontSize, lines: label.lines,
+          alignment: side < 0 ? "end" : "start",
+        });
+        y += label.height + gap;
+      }
+    }
+  }
 
   function updateFromPointer(event: PointerEvent<SVGElement>) {
     const active = dragging.current;
@@ -109,7 +145,10 @@ export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: Skil
   }
 
   if (axes.length === 0) {
-    return <div className="skill-radar skill-radar--empty" role="status">Добавьте навыки, чтобы настроить требования к грейду.</div>;
+    return <section className="skill-radar skill-radar--empty" aria-label={ariaLabel}>
+      <p role="status">Добавьте навыки, чтобы настроить требования к грейду.</p>
+      {children}
+    </section>;
   }
 
   return (
@@ -117,7 +156,7 @@ export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: Skil
       <p className="skill-radar__hint" id={`${id}-hint`}>
         Перетащите точки: intern ближе к центру, senior+ — на внешнем круге.
       </p>
-      <svg ref={svgRef} className="skill-radar__chart" viewBox="0 0 720 600"
+      <svg ref={svgRef} className={`skill-radar__chart${dense ? " skill-radar__chart--dense" : ""}`} viewBox="0 0 720 420"
         role="group" aria-label={ariaLabel} aria-describedby={`${id}-hint`}
         onPointerMove={updateFromPointer} onPointerUp={finishPointer} onPointerCancel={finishPointer}
         onLostPointerCapture={(event) => {
@@ -136,18 +175,32 @@ export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: Skil
         </g>
         <motion.path className={`skill-radar__shape${points.length < 3 ? " skill-radar__shape--line" : ""}`}
           fill={`url(#${id}-fill)`} initial={false} animate={{ d: path }} transition={transition} aria-hidden="true" />
-        {points.map((point, index) => {
+        {points.map((point) => {
           const value = gradeValue(point.value);
-          const labelX = CENTER.x + point.unit.x * (RADIUS + 30);
+          const labelX = CENTER.x + point.unit.x * (RADIUS + 16);
           const labelY = CENTER.y + point.unit.y * (RADIUS + 30);
-          const lines = dense ? [String(index + 1)] : labelLines(point.label);
           const anchor = point.unit.x > 0.25 ? "start" : point.unit.x < -0.25 ? "end" : "middle";
+          const position = labelPositions.get(point.key) ?? {
+            x: labelX - (anchor === "end" ? 180 : anchor === "middle" ? 90 : 0),
+            y: labelY - 24,
+            height: 48,
+            fontSize: 15,
+            lines: wrapLabel(point.label, 14),
+            alignment: anchor,
+          };
           return <g key={point.key}>
-            <text className="skill-radar__label" x={labelX} y={labelY - ((lines.length - 1) * 17) / 2}
-              textAnchor={anchor} dominantBaseline="middle" aria-hidden="true">
-              <title>{point.label}</title>
-              {lines.map((line, lineIndex) => <tspan key={lineIndex} x={labelX} dy={lineIndex === 0 ? 0 : 17}>{line}</tspan>)}
-            </text>
+            {packedLabels && <line className="skill-radar__label-guide" aria-hidden="true"
+              x1={CENTER.x + point.unit.x * RADIUS} y1={CENTER.y + point.unit.y * RADIUS}
+              x2={position.x + (position.alignment === "end" ? 180 : 0)} y2={position.y + position.height / 2} />}
+            <foreignObject x={position.x} y={position.y} width={180} height={position.height} className="skill-radar__label-box">
+              <div className={`skill-radar__label skill-radar__label--${position.alignment}`} style={{ fontSize: position.fontSize }}>
+                <span title={`${point.label}: ${gradeLabel(value)}`}>{position.lines.map((line, index) =>
+                  <span className="skill-radar__label-line" key={index}>{line}</span>)}</span>
+                {onRemove && <button type="button" className="skill-radar__remove" disabled={disabled}
+                  aria-label={`Удалить навык ${point.label}`} title={`Удалить ${point.label}`}
+                  onClick={() => { if (!disabled) onRemove(point.key); }}>×</button>}
+              </div>
+            </foreignObject>
             <motion.g className="skill-radar__handle" initial={false} animate={{ x: point.x, y: point.y }} transition={transition}
               tabIndex={disabled ? -1 : 0} role="slider" aria-label={point.label} aria-valuemin={1} aria-valuemax={7}
               aria-valuenow={value} aria-valuetext={gradeLabel(value)} aria-disabled={disabled}
@@ -168,21 +221,7 @@ export function SkillRadar({ axes, disabled = false, onChange, ariaLabel }: Skil
           </g>;
         })}
       </svg>
-      <div className="skill-radar__scale" aria-label="Шкала грейдов">
-        {GRADES.map((grade) => <span key={grade}>{grade}</span>)}
-      </div>
-      <div className="skill-radar__controls">
-        {axes.map((axis, index) => {
-          const value = gradeValue(axis.value);
-          return <label className="skill-radar__control" key={axis.key}>
-            <span className="skill-radar__control-heading"><span>{dense && `${index + 1}. `}{axis.label}</span>
-              <output>{gradeLabel(value)}</output></span>
-            <input type="range" min={1} max={7} step={1} value={value} disabled={disabled}
-              aria-label={`${axis.label}: требуемый грейд`} aria-valuetext={gradeLabel(value)}
-              onChange={(event) => onChange(axis.key, Number(event.currentTarget.value))} />
-          </label>;
-        })}
-      </div>
+      {children}
     </section>
   );
 }

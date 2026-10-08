@@ -8,7 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
 from matching_engine.vacancy_models import (
+    VacancyDeactivate,
+    VacancyDelete,
+    VacancyDeleteReceipt,
     VacancyInput,
+    VacancyLifecycleReceipt,
     VacancyPipelineStatus,
     VacancyReady,
     VacancyReadyPage,
@@ -47,6 +51,18 @@ def vacancy_router(repository: VacancyStore | None, require_internal: Callable) 
     def status(vacancy_id: UUID, store: Annotated[VacancyStore, Depends(storage)]) -> VacancyPipelineStatus:
         """Read pipeline progress separately from business lifecycle status."""
         return store.status(vacancy_id)
+
+    @router.post("/{vacancy_id}/deactivate", response_model=VacancyLifecycleReceipt)
+    def deactivate(vacancy_id: UUID, request: VacancyDeactivate,
+                   store: Annotated[VacancyStore, Depends(storage)]) -> VacancyLifecycleReceipt:
+        """Fence withdrawn/closed input before employer source mutation without deleting history."""
+        return store.deactivate(vacancy_id, request)
+
+    @router.delete("/{vacancy_id}", response_model=VacancyDeleteReceipt)
+    def delete(vacancy_id: UUID, request: VacancyDelete,
+               store: Annotated[VacancyStore, Depends(storage)]) -> VacancyDeleteReceipt:
+        """Hard-delete owned matching records under a permanent monotonic replay fence."""
+        return store.delete(vacancy_id, request)
 
     @router.get("/{vacancy_id}/ready", response_model=VacancyReady)
     def ready(vacancy_id: UUID, store: Annotated[VacancyStore, Depends(storage)]) -> VacancyReady:

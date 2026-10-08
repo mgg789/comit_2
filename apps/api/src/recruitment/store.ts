@@ -8,6 +8,7 @@ import type {
 } from "@comit/shared";
 import { timestamp, transaction } from "../auth/database.js";
 import { canonicalJson } from "../profiles/projection.js";
+import { lockVacancy } from "./vacancy-lifecycle.js";
 
 /** Sanitized domain error; routes never return PostgreSQL errors or private payloads. */
 export class RecruitmentError extends Error {
@@ -44,7 +45,8 @@ export interface InvitationGrant {
 /** Persist process-level CAS, actor-scoped receipts and immutable ordered events atomically. */
 export class RecruitmentStore {
   public constructor(private readonly pool: Pool, private readonly chatConfigured = false,
-    private readonly cursorSecret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? randomUUID()) {}
+    private readonly cursorSecret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? randomUUID(),
+    private readonly vacancyWritable?: (owner: string, draftId: string, client: PoolClient) => Promise<boolean>) {}
 
   private cursorScope(role: AccountRole, actorId: string, draftId?: string): string {
     return createHash("sha256").update(canonicalJson({ role, actorId, draftId: draftId ?? null })).digest("hex");
@@ -100,6 +102,9 @@ export class RecruitmentStore {
 
   private async process(client: PoolClient, role: AccountRole, actorId: string, id: string): Promise<ProcessRow> {
     const column = role === "employer" ? "owner_id" : "candidate_id";
+    const source = (await client.query<{ draft_id: string }>(`SELECT draft_id FROM recruitment_processes WHERE id=$1 AND ${column}=$2`, [id, actorId])).rows[0];
+    if (!source) return fail(404, "recruitment_not_found");
+    await lockVacancy(client, source.draft_id);
     const row = (await client.query<ProcessRow>(`SELECT * FROM recruitment_processes WHERE id=$1 AND ${column}=$2
       AND ($3::boolean OR invited_at IS NOT NULL) FOR UPDATE`, [id, actorId, role === "employer"])).rows[0];
     if (!row) return fail(404, "recruitment_not_found");
@@ -155,10 +160,13 @@ export class RecruitmentStore {
     // Consent withdrawal closes access to further progression, not the historical record.
     const consent = (await client.query<{ processing_consent: boolean }>("SELECT processing_consent FROM candidate_profiles WHERE candidate_id=$1", [row.candidate_id])).rows[0];
     if (!consent?.processing_consent) actions = actions.filter(action => ["reject", "decline", "withdraw", "view", "interview_cancel", "interview_decline", "offer_decline"].includes(action));
+    const vacancyOpen = !this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client);
+    if (!vacancyOpen) actions = [];
     return { id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, vacancy_id: row.vacancy_id, draft_id: row.draft_id,
       profile_revision: Number(row.profile_revision), revision: Number(row.revision), state: row.state, terms: row.terms,
       interviews, offers: mappedOffers, allowed_actions: actions,
       chat_available: this.chatConfigured && row.invited_at !== null && !!consent?.processing_consent,
+      chat_writable: this.chatConfigured && row.invited_at !== null && !!consent?.processing_consent && !terminal.has(row.state) && vacancyOpen,
       invited_at: row.invited_at === null ? null : timestamp(row.invited_at), closure: row.closure,
       created_at: timestamp(row.created_at), updated_at: timestamp(row.updated_at) };
   }
@@ -167,6 +175,8 @@ export class RecruitmentStore {
   public async invite(ownerId: string, request: InviteRequest, grant: InvitationGrant): Promise<RecruitmentView> {
     const fingerprint = recruitmentFingerprint(`invite:${grant.draft_id}`, request);
     return transaction(this.pool, async client => {
+      await lockVacancy(client, grant.draft_id);
+      if (this.vacancyWritable && !await this.vacancyWritable(ownerId, grant.draft_id, client)) return fail(409, "vacancy_not_published");
       await this.lockKey(client, ownerId, request.idempotency_key);
       const old = await this.receiptFor(client, ownerId, request.idempotency_key, fingerprint);
       if (old) return old;
@@ -202,6 +212,8 @@ export class RecruitmentStore {
   public async rejectSaved(ownerId: string, draftId: string, vacancyId: string, profileRevision: number, request: RejectSavedRequest): Promise<RecruitmentView> {
     const fingerprint = recruitmentFingerprint(`reject-saved:${draftId}`, request);
     return transaction(this.pool, async client => {
+      await lockVacancy(client, draftId);
+      if (this.vacancyWritable && !await this.vacancyWritable(ownerId, draftId, client)) return fail(409, "vacancy_not_published");
       await this.lockKey(client, ownerId, request.idempotency_key);
       const prior = await this.receiptFor(client, ownerId, request.idempotency_key, fingerprint);
       if (prior) return prior;
@@ -271,6 +283,7 @@ export class RecruitmentStore {
       if (!row.invited_at) return fail(404, "chat_not_found");
       await this.profile(client, row.candidate_id);
       if (write && terminal.has(row.state)) return fail(409, "chat_read_only");
+      if (write && this.vacancyWritable && !await this.vacancyWritable(row.owner_id, row.draft_id, client)) return fail(409, "chat_read_only");
       return operation({ process_id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, actor_id: actorId });
     });
   }
