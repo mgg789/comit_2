@@ -682,6 +682,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   >([]);
   const [composerMultiline, setComposerMultiline] = useState(false);
   const documentInput = useRef<HTMLInputElement>(null);
+  const documentUploadInFlight = useRef(false);
   const composerField = useRef<HTMLTextAreaElement>(null);
   const composerWrap = useRef<HTMLDivElement>(null);
   const [historyBottom, setHistoryBottom] = useState<number>();
@@ -872,6 +873,14 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   }
   async function uploadDocument(file?: File) {
     if (!file) return;
+    if (documentUploadInFlight.current || sending) return;
+    if (uploadedDocuments.length >= 3) {
+      setError(
+        "Можно прикрепить до трёх файлов. Уберите одно вложение, чтобы добавить другое.",
+      );
+      if (documentInput.current) documentInput.current.value = "";
+      return;
+    }
     if (
       !file.size ||
       file.size > 5 * 1024 * 1024 ||
@@ -880,6 +889,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       setError("Поддерживаются PDF, TXT и MD до 5 МБ.");
       return;
     }
+    documentUploadInFlight.current = true;
     setUploadingDocument(true);
     setError(null);
     try {
@@ -896,6 +906,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     } catch (reason) {
       setError(errorText(reason));
     } finally {
+      documentUploadInFlight.current = false;
       setUploadingDocument(false);
       if (documentInput.current) documentInput.current.value = "";
     }
@@ -940,16 +951,6 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         }
       >
         {loading && <State loading />}
-        {!loading && !visible.length && (
-          <div className="assistant-welcome">
-            <AssistantAvatar />
-            <h2>Чем могу помочь?</h2>
-            <p>
-              Расскажите о задаче: я помогу с вакансиями и работой с
-              кандидатами.
-            </p>
-          </div>
-        )}
         <AnimatePresence initial={false}>
           {visible.map((message) => (
             <motion.article
@@ -1047,6 +1048,15 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         )}
         <div ref={end} />
       </div>
+      {!loading && !visible.length && (
+        <div className="assistant-welcome">
+          <AssistantAvatar />
+          <h2>Чем могу помочь?</h2>
+          <p>
+            Расскажите о задаче: я помогу с вакансиями и работой с кандидатами.
+          </p>
+        </div>
+      )}
       <motion.div
         ref={composerWrap}
         className="communication-composer-wrap organization-composer"
@@ -1123,7 +1133,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             type="button"
             className="attach-button"
             aria-label="Загрузить PDF, TXT или MD до 5 МБ"
-            disabled={uploadingDocument || sending}
+            disabled={
+              uploadingDocument || sending || uploadedDocuments.length >= 3
+            }
             onClick={() => documentInput.current?.click()}
           >
             {uploadingDocument ? (
@@ -1171,13 +1183,12 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           </Action>
         </form>
         <p className="communication-attribution">
-          Работает на{" "}
           <img
             className="droidje-ai-logo"
             src={asset("droidje-ai-logo.svg")}
             alt=""
           />
-          <span>Droidje AI</span>
+          Работает на <span>Droidje AI</span>
         </p>
       </motion.div>
       <motion.aside

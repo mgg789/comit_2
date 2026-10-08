@@ -453,6 +453,9 @@
   height: 19.7rem;
   object-fit: contain;
 }
+.organization-composer .communication-attribution span {
+  color: inherit;
+}
 .recruitment-empty > .state {
   margin-top: 8rem;
 }
@@ -502,7 +505,15 @@
   color: var(--employer-paint-c2c5d1);
 }
 .assistant-welcome {
-  margin: auto;
+  position: absolute;
+  left: 50%;
+  top: clamp(180rem, 50dvh, calc(100dvh - 240rem));
+  transform: translate(-50%, -50%);
+  width: min(956rem, calc(100% - 240rem));
+  max-height: calc(100dvh - 300rem);
+  overflow: auto;
+  scrollbar-width: thin;
+  margin: 0;
   text-align: center;
   color: var(--employer-paint-eee);
 }
@@ -937,6 +948,11 @@
   }
   .assistant-welcome h2 {
     font-size: 26rem;
+  }
+  .assistant-welcome {
+    top: clamp(145rem, 43dvh, calc(100dvh - 220rem));
+    width: calc(100% - 48rem);
+    max-height: calc(100dvh - 280rem);
   }
   .assistant-welcome p {
     font-size: 15rem;

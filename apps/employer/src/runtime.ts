@@ -12,6 +12,13 @@ export function asset(name: string): string {
 /** Human-readable errors without dumping private upstream response payloads. */
 export function errorText(error: unknown): string {
   if (error instanceof ApiError) {
+    if (
+      error.body &&
+      typeof error.body === "object" &&
+      "detail" in error.body &&
+      error.body.detail === "agent_disabled_manual_available"
+    )
+      return "AI-агент на этом стенде не подключён. Отправка сообщений станет доступна после подключения AI.";
     if (error.status === 401) return "Сессия закончилась. Войдите снова.";
     if (error.status === 403) return "Нет доступа к этим данным.";
     if (error.status === 409)

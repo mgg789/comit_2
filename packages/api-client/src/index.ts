@@ -232,7 +232,7 @@ export function createApiClient({
     } finally { await reader.cancel().catch(() => undefined); }
   }
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = body === undefined ? {} : { "content-type": "application/json" };
     const token = getAuthToken();
     if (token) headers.authorization = `Bearer ${token}`;
 
