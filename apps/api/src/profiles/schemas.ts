@@ -29,6 +29,8 @@ export const candidateProfileFieldsSchema = object({
   domains: array(skill, 1000), stacks: array(skill, 1000), soft_skills: array(skill, 1000), description: text(10000),
   projects: array(narrative, 100), experience: array(narrative, 100), achievements: array(narrative, 100),
   preferences: array({ ...text(1000), minLength: 1 }, 100),
+  fsp_id: nullable({ type: "string", maxLength: 120, pattern: "^[A-Za-z0-9._:-]+$" }),
+  fsp_claim_id: nullable({ type: "string", maxLength: 120, pattern: "^[A-Za-z0-9._:-]+$" }),
 });
 
 /** CAS revision zero creates a profile; explicit consent never accepts client-supplied timestamps. */

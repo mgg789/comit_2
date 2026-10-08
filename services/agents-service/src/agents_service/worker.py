@@ -8,6 +8,7 @@ import psycopg
 from agents_service.agent_bridge import AtomicAgentStore, DraftGateway
 from agents_service.agent_runtime import AgentRuntime, AgentRuntimeError
 from agents_service.agent_store import AgentStore
+from agents_service.availability import require_capability
 from agents_service.database import connect
 from agents_service.models import JobView, SchemaSnapshot
 from agents_service.providers import (
@@ -70,8 +71,12 @@ class Worker:
                 result = self.matching.publish(str(job.draft_id), job.payload)
                 self.store.succeed_publication(job.job_id, job.lease_token, result)
             elif job.kind == "enrichment":
+                if isinstance(self.laya, LayaClient):
+                    require_capability("enrichment")
                 self._enrich(job)
             else:
+                if isinstance(self.deepseek, DeepSeekClient):
+                    require_capability("agent")
                 self._agent(job)
         except LeaseError:
             pass  # A new lease owns recovery; this process must not acknowledge anything.

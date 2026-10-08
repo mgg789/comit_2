@@ -152,6 +152,16 @@ export function projectCandidateIntake(
 ): CandidateIntake {
   const map = evidenceMap(evidenceRows);
   const declaredGrade = fields.declared_grade ?? null;
+  const externalEvidence = evidenceRows.flatMap(row => {
+    const match = /^(external:(?:fsp|repository|hh)):(.+)$/.exec(row.evidence_key);
+    if (!match) return [];
+    const subject = match[2];
+    const prefix = match[1];
+    if (!subject || !prefix) return [];
+    return [{ kind: prefix.slice("external:".length) as "fsp" | "repository" | "hh", subject,
+      // External input is kept in the evidence hash, while the provider result is already server-bound.
+      status: row.status, verified_value: row.verified_value }];
+  });
   const intake = {
     source_revision: revision,
     ...(fields.display_name !== undefined ? { display_name: fields.display_name } : {}),
@@ -181,6 +191,7 @@ export function projectCandidateIntake(
     experience: narratives(fields, "experience", map),
     achievements: narratives(fields, "achievements", map),
     preferences: fields.preferences ?? [],
+    ...(externalEvidence.length ? { external_evidence: externalEvidence } : {}),
   };
   return intake;
 }

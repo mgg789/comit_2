@@ -1,15 +1,16 @@
 /** Employer-wide public discovery; every response is watermarked against API source consent. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { PublicCandidateCard, PublicCandidateDetail, SearchPage } from "@comit/shared";
+import type { AgentsDraftView, PublicCandidateCard, PublicCandidateDetail, SearchPage, SearchRequest, VacancyReady } from "@comit/shared";
 import type { AccountGatewayOptions } from "./accounts.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
+import { correlatedFetch } from "../operations/index.js";
 
 const ref = (name: string) => ({ $ref: `urn:comit:public:matching:${name}` });
 const uuid = { type: "string", format: "uuid" };
 
 /** Register under accountRoutes so the generated matching schemas are inherited. */
 export async function showcaseRoutes(app: FastifyInstance, options: AccountGatewayOptions): Promise<void> {
-  const transport = options.transport ?? fetch;
+  const transport = correlatedFetch(options.transport ?? fetch);
   const url = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
   const token = options.matchingToken ?? process.env.CANDIDATE_PIPELINE_TOKEN;
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
@@ -65,6 +66,22 @@ export async function showcaseRoutes(app: FastifyInstance, options: AccountGatew
     const identity = identities.get(request);
     if (!identity || !token || !options.profiles) return reply.code(503).send({ detail: "showcase_unavailable" });
     try {
+      const vacancyId = (request.body as SearchRequest).filters?.vacancy_id;
+      if (vacancyId) {
+        const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
+        const agentsUrl = options.agentsUrl ?? process.env.AGENTS_SERVICE_URL ?? "http://agents-service:8104";
+        if (!agentsToken) return reply.code(503).send({ detail: "showcase_unavailable" });
+        // Managed vacancy and draft IDs are identical; require the authoritative publication first.
+        const source = await transport(new URL(`/internal/vacancy-drafts/${vacancyId}`, agentsUrl), {
+          headers: { "x-internal-token": agentsToken, "x-owner-id": identity.accountId }, signal: AbortSignal.timeout(10000), redirect: "error" });
+        if (!source.ok) return reply.code(source.status === 404 ? 404 : 503).send({ detail: "owner_record_not_found" });
+        const draft = await source.json() as AgentsDraftView;
+        if (draft.owner_id !== identity.accountId || draft.vacancy_id !== vacancyId) return reply.code(404).send({ detail: "owner_record_not_found" });
+        if (draft.state !== "created" || draft.publication?.status !== "accepted" || draft.business_status !== "open" || draft.archived) return reply.code(409).send({ detail: "vacancy_not_open" });
+        const vacancy = await json(request, identity.accountId, `/internal/vacancies/${vacancyId}/ready`, ref("VacancyReady")) as VacancyReady;
+        if (vacancy.vacancy_id !== vacancyId || vacancy.owner_id !== identity.accountId) return reply.code(404).send({ detail: "owner_record_not_found" });
+        if (vacancy.status !== "open") return reply.code(409).send({ detail: "vacancy_not_open" });
+      }
       const result = await json(request, identity.accountId, "/internal/employer/candidates/search", ref("SearchPage"), request.body) as SearchPage;
       if (!await current(result.items)) return reply.code(409).send({ detail: "showcase_source_obsolete" });
       return reply.send({ ...result, items: result.items.map(card => ({ ...card, resume_url: pdfUrl(card.candidate_id, card.profile_revision) })) });

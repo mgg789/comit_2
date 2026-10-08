@@ -81,6 +81,10 @@ class FeedCard(CandidateCard):
     order_probability: float | None = Field(default=None, gt=0, le=1)
     probability_scope: Literal["conditional_pair_and_order_at_budget_opportunity"] | None = None
     exploration_added: bool = False
+    batch_id: UUID | None = None
+    source_main_run_id: UUID | None = None
+    source_rerank_run_id: UUID | None = None
+    source_pool_generation: int | None = None
 
 
 class FeedPage(Contract):
@@ -96,6 +100,24 @@ class FeedPage(Contract):
     has_more: bool
     items: list[FeedCard]
     order_revision: int = 0
+    refill_state: Literal["active", "queued", "running", "exhausted", "failed"] = "active"
+    refill_job_id: UUID | None = None
+    pool_change_fraction: float = Field(default=0, ge=0, le=1)
+
+
+class FeedRefillStatus(Contract):
+    """Durable tail refill job state exposed without mutable card contents."""
+
+    job_id: UUID
+    session_id: UUID
+    vacancy_id: UUID
+    reason: Literal["low_water", "pool_change", "low_water_pool_change"]
+    state: Literal["queued", "running", "ready", "retrying", "failed", "stale"]
+    attempt_count: int = 0
+    batch_id: UUID | None = None
+    error_code: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
 
 
 class FeedDecisionRequest(Contract):
@@ -180,3 +202,6 @@ class FeedListPage[T](Contract):
     limit: int
     offset: int
     has_more: bool
+    cursor: str | None = None
+    next_cursor: str | None = None
+    snapshot_at: datetime | None = None

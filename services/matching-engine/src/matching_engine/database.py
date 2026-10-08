@@ -12,6 +12,9 @@ from matching_engine.strict import initial_schema
 MIGRATION_LOCK = 1440130171
 PIPELINE_LOCK = 1440130172
 
+# These SQL bytes are immutable: deployments may already have the old filename.
+MIGRATION_ALIASES = {"012_hypothesis_exploration.sql": "011_hypothesis_exploration.sql"}
+
 
 def connect(database_url: str) -> psycopg.Connection:
     """Open a transaction-capable connection; never print its credentials."""
@@ -25,6 +28,9 @@ def migrate(database_url: str) -> list[str]:
         (item for item in files("matching_engine").joinpath("migrations").iterdir()
          if item.name.endswith(".sql")), key=lambda item: item.name
     )
+    versions = [item.name.split("_", 1)[0] for item in migration_files]
+    if len(versions) != len(set(versions)):
+        raise RuntimeError("duplicate migration version")
     with connect(database_url) as connection:
         connection.execute("SELECT pg_advisory_xact_lock(%s)", (MIGRATION_LOCK,))
         connection.execute("CREATE SCHEMA IF NOT EXISTS candidate_pipeline")
@@ -37,6 +43,13 @@ def migrate(database_url: str) -> list[str]:
         for migration_file in migration_files:
             sql = migration_file.read_text(encoding="utf-8")
             checksum = hashlib.sha256(sql.encode()).hexdigest()
+            legacy = MIGRATION_ALIASES.get(migration_file.name)
+            if legacy:
+                old = connection.execute("SELECT checksum FROM candidate_pipeline.migrations WHERE name=%s", (legacy,)).fetchone()
+                if old:
+                    if old["checksum"] != checksum:
+                        raise RuntimeError(f"applied migration changed: {legacy}")
+                    connection.execute("INSERT INTO candidate_pipeline.migrations(name,checksum) VALUES (%s,%s) ON CONFLICT DO NOTHING", (migration_file.name, checksum))
             existing = connection.execute(
                 "SELECT checksum FROM candidate_pipeline.migrations WHERE name = %s",
                 (migration_file.name,),
@@ -45,7 +58,7 @@ def migrate(database_url: str) -> list[str]:
                 if existing["checksum"] != checksum:
                     raise RuntimeError(f"applied migration changed: {migration_file.name}")
                 continue
-            if migration_file.name in ("007_employer_feed.sql", "008_real_card_learning.sql", "009_live_preferences.sql", "010_preference_event_clock.sql", "011_hypothesis_exploration.sql", "011_candidate_showcase.sql"):
+            if int(migration_file.name.split("_", 1)[0]) >= 7:
                 # Match intake/feedback lock order before taking migration table locks.
                 connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
             connection.execute(sql)

@@ -2,6 +2,7 @@
 
 import hmac
 import os
+from collections.abc import Callable
 from typing import Annotated
 from uuid import UUID
 
@@ -10,8 +11,10 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from agents_service.models import (
+    CapabilityView,
     CreateRequest,
     DraftCreate,
+    DraftPage,
     DraftPatch,
     DraftView,
     JobView,
@@ -24,11 +27,13 @@ from agents_service.store import ConflictError, NotFoundError, Store
 
 
 def create_app(store: Store | None = None, matching: MatchingClient | None = None,
-               token: str | None = None) -> FastAPI:
+               token: str | None = None, capability_check: Callable[[str], None] | None = None) -> FastAPI:
     """Build an injectable app; startup never applies migrations or loads LLMs."""
     app = FastAPI(title="Comit Agents Service", version="0.1.0")
     secret = token if token is not None else os.getenv("AGENTS_SERVICE_TOKEN", "")
     engine = matching or MatchingClient()
+    from agents_service.availability import require_capability
+    require_optional = capability_check or require_capability
 
     def database() -> Store:
         if store is not None:
@@ -89,6 +94,12 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
         """Expose all three matching-owned groups directly to clients and agent tools."""
         return engine.schema()
 
+    @app.get("/internal/agents/capabilities", response_model=CapabilityView)
+    def capabilities(_owner: Owner) -> dict:
+        """Expose cached provider availability separately from editorial/matching readiness."""
+        from agents_service.availability import capability_view
+        return capability_view()
+
     @app.post("/internal/vacancy-drafts", response_model=DraftView)
     def create(request: DraftCreate, owner_id: Owner, db: Database):
         """Create an editable owner-scoped draft; no matching intake occurs."""
@@ -104,6 +115,47 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     def draft(draft_id: UUID, owner_id: Owner, db: Database):
         """Read shared form/chat state and current summary/publication status."""
         return db.get(owner_id, draft_id)
+
+    @app.get("/internal/vacancies", response_model=DraftPage)
+    def vacancy_page(owner_id: Owner, db: Database, limit: int = Query(50, ge=1, le=100),
+                     offset: int = Query(0, ge=0, le=1000000), cursor: str | None = Query(None, max_length=1000)):
+        """List managed vacancies with creation-key cursors and legacy offset compatibility."""
+        return db.page(owner_id, limit=limit, offset=offset, cursor=cursor)
+
+    @app.post("/internal/vacancies", response_model=DraftView)
+    def create_vacancy(request: DraftCreate, owner_id: Owner, db: Database):
+        """Create the same editorial draft; publication remains an explicit later confirmation."""
+        return db.create(owner_id, request.fields, engine.schema())
+
+    @app.get("/internal/vacancies/{draft_id}", response_model=DraftView)
+    def get_vacancy(draft_id: UUID, owner_id: Owner, db: Database):
+        """Read the authoritative editorial record, including archived audit state."""
+        return db.get(owner_id, draft_id)
+
+    @app.patch("/internal/vacancies/{draft_id}", response_model=DraftView)
+    def revise_vacancy(draft_id: UUID, request: DraftPatch, owner_id: Owner, db: Database):
+        """Stage changes to an existing publication without auto-approving or auto-publishing."""
+        return db.revise(owner_id, draft_id, request, engine.schema())
+
+    @app.post("/internal/vacancies/{draft_id}/approve", response_model=DraftView)
+    def approve_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
+        """Reuse the existing summary snapshot and exact revision guard."""
+        return db.approve(owner_id, draft_id, request, engine.schema())
+
+    @app.post("/internal/vacancies/{draft_id}/publish", response_model=DraftView)
+    def publish_vacancy(draft_id: UUID, request: CreateRequest, owner_id: Owner, db: Database):
+        """Human publication confirms the approved summary using the existing durable job."""
+        return db.submit(owner_id, draft_id, request, engine.schema())
+
+    @app.post("/internal/vacancies/{draft_id}/close", response_model=DraftView)
+    def close_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
+        """Durably close a vacancy without deleting selection or recruitment audit."""
+        return db.close(owner_id, draft_id, request)
+
+    @app.delete("/internal/vacancies/{draft_id}", response_model=DraftView)
+    def archive_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
+        """Archive and, when published, enqueue a closed snapshot before removal from lists."""
+        return db.close(owner_id, draft_id, request, archive=True)
 
     @app.patch("/internal/vacancy-drafts/{draft_id}", response_model=DraftView)
     def patch(draft_id: UUID, request: DraftPatch, owner_id: Owner, db: Database):
@@ -134,6 +186,7 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     @app.post("/internal/vacancy-drafts/{draft_id}/enrich", response_model=JobView)
     def enrich(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
         """Queue form-only Laya inference on one immutable revision; manual edits win."""
+        require_optional("enrichment")
         value = db.get(owner_id, draft_id)
         if value.revision != request.expected_revision or value.state in ("creating", "created", "failed"):
             raise HTTPException(409, "draft_revision_or_state_conflict")
@@ -154,10 +207,14 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
         value = db.get_job(owner_id, job_id)
         if value.kind == "agent_turn":
             from agents_service.session_routes import retry_agent_job
-            return retry_agent_job(db, owner_id, job_id)
+            return retry_agent_job(db, owner_id, job_id, capability_check=require_optional)
         return db.retry_job(owner_id, job_id)
 
     # Separate session module shares this app's owner dependency and database store.
     from agents_service.session_routes import register_session_routes
-    register_session_routes(app, owner, database, engine)
+    register_session_routes(app, owner, database, engine, capability_check=require_optional)
+    from agents_service.organization_routes import register_organization_routes
+    register_organization_routes(app, owner, database, capability_check=require_optional)
+    from agents_service.organization_documents import register_document_routes
+    register_document_routes(app, owner, database)
     return app

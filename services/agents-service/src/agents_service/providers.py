@@ -71,7 +71,9 @@ class MatchingClient:
         """Idempotently send the entire confirmed snapshot; ACK is not technical ready."""
         try:
             result = MatchingStatus.model_validate(self._call("PUT", f"/internal/vacancies/{vacancy_id}", snapshot))
-            if result.vacancy_id != UUID(vacancy_id) or result.source_revision != snapshot["source_revision"] or result.status != "open" or result.missing_requirements:
+            expected_status = snapshot.get("status", "open")
+            if (result.vacancy_id != UUID(vacancy_id) or result.source_revision != snapshot["source_revision"]
+                or result.status != expected_status or expected_status == "open" and result.missing_requirements):
                 raise ValueError()
             return result.model_dump(mode="json")
         except (ValidationError, ValueError):

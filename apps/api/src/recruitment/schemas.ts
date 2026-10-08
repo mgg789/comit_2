@@ -69,6 +69,7 @@ export const recruitmentViewSchema = object({
 /** Participant-scoped list response with explicit pagination bounds. */
 export const recruitmentPageSchema = object({ items: { type: "array", items: recruitmentViewSchema },
   limit: integer(1, 100), offset: integer(0), has_more: { type: "boolean" },
+  next_cursor: nullable(text(1024)),
 });
 
 /** Separate authorized contact response, never nested in recruitment snapshots. */

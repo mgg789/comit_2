@@ -22,6 +22,7 @@ from matching_engine.models import (
     StrictSchema,
     missing_requirements,
 )
+from matching_engine.page_cursor import decode_cursor, encode_cursor
 from matching_engine.strict import schema_hash, validate_coordinates
 
 
@@ -406,20 +407,35 @@ class Store:
         with connect(self.database_url) as connection:
             return self._status(connection, candidate_id)
 
-    def pool(self, limit: int, offset: int) -> PoolPage:
+    def pool(self, limit: int, offset: int, cursor: str | None = None) -> PoolPage:
         """List active-generation ready candidates ranked grade, strength, UUID per direction."""
         with connect(self.database_url) as connection:
-            rows = connection.execute("""
-                WITH ready AS (
+            connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+            source = """
                     SELECT p.*,row_number() OVER (PARTITION BY p.specialization
                         ORDER BY p.grade_rank DESC,p.confirmed_strength DESC,p.candidate_id) AS rank
                     FROM candidate_pipeline.pool p
                     JOIN candidate_pipeline.candidates c
                         ON c.candidate_id=p.candidate_id AND c.revision=p.revision AND c.state='ready'
                     JOIN candidate_pipeline.settings s ON s.active_schema_version=p.schema_version
-                ) SELECT *,semantic_vector::text AS vector FROM ready
+                """
+            snapshot = connection.execute(f"WITH ready AS ({source}) SELECT COALESCE(md5(string_agg(candidate_id::text||':'||revision::text||':'||schema_hash,',' ORDER BY candidate_id)),md5('')) AS value FROM ready").fetchone()["value"]
+            key = decode_cursor(cursor, "pool", snapshot)
+            if key is not None and (offset or len(key) != 3 or not isinstance(key[0], str) or type(key[1]) is not int or not isinstance(key[2], str)):
+                raise ConflictError("invalid pool cursor")
+            try:
+                if key is not None:
+                    UUID(key[2])
+            except ValueError:
+                raise ConflictError("invalid pool cursor") from None
+            after = "WHERE (specialization,rank,candidate_id)>(%s,%s,%s)" if key is not None else ""
+            rows = connection.execute(f"""
+                WITH ready AS ({source}) SELECT *,semantic_vector::text AS vector FROM ready {after}
                 ORDER BY specialization,rank LIMIT %s OFFSET %s
-            """, (limit, offset)).fetchall()
+            """, (*(key or []), limit + 1, offset)).fetchall()
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            next_cursor = encode_cursor("pool", snapshot, [rows[-1]["specialization"], rows[-1]["rank"], str(rows[-1]["candidate_id"])]) if has_more else None
             return PoolPage(items=[PoolEntry(
                 candidate_id=row["candidate_id"], profile_revision=row["revision"],
                 display_name=row["public_profile"]["display_name"], city=row["public_profile"]["city"],
@@ -432,7 +448,8 @@ class Store:
                 semantic_model_version=row["semantic_model_version"],
                 semantic_space_id=EMBEDDING_SPACE_ID, published_at=row["published_at"],
                 resume_url=f"/internal/pool/{row['candidate_id']}/resume.pdf",
-            ) for row in rows], limit=limit, offset=offset)
+                external_evidence=row["public_profile"].get("external_evidence", []),
+            ) for row in rows], limit=limit, offset=offset, has_more=has_more, next_cursor=next_cursor)
 
     def resume(self, candidate_id: UUID, public: bool = True) -> bytes:
         """Return a PDF only while its exact revision and vector generation remain published."""

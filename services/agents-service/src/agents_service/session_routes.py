@@ -15,6 +15,7 @@ from agents_service.agent_models import (
     UserTurnRequest,
 )
 from agents_service.agent_runtime import AgentRuntime, AgentRuntimeError
+from agents_service.availability import require_capability
 from agents_service.database import connect
 from agents_service.models import JobView
 from agents_service.providers import DeepSeekClient, MatchingClient
@@ -39,8 +40,9 @@ def _enqueue(connection, db: Store, owner_id: UUID, turn) -> JobView:
                          session_id=turn.session_id, max_attempts=5)
 
 
-def retry_agent_job(db: Store, owner_id: UUID, job_id: UUID) -> JobView:
+def retry_agent_job(db: Store, owner_id: UUID, job_id: UUID, capability_check=None) -> JobView:
     """Reset a failed generic job and its turn atomically, preserving tool checkpoints."""
+    (capability_check or require_capability)("agent")
     with connect(db.database_url) as connection:
         row = connection.execute("SELECT * FROM agents_service.jobs WHERE owner_id=%s AND job_id=%s FOR UPDATE",
                                  (owner_id, job_id)).fetchone()
@@ -54,11 +56,13 @@ def retry_agent_job(db: Store, owner_id: UUID, job_id: UUID) -> JobView:
         return db._job(updated)
 
 
-def register_session_routes(app: FastAPI, owner_dependency, database_dependency, matching=None) -> None:
+def register_session_routes(app: FastAPI, owner_dependency, database_dependency, matching=None,
+                            capability_check=None) -> None:
     """Register owner-scoped sessions, turns and checked interaction responses."""
     Owner = Annotated[UUID, Depends(owner_dependency)]
     Database = Annotated[Store, Depends(database_dependency)]
     engine = matching or MatchingClient()
+    require_optional = capability_check or require_capability
 
     @app.exception_handler(AgentRuntimeError)
     async def runtime_error(_request, error: AgentRuntimeError):
@@ -68,6 +72,7 @@ def register_session_routes(app: FastAPI, owner_dependency, database_dependency,
     @app.post("/internal/agents/sessions", response_model=AgentSession)
     def create(request: SessionCreate, owner_id: Owner, db: Database):
         """Create a persisted session pinned to the agent definition and knowledge."""
+        require_optional("agent")
         with connect(db.database_url) as connection:
             runtime = _runtime(connection, db)
             draft = runtime.drafts.get_draft(owner_id, request.draft_id)
@@ -84,6 +89,7 @@ def register_session_routes(app: FastAPI, owner_dependency, database_dependency,
     @app.post("/internal/agents/sessions/{session_id}/turns", response_model=JobView)
     def turn(session_id: UUID, request: UserTurnRequest, owner_id: Owner, db: Database):
         """Persist one user turn and its worker job in the same transaction."""
+        require_optional("agent")
         with connect(db.database_url) as connection:
             runtime = _runtime(connection, db)
             session = runtime.store.get_session(session_id, owner_id, for_update=True)
@@ -97,6 +103,7 @@ def register_session_routes(app: FastAPI, owner_dependency, database_dependency,
                     owner_id: Owner, db: Database):
         """Apply a saved allowed interaction response and enqueue its continuation atomically."""
         # Schema network call is outside the transaction holding session/draft rows.
+        require_optional("agent")
         schema = engine.schema()
         with connect(db.database_url) as connection:
             runtime = _runtime(connection, db, schema)

@@ -93,6 +93,31 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
         add("Предпочтения", heading)
         for value in profile.preferences:
             add(value)
+    if profile.external_evidence:
+        add("Внешние подтверждения", heading)
+        for evidence in profile.external_evidence:
+            if evidence.kind == "fsp":
+                value = evidence.verified_value or {}
+                rating = value.get("rating") if isinstance(value, dict) else None
+                rank = value.get("rank") if isinstance(value, dict) else None
+                label = "Демо-реестр ФСП" if isinstance(value, dict) and value.get("demo_registry") is True else "ФСП"
+                add(f"{label}: рейтинг {rating if rating is not None else '-'}, разряд {rank or '-'} - {_STATUS[evidence.status]}")
+            elif evidence.kind == "repository":
+                value = evidence.verified_value or {}
+                url = value.get("url", evidence.subject) if isinstance(value, dict) else evidence.subject
+                narrative = value.get("contribution_narrative", "") if isinstance(value, dict) else ""
+                safe_url = isinstance(url, str) and any(
+                    url.startswith(f"https://{host}/")
+                    for host in ("github.com", "gitlab.com", "bitbucket.org", "gitverse.ru", "sourcecraft.dev", "git.sourcecraft.dev")
+                )
+                add(f"Репозиторий: {url if safe_url else '[ссылка скрыта]'} - {_STATUS[evidence.status]}", redact=False)
+                if narrative:
+                    add(f"Заявленный вклад: {narrative}")
+            else:
+                value = evidence.verified_value or {}
+                if isinstance(value, dict):
+                    add(f"HH резюме: {value.get('title') or '-'} - {_STATUS[evidence.status]}")
+                    add("Владелец резюме не подтверждён аккаунтом HH.")
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=(210 * mm, 297 * mm),
                            rightMargin=20 * mm, leftMargin=20 * mm,

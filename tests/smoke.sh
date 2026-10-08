@@ -56,6 +56,9 @@ if [[ -n "${AGENTS_PORT:-}" ]]; then
 fi
 check "testing"       "http://localhost:${TESTING_PORT}/healthz"      '"service":"testing-engine"' || failures=$((failures + 1))
 check "integration"   "http://localhost:${INTEGRATION_PORT}/healthz"  '"service":"integration-engine"' || failures=$((failures + 1))
+if [[ -n "${VERIFICATION_PORT:-}" ]]; then
+  check "verification" "http://localhost:${VERIFICATION_PORT}/healthz" '"service":"verification-engine"' || failures=$((failures + 1))
+fi
 check "web root"      "http://localhost:${WEB_PORT}/"                 "работа настигает сама" || failures=$((failures + 1))
 check "web candidate" "http://localhost:${WEB_PORT}/candidate/"       "кабинет кандидата" || failures=$((failures + 1))
 check "web employer"  "http://localhost:${WEB_PORT}/employer/"        "кабинет работодателя" || failures=$((failures + 1))
@@ -64,6 +67,7 @@ check "api via nginx" "http://localhost:${WEB_PORT}/api/healthz"      '"service"
 check "blueprints"    "http://localhost:${TESTING_PORT}/blueprints"   "algo-hash-lookup" || failures=$((failures + 1))
 check_status "fsp mock 404" "http://localhost:${INTEGRATION_PORT}/fsp/participants/fsp-none" 404 || failures=$((failures + 1))
 check_status "fsp mock 200" "http://localhost:${INTEGRATION_PORT}/fsp/participants/fsp-001" 200 || failures=$((failures + 1))
+check "fsp demo achievements" "http://localhost:${INTEGRATION_PORT}/fsp/participants/fsp-001/achievements/fsp-001-achievement-2026-cup" '"place":3' || failures=$((failures + 1))
 
 if [[ "$failures" -gt 0 ]]; then
   echo "smoke: ${failures} failure(s)"

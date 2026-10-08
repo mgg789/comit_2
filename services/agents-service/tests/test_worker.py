@@ -195,7 +195,7 @@ def test_interaction_applies_same_fields_and_replays_response(setup):
     ask_slider(store)
     with connect(store.database_url) as connection:
         interaction = AgentStore(connection).list_interactions(turn.session_id)[0]
-    client = TestClient(create_app(store, Registry(), token="synthetic"))
+    client = TestClient(create_app(store, Registry(), token="synthetic", capability_check=lambda _: None))
     path = f"/internal/agents/sessions/{turn.session_id}/interactions/{interaction.interaction_id}"
     headers = {"X-Internal-Token": "synthetic", "X-Owner-ID": str(owner)}
     body = {"expected_revision": 1, "value": 5}
@@ -213,7 +213,7 @@ def test_old_interaction_cannot_overwrite_new_manual_revision(setup):
     with connect(store.database_url) as connection:
         interaction = AgentStore(connection).list_interactions(turn.session_id)[0]
     store.patch(owner, draft.draft_id, {"expected_revision": 1, "fields": {"bio": "new manual"}}, Registry().schema())
-    client = TestClient(create_app(store, Registry(), token="synthetic"))
+    client = TestClient(create_app(store, Registry(), token="synthetic", capability_check=lambda _: None))
     path = f"/internal/agents/sessions/{turn.session_id}/interactions/{interaction.interaction_id}"
     headers = {"X-Internal-Token": "synthetic", "X-Owner-ID": str(owner)}
     assert client.post(path, headers=headers, json={"expected_revision": 2, "value": 5}).status_code == 409
@@ -229,7 +229,7 @@ def test_retry_cannot_activate_two_turns_in_one_session(setup):
         agent.append_turn(session_id=turn.session_id, owner_id=owner, draft_id=draft.draft_id,
                           message="new request", expected_revision=1, idempotency_key="second")
         connection.execute("UPDATE agents_service.jobs SET state='failed' WHERE job_id=%s", (job.job_id,))
-    client = TestClient(create_app(store, Registry(), token="synthetic"))
+    client = TestClient(create_app(store, Registry(), token="synthetic", capability_check=lambda _: None))
     headers = {"X-Internal-Token": "synthetic", "X-Owner-ID": str(owner)}
     response = client.post(f"/internal/agents/jobs/{job.job_id}/retry", headers=headers)
     assert response.status_code == 409
@@ -244,7 +244,7 @@ def test_new_chat_turn_after_create_is_rejected_before_provider(setup):
     approved = store.approve(owner, draft.draft_id, {"expected_revision": 1}, Registry().schema())
     store.submit(owner, draft.draft_id, {"expected_revision": 1,
         "summary_hash": approved.summary.summary_hash}, Registry().schema())
-    client = TestClient(create_app(store, Registry(), token="synthetic"))
+    client = TestClient(create_app(store, Registry(), token="synthetic", capability_check=lambda _: None))
     headers = {"X-Internal-Token": "synthetic", "X-Owner-ID": str(owner)}
     response = client.post(f"/internal/agents/sessions/{turn.session_id}/turns", headers=headers,
         json={"expected_revision": 1, "idempotency_key": "after-create", "message": "Change salary"})
@@ -266,7 +266,7 @@ def test_create_between_runtime_read_and_turn_insert_cannot_queue_work(setup, mo
         return original(agent, **kwargs)
 
     monkeypatch.setattr(AgentStore, "append_turn", publish_before_insert)
-    client = TestClient(create_app(store, Registry(), token="synthetic"))
+    client = TestClient(create_app(store, Registry(), token="synthetic", capability_check=lambda _: None))
     response = client.post(f"/internal/agents/sessions/{turn.session_id}/turns",
         headers={"X-Internal-Token": "synthetic", "X-Owner-ID": str(owner)},
         json={"expected_revision": 1, "idempotency_key": "racing-create", "message": "Change salary"})

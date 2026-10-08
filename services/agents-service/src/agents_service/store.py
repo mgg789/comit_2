@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from collections.abc import Mapping
@@ -17,6 +18,7 @@ from .database import connect, migrate
 from .models import (
     CreateRequest,
     DraftFields,
+    DraftPage,
     DraftPatch,
     DraftView,
     FieldSource,
@@ -141,6 +143,7 @@ class Store:
             field_sources=cls._source_map(row.get("field_sources")),
             missing_requirements=list(row.get("missing_requirements") or []), summary=summary,
             publication=publication,
+            business_status=row.get("business_status", "draft"), archived=row.get("deleted_at") is not None,
         )
 
     @staticmethod
@@ -235,6 +238,12 @@ class Store:
 
     def create(self, owner_id: UUID | str, fields: DraftFields | Mapping[str, Any] | None, schema: SchemaSnapshot) -> DraftView:
         """Create one owner-scoped draft whose draft and vacancy identifiers are identical."""
+        with connect(self.database_url) as connection:
+            return self.create_in_connection(connection, owner_id, fields, schema)
+
+    def create_in_connection(self, connection: psycopg.Connection, owner_id: UUID | str,
+                             fields: DraftFields | Mapping[str, Any] | None, schema: SchemaSnapshot) -> DraftView:
+        """Create a draft in the caller transaction so agent effects and receipts commit together."""
         owner = _uuid(owner_id)
         canonical = self._canonical_fields(fields)
         self._validate_coordinates(canonical, schema)
@@ -243,17 +252,16 @@ class Store:
         sources = {key: {"source": "manual", "metadata": {}} for key in present if key != "class_key"}
         if "class" in present or "class_key" in present:
             sources["class"] = {"source": "manual", "metadata": {}}
-        with connect(self.database_url) as connection:
-            connection.execute(
-                """
-                INSERT INTO agents_service.drafts
-                    (draft_id, vacancy_id, owner_id, fields, field_sources, missing_requirements)
-                VALUES (%s, %s, %s, %s, %s, %s)
-                """,
-                (draft_id, draft_id, owner, Jsonb(canonical.model_dump(by_alias=True)), Jsonb(sources),
-                 Jsonb(self._missing(canonical))),
-            )
-            row = self._get_row(connection, owner, draft_id)
+        connection.execute(
+            """
+            INSERT INTO agents_service.drafts
+                (draft_id, vacancy_id, owner_id, fields, field_sources, missing_requirements)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (draft_id, draft_id, owner, Jsonb(canonical.model_dump(by_alias=True)), Jsonb(sources),
+             Jsonb(self._missing(canonical))),
+        )
+        row = self._get_row(connection, owner, draft_id)
         return self._view(row)
 
     def get(self, owner_id: UUID | str, draft_id: UUID | str) -> DraftView:
@@ -270,10 +278,89 @@ class Store:
             rows = connection.execute(
                 """
                 SELECT * FROM agents_service.drafts
-                WHERE owner_id = %s ORDER BY updated_at DESC, draft_id LIMIT %s OFFSET %s
+                WHERE owner_id = %s AND deleted_at IS NULL ORDER BY updated_at DESC, draft_id LIMIT %s OFFSET %s
                 """, (_uuid(owner_id), limit, offset),
             ).fetchall()
         return [self._view(row) for row in rows]
+
+    def page(self, owner_id: UUID | str, *, limit: int = 50, offset: int = 0, cursor: str | None = None) -> DraftPage:
+        """Page immutable creation keys, preserving offset callers without mixing pagination modes."""
+        owner = _uuid(owner_id)
+        if not 1 <= limit <= 100 or not 0 <= offset <= 1000000 or cursor and offset:
+            raise ConflictError("invalid_pagination")
+        boundary = None
+        if cursor:
+            try:
+                if len(cursor) > 1000:
+                    raise ValueError("cursor length")
+                value = json.loads(base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)))
+                if value["owner"] != str(owner) or value["v"] != 1:
+                    raise ValueError("cursor scope")
+                timestamp = datetime.fromisoformat(value["created"])
+                if timestamp.tzinfo is None:
+                    raise ValueError("cursor timezone")
+                boundary = (timestamp, UUID(value["id"]))
+            except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+                raise ConflictError("invalid_cursor") from None
+        clause = "AND (created_at,draft_id) < (%s,%s)" if boundary else ""
+        params = (owner, *(boundary or ()), limit + 1, offset)
+        with connect(self.database_url) as connection:
+            rows = connection.execute(f"""SELECT * FROM agents_service.drafts WHERE owner_id=%s
+                AND deleted_at IS NULL {clause} ORDER BY created_at DESC,draft_id DESC LIMIT %s OFFSET %s""", params).fetchall()
+        more = len(rows) > limit
+        selected = rows[:limit]
+        next_cursor = None
+        if more:
+            last = selected[-1]
+            value = {"v": 1, "owner": str(owner), "created": last["created_at"].isoformat(), "id": str(last["draft_id"])}
+            next_cursor = base64.urlsafe_b64encode(_json_bytes(value)).decode().rstrip("=")
+        return DraftPage(items=[self._view(row) for row in selected], limit=limit, has_more=more, next_cursor=next_cursor)
+
+    def revise(self, owner_id: UUID | str, draft_id: UUID | str, request: DraftPatch, schema: SchemaSnapshot) -> DraftView:
+        """Edit a published vacancy into a new draft; the previous publication remains until explicit publish."""
+        with connect(self.database_url) as connection:
+            return self.revise_in_connection(connection, owner_id, draft_id, request, schema)
+
+    def revise_in_connection(self, connection: psycopg.Connection, owner_id: UUID | str, draft_id: UUID | str, request: DraftPatch, schema: SchemaSnapshot) -> DraftView:
+        """Stage published vacancy edits in the same transaction as the agent tool receipt."""
+        owner, draft = _uuid(owner_id), _uuid(draft_id)
+        row = self._get_row(connection, owner, draft, lock=True)
+        if row["deleted_at"] is not None or row["state"] in {"creating", "failed"}:
+            raise ConflictError("vacancy_not_editable")
+        if row["revision"] != request.expected_revision:
+            raise StaleRevisionError("draft revision is stale")
+        if row["state"] == "created":
+            connection.execute("UPDATE agents_service.drafts SET state='editing' WHERE draft_id=%s", (draft,))
+        changed = self._patch_tx(connection, owner, draft, request, schema, source="manual", source_metadata=None)
+        return self._view(changed)
+
+    def close(self, owner_id: UUID | str, draft_id: UUID | str, request: RevisionRequest, *, archive: bool = False) -> DraftView:
+        """CAS-close or archive while preserving audit and durably enqueueing a higher closed source revision."""
+        owner, draft = _uuid(owner_id), _uuid(draft_id)
+        with connect(self.database_url) as connection:
+            row = self._get_row(connection, owner, draft, lock=True)
+            if row["revision"] != request.expected_revision:
+                raise StaleRevisionError("draft revision is stale")
+            if row["state"] in {"creating", "failed"}:
+                raise ConflictError("publication_pending_or_failed")
+            if row["deleted_at"] is not None:
+                raise ConflictError("vacancy_archived")
+            revision = row["revision"] + 1
+            publication = row.get("publication")
+            state = "editing"
+            if row.get("published_fields") is not None:
+                fields = self._canonical_fields(row["published_fields"])
+                payload = self._publication_payload(owner, revision, fields)
+                payload["status"] = "closed"
+                job = self._enqueue_tx(connection, owner_id=owner, kind="publication", payload=payload,
+                    idempotency_key=f"closure:{draft}:{revision}", draft_id=draft, session_id=None, max_attempts=5)
+                publication = {"status": "pending", "source_revision": revision, "job_id": str(job["job_id"])}
+                state = "creating"
+            connection.execute("""UPDATE agents_service.drafts SET revision=%s,business_status='closed',state=%s,
+                summary=NULL,publication=%s,deleted_at=CASE WHEN %s THEN now() ELSE deleted_at END,updated_at=now()
+                WHERE owner_id=%s AND draft_id=%s""", (revision, state, Jsonb(publication) if publication else None, archive, owner, draft))
+            changed = self._get_row(connection, owner, draft)
+        return self._view(changed)
 
     def patch(
         self,
@@ -427,40 +514,46 @@ class Store:
 
     def submit(self, owner_id: UUID | str, draft_id: UUID | str, request: CreateRequest | Mapping[str, Any], schema: SchemaSnapshot) -> DraftView:
         """Record the human publication confirmation and enqueue one frozen matching intake."""
+        with connect(self.database_url) as connection:
+            return self.submit_in_connection(connection, owner_id, draft_id, request, schema)
+
+    def submit_in_connection(self, connection: psycopg.Connection, owner_id: UUID | str, draft_id: UUID | str, request: CreateRequest | Mapping[str, Any], schema: SchemaSnapshot) -> DraftView:
+        """Enqueue frozen publication atomically with an agent tool receipt."""
         create = request if isinstance(request, CreateRequest) else CreateRequest.model_validate(request)
         owner, draft = _uuid(owner_id), _uuid(draft_id)
-        with connect(self.database_url) as connection:
-            row = self._get_row(connection, owner, draft, lock=True)
-            existing_pub = row.get("publication") or {}
-            if row["state"] in {"creating", "created", "failed"}:
-                if row["revision"] == create.expected_revision and existing_pub.get("summary_hash") == create.summary_hash:
-                    return self._view(row)
-                raise ConflictError("publication request does not match the current snapshot")
-            if row["revision"] != create.expected_revision:
-                raise StaleRevisionError("draft revision is stale")
-            if row["state"] != "summary" or not row.get("summary"):
-                raise ConflictError("draft must be approved before publication")
-            summary = SummarySnapshot.model_validate(row["summary"])
-            if summary.summary_hash != create.summary_hash:
-                raise ConflictError("summary hash does not match the approved snapshot")
-            if summary.strict_schema_version != schema.version or summary.strict_schema_hash != schema.schema_hash:
-                raise ConflictError("matching schema changed since approval")
-            fields = self._canonical_fields(summary.fields)
-            publication_payload = self._publication_payload(owner, row["revision"], fields)
-            job = self._enqueue_tx(
-                connection, owner_id=owner, kind="publication", payload=publication_payload,
-                idempotency_key=f"publication:{draft}:{row['revision']}:{summary.summary_hash}",
-                draft_id=draft, session_id=None, max_attempts=5,
-            )
-            publication = {
-                "status": "pending", "source_revision": row["revision"], "summary_hash": summary.summary_hash,
-                "job_id": str(job["job_id"]),
-            }
-            connection.execute(
-                "UPDATE agents_service.drafts SET state='creating', publication=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
-                (Jsonb(publication), owner, draft),
-            )
-            updated = self._get_row(connection, owner, draft)
+        row = self._get_row(connection, owner, draft, lock=True)
+        existing_pub = row.get("publication") or {}
+        if row.get("deleted_at") is not None:
+            raise ConflictError("vacancy_archived")
+        if row["state"] in {"creating", "created", "failed"}:
+            if row["revision"] == create.expected_revision and existing_pub.get("summary_hash") == create.summary_hash:
+                return self._view(row)
+            raise ConflictError("publication request does not match the current snapshot")
+        if row["revision"] != create.expected_revision:
+            raise StaleRevisionError("draft revision is stale")
+        if row["state"] != "summary" or not row.get("summary"):
+            raise ConflictError("draft must be approved before publication")
+        summary = SummarySnapshot.model_validate(row["summary"])
+        if summary.summary_hash != create.summary_hash:
+            raise ConflictError("summary hash does not match the approved snapshot")
+        if summary.strict_schema_version != schema.version or summary.strict_schema_hash != schema.schema_hash:
+            raise ConflictError("matching schema changed since approval")
+        fields = self._canonical_fields(summary.fields)
+        publication_payload = self._publication_payload(owner, row["revision"], fields)
+        job = self._enqueue_tx(
+            connection, owner_id=owner, kind="publication", payload=publication_payload,
+            idempotency_key=f"publication:{draft}:{row['revision']}:{summary.summary_hash}",
+            draft_id=draft, session_id=None, max_attempts=5,
+        )
+        publication = {
+            "status": "pending", "source_revision": row["revision"], "summary_hash": summary.summary_hash,
+            "job_id": str(job["job_id"]),
+        }
+        connection.execute(
+            "UPDATE agents_service.drafts SET state='creating', business_status='open', publication=%s, updated_at=now() WHERE owner_id=%s AND draft_id=%s",
+            (Jsonb(publication), owner, draft),
+        )
+        updated = self._get_row(connection, owner, draft)
         return self._view(updated)
 
     def apply_enrichment(
@@ -723,12 +816,15 @@ class Store:
                 connection.execute(
                     """
                     UPDATE agents_service.drafts
-                    SET state='created', publication=jsonb_set(
+                    SET state='created', business_status=%s,
+                        published_fields=CASE WHEN %s='open' THEN fields ELSE published_fields END,
+                        publication=jsonb_set(
                         jsonb_set(COALESCE(publication,'{}'::jsonb), '{status}', '"accepted"'::jsonb),
                         '{matching_status}', to_jsonb(%s::text)),
                         updated_at=now()
-                    WHERE draft_id=%s AND state='creating'
-                    """, (matching_status, row["draft_id"]),
+                    WHERE draft_id=%s AND state='creating' AND revision=%s
+                    """, (row["payload"].get("status", "open"), row["payload"].get("status", "open"),
+                        matching_status, row["draft_id"], row["payload"]["source_revision"]),
                 )
         return self._job(row)
 

@@ -42,6 +42,9 @@ export interface CandidateProfileFields {
   experience?: CandidateDeclaredNarrative[];
   achievements?: CandidateDeclaredNarrative[];
   preferences?: string[];
+  /** Public FSP participant id, kept separate from account identity. */
+  fsp_id?: string | null;
+  fsp_claim_id?: string | null;
 }
 
 /** Explicit profile consent, separate from registration consent; timestamps are server-owned. */
@@ -69,6 +72,47 @@ export interface CandidateClaimEvidence {
   verified_value: JsonValue | null;
   provenance: string[];
   checked_at: string | null;
+}
+
+/** Server-produced external evidence; candidates can read but never write this channel. */
+export interface CandidateExternalEvidence extends CandidateClaimEvidence {
+  kind: "fsp" | "repository" | "hh";
+  subject: string;
+}
+
+/** Candidate-owned request for an external provider check. The account comes from the session. */
+export interface CandidateVerificationRequest {
+  expected_revision: number;
+  fsp_id?: string;
+  claimed_rating?: number | null;
+  fsp_claim_id?: string;
+  demo_fixture_id?: string;
+  origin?: "mock" | "live_unbound";
+  repository_url?: string;
+  contribution_narrative?: string;
+  hh_resume_id?: string;
+  claim_kind?: "projects" | "experience" | "achievements";
+  claim_id?: string;
+}
+
+/** Encrypted upload metadata. A document remains pending until an independent verifier confirms it. */
+export interface CandidateVerificationDocument {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  status: "pending";
+  uploaded_at: string;
+  claim_kind: "projects" | "experience" | "achievements";
+  claim_id: string;
+}
+
+export interface CandidateVerificationDocumentUpload {
+  filename: string;
+  content_type: string;
+  content_base64: string;
+  claim_kind: "projects" | "experience" | "achievements";
+  claim_id: string;
 }
 
 /** Durable delivery describes intake acknowledgement, not completion of vectors or the PDF. */

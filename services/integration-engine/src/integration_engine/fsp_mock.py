@@ -18,6 +18,14 @@ MOCK_PARTICIPANTS: dict[str, dict[str, Any]] = {
             {"title": "Кубок ФСП, осенний этап", "year": 2026, "place": 3},
         ],
         "certificates": ["Школа ФСП: алгоритмы, 2024"],
+        "provider": "fsp_hackathon_registry",
+        "provider_version": "demo-2026-10",
+        "demo": True,
+        "account_ref": "demo-person-001",
+        "achievements": [
+            {"claim_id": "fsp-001-achievement-2025-final", "title": "Всероссийская олимпиада по программированию, финал", "year": 2025, "place": 7},
+            {"claim_id": "fsp-001-achievement-2026-cup", "title": "Кубок ФСП, осенний этап", "year": 2026, "place": 3},
+        ],
     },
     "fsp-002": {
         "fsp_id": "fsp-002",
@@ -28,6 +36,13 @@ MOCK_PARTICIPANTS: dict[str, dict[str, Any]] = {
             {"title": "Чемпионат ФСП, командный зачёт", "year": 2026, "place": 1},
         ],
         "certificates": [],
+        "provider": "fsp_hackathon_registry",
+        "provider_version": "demo-2026-10",
+        "demo": True,
+        "account_ref": "demo-person-002",
+        "achievements": [
+            {"claim_id": "fsp-002-achievement-2026-team", "title": "Чемпионат ФСП, командный зачёт", "year": 2026, "place": 1},
+        ],
     },
 }
 

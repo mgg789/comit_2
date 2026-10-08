@@ -147,6 +147,15 @@ class NarrativeClaim(Contract):
     )
 
 
+class ExternalEvidence(Contract):
+    """Safe provider fact copied from API source projection; no account ownership claim."""
+
+    kind: Literal["fsp", "repository", "hh"]
+    subject: str = Field(min_length=1, max_length=2000)
+    status: ClaimStatus
+    verified_value: JsonValue | None = None
+
+
 class CandidateProfile(Contract):
     """Complete or draft input; contacts remain private until downstream acceptance."""
 
@@ -176,6 +185,7 @@ class CandidateProfile(Contract):
         default_factory=list, max_length=100
     )
     metadata: dict[str, JsonValue] = Field(default_factory=dict, max_length=100)
+    external_evidence: list[ExternalEvidence] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def unique_skills(self) -> "CandidateProfile":
@@ -255,6 +265,7 @@ class PoolEntry(Contract):
     semantic_space_id: str
     published_at: datetime
     resume_url: str
+    external_evidence: list[ExternalEvidence] = Field(default_factory=list)
 
 
 class CoordinateEvidence(Contract):
@@ -276,6 +287,8 @@ class PoolPage(Contract):
     items: list[PoolEntry]
     limit: int
     offset: int
+    has_more: bool = False
+    next_cursor: str | None = None
 
 
 def missing_requirements(profile: CandidateProfile) -> list[str]:

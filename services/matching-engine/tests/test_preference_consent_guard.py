@@ -61,7 +61,9 @@ def test_consent_cannot_commit_during_fit_and_result_write(source):
     def revoke_attempt():
         with connect(url) as connection:
             connection.execute("SET LOCAL lock_timeout='200ms'")
-            connection.execute("UPDATE public.candidate_profiles SET pool_consent=false WHERE candidate_id=%s", (candidate,))
+            connection.execute("""UPDATE public.candidate_profiles SET pool_consent=false,
+                training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL
+                WHERE candidate_id=%s""", (candidate,))
 
     with (current_consent([{"candidate_key": pseudonym(KEY, "candidate", candidate)}], summary, url, KEY),
           ThreadPoolExecutor(max_workers=1) as executor, pytest.raises(psycopg.errors.LockNotAvailable)):

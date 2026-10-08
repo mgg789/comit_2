@@ -25,6 +25,12 @@ services:
     environment:
       PORT: 8080
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      VERIFICATION_ENGINE_URL: http://verification-engine:8105
+      VERIFICATION_ENGINE_TOKEN: ${VERIFICATION_ENGINE_TOKEN:-}
+      VERIFICATION_DOCUMENT_KEY: ${VERIFICATION_DOCUMENT_KEY:-}
+      FSP_DEMO_INTERNAL_TOKEN: ${FSP_DEMO_INTERNAL_TOKEN:-}
+      FSP_DEMO_CALLBACK_URL: ${FSP_DEMO_CALLBACK_URL:-http://localhost:8080/candidate/profile/fsp/demo/callback}
+      FSP_DEMO_PUBLIC_URL: ${FSP_DEMO_PUBLIC_URL:-http://localhost:8103}
     depends_on:
       postgres:
         condition: service_healthy
@@ -60,8 +66,26 @@ services:
       dockerfile: infra/integration-engine.Dockerfile
     environment:
       PORT: 8103
+      FSP_DEMO_INTERNAL_TOKEN: ${FSP_DEMO_INTERNAL_TOKEN:-}
+      FSP_DEMO_CALLBACK_URL: ${FSP_DEMO_CALLBACK_URL:-http://localhost:8080/candidate/profile/fsp/demo/callback}
     ports:
       - "${INTEGRATION_PORT:-8103}:8103"
+
+  verification-engine:
+    build:
+      context: ..
+      dockerfile: infra/verification-engine.Dockerfile
+    environment:
+      PORT: 8105
+      INTEGRATION_ENGINE_URL: http://integration-engine:8103
+      VERIFICATION_ENGINE_TOKEN: ${VERIFICATION_ENGINE_TOKEN:-}
+      HH_API_TOKEN: ${HH_API_TOKEN:-}
+      HH_USER_AGENT: ${HH_USER_AGENT:-comit-verification/0.1}
+      FSP_DEMO_INTERNAL_TOKEN: ${FSP_DEMO_INTERNAL_TOKEN:-}
+    depends_on:
+      - integration-engine
+    expose:
+      - "8105"
 
   web:
     build:

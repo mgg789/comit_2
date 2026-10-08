@@ -9,6 +9,20 @@ const owner = "00000000-0000-4000-8000-000000000001";
 const draft = "00000000-0000-4000-8000-000000000002";
 const headers = { "x-internal-token": "synthetic-agents-token", "x-owner-id": owner };
 
+test("editorial management namespace maps to the agents source, preserving matching paths", async () => {
+  const app = Fastify({ ajv: { customOptions: candidateValidationOptions } });
+  await app.register(agentsRoutes, { token: headers["x-internal-token"], transport: async (input, init) => {
+    assert.equal(new URL(String(input)).pathname, `/internal/vacancies/${draft}`);
+    assert.equal(init?.method, "DELETE");
+    return Response.json({ detail: "synthetic-conflict" }, { status: 409 });
+  } });
+  try {
+    const response = await app.inject({ method: "DELETE", url: `/internal/agents/vacancies/${draft}`, headers, payload: { expected_revision: 1 } });
+    assert.equal(response.statusCode, 409, response.body);
+    assert.equal((await app.inject({ url: `/internal/vacancies/${draft}`, headers })).statusCode, 404);
+  } finally { await app.close(); }
+});
+
 test("agents routes fail closed before exposing payload validation", async () => {
   const app = Fastify({ ajv: { customOptions: candidateValidationOptions } });
   let calls = 0;

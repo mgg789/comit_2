@@ -184,7 +184,8 @@ class LearningStore:
                     if digest(row["features"]) != row["feature_hash"]:
                         raise ConflictError("learning feature snapshot integrity mismatch")
                     observations = connection.execute("""SELECT e.exposure_id,e.session_id,e.position,e.kind,
-                        e.served_at,e.card,f.rerank_run_id,f.artifact_hash,f.activation_revision,
+                        e.served_at,e.card,e.batch_id,e.source_main_run_id,e.source_rerank_run_id,e.source_pool_generation,
+                        f.rerank_run_id,f.artifact_hash,f.activation_revision,
                         f.feature_schema_hash,f.tail_policy_hash,f.expires_at,
                         COALESCE(jsonb_agg(jsonb_build_object('kind',o.event_type,'at',o.recorded_at)
                             ORDER BY o.recorded_at,o.event_id) FILTER(WHERE o.event_id IS NOT NULL),'[]') AS events
@@ -200,6 +201,10 @@ class LearningStore:
                         exposures.append({"exposure_id": pseudonym(key, "exposure", exposure["exposure_id"]),
                             "session_id": pseudonym(key, "session", exposure["session_id"]),
                             "position": exposure["position"], "kind": exposure["kind"],
+                            "batch_id": pseudonym(key, "feed-batch", exposure["batch_id"]) if exposure["batch_id"] else None,
+                            "source_main_run_id": pseudonym(key, "main", exposure["source_main_run_id"]) if exposure["source_main_run_id"] else None,
+                            "source_rerank_run_id": pseudonym(key, "rerank", exposure["source_rerank_run_id"]) if exposure["source_rerank_run_id"] else None,
+                            "source_pool_generation": exposure["source_pool_generation"],
                             "rerank_run_id": pseudonym(key, "rerank", exposure["rerank_run_id"]),
                             "artifact_hash": exposure["artifact_hash"], "activation_revision": exposure["activation_revision"],
                             "mode": exposure["card"].get("mode"), "rerank_score": exposure["card"].get("rerank_score"),

@@ -27,7 +27,7 @@ def client():
     migrate(url)
     with connect(url) as connection:
         connection.execute("TRUNCATE agents_service.drafts CASCADE")
-    return TestClient(create_app(Store(url), TestRegistry(), token="synthetic"))
+    return TestClient(create_app(Store(url), TestRegistry(), token="synthetic", capability_check=lambda _: None))
 
 
 def headers(owner=None):

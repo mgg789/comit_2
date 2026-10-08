@@ -352,3 +352,25 @@ training_consent и не используют прежнее согласие к
 
 Новые learning samples фиксируют именно training-v1 и training_accepted_at в
 consent_version/consent_accepted_at, а не подменяют их временем profile consent.
+# Внешняя верификация и документы
+
+`candidate_profile_evidence` хранит canonical input SHA-256, provider status, verified value и provenance. `candidate_verification_ledger` append-only записывает каждый provider result до замены latest evidence. Каждое подтверждение поднимает source revision и создаёт новый immutable outbox snapshot; профильная правка с изменённым input сбрасывает старый status. `candidate_fsp_demo_auth_states` хранит только hash short-lived state, выбранный fixture, revision и одноразовую отметку consumption. Imported facts несут immutable `provider_version` и server `imported_at`. `candidate_verification_documents` хранит только AES-256-GCM ciphertext и metadata со статусом `pending`; загрузка не является подтверждением.
+## Статистика работодателя: чтение агрегатов
+
+API статистики читает общую PostgreSQL без новых таблиц и изменений исходных событий: source vacancy drafts, feed exposures/decisions/impressions и recruitment events. Один SQL-снимок, owner scope на всех источниках, таймаут 5 секунд; [определения метрик](employer-statistics.md). Приватные профили и learning features не входят в ответ.
+
+## Глобальный агент и приватный vault
+
+Новые миграции `005_organization_agent.sql`, `006_organization_documents.sql`
+и `007_organization_workflows.sql`
+в `agents-service` сохраняют глобальные чаты, сообщения, очередь, поручения,
+context/memory, журнал инструментов, вызовы провайдера, резервы и usage ledger.
+Уникальность чата задаётся `owner_id`; CAS применяется к memory.
+`organization_documents` хранит исходные байты и извлечённый текст, SHA-256,
+тип, имя и owner-scoped ключ повторной загрузки. Права чтения наследуются от
+аккаунта работодателя; файлы не входят в общую витрину.
+
+API миграции `009_organization_agent_tool_receipts.sql` и
+`010_organization_agent_read_receipts.sql` сохраняют immutable hash
+запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
+сохраняют checksum. [Потоки и ограничения](agents.md).

@@ -70,6 +70,13 @@ export interface CandidateIntake {
   achievements?: PipelineNarrative[];
   preferences?: string[];
   metadata?: Record<string, JsonValue>;
+  /** Provider facts are safe, structured evidence; private provenance stays in api-core. */
+  external_evidence?: Array<{
+    kind: "fsp" | "repository" | "hh";
+    subject: string;
+    status: ClaimStatus;
+    verified_value: JsonValue | null;
+  }>;
 }
 /** Progress is safe to expose after the API has checked candidate ownership. */
 export interface CandidatePipelineStatus {
@@ -109,4 +116,11 @@ export interface CandidatePoolEntry {
   semantic_space_id: string;
   published_at: string;
   resume_url: string;
+  /** Allowlisted FSP/repository facts; provenance and account identity remain private. */
+  external_evidence?: Array<{
+    kind: "fsp" | "repository" | "hh";
+    subject: string;
+    status: ClaimStatus;
+    verified_value: JsonValue | null;
+  }>;
 }

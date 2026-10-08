@@ -1,5 +1,5 @@
 /** Transactional hiring lifecycle; API owns decisions, matching owns the historical saved set. */
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
   AccountRole, CandidateProfileFields, InvitationTerms, InviteRequest, InterviewView,
@@ -43,7 +43,32 @@ export interface InvitationGrant {
 
 /** Persist process-level CAS, actor-scoped receipts and immutable ordered events atomically. */
 export class RecruitmentStore {
-  public constructor(private readonly pool: Pool, private readonly chatConfigured = false) {}
+  public constructor(private readonly pool: Pool, private readonly chatConfigured = false,
+    private readonly cursorSecret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? randomUUID()) {}
+
+  private cursorScope(role: AccountRole, actorId: string, draftId?: string): string {
+    return createHash("sha256").update(canonicalJson({ role, actorId, draftId: draftId ?? null })).digest("hex");
+  }
+
+  private encodeCursor(scope: string, created: string, id: string): string {
+    const payload = Buffer.from(JSON.stringify({ v: 1, scope, created, id })).toString("base64url");
+    return `${payload}.${createHmac("sha256", this.cursorSecret).update(payload).digest("hex")}`;
+  }
+
+  private decodeCursor(cursor: string, scope: string): { created: string; id: string } {
+    if (cursor.length > 1024 || !/^[A-Za-z0-9_-]+\.[a-f0-9]{64}$/.test(cursor)) return fail(409, "invalid_cursor");
+    const [payload, signature] = cursor.split(".");
+    const expected = createHmac("sha256", this.cursorSecret).update(payload!).digest();
+    if (!timingSafeEqual(expected, Buffer.from(signature!, "hex"))) return fail(409, "invalid_cursor");
+    try {
+      const parsed: unknown = JSON.parse(Buffer.from(payload!, "base64url").toString("utf8"));
+      if (!parsed || typeof parsed !== "object") return fail(409, "invalid_cursor");
+      const value = parsed as Record<string, unknown>;
+      if (value.v !== 1 || value.scope !== scope || typeof value.id !== "string" || !/^[a-f0-9-]{36}$/i.test(value.id)
+        || typeof value.created !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/.test(value.created)) return fail(409, "invalid_cursor");
+      return { created: value.created, id: value.id };
+    } catch { return fail(409, "invalid_cursor"); }
+  }
 
   /** Read an already committed receipt before remote prechecks; conflicting reuse is rejected. */
   public async receipt(actorId: string, key: string, fingerprint: string): Promise<RecruitmentView | null> {
@@ -206,15 +231,24 @@ export class RecruitmentStore {
   }
 
   /** Page only the authenticated participant's processes; another owner's draft returns an empty page. */
-  public async list(role: AccountRole, actorId: string, limit = 50, offset = 0, draftId?: string): Promise<RecruitmentPage> {
+  public async list(role: AccountRole, actorId: string, limit = 50, offset = 0, draftId?: string, cursor?: string): Promise<RecruitmentPage> {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100 || !Number.isSafeInteger(offset) || offset < 0) return fail(422, "invalid_pagination");
     const column = role === "employer" ? "owner_id" : "candidate_id";
-    const rows = (await this.pool.query<{ id: string }>(`SELECT id FROM recruitment_processes WHERE ${column}=$1
+    if (cursor && offset) return fail(409, "pagination_modes_conflict");
+    const scope = this.cursorScope(role, actorId, draftId);
+    const boundary = cursor ? this.decodeCursor(cursor, scope) : null;
+    // Keep PostgreSQL's microseconds intact: a JavaScript Date loses candidates sharing a millisecond.
+    const rows = (await this.pool.query<{ id: string; cursor_created: string }>(`SELECT id,
+      to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created
+      FROM recruitment_processes WHERE ${column}=$1
       AND ($2::uuid IS NULL OR draft_id=$2) AND ($5::boolean OR invited_at IS NOT NULL)
-      ORDER BY created_at DESC,id LIMIT $3 OFFSET $4`, [actorId, draftId ?? null, limit + 1, offset, role === "employer"])).rows;
+      AND ($6::timestamptz IS NULL OR (created_at,id) < ($6::timestamptz,$7::uuid))
+      ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`, [actorId, draftId ?? null, limit + 1, offset, role === "employer", boundary?.created ?? null, boundary?.id ?? null])).rows;
     const items: RecruitmentView[] = [];
     for (const row of rows.slice(0, limit)) items.push(await this.get(role, actorId, row.id));
-    return { items, limit, offset, has_more: rows.length > limit };
+    const last = rows[Math.min(rows.length, limit) - 1];
+    return { items, limit, offset, has_more: rows.length > limit,
+      next_cursor: rows.length > limit && last ? this.encodeCursor(scope, last.cursor_created, last.id) : null };
   }
 
   /** Read live private contacts only after candidate acceptance and with current processing consent. */

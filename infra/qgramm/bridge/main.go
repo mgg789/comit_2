@@ -82,6 +82,13 @@ type historyInput struct {
 	Limit         int   `json:"limit"`
 }
 
+// ChatEvent exposes only authorized messages; other journal rows advance the cursor.
+type ChatEvent struct {
+	Sequence int64    `json:"sequence"`
+	Type     string   `json:"type"`
+	Message  *Message `json:"message,omitempty"`
+}
+
 type sendInput struct {
 	contextInput
 	IdempotencyKey string `json:"idempotency_key"`
@@ -208,6 +215,8 @@ func (b *Bridge) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/internal/chat/history":
 		b.handleHistory(w, r)
+	case "/internal/chat/events":
+		b.handleEvents(w, r)
 	case "/internal/chat/send":
 		b.handleSend(w, r)
 	case "/internal/chat/upload":
@@ -217,6 +226,59 @@ func (b *Bridge) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, 404, "not found")
 	}
+}
+
+// handleEvents reads one bounded durable journal page, never a held-open stream.
+func (b *Bridge) handleEvents(w http.ResponseWriter, r *http.Request) {
+	var in historyInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if in.AfterSequence < 0 || in.AfterSequence > 9007199254740991 || in.Limit < 1 || in.Limit > maxHistory {
+		writeError(w, 400, "invalid event cursor")
+		return
+	}
+	a, chat, err := b.context(r.Context(), in.contextInput)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	// Direct Core.Events retains the same current member/device ACL as its HTTP handler.
+	raw, err := b.core.Events(r.Context(), core.Identity{UserID: a.UserID, DeviceID: a.DeviceID}, chat, in.AfterSequence, in.Limit)
+	if err != nil {
+		writeAPIError(w, err)
+		return
+	}
+	out := make([]ChatEvent, 0, len(raw))
+	next := in.AfterSequence
+	for _, event := range raw {
+		if event.Seq > 9007199254740991 {
+			writeError(w, 502, "event sequence exceeds contract")
+			return
+		}
+		item := ChatEvent{Sequence: event.Seq, Type: "cursor"}
+		if event.Type == "message.created" {
+			encoded, e := json.Marshal(event.Data)
+			var message core.Message
+			if e != nil || json.Unmarshal(encoded, &message) != nil {
+				writeError(w, 502, "invalid event projection")
+				return
+			}
+			plain, e := b.openMessage(r.Context(), a, message)
+			if e != nil {
+				writeError(w, 502, "event decryption failed")
+				return
+			}
+			projected := projection(message, plain, in.contextInput, b)
+			item.Type = "message.created"
+			item.Message = &projected
+		}
+		out = append(out, item)
+		if event.Seq > next {
+			next = event.Seq
+		}
+	}
+	writeJSON(w, 200, map[string]any{"events": out, "next_sequence": next})
 }
 
 func (b *Bridge) handleHistory(w http.ResponseWriter, r *http.Request) {

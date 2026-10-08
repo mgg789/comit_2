@@ -115,7 +115,7 @@ export interface ContactsView {
 }
 
 /** Bounded participant-scoped recruitment list. */
-export interface RecruitmentPage { items: RecruitmentView[]; limit: number; offset: number; has_more: boolean }
+export interface RecruitmentPage { items: RecruitmentView[]; limit: number; offset: number; has_more: boolean; next_cursor?: string | null; }
 
 /** Immutable participant-scoped state notification; excludes contacts and message bodies. */
 export interface RecruitmentEvent {

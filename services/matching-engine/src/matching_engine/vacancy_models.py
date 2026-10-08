@@ -121,6 +121,8 @@ class VacancyReadyPage(Contract):
     items: list[VacancyReady]
     limit: int
     offset: int
+    has_more: bool = False
+    next_cursor: str | None = None
 
 
 def missing_requirements(vacancy: VacancyInput) -> list[str]:

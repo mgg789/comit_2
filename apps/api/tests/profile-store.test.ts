@@ -118,3 +118,44 @@ test("training consent is optional, versioned, preserved on field edits and inde
     await pool.end();
   }
 });
+
+test("demo FSP state is candidate-bound, one-time and bulk imports achievements", { skip: !databaseUrl }, async () => {
+  const pool = new Pool({ connectionString: databaseUrl });
+  try {
+    const { migrate } = await import("../src/auth/migrate.js");
+    await migrate(pool);
+    await pool.query("TRUNCATE candidate_profiles, accounts CASCADE");
+    await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "fsp-demo@example.test"]);
+    const otherCandidate = "00000000-0000-4000-8000-000000000002";
+    await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [otherCandidate, "fsp-other@example.test"]);
+    const store = new CandidateProfileStore(pool);
+    const initial = await store.save(candidateId, {
+      expected_revision: 0, fields: { achievements: [{ title: "Existing", description: "Keep" }] },
+      consent: { processing: true, pool: true, version: "profile-v1" },
+    });
+    const state = await store.startFspDemoAuthorization(candidateId, initial.revision, "fsp-001");
+    await assert.rejects(() => store.assertFspDemoState(otherCandidate, initial.revision, state.state),
+      (error: unknown) => error instanceof ProfileError && error.code === "demo_state_invalid_or_replayed");
+    const participant = {
+      fsp_id: "fsp-001", rank: "I", rating: 1876,
+      achievements: [{ claim_id: "fsp-001-achievement-2026-cup", title: "Кубок ФСП", year: 2026, place: 3 }],
+      events: [], certificates: [], provider: "fsp_hackathon_registry", demo: true,
+      account_ref: "demo-person-001", provider_version: "demo-2026-10",
+    };
+    await assert.rejects(() => store.completeFspDemoAuthorization(candidateId, initial.revision, state.state, { ...participant, fsp_id: "fsp-002" }),
+      (error: unknown) => error instanceof ProfileError && error.code === "demo_fixture_mismatch");
+    const completed = await store.completeFspDemoAuthorization(candidateId, initial.revision, state.state, participant);
+    assert.equal(completed.fields.fsp_id, "fsp-001");
+    assert.equal(completed.fields.fsp_claim_id, "fsp-001-achievement-2026-cup");
+    assert.equal(completed.fields.achievements?.length, 2);
+    assert.equal((await pool.query("SELECT count(*) FROM candidate_verification_ledger WHERE candidate_id=$1", [candidateId])).rows[0]?.count, "1");
+    await assert.rejects(() => store.completeFspDemoAuthorization(candidateId, initial.revision, state.state, participant),
+      (error: unknown) => error instanceof ProfileError && error.code === "demo_state_invalid_or_replayed");
+    const expired = await store.startFspDemoAuthorization(candidateId, completed.revision, "fsp-001");
+    await pool.query("UPDATE candidate_fsp_demo_auth_states SET expires_at=now()-interval '1 second' WHERE candidate_id=$1 AND used_at IS NULL", [candidateId]);
+    await assert.rejects(() => store.assertFspDemoState(candidateId, completed.revision, expired.state),
+      (error: unknown) => error instanceof ProfileError && error.code === "demo_state_invalid_or_replayed");
+  } finally {
+    await pool.end();
+  }
+});

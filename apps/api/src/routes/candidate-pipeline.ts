@@ -2,6 +2,7 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { type: "json" };
+import { correlatedFetch } from "../operations/index.js";
 
 /** Injected transport is only for isolated gateway tests; production uses real HTTP. */
 export interface CandidateGatewayOptions {
@@ -30,7 +31,7 @@ function engineSchema(value: SchemaValue): SchemaValue {
 export async function candidatePipelineRoutes(app: FastifyInstance, options: CandidateGatewayOptions = {}): Promise<void> {
   const token = options.token ?? process.env.CANDIDATE_PIPELINE_TOKEN;
   const baseUrl = options.engineUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
-  const transport = options.transport ?? fetch;
+  const transport = correlatedFetch(options.transport ?? fetch);
   for (const [name, schema] of Object.entries(engineSpec.components.schemas)) {
     const transformed = engineSchema(schema);
     if (transformed !== null && typeof transformed === "object" && !Array.isArray(transformed)) {

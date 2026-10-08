@@ -7,10 +7,9 @@ from pathlib import Path
 
 import psycopg
 import pytest
-from psycopg.conninfo import conninfo_to_dict
-
 from matching_engine.database import connect
 from matching_engine.learning_store import LearningStore, pseudonym
+from psycopg.conninfo import conninfo_to_dict
 
 pytestmark = pytest.mark.integration
 
@@ -46,7 +45,9 @@ def test_operational_export_holds_authoritative_consent_until_commit(tmp_path: P
             assert entered.wait(10)
             with pytest.raises(psycopg.errors.QueryCanceled), connect(url) as connection:
                 connection.execute("SET LOCAL statement_timeout='200ms'")
-                connection.execute("UPDATE public.candidate_profiles SET pool_consent=false WHERE candidate_id=%s",
+                connection.execute("""UPDATE public.candidate_profiles SET pool_consent=false,
+                    training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL
+                    WHERE candidate_id=%s""",
                                    (row["candidate_id"],))
         finally:
             release.set()
