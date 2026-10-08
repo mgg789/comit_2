@@ -34,6 +34,30 @@ export function errorText(error: unknown): string {
   return "Не удалось выполнить запрос. Проверьте соединение и повторите.";
 }
 
+/** Explain upload failures using only known public codes, never arbitrary upstream text. */
+export function documentErrorText(error: unknown): string {
+  if (error instanceof ApiError) {
+    const detail = error.body && typeof error.body === "object" && "detail" in error.body
+      ? error.body.detail : null;
+    const messages: Record<string, string> = {
+      document_name_invalid: "Недопустимое имя файла. Переименуйте его и попробуйте снова.",
+      document_size_invalid: "Файл пустой или больше 5 МБ.",
+      document_type_unsupported: "Поддерживаются только PDF, TXT и MD.",
+      document_pdf_invalid: "Не удалось прочитать PDF. Проверьте файл или сохраните его заново.",
+      document_pdf_encrypted_or_too_long: "Нужен PDF без пароля, не более 100 страниц.",
+      document_pdf_stream_too_large: "PDF слишком сложный для обработки. Сохраните облегчённую копию.",
+      document_text_too_long: "В документе слишком много текста. Максимум — 200 000 символов.",
+      document_text_invalid: "Нужен текст в UTF-8 без служебных нулевых символов, до 200 000 символов.",
+    };
+    const message = typeof detail === "string" ? messages[detail] : undefined;
+    if (typeof detail === "string" && Object.hasOwn(messages, detail) && message) return message;
+    if (error.status === 413) return "Файл слишком большой. Максимум — 5 МБ.";
+    if (error.status === 400 || error.status === 422)
+      return "Не удалось прочитать файл. Для TXT и MD используйте UTF-8, для PDF — документ без пароля.";
+  }
+  return errorText(error);
+}
+
 /** Fetch current data, ignoring stale responses after navigation or unmount. */
 export function useResource<T>(
   load: () => Promise<T>,

@@ -1187,9 +1187,7 @@ textarea::placeholder {
   font-weight: 500;
   color: var(--comit-text-muted);
   cursor: text;
-  transition:
-    color 180ms,
-    box-shadow 180ms;
+  transition: color 180ms;
 }
 .otp-digit.focused,
 .otp-digit.filled {

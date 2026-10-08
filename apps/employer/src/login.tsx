@@ -133,9 +133,19 @@ export function Login({
                     ),
                   )
                 }
-                onChange={(event) =>
-                  setCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Backspace") return;
+                  const field = event.currentTarget;
+                  const start = field.selectionStart ?? code.length;
+                  const end = field.selectionEnd ?? start;
+                  setCodePosition(Math.min(start === end ? Math.max(0, start - 1) : start, 5));
+                }}
+                onChange={(event) => {
+                  const field = event.currentTarget;
+                  const position = field.value.slice(0, field.selectionStart ?? field.value.length).replace(/\D/g, "").length;
+                  setCodePosition(Math.min(position, 5));
+                  setCode(field.value.replace(/\D/g, "").slice(0, 6));
+                }}
               />
               {Array.from({ length: 6 }, (_, index) => (
                 <span

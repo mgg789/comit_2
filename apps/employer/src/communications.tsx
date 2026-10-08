@@ -20,7 +20,7 @@ import type {
   RecruitmentView,
   SendChatMessage,
 } from "@comit/shared";
-import { api, asset, errorText, salary, useResource } from "./runtime";
+import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
 
@@ -670,6 +670,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  const [documentError, setDocumentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
   const [showReasoning, setShowReasoning] = useState(false);
@@ -694,6 +696,14 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!loading) {
+      setShowLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoading(true), 450);
+    return () => clearTimeout(timer);
+  }, [loading]);
   useLayoutEffect(() => {
     const field = composerField.current;
     if (!field) return;
@@ -873,12 +883,13 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   }
   async function uploadDocument(file?: File) {
     if (!file) return;
+    if (documentInput.current) documentInput.current.value = "";
     if (documentUploadInFlight.current || sending) return;
+    setError(null);
     if (uploadedDocuments.length >= 3) {
-      setError(
+      setDocumentError(
         "Можно прикрепить до трёх файлов. Уберите одно вложение, чтобы добавить другое.",
       );
-      if (documentInput.current) documentInput.current.value = "";
       return;
     }
     if (
@@ -886,12 +897,12 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       file.size > 5 * 1024 * 1024 ||
       !/\.(pdf|txt|md)$/i.test(file.name)
     ) {
-      setError("Поддерживаются PDF, TXT и MD до 5 МБ.");
+      setDocumentError(!file.size ? "Файл пустой. Выберите документ с содержимым." : "Поддерживаются PDF, TXT и MD до 5 МБ.");
       return;
     }
     documentUploadInFlight.current = true;
     setUploadingDocument(true);
-    setError(null);
+    setDocumentError(null);
     try {
       const document = await api.uploadOrganizationDocument({
         name: file.name,
@@ -904,7 +915,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       ]);
       pending.current = null;
     } catch (reason) {
-      setError(errorText(reason));
+      setDocumentError(documentErrorText(reason));
     } finally {
       documentUploadInFlight.current = false;
       setUploadingDocument(false);
@@ -950,7 +961,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             : { bottom: historyBottom, height: "auto" }
         }
       >
-        {loading && <State loading />}
+        {loading && showLoading && <State loading />}
         <AnimatePresence initial={false}>
           {visible.map((message) => (
             <motion.article
@@ -1089,6 +1100,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
                     aria-label={`Убрать вложение ${document.name}`}
                     disabled={sending}
                     onClick={() => {
+                      setDocumentError(null);
+                      setError(null);
                       setUploadedDocuments((current) =>
                         current.filter(
                           (item) => item.document_id !== document.document_id,
@@ -1104,6 +1117,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             </motion.div>
           )}
         </AnimatePresence>
+        {documentError && (
+          <p className="communication-error" role="alert">{documentError}</p>
+        )}
         {error && (
           <p className="communication-error" role="alert">
             {error}
