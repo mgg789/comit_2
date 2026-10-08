@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import type {
   AccountView,
   AgentsOrganizationBudget,
+  AgentsDocumentView,
   AgentsOrganizationMessage,
   AgentsOrganizationTurn,
   AgentsPendingAnswer,
@@ -676,6 +677,10 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     "off" | "medium" | "max"
   >("off");
   const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<
+    AgentsDocumentView[]
+  >([]);
+  const [composerMultiline, setComposerMultiline] = useState(false);
   const documentInput = useRef<HTMLInputElement>(null);
   const composerField = useRef<HTMLTextAreaElement>(null);
   const composerWrap = useRef<HTMLDivElement>(null);
@@ -684,6 +689,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     message: string;
     idempotency_key: string;
     reasoning_effort: "off" | "medium" | "max";
+    document_ids: string[];
   } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -694,6 +700,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       field.style.height = "0px";
       const line = Number.parseFloat(getComputedStyle(field).lineHeight) || 24;
       const naturalHeight = field.scrollHeight;
+      setComposerMultiline(naturalHeight > line + 1);
       field.style.height = `${Math.max(line, Math.min(naturalHeight, line * 8))}px`;
       field.style.overflowY = naturalHeight > line * 8 + 1 ? "auto" : "hidden";
     };
@@ -710,7 +717,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           getComputedStyle(document.documentElement).fontSize,
         ) || 1;
       setHistoryBottom(
-        window.innerHeight - wrap.getBoundingClientRect().top + 20 * rootUnit,
+        wrap.offsetHeight +
+          (Number.parseFloat(getComputedStyle(wrap).bottom) || 0) +
+          20 * rootUnit,
       );
     };
     const observer = new ResizeObserver(measure);
@@ -809,24 +818,51 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   }, [onClose]);
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!text.trim() || sending || uploadingDocument || activeTurn.current)
+    if (
+      (!text.trim() && !uploadedDocuments.length) ||
+      sending ||
+      uploadingDocument ||
+      activeTurn.current
+    )
       return;
-    setSending(true);
-    setError(null);
     const body = pending.current || {
-      message: text.trim(),
+      message: [
+        text.trim() || "Используй прикреплённый документ.",
+        ...uploadedDocuments.map(
+          (document) =>
+            `Прикреплённый документ: ${document.name} (ID: ${document.document_id})`,
+        ),
+      ].join("\n\n"),
       idempotency_key: crypto.randomUUID(),
       reasoning_effort: reasoningEffort,
+      document_ids: uploadedDocuments.map((document) => document.document_id),
     };
+    if (body.message.length > 8000) {
+      setError(
+        "Сообщение вместе с названиями вложений должно быть короче 8000 символов.",
+      );
+      return;
+    }
+    setSending(true);
+    setError(null);
     pending.current = body;
     try {
-      const value = await api.sendOrganizationMessage(body);
+      const value = await api.sendOrganizationMessage({
+        message: body.message,
+        idempotency_key: body.idempotency_key,
+        reasoning_effort: body.reasoning_effort,
+      });
       setTurn(value);
       activeTurn.current =
         value.status === "failed" || value.status === "succeeded"
           ? null
           : value.turn_id;
       setText("");
+      setUploadedDocuments((current) =>
+        current.filter(
+          (document) => !body.document_ids.includes(document.document_id),
+        ),
+      );
       pending.current = null;
     } catch (reason) {
       setError(errorText(reason));
@@ -852,10 +888,10 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         content_base64: await fileBase64(file),
         idempotency_key: crypto.randomUUID(),
       });
-      setText(
-        (current) =>
-          `${current}${current ? "\n" : ""}Используй загруженный документ «${document.name}».`,
-      );
+      setUploadedDocuments((current) => [
+        ...current.filter((item) => item.document_id !== document.document_id),
+        document,
+      ]);
       pending.current = null;
     } catch (reason) {
       setError(errorText(reason));
@@ -1011,17 +1047,60 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         )}
         <div ref={end} />
       </div>
-      <div
+      <motion.div
         ref={composerWrap}
         className="communication-composer-wrap organization-composer"
+        initial={{ opacity: 0, y: "100vh" }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: "100vh" }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
+        <AnimatePresence initial={false}>
+          {!!uploadedDocuments.length && (
+            <motion.div
+              className="agent-attached-documents"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+            >
+              {uploadedDocuments.map((document) => (
+                <div
+                  className="agent-attached-document"
+                  key={document.document_id}
+                >
+                  <img
+                    className="agent-attached-document-icon"
+                    src={asset("attached-file-icon.svg")}
+                    alt=""
+                  />
+                  <span title={document.name}>{document.name}</span>
+                  <button
+                    type="button"
+                    aria-label={`Убрать вложение ${document.name}`}
+                    disabled={sending}
+                    onClick={() => {
+                      setUploadedDocuments((current) =>
+                        current.filter(
+                          (item) => item.document_id !== document.document_id,
+                        ),
+                      );
+                      pending.current = null;
+                    }}
+                  >
+                    <img src={asset("attached-file-remove.svg")} alt="" />
+                  </button>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
         {error && (
           <p className="communication-error" role="alert">
             {error}
           </p>
         )}
         <form
-          className="communication-composer glass"
+          className={`communication-composer glass${composerMultiline ? " multiline" : ""}`}
           onSubmit={send}
           onMouseDown={(event) => {
             if (
@@ -1060,7 +1139,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             aria-label="Сообщение AI-агенту"
             placeholder="Отправьте сообщение"
             value={text}
-            maxLength={16000}
+            maxLength={8000}
             disabled={sending}
             onKeyDown={(event) => {
               if (
@@ -1085,17 +1164,22 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               sending ||
               uploadingDocument ||
               !!activeTurn.current ||
-              !text.trim()
+              (!text.trim() && !uploadedDocuments.length)
             }
           >
             {sending ? <span className="spinner" /> : <Icon name="send" />}
           </Action>
         </form>
         <p className="communication-attribution">
-          <Icon name="logo" />
-          Работает на Droidje AI
+          Работает на{" "}
+          <img
+            className="droidje-ai-logo"
+            src={asset("droidje-ai-logo.svg")}
+            alt=""
+          />
+          <span>Droidje AI</span>
         </p>
-      </div>
+      </motion.div>
       <motion.aside
         className="agent-tools glass"
         initial={{ opacity: 0, y: "190rem", scale: 0.65 }}
@@ -1212,27 +1296,35 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           </AnimatePresence>
         </div>
       </motion.aside>
-      {showBudget && (
-        <div className="agent-budget glass">
-          {percentage == null ? (
-            "Бюджет недоступен"
-          ) : (
-            <>
-              <strong>{percentage}%</strong>
-              <span
-                className="agent-budget-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={percentage}
-                aria-label="Осталось бюджета AI"
-              >
-                <span style={{ width: `${percentage}%` }} />
-              </span>
-            </>
-          )}
-        </div>
-      )}
+      <AnimatePresence>
+        {showBudget && (
+          <motion.div
+            className="agent-budget glass"
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 8 }}
+            transition={{ duration: 0.15 }}
+          >
+            {percentage == null ? (
+              "Бюджет недоступен"
+            ) : (
+              <>
+                <strong>{percentage}%</strong>
+                <span
+                  className="agent-budget-track"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={percentage}
+                  aria-label="Осталось бюджета AI"
+                >
+                  <span style={{ width: `${percentage}%` }} />
+                </span>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <Action
         className="agent-close circle glass glass-surface"
         aria-label="Закрыть AI-агента"

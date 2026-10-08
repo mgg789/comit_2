@@ -395,7 +395,7 @@ small {
 .topbar {
   height: 66rem;
   position: relative;
-  margin: 50rem 80rem 0;
+  margin: 40rem 80rem 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -447,11 +447,14 @@ small {
   border: 0;
   border-radius: 97rem;
   color: var(--comit-text);
-  gap: 10rem;
+  gap: 0;
   font-size: 24rem;
   font-weight: 600;
   white-space: nowrap;
-  transition: transform 0.16s;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.32s;
 }
 .nav-item.selected {
   background: var(--comit-text);
@@ -474,9 +477,7 @@ small {
   display: inline-block;
   overflow: hidden;
   white-space: nowrap;
-}
-.nav-item.selected .nav-label {
-  display: block;
+  flex-shrink: 0;
 }
 .tooltip {
   position: absolute;
@@ -517,11 +518,11 @@ small {
   gap: 12rem;
 }
 .account-tools .plain-icon > .icon {
-  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .account-tools .plain-icon:hover > .icon-search,
 .account-tools .plain-icon:hover > .icon-bell {
-  transform: scale(1.14);
+  transform: scale(1.09);
 }
 .account-tools .plain-icon:hover > .icon-chevron {
   transform: rotate(18deg);
@@ -551,7 +552,7 @@ small {
   overflow-wrap: anywhere;
 }
 .main-content {
-  margin: 100rem 80rem 80rem;
+  margin: 90rem 80rem 80rem;
   min-height: 700rem;
 }
 .page-heading {
@@ -836,6 +837,17 @@ small {
   background: transparent;
   color: inherit;
   font-size: 30rem;
+}
+.card-arrow .icon {
+  width: 20rem;
+  height: 20rem;
+  translate: -2rem 0;
+  rotate: -90deg;
+}
+.edit-badge .icon {
+  width: 18rem;
+  height: 18rem;
+  filter: brightness(0);
 }
 .card-link {
   position: absolute;
@@ -1296,7 +1308,19 @@ textarea::placeholder {
   border-radius: 50%;
   background: var(--comit-text);
   color: var(--employer-ink);
-  padding: 2rem 6rem;
+  width: 28rem;
+  height: 28rem;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
+}
+.count.count-overflow {
+  width: auto;
+  min-width: 38rem;
+  padding: 0 7rem;
+  border-radius: 97rem;
 }
 .saved-row {
   display: flex;

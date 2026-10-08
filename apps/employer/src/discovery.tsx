@@ -348,12 +348,12 @@ export function Showcase({
   }
   return (
     <Reveal className="discovery-showcase">
-      <PageTitle title="Соискатели">
+      <PageTitle title="Кандидаты">
         <form onSubmit={submit} className="discovery-search">
           <input
             ref={searchInput}
             aria-label="Поиск по имени, роли или стеку"
-            placeholder="Поиск: Имя, роль, стек"
+            placeholder="Имя, роль, стек"
             value={q}
             onChange={(event) => setQ(event.target.value)}
           />

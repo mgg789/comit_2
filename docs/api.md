@@ -1,5 +1,10 @@
 # API — Comit
 
+`GET /api/employer/vacancy-drafts` и `GET /api/employer/vacancy-drafts/{draft_id}`
+возвращают в `AgentsDraftView` nullable ISO-8601 `created_at`, `published_at`,
+`closed_at`. Даты отражают реальные события жизненного цикла; отсутствующая
+историческая дата возвращается как `null`, а не подменяется временем редактирования.
+
 Статистика работодателя: `GET /api/employer/statistics?from=YYYY-MM-DD&to=YYYY-MM-DD&vacancy_id=UUID` — текущий инвентарь, этапы подбора, дневные события и предыдущий период; [контракт и определения](employer-statistics.md).
 
 Feed поддерживает `POST /api/employer/vacancy-drafts/{draft_id}/feed/impressions`

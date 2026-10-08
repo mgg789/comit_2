@@ -24,6 +24,8 @@ const icons = {
   settings: "944a3f714471682b2ae2b66d8711c46598ca1e19.svg",
   search: "6da721179169b7fd86cc9afd7a125e469ad945bd.svg",
   chevron: "be7a21bfb4b868880613999d5d0bc4a2650413ed.svg",
+  "vacancy-chevron": "vacancy-card-chevron.svg",
+  edit: "vacancy-edit-pencil.svg",
   bell: "29795c078097fdcbdd8d396900a5dfd4a5309de8.svg",
   logo: "dec04dda54551634f35985932f0a53e8bcda20f5.svg",
   back: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",

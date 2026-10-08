@@ -144,6 +144,7 @@ class Store:
             missing_requirements=list(row.get("missing_requirements") or []), summary=summary,
             publication=publication,
             business_status=row.get("business_status", "draft"), archived=row.get("deleted_at") is not None,
+            created_at=row.get("created_at"), published_at=row.get("published_at"), closed_at=row.get("closed_at"),
         )
 
     @staticmethod
@@ -357,7 +358,9 @@ class Store:
                 publication = {"status": "pending", "source_revision": revision, "job_id": str(job["job_id"])}
                 state = "creating"
             connection.execute("""UPDATE agents_service.drafts SET revision=%s,business_status='closed',state=%s,
-                summary=NULL,publication=%s,deleted_at=CASE WHEN %s THEN now() ELSE deleted_at END,updated_at=now()
+                summary=NULL,publication=%s,
+                closed_at=CASE WHEN business_status='closed' THEN closed_at ELSE now() END,
+                deleted_at=CASE WHEN %s THEN now() ELSE deleted_at END,updated_at=now()
                 WHERE owner_id=%s AND draft_id=%s""", (revision, state, Jsonb(publication) if publication else None, archive, owner, draft))
             changed = self._get_row(connection, owner, draft)
         return self._view(changed)
@@ -818,12 +821,14 @@ class Store:
                     UPDATE agents_service.drafts
                     SET state='created', business_status=%s,
                         published_fields=CASE WHEN %s='open' THEN fields ELSE published_fields END,
+                        published_at=CASE WHEN %s='open' THEN now() ELSE published_at END,
                         publication=jsonb_set(
                         jsonb_set(COALESCE(publication,'{}'::jsonb), '{status}', '"accepted"'::jsonb),
                         '{matching_status}', to_jsonb(%s::text)),
                         updated_at=now()
                     WHERE draft_id=%s AND state='creating' AND revision=%s
                     """, (row["payload"].get("status", "open"), row["payload"].get("status", "open"),
+                        row["payload"].get("status", "open"),
                         matching_status, row["draft_id"], row["payload"]["source_revision"]),
                 )
         return self._job(row)

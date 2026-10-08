@@ -33,6 +33,30 @@ const status = (draft: AgentsDraftView) =>
         ? "Активная"
         : "Черновик";
 
+/** Format the genuine lifecycle date for the card's current business status. */
+function vacancyDate(draft: AgentsDraftView): string {
+  const [label, timestamp] =
+    draft.business_status === "open"
+      ? ["Опубликована", draft.published_at]
+      : draft.business_status === "closed"
+        ? ["Закрыта", draft.closed_at]
+        : ["Создана", draft.created_at];
+  if (!timestamp) return `${label}: дата не указана`;
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime())
+    ? `${label}: дата не указана`
+    : `${label} ${new Intl.DateTimeFormat("ru-RU").format(date)}`;
+}
+
+/** Keep a circular badge for counts up to 99, widening only the capped value. */
+function CountBadge({ count }: { count: number }) {
+  return (
+    <span className={`count${count > 99 ? " count-overflow" : ""}`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 /** Own vacancies with complete cursor pagination; filter counts reflect all loaded pages. */
 export function Vacancies({
   navigate,
@@ -52,11 +76,11 @@ export function Vacancies({
     } while (cursor);
     return items;
   });
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState("draft");
   const [query, setQuery] = useState("");
   const items = resource.data || [];
   const matches = (draft: AgentsDraftView, name: string) =>
-    !draft.archived && (name === "all" || draft.business_status === name);
+    !draft.archived && draft.business_status === name;
   const filtered = items.filter(
     (draft) =>
       matches(draft, filter) &&
@@ -89,7 +113,7 @@ export function Vacancies({
         aria-label="Статус вакансий"
       >
         {[
-          ["all", "Все"],
+          ["draft", "Черновики"],
           ["open", "Открытые"],
           ["closed", "Закрытые"],
         ].map(([key, label]) => (
@@ -100,7 +124,7 @@ export function Vacancies({
             aria-selected={filter === key}
             onClick={() => setFilter(key!)}
           >
-            {label}({items.filter((draft) => matches(draft, key!)).length})
+            {label} ({items.filter((draft) => matches(draft, key!)).length})
           </button>
         ))}
       </div>
@@ -145,9 +169,11 @@ export function Vacancies({
               <div className="vacancy-footer">
                 <span className="date">
                   <Icon name="clock" />
-                  Версия {draft.revision}
+                  {vacancyDate(draft)}
                 </span>
-                <span className="card-arrow">›</span>
+                <span className="card-arrow">
+                  <Icon name="vacancy-chevron" />
+                </span>
               </div>
               <button
                 className="card-link"
@@ -1000,13 +1026,16 @@ export function VacancyDetail({
     );
   return (
     <Reveal>
-      <PageTitle title="К вакансиям" back={() => navigate("/vacancies")}>
+      <PageTitle title="Вакансия" back={() => navigate("/vacancies")}>
         <Action
           variant="primary"
           disabled={draft.data?.archived}
           onClick={() => draft.data && onEdit(draft.data)}
         >
-          Редактировать<span className="edit-badge">✎</span>
+          Редактировать
+          <span className="edit-badge">
+            <Icon name="edit" />
+          </span>
         </Action>
       </PageTitle>
       <div className="detail-columns">
@@ -1066,7 +1095,7 @@ export function VacancyDetail({
           <section className="panel">
             <div className="small-heading">
               <h2>Понравились в ленте</h2>
-              <span className="count">{saved.data?.items.length || 0}</span>
+              <CountBadge count={saved.data?.items.length || 0} />
               <button
                 className="shortlist-all"
                 onClick={() => navigate(`/vacancy/${draftId}/resumes`)}
@@ -1125,7 +1154,7 @@ export function VacancyDetail({
           <section className="panel">
             <div className="small-heading">
               <h2>Назначенные собеседования</h2>
-              <span className="count">{interviews.length}</span>
+              <CountBadge count={interviews.length} />
             </div>
             {processes.loading || processes.error ? (
               <State

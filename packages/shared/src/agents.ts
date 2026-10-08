@@ -51,7 +51,7 @@ export type AgentsDraftPage = { "items": Array<AgentsDraftView>; "limit": number
 export type AgentsDraftPatch = { "expected_revision": number; "fields"?: AgentsDraftFields_Input; };
 
 /** Owner-scoped draft response with revision, provenance and publication state. */
-export type AgentsDraftView = { "draft_id": string; "vacancy_id": string; "owner_id": string; "revision": number; "state": "editing" | "summary" | "creating" | "created" | "failed"; "fields": AgentsDraftFields_Output; "field_sources"?: Record<string, AgentsFieldSource>; "missing_requirements"?: Array<string>; "summary"?: (AgentsSummarySnapshot | null); "publication"?: (AgentsPublicationView | null); "business_status"?: "draft" | "open" | "closed"; "archived"?: boolean; };
+export type AgentsDraftView = { "draft_id": string; "vacancy_id": string; "owner_id": string; "revision": number; "state": "editing" | "summary" | "creating" | "created" | "failed"; "fields": AgentsDraftFields_Output; "field_sources"?: Record<string, AgentsFieldSource>; "missing_requirements"?: Array<string>; "summary"?: (AgentsSummarySnapshot | null); "publication"?: (AgentsPublicationView | null); "business_status"?: "draft" | "open" | "closed"; "archived"?: boolean; "created_at"?: (string | null); "published_at"?: (string | null); "closed_at"?: (string | null); };
 
 /** Provenance attached to one field or requirement group. */
 export type AgentsFieldSource = { "source": "manual" | "agent" | "laya" | "system" | "fsp"; "metadata"?: Record<string, AgentsJsonValue>; };

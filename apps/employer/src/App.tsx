@@ -235,16 +235,7 @@ export default function App() {
                     { id: "settings", label: "Аккаунт" },
                   ] as const
                 ).map((item) => (
-                  <motion.button
-                    layout
-                    transition={{
-                      layout: {
-                        type: "spring",
-                        stiffness: 360,
-                        damping: 34,
-                        mass: 0.85,
-                      },
-                    }}
+                  <button
                     key={item.id}
                     className={`nav-item glass ${selected === item.id ? "selected" : ""}`}
                     onClick={() => {
@@ -255,23 +246,20 @@ export default function App() {
                     aria-current={selected === item.id ? "page" : undefined}
                   >
                     <Icon name={item.id} />
-                    <AnimatePresence initial={false}>
-                      {selected === item.id && (
-                        <motion.span
-                          className="nav-label"
-                          initial={{ width: 0, opacity: 0 }}
-                          animate={{ width: "auto", opacity: 1 }}
-                          exit={{ width: 0, opacity: 0 }}
-                          transition={{
-                            duration: 0.28,
-                            ease: [0.22, 1, 0.36, 1],
-                          }}
-                        >
-                          {item.label}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </motion.button>
+                    <motion.span
+                      className="nav-label"
+                      aria-hidden={selected !== item.id}
+                      initial={false}
+                      animate={{
+                        width: selected === item.id ? "auto" : 0,
+                        opacity: selected === item.id ? 1 : 0,
+                        marginLeft: selected === item.id ? "10rem" : "0rem",
+                      }}
+                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      {item.label}
+                    </motion.span>
+                  </button>
                 ))}
               </nav>
               <div className="account-tools glass">
