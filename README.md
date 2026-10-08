@@ -49,7 +49,7 @@ services: matching-engine | testing-engine | integration-engine | verification-e
 - **testing-engine** — параметризованные blueprint'ы заданий, устойчивые к утечке; адаптивный грейд-тест.
 - **integration-engine** — хостит мок-реестр ФСП и демо-привязку ФСП-профиля (реального API на хакатоне нет).
 - **verification-engine** — проверка внешних фактов профиля: ФСП (через мок integration-engine), публичный Git-репозиторий, резюме hh.ru; внутренний порт 8105 без публикации на хост.
-- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek), opt-in overlay `infra/docker-compose.agents.yml`.
+- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek) и глобальный агент работодателя (один чат на аккаунт, фоновые поручения через `organization-worker`), opt-in overlay `infra/docker-compose.agents.yml`.
 
 Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`, `docs/verification.md`.
 
@@ -78,7 +78,7 @@ preference-поправка на непоказанный суффикс лен�
 | `services/testing-engine` | Python/FastAPI: тестирование (blueprints/) |
 | `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
 | `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
-| `services/agents-service` | Python/FastAPI: черновик вакансии, форма + агент |
+| `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
 | `infra/` | docker-compose (dev/prod), Dockerfiles, nginx, postgres init |
 | `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
 | `tests/` | сквозной smoke-гейт и acceptance-сценарии |

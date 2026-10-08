@@ -38,7 +38,7 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
 | `services/integration-engine` | FastAPI | Мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`, достижения) и демо-привязка (`/fsp/demo/authorize`, `/fsp/demo/token`) | Внешние источники меняются независимо от ядра |
 | `services/verification-engine` | FastAPI | Внутренние `/verify/fsp`, `/verify/repository`, `/verify/hh` под сервисным токеном; без candidate id ([verification.md](verification.md)) | Сетевые проверки внешних провайдеров изолированы от ядра |
-| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create | Отдельные знания, инструменты и провайдеры |
+| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
 Чаты на движке-протоколе Mike (QGramm) интегрированы в пост-отбор отдельным
