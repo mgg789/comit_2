@@ -163,13 +163,20 @@ export default function App() {
       />
     );
   else if (pieces[0] === "resumes") screen = <Resumes navigate={navigate} />;
-  else if (pieces[0] === "showcase") screen = <Showcase navigate={navigate} />;
+  else if (pieces[0] === "showcase")
+    screen = (
+      <Showcase
+        navigate={navigate}
+        focusSearch={new URLSearchParams(query).get("search") === "1"}
+      />
+    );
   else if (pieces[0] === "statistics")
     screen = <Statistics navigate={navigate} />;
   else if (pieces[0] === "chat" && account)
     screen = (
       <RecruitmentChat
         account={account}
+        onBack={() => navigate("/vacancies")}
         initialProcessId={pieces[1]}
         onProfile={(candidateId) => navigate(`/resume/${candidateId}`)}
       />
@@ -271,7 +278,13 @@ export default function App() {
                 <button
                   className="plain-icon"
                   aria-label="Поиск кандидатов"
-                  onClick={() => navigate("/showcase")}
+                  onClick={() => {
+                    if (pieces[0] === "showcase")
+                      window.dispatchEvent(
+                        new Event("employer:focus-candidate-search"),
+                      );
+                    else navigate("/showcase?search=1");
+                  }}
                 >
                   <Icon name="search" />
                 </button>
@@ -341,7 +354,7 @@ export default function App() {
               </AnimatePresence>
             </main>
             <Action
-              className="agent-launcher glass"
+              className="agent-launcher glass glass-surface"
               onClick={() => setAgent(true)}
               aria-label="Открыть AI-агента"
             >

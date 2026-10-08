@@ -279,6 +279,45 @@ small {
     backdrop-filter: url("#glass-refraction") blur(18rem) saturate(1.35);
   }
 }
+/* Filter only the backdrop surface: transformed controls keep foreground sharp. */
+.glass.glass-surface {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.glass.glass-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--employer-glass);
+  backdrop-filter: blur(22rem) saturate(1.35);
+  -webkit-backdrop-filter: blur(22rem) saturate(1.35);
+  box-shadow:
+    inset 0 1px 0 var(--employer-paint-ffffff38),
+    inset 1px 0 0 var(--employer-paint-ffffff14),
+    inset 0 -1px 0 var(--employer-paint-ffffff0f),
+    0 10rem 40rem var(--employer-paint-00000014);
+}
+@supports (backdrop-filter: url("#glass-refraction")) {
+  .glass.glass-surface::before {
+    backdrop-filter: url("#glass-refraction") blur(18rem) saturate(1.35);
+  }
+}
+.agent-launcher.glass-surface {
+  position: fixed;
+}
+.agent-close.glass-surface {
+  position: absolute;
+}
+.action.glass-surface:hover:not(:disabled) {
+  box-shadow: none;
+}
 .panel {
   background: var(--employer-paint-191918);
   border-radius: 30rem;
@@ -377,7 +416,7 @@ small {
   font-family: var(--employer-logo);
   font-size: 32rem;
   line-height: 1;
-  transform: translateY(3rem);
+  transform: translateY(5rem);
 }
 .topbar.assistant-open {
   z-index: auto;
@@ -477,9 +516,19 @@ small {
   justify-content: center;
   gap: 12rem;
 }
+.account-tools .plain-icon > .icon {
+  transition: transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.account-tools .plain-icon:hover > .icon-search,
+.account-tools .plain-icon:hover > .icon-bell {
+  transform: scale(1.14);
+}
+.account-tools .plain-icon:hover > .icon-chevron {
+  transform: rotate(18deg);
+}
 .account-avatar {
-  height: 50rem;
-  width: 50rem;
+  height: 46rem;
+  width: 46rem;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1527,12 +1576,9 @@ textarea::placeholder {
     padding: 6rem 12rem;
     gap: 12rem;
   }
-  .account-tools > .plain-icon:first-child {
-    display: none;
-  }
   .account-avatar {
-    width: 32rem;
-    height: 32rem;
+    width: 30rem;
+    height: 30rem;
     font-size: 16rem;
   }
   .nav {

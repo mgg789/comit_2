@@ -493,6 +493,7 @@ export function VacancyEditor({
                   </Select>
                   <Action
                     type="button"
+                    className="glass-surface"
                     aria-expanded={skillsOpen}
                     onClick={() => setSkillsOpen((value) => !value)}
                   >

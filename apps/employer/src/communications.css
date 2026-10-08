@@ -400,6 +400,46 @@
 .organization-composer {
   bottom: 40rem;
 }
+.recruitment-empty > .state {
+  margin-top: 8rem;
+}
+.organization-composer .communication-composer {
+  height: auto;
+  min-height: 80rem;
+  border-radius: 40rem;
+  align-items: flex-end;
+}
+.organization-composer textarea {
+  align-self: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  max-height: 192rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  resize: none;
+  background: transparent;
+  color: var(--employer-paint-fff);
+  font: inherit;
+  font-size: 20rem;
+  line-height: 24rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+}
+.organization-composer textarea::placeholder {
+  color: var(--employer-paint-f5f4fb);
+}
+.organization-composer .send-button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+.organization-composer .send-button {
+  transition: none;
+}
 .organization-history .agent-turn-state {
   margin-left: 42rem;
   font-size: 16rem;
@@ -439,6 +479,9 @@
   width: 28rem;
   height: 28rem;
   transform: rotate(45deg);
+}
+.agent-close:hover:not(:disabled) {
+  filter: none;
 }
 .organization-composer .attach-button .icon {
   width: 28rem;
@@ -520,67 +563,49 @@
   inset: 0 -24rem 0 auto;
   width: 24rem;
 }
-.agent-reasoning input[type="range"] {
-  appearance: none;
-  -webkit-appearance: none;
+.agent-reasoning-slider {
+  position: relative;
   width: 123rem;
   height: 20rem;
-  min-width: 0;
+  flex-shrink: 0;
+}
+.agent-reasoning-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
   min-height: 0;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
-  outline: none;
-  box-shadow: none;
-  border-radius: 97rem;
-  background: transparent;
+  opacity: 0;
   cursor: pointer;
-  flex-shrink: 0;
 }
-.agent-reasoning input[type="range"]:focus {
-  outline: none;
-  box-shadow: none;
-  border: 0;
-}
-.agent-reasoning input[type="range"]::-webkit-slider-runnable-track {
-  height: 20rem;
-  border: 0;
+.agent-reasoning-track {
+  display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 97rem;
   background: var(--employer-paint-2f2f2d, var(--employer-paint-333));
+  pointer-events: none;
 }
-.agent-reasoning input[type="range"]::-moz-range-track {
-  height: 20rem;
-  border: 0;
-  border-radius: 97rem;
-  background: var(--employer-paint-2f2f2d, var(--employer-paint-333));
-}
-.agent-reasoning
-  input[type="range"]:focus-visible::-webkit-slider-runnable-track {
-  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
-}
-.agent-reasoning input[type="range"]:focus-visible::-moz-range-track {
-  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
-}
-.agent-reasoning input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
+.agent-reasoning-thumb {
+  display: block;
   width: 20rem;
   height: 20rem;
-  margin-top: 0;
-  border: 0;
   border-radius: 50%;
   background: var(--employer-paint-f8fcfe, var(--employer-paint-fff));
 }
-.agent-reasoning input[type="range"]::-moz-range-thumb {
-  width: 20rem;
-  height: 20rem;
-  border: 0;
-  border-radius: 50%;
-  background: var(--employer-paint-f8fcfe, var(--employer-paint-fff));
+.agent-reasoning-slider input:focus-visible + .agent-reasoning-track {
+  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
 }
-.agent-reasoning input[type="range"]:disabled {
-  opacity: 0.45;
+.agent-reasoning-slider input:disabled {
   cursor: default;
+}
+.agent-reasoning-slider:has(input:disabled) .agent-reasoning-track {
+  opacity: 0.45;
 }
 .agent-tools svg {
   width: 28rem;
@@ -732,6 +757,16 @@
     height: 58rem;
     gap: 10rem;
     padding: 6rem;
+  }
+  .organization-composer .communication-composer {
+    height: auto;
+    min-height: 58rem;
+    border-radius: 29rem;
+  }
+  .organization-composer textarea {
+    font-size: 14rem;
+    line-height: 20rem;
+    max-height: 160rem;
   }
   .attach-button,
   .communication-composer .send-button {

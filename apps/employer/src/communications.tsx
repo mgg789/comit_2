@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type {
   AccountView,
@@ -14,7 +20,7 @@ import type {
   SendChatMessage,
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
-import { Action, Field, Icon, State } from "./ui";
+import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
 
 const stateNames: Record<RecruitmentView["state"], string> = {
@@ -71,10 +77,12 @@ export function RecruitmentChat({
   account,
   initialProcessId,
   onProfile,
+  onBack,
 }: {
   account: AccountView;
   initialProcessId?: string;
   onProfile: (candidateId: string) => void;
+  onBack: () => void;
 }) {
   const list = useResource(() => api.getRecruitmentList("employer", 100));
   const [selected, setSelected] = useState(initialProcessId || "");
@@ -86,7 +94,7 @@ export function RecruitmentChat({
   if (!id)
     return (
       <section className="recruitment-empty">
-        <h1>Чаты</h1>
+        <PageTitle title="Чаты" back={onBack} />
         <State
           loading={list.loading}
           error={list.error}
@@ -98,16 +106,10 @@ export function RecruitmentChat({
   return (
     <section className="recruitment-screen">
       <div className="chat-back">
-        <Action
-          className="circle"
-          onClick={() => {
-            window.location.hash = `/vacancy/${list.data?.items.find((item) => item.id === id)?.draft_id || ""}`;
-          }}
-          aria-label="К вакансии"
-        >
+        <Action className="circle" onClick={onBack} aria-label="К вакансиям">
           <Icon name="back" />
         </Action>
-        <h1>К вакансии</h1>
+        <h1>Чаты</h1>
       </div>
       {list.data && list.data.items.length > 1 && (
         <select
@@ -675,6 +677,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   >("off");
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const documentInput = useRef<HTMLInputElement>(null);
+  const composerField = useRef<HTMLTextAreaElement>(null);
+  const composerWrap = useRef<HTMLDivElement>(null);
+  const [historyBottom, setHistoryBottom] = useState<number>();
   const pending = useRef<{
     message: string;
     idempotency_key: string;
@@ -682,6 +687,41 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   } | null>(null);
   const activeTurn = useRef<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const field = composerField.current;
+    if (!field) return;
+    const fit = () => {
+      field.style.height = "0px";
+      const line = Number.parseFloat(getComputedStyle(field).lineHeight) || 24;
+      const naturalHeight = field.scrollHeight;
+      field.style.height = `${Math.max(line, Math.min(naturalHeight, line * 8))}px`;
+      field.style.overflowY = naturalHeight > line * 8 + 1 ? "auto" : "hidden";
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [text]);
+  useLayoutEffect(() => {
+    const wrap = composerWrap.current;
+    if (!wrap) return;
+    const measure = () => {
+      const rootUnit =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).fontSize,
+        ) || 1;
+      setHistoryBottom(
+        window.innerHeight - wrap.getBoundingClientRect().top + 20 * rootUnit,
+      );
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    window.addEventListener("resize", measure);
+    measure();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
   useEffect(() => {
     let active = true;
     let cursor = 0;
@@ -854,7 +894,15 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       exit={{ opacity: 0, backdropFilter: "blur(0rem)" }}
       transition={{ duration: 0.25 }}
     >
-      <div className="organization-history" aria-live="polite">
+      <div
+        className="organization-history"
+        aria-live="polite"
+        style={
+          historyBottom == null
+            ? undefined
+            : { bottom: historyBottom, height: "auto" }
+        }
+      >
         {loading && <State loading />}
         {!loading && !visible.length && (
           <div className="assistant-welcome">
@@ -963,13 +1011,28 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         )}
         <div ref={end} />
       </div>
-      <div className="communication-composer-wrap organization-composer">
+      <div
+        ref={composerWrap}
+        className="communication-composer-wrap organization-composer"
+      >
         {error && (
           <p className="communication-error" role="alert">
             {error}
           </p>
         )}
-        <form className="communication-composer glass" onSubmit={send}>
+        <form
+          className="communication-composer glass"
+          onSubmit={send}
+          onMouseDown={(event) => {
+            if (
+              !(event.target instanceof Element) ||
+              event.target.closest("button, textarea")
+            )
+              return;
+            event.preventDefault();
+            composerField.current?.focus();
+          }}
+        >
           <input
             ref={documentInput}
             type="file"
@@ -990,13 +1053,25 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               <Icon name="plus" />
             )}
           </button>
-          <input
+          <textarea
+            ref={composerField}
+            rows={1}
             autoFocus
             aria-label="Сообщение AI-агенту"
             placeholder="Отправьте сообщение"
             value={text}
             maxLength={16000}
             disabled={sending}
+            onKeyDown={(event) => {
+              if (
+                event.key !== "Enter" ||
+                event.shiftKey ||
+                event.nativeEvent.isComposing
+              )
+                return;
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }}
             onChange={(event) => {
               setText(event.target.value);
               pending.current = null;
@@ -1088,30 +1163,49 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
                 transition={{ duration: 0.15 }}
               >
                 <span aria-hidden="true">low</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={1}
-                  value={{ off: 0, medium: 1, max: 2 }[reasoningEffort]}
-                  aria-label="Уровень размышлений AI"
-                  aria-valuetext={
-                    {
-                      off: "Без размышлений",
-                      medium: "Средний",
-                      max: "Максимальный",
-                    }[reasoningEffort]
-                  }
-                  disabled={sending || !!activeTurn.current}
-                  onChange={(event) => {
-                    const value = (["off", "medium", "max"] as const)[
-                      Number(event.target.value)
-                    ];
-                    if (!value || value === reasoningEffort) return;
-                    setReasoningEffort(value);
-                    pending.current = null;
-                  }}
-                />
+                <span className="agent-reasoning-slider">
+                  <input
+                    type="range"
+                    min={0}
+                    max={2}
+                    step={1}
+                    value={{ off: 0, medium: 1, max: 2 }[reasoningEffort]}
+                    aria-label="Уровень размышлений AI"
+                    aria-valuetext={
+                      {
+                        off: "Без размышлений",
+                        medium: "Средний",
+                        max: "Максимальный",
+                      }[reasoningEffort]
+                    }
+                    disabled={sending || !!activeTurn.current}
+                    onChange={(event) => {
+                      const value = (["off", "medium", "max"] as const)[
+                        Number(event.target.value)
+                      ];
+                      if (!value || value === reasoningEffort) return;
+                      setReasoningEffort(value);
+                      pending.current = null;
+                    }}
+                  />
+                  <span className="agent-reasoning-track" aria-hidden="true">
+                    <motion.span
+                      className="agent-reasoning-thumb"
+                      initial={false}
+                      animate={{
+                        x: { off: "0rem", medium: "51.5rem", max: "103rem" }[
+                          reasoningEffort
+                        ],
+                      }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 32,
+                        mass: 0.65,
+                      }}
+                    />
+                  </span>
+                </span>
                 <span aria-hidden="true">max</span>
               </motion.div>
             )}
@@ -1140,7 +1234,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         </div>
       )}
       <Action
-        className="agent-close circle glass"
+        className="agent-close circle glass glass-surface"
         aria-label="Закрыть AI-агента"
         onClick={onClose}
       >

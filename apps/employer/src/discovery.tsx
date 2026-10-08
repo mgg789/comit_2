@@ -161,7 +161,18 @@ function mismatchFrom(error: unknown): ShowcaseMismatchWarning | null {
 }
 
 /** Real public pool with canonical filters and revision-bound shortlist confirmation. */
-export function Showcase({ navigate }: Navigation) {
+export function Showcase({
+  navigate,
+  focusSearch = false,
+}: Navigation & { focusSearch?: boolean }) {
+  const searchInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const focus = () => searchInput.current?.focus();
+    if (focusSearch) focus();
+    window.addEventListener("employer:focus-candidate-search", focus);
+    return () =>
+      window.removeEventListener("employer:focus-candidate-search", focus);
+  }, [focusSearch]);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
   const [specialization, setSpecialization] = useState("");
@@ -340,6 +351,7 @@ export function Showcase({ navigate }: Navigation) {
       <PageTitle title="Соискатели">
         <form onSubmit={submit} className="discovery-search">
           <input
+            ref={searchInput}
             aria-label="Поиск по имени, роли или стеку"
             placeholder="Поиск: Имя, роль, стек"
             value={q}
@@ -1091,7 +1103,9 @@ export function Resumes({ navigate }: Navigation) {
             {selection === null
               ? "Все вакансии"
               : `Вакансии: ${selection.length}`}
-            <Icon name="chevron" />
+            <span className="resume-filter-arrow">
+              <Icon name="chevron" />
+            </span>
           </summary>
           <div className="resume-vacancy-options">
             <label>
@@ -1389,7 +1403,7 @@ export function VacancyResumes({
   );
 }
 
-/** Accurate owner dashboard over UTC milestones, inventory and raw daily activity. */
+/** Chart-ready owner dashboard; milestone pairs and daily events remain separate measures. */
 export function Statistics({ navigate }: Navigation) {
   const data = useResource(() => api.getEmployerStatistics());
   if (data.loading || data.error || !data.data)
@@ -1410,121 +1424,275 @@ export function Statistics({ navigate }: Navigation) {
     "offered",
     "hired",
   ];
-  const max = Math.max(
-    1,
-    ...stats.daily.map((day) =>
-      Object.values(day.counts).reduce((sum, value) => sum + value, 0),
-    ),
+  const daily = stats.daily.map((day) =>
+    Object.values(day.counts).reduce((sum, value) => sum + value, 0),
   );
+  const dailyMax = Math.max(1, ...daily);
+  const stageMax = Math.max(
+    1,
+    ...stages.flatMap((stage) => [stats.current[stage], stats.previous[stage]]),
+  );
+  const inventory = [
+    { label: "Открыты", value: stats.inventory.open, tone: "blue" },
+    { label: "Черновики", value: stats.inventory.draft, tone: "light" },
+    { label: "Закрыты", value: stats.inventory.closed, tone: "green" },
+    { label: "Архив", value: stats.inventory.archived, tone: "muted" },
+  ];
+  const total = inventory.reduce((sum, item) => sum + item.value, 0);
+  let offset = 0;
+  const arcs = inventory.map((item) => {
+    const length = total ? (item.value / total) * 100 : 0;
+    const arc = { ...item, length, offset };
+    offset += length;
+    return arc;
+  });
+  const points = (values: number[], maximum: number) =>
+    values
+      .map(
+        (value, index) =>
+          `${values.length > 1 ? (index / (values.length - 1)) * 600 : 300},${150 - (value / maximum) * 135}`,
+      )
+      .join(" ");
+  const activityPoints = points(daily, dailyMax);
+  const topMax = Math.max(1, ...stats.top_vacancies.map((item) => item.events));
   return (
     <Reveal className="discovery-statistics">
       <PageTitle title="Статистика" />
-      <div className="statistics-columns">
-        <div className="statistics-left">
-          <section className="panel statistics-kpis">
-            {(["viewed", "liked", "interviewed"] as const).map((stage) => (
-              <div key={stage}>
-                <strong>{stats.current[stage]}</strong>
-                <p>{stageLabels[stage].toLowerCase()}</p>
-                <small>Ранее: {stats.previous[stage]}</small>
-              </div>
-            ))}
-          </section>
-          <section className="panel statistics-inventory">
-            <h3>Ваши вакансии</h3>
-            <p className="muted">Текущее состояние</p>
-            <div className="tags">
-              <span className="tag">Открыто {stats.inventory.open}</span>
-              <span className="tag">Черновики {stats.inventory.draft}</span>
-              <span className="tag">Закрыто {stats.inventory.closed}</span>
-              <span className="tag">Архив {stats.inventory.archived}</span>
-            </div>
-          </section>
-          <section className="panel statistics-summary">
-            <h3>Подбор в цифрах</h3>
-            <div>
-              <strong>{stats.unique_candidates}</strong>
-              <p>уникальных кандидатов за период</p>
-            </div>
-            <div>
-              <strong>{stats.inventory.saved_pairs}</strong>
-              <p>сохранено сейчас</p>
-            </div>
-            <div>
-              <strong>{stats.inventory.active_processes}</strong>
-              <p>активных процессов</p>
-            </div>
-          </section>
-        </div>
-        <div className="statistics-right">
-          <section className="panel statistics-vacancies">
-            <h3>Последние вакансии ›</h3>
-            {stats.top_vacancies.length ? (
-              stats.top_vacancies.map((item) => (
-                <button
-                  key={item.vacancy_id}
-                  onClick={() => navigate(`/vacancy/${item.draft_id}`)}
-                >
-                  <span>{item.title}</span>
-                  <span>
-                    <small>
-                      {item.status === "open"
-                        ? "Активна"
-                        : item.status === "closed"
-                          ? "Закрыта"
-                          : "Черновик"}
-                    </small>
-                    <p>{item.candidates} кандидатов</p>
-                  </span>
-                  <span>{item.events} событий</span>
-                </button>
-              ))
-            ) : (
-              <p className="empty-note">Активности по вакансиям пока нет.</p>
-            )}
-          </section>
-          <section className="panel statistics-metrics">
-            <h3>Этапы подбора</h3>
-            <p className="muted">
-              Уникальные пары «вакансия — кандидат» на каждом этапе за период.
-              Этапы не образуют воронку конверсии.
-            </p>
-            <div className="statistics-metric-grid">
-              {stages.map((stage) => (
+      <div className="statistics-grid">
+        <section className="panel statistics-kpis">
+          <h3>Обзор подбора</h3>
+          <div className="statistics-kpi-grid">
+            {(["viewed", "liked", "interviewed"] as const).map((stage) => {
+              const values = stats.daily.map((day) => day.counts[stage]);
+              return (
                 <div key={stage}>
-                  <span>{stageLabels[stage]}</span>
+                  <span className="statistics-caption">
+                    {stageLabels[stage]}
+                  </span>
                   <strong>{stats.current[stage]}</strong>
-                  <small>Ранее {stats.previous[stage]}</small>
+                  <small>События по дням</small>
+                  <svg
+                    viewBox="0 0 600 160"
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                    className="statistics-sparkline"
+                  >
+                    <polyline points={points(values, Math.max(1, ...values))} />
+                  </svg>
+                  <small title="За предыдущий период">
+                    Ранее {stats.previous[stage]}
+                  </small>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <section className="panel statistics-daily">
+          <div className="statistics-card-heading">
+            <h3>Активность</h3>
+            <span className="statistics-caption">События · UTC</span>
+          </div>
+          <svg
+            className="statistics-area"
+            viewBox="0 0 600 170"
+            role="img"
+            aria-label={`Событий за период: ${daily.reduce((sum, value) => sum + value, 0)}`}
+          >
+            {[15, 60, 105, 150].map((y) => (
+              <line
+                className="statistics-guide"
+                key={y}
+                x1="0"
+                x2="600"
+                y1={y}
+                y2={y}
+              />
+            ))}
+            {daily.length > 0 && (
+              <>
+                <polygon points={`0,150 ${activityPoints} 600,150`} />
+                <polyline points={activityPoints} />
+              </>
+            )}
+          </svg>
+          <div className="statistics-axis">
+            <span>{stats.period.from}</span>
+            <span>{stats.period.to}</span>
+          </div>
+          {!daily.some(Boolean) && (
+            <p className="statistics-empty">Событий за период пока нет</p>
+          )}
+          <details className="statistics-data-table">
+            <summary>Данные по дням</summary>
+            <table>
+              <thead>
+                <tr>
+                  <th>Дата · UTC</th>
+                  <th>События</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.daily.map((day, index) => (
+                  <tr key={day.date}>
+                    <td>{day.date}</td>
+                    <td>{daily[index]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </section>
+        <section className="panel statistics-inventory">
+          <h3>Ваши вакансии</h3>
+          <div className="statistics-inventory-chart">
+            <div className="statistics-donut">
+              <svg
+                viewBox="0 0 160 160"
+                role="img"
+                aria-label={inventory
+                  .map((item) => `${item.label}: ${item.value}`)
+                  .join(", ")}
+              >
+                <circle
+                  className="statistics-donut-track"
+                  cx="80"
+                  cy="80"
+                  r="61"
+                />
+                {arcs
+                  .filter((arc) => arc.length > 0)
+                  .map((arc) => (
+                    <circle
+                      key={arc.label}
+                      className={`statistics-tone-${arc.tone}`}
+                      cx="80"
+                      cy="80"
+                      r="61"
+                      pathLength="100"
+                      strokeDasharray={`${arc.length} ${100 - arc.length}`}
+                      strokeDashoffset={-arc.offset}
+                    />
+                  ))}
+              </svg>
+              <div>
+                <strong>{total}</strong>
+                <span>всего</span>
+              </div>
+            </div>
+            <div className="statistics-legend">
+              {inventory.map((item) => (
+                <div key={item.label}>
+                  <i className={`statistics-tone-${item.tone}`} />
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
                 </div>
               ))}
             </div>
-          </section>
-          <section className="panel statistics-daily">
-            <h3>Активность по дням</h3>
-            <p className="muted">Количество событий · UTC</p>
-            <div
-              className="statistics-bars"
-              aria-label="Ежедневное количество событий"
-            >
-              {stats.daily.map((day) => {
-                const count = Object.values(day.counts).reduce(
-                  (sum, value) => sum + value,
-                  0,
-                );
-                return (
-                  <div key={day.date} title={`${day.date}: ${count} событий`}>
-                    <span style={{ height: `${(count / max) * 100}%` }} />
-                    <small>{day.date.slice(8)}</small>
-                  </div>
-                );
-              })}
+          </div>
+          {!total && (
+            <p className="statistics-empty">
+              Создайте первую вакансию, чтобы начать подбор
+            </p>
+          )}
+        </section>
+        <section className="panel statistics-metrics">
+          <div className="statistics-card-heading">
+            <h3>Этапы подбора</h3>
+            <span className="statistics-comparison-key">
+              <i />
+              Сейчас <i />
+              Ранее
+            </span>
+          </div>
+          <div className="statistics-stage-bars">
+            {stages.map((stage) => (
+              <div key={stage}>
+                <span>{stageLabels[stage]}</span>
+                <div
+                  className="statistics-stage-track"
+                  title={`Сейчас ${stats.current[stage]}, ранее ${stats.previous[stage]}`}
+                >
+                  <span
+                    className="statistics-stage-previous"
+                    style={{
+                      width: `${(stats.previous[stage] / stageMax) * 100}%`,
+                    }}
+                  />
+                  <span
+                    className="statistics-stage-current"
+                    style={{
+                      width: `${(stats.current[stage] / stageMax) * 100}%`,
+                    }}
+                  />
+                </div>
+                <strong>{stats.current[stage]}</strong>
+              </div>
+            ))}
+          </div>
+          <p className="statistics-footnote">
+            Уникальные пары «вакансия — кандидат» на каждом этапе
+          </p>
+        </section>
+        <section className="panel statistics-summary">
+          <h3>В работе</h3>
+          <div className="statistics-summary-grid">
+            <div>
+              <Icon name="candidates" />
+              <strong>{stats.unique_candidates}</strong>
+              <span>кандидатов за период</span>
             </div>
-          </section>
-        </div>
+            <div>
+              <Icon name="resumes" />
+              <strong>{stats.inventory.saved_pairs}</strong>
+              <span>сохранено сейчас</span>
+            </div>
+            <div>
+              <Icon name="clock" />
+              <strong>{stats.inventory.active_processes}</strong>
+              <span>активных процессов</span>
+            </div>
+          </div>
+        </section>
+        <section className="panel statistics-vacancies">
+          <div className="statistics-card-heading">
+            <h3>Активность вакансий</h3>
+            <button
+              className="statistics-all-link"
+              onClick={() => navigate("/vacancies")}
+            >
+              Все вакансии <span>↗</span>
+            </button>
+          </div>
+          {stats.top_vacancies.length ? (
+            stats.top_vacancies.map((item) => (
+              <button
+                className="statistics-vacancy-row"
+                key={item.vacancy_id}
+                onClick={() => navigate(`/vacancy/${item.draft_id}`)}
+              >
+                <span>
+                  <b>{item.title}</b>
+                  <small>{item.candidates} кандидатов</small>
+                </span>
+                <span className="statistics-vacancy-meter">
+                  <span style={{ width: `${(item.events / topMax) * 100}%` }} />
+                </span>
+                <strong title="Количество событий">{item.events}</strong>
+              </button>
+            ))
+          ) : (
+            <div className="statistics-vacancy-empty">
+              <Icon name="vacancies" />
+              <p>Активности по вакансиям пока нет</p>
+            </div>
+          )}
+        </section>
       </div>
       <p className="statistics-period">
-        Период {stats.period.from} — {stats.period.to}, UTC. Предыдущий:{" "}
-        {stats.period.previous_from} — {stats.period.previous_to}.
+        {stats.period.from} — {stats.period.to} · UTC{" "}
+        <span>
+          Сравнение: {stats.period.previous_from} — {stats.period.previous_to}
+        </span>
       </p>
     </Reveal>
   );
