@@ -1,5 +1,5 @@
 # session/tool state
-/.mimosa
+.mimosa/
 
 # environment & secrets
 .env
