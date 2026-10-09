@@ -140,9 +140,7 @@ legacy consent regression:27 passed. API запускается последов
 сохранена внутри общей `_decision_locked` транзакции для ranked reactions.
 Source входит в хеш политики назначения.
 
-Миграции `011_candidate_showcase.sql` и `011_hypothesis_exploration.sql` сохранены
-с исходными checksum; мигратор учитывает полные имена, одинаковый числовой
-префикс не заменяет одну миграцию другой. [Отдельный отчёт объединения](../data/validation/hypothesis-showcase-integration.json)
+После объединения витрины и гипотез файлы получили канонические имена `011_candidate_showcase.sql` и `012_hypothesis_exploration.sql` ([matching-migrations.md](matching-migrations.md)); историческая запись `011_hypothesis_exploration.sql` учитывается checksum-alias без повторного DDL. [Отдельный отчёт объединения](../data/validation/hypothesis-showcase-integration.json)
 содержит дополнительный свежий22-profile Harrier прогон с обеими миграциями,
 37 PostgreSQL тестов смежных модулей и46 API тестов (один внешний QGramm skip),
 typecheck/build, scoped Ruff и smoke12/12. Общий прогон объединённой версии:
