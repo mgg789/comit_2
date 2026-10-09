@@ -22,12 +22,16 @@ from matching_engine.preference_model import (
 from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import RerankArtifact, validate_artifact
 
-LIVE_POLICY_VERSION = "vacancy-preference-live-v1"
-MIN_TRAIN_ROWS = 24
+# Operator decision (Mike, 2026-10-08): first fit lowered 40 -> 30 reactions.
+# Synthetic-employer validation (preference-validation-v5) shows every coherent
+# policy converges by ~21 reactions; the activation gate still requires positive
+# validation/golden gains and forbids regression against the active model.
+LIVE_POLICY_VERSION = "vacancy-preference-live-v2"
+MIN_TRAIN_ROWS = 14
 MIN_HOLDOUT_ROWS = 8
 MIN_CLASS_COUNT = 2
 MAX_LOGLOSS_REGRESSION = 0.01
-INITIAL_ACTION_THRESHOLD = 40
+INITIAL_ACTION_THRESHOLD = 30
 FOLLOWUP_ACTION_THRESHOLD = 16
 
 

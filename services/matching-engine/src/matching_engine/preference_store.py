@@ -143,7 +143,7 @@ class PreferenceStore:
 
     @staticmethod
     def enqueue(connection: psycopg.Connection, session: dict) -> UUID | None:
-        """Coalesce reactions transactionally: first 40 candidates, then 16 fresh candidates per fit."""
+        """Coalesce reactions transactionally: first 30 candidates, then 16 fresh candidates per fit."""
         if session.get("artifact_hash") is None or session.get("card", {}).get("mode") == "main_fallback":
             return None
         control = PreferenceStore.ensure(connection, session)
@@ -159,7 +159,7 @@ class PreferenceStore:
             connection.execute("UPDATE preference_pipeline.controls SET state='observation_limit' WHERE vacancy_id=%s", (control["vacancy_id"],))
             return None
         fresh = sum(control["last_attempt_at"] is None or timestamp(row["decision_at"]) > control["last_attempt_at"] for row in rows)
-        if len(rows) < 40 or (control["last_attempt_at"] is not None and fresh < 16):
+        if len(rows) < 30 or (control["last_attempt_at"] is not None and fresh < 16):
             return None
         job_id = uuid4()
         connection.execute("INSERT INTO preference_pipeline.jobs(job_id,vacancy_id,context_hash,epoch) VALUES(%s,%s,%s,%s)",
@@ -258,7 +258,7 @@ class PreferenceStore:
             self._verify_rows(selected, artifact)
             context = {"identity": control["identity"], "train": selected[:-16],
                        "validation": selected[-16:-8], "golden": selected[-8:]}
-            fresh_audit = bool(len(selected) >= 40 and (control["last_attempt_at"] is None
+            fresh_audit = bool(len(selected) >= 30 and (control["last_attempt_at"] is None
                               or timestamp(selected[-16]["decision_at"]) > control["last_attempt_at"]))
             input_hash = digest(selected)
             plan = {"context_hash": control["context_hash"], "epoch": control["epoch"], "input_hash": input_hash,

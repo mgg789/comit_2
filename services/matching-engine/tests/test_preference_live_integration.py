@@ -93,12 +93,12 @@ def react(store, feed, vacancy_id, owner_id, session_id, rows, start: int, end: 
 def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     """Actually fit a model, score remaining cards and rollback without moving delivered cards."""
     feed, vacancy_id, owner_id, session_id, rows, artifact = numeric_feed(store)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 39)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 29)
     preferences = PreferenceStore(store.database_url)
     assert preferences.status(owner_id, vacancy_id)["job_id"] is None
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 39, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 29, 30)
     queued = preferences.status(owner_id, vacancy_id)
-    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == 40
+    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == 30
     with connect(store.database_url) as connection:
         delivered = connection.execute("SELECT exposure_id,position,card FROM feed_pipeline.exposures WHERE served_at IS NOT NULL ORDER BY position").fetchall()
     assert PreferenceWorker(preferences, retry_base_seconds=0).process_once()
@@ -107,7 +107,7 @@ def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     with connect(store.database_url) as connection:
         model = connection.execute("SELECT * FROM preference_pipeline.models WHERE model_hash=%s", (active["active_model_hash"],)).fetchone()
         report = connection.execute("SELECT plan,report FROM preference_pipeline.jobs WHERE job_id=%s", (model["job_id"],)).fetchone()
-        assert len(report["plan"]["splits"]["train"]) == 24
+        assert len(report["plan"]["splits"]["train"]) == 14
         assert len(report["plan"]["splits"]["golden"]) == 8
         assert report["report"]["fit_performed"] and "model_full_json" not in report["report"]
     page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(40), 1)

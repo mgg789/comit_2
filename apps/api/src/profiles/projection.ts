@@ -142,6 +142,8 @@ function narratives(fields: CandidateProfileFields, group: "projects" | "experie
  * Build the exact matching intake from the API-owned source row.
  * Email is copied only from a verified account; declared grade is deliberately
  * self-reported and has no invented test session or approval timestamp.
+ * The FSP block is copied only from a server-confirmed registry evidence row;
+ * the registry display name never enters the snapshot.
  */
 export function projectCandidateIntake(
   account: ProjectionAccount,

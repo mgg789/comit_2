@@ -14,7 +14,8 @@ export type {
 } from "./candidate-profile.js";
 export type {
   CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,
-  CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill, StrictCoordinateEvidence,
+  CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill,
+  StrictCoordinateEvidence,
 } from "./candidate-pipeline.js";
 export type {
   VacancyIntake, VacancyPipelineStatus, VacancyReady, VacancyReadyPage, VacancyWorkType,
