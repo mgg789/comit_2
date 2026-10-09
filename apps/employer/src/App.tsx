@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
@@ -277,140 +278,24 @@ export default function App() {
           </>
         ) : (
           <>
-            <header className={`topbar ${agent ? "assistant-open" : ""}`}>
-              <a
-                className="brand glass"
-                href="#/vacancies"
-                aria-label="Comit — вакансии"
-              >
-                <Icon name="logo" />
-                <span className="brand-word">comit</span>
-              </a>
-              <nav className="nav" aria-label="Навигация работодателя">
-                {(
-                  [
-                    { id: "vacancies", label: "Вакансии", path: "/vacancies" },
-                    { id: "resumes", label: "Резюме", path: "/resumes" },
-                    { id: "candidates", label: "Кандидаты", path: "/showcase" },
-                    {
-                      id: "statistics",
-                      label: "Статистика",
-                      path: "/statistics",
-                    },
-                    { id: "settings", label: "Настройки", path: "/settings" },
-                  ] as const
-                ).map((item) => (
-                  <button
-                    key={item.id}
-                    className={`nav-item glass ${selected === item.id ? "selected" : ""}`}
-                    onClick={() => {
-                      navigate(item.path);
-                    }}
-                    aria-label={item.label}
-                    aria-current={selected === item.id ? "page" : undefined}
-                  >
-                    <Icon name={item.id} />
-                    <motion.span
-                      className="nav-label"
-                      aria-hidden={selected !== item.id}
-                      initial={false}
-                      animate={{
-                        width: selected === item.id ? "auto" : 0,
-                        opacity: selected === item.id ? 1 : 0,
-                        marginLeft: selected === item.id ? "10rem" : "0rem",
-                      }}
-                      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                    >
-                      {item.label}
-                    </motion.span>
-                  </button>
-                ))}
-              </nav>
-              <div className="account-tools glass" ref={accountToolsRef}>
-                <button
-                  className="plain-icon"
-                  aria-label="Поиск кандидатов"
-                  onClick={() => leaveAgent(() => {
-                    if (pieces[0] === "showcase")
-                      window.dispatchEvent(
-                        new Event("employer:focus-candidate-search"),
-                      );
-                    else navigate("/showcase?search=1");
-                  })}
-                >
-                  <Icon name="search" />
-                </button>
-                <button
-                  className="plain-icon"
-                  aria-label="Переписка и приглашения"
-                  onClick={() => leaveAgent(() => navigate("/chat"))}
-                >
-                  <Icon name="message" />
-                </button>
-                <button
-                  className="plain-icon"
-                  onClick={() => setMenu((value) => !value)}
-                  aria-label="Открыть меню аккаунта"
-                  aria-expanded={menu}
-                >
-                  <span className="account-avatar">
-                    {account.email.slice(0, 1).toUpperCase()}
-                  </span>
-                  <Icon name="chevron" />
-                </button>
-              </div>
-              <AnimatePresence>
-                {menu && (
-                  <motion.div
-                    ref={menuRef}
-                    className="account-menu glass"
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                  >
-                    <p>{account.email}</p>
-                    <Action
-                      onClick={() => {
-                        leaveAgent(() => navigate("/chat"));
-                      }}
-                    >
-                      Мои чаты
-                    </Action>
-                    <Action
-                      onClick={() => confirmAccountAction("logout")}
-                    >
-                      Выйти
-                    </Action>
-                    <Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </header>
+            <AppShellHeader brandHref="#/vacancies" brandLabel="Comit — вакансии" navigationLabel="Навигация работодателя"
+              items={[
+                { id: "vacancies", label: "Вакансии", path: "/vacancies", icon: "vacancies" },
+                { id: "resumes", label: "Резюме", path: "/resumes", icon: "resumes" },
+                { id: "candidates", label: "Кандидаты", path: "/showcase", icon: "candidates" },
+                { id: "statistics", label: "Статистика", path: "/statistics", icon: "statistics" },
+                { id: "settings", label: "Настройки", path: "/settings", icon: "settings" },
+              ]} selected={selected} navigate={navigate} email={account.email} menu={menu} toggleMenu={() => setMenu(value => !value)}
+              toolsRef={accountToolsRef} menuRef={menuRef} assistantOpen={agent}
+              searchLabel="Поиск кандидатов" onSearch={() => leaveAgent(() => {
+                if (pieces[0] === "showcase") window.dispatchEvent(new Event("employer:focus-candidate-search"));
+                else navigate("/showcase?search=1");
+              })} secondaryLabel="Переписка и приглашения" onSecondary={() => leaveAgent(() => navigate("/chat"))}
+              menuContent={<><Action onClick={() => leaveAgent(() => navigate("/chat"))}>Мои чаты</Action><Action onClick={() => confirmAccountAction("logout")}>Выйти</Action><Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action></>}
+            />
             <AnimatePresence>
               {accountAction && (
-                <motion.div
-                  className="modal-shade"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={(event) => {
-                    if (event.target === event.currentTarget && !accountBusy)
-                      setAccountAction(null);
-                  }}
-                >
-                  <section
-                    className="modal account-confirmation glass"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="account-confirmation-title"
-                  >
-                    <h2 id="account-confirmation-title">
-                      {accountAction === "delete"
-                        ? "Удалить аккаунт?"
-                        : accountAction === "logout-all"
-                          ? "Выйти на всех устройствах?"
-                          : "Выйти из аккаунта?"}
-                    </h2>
+                <Dialog manageFocus={false} close={() => { if (!accountBusy) setAccountAction(null); }} title={accountAction === "delete" ? "Удалить аккаунт?" : accountAction === "logout-all" ? "Выйти на всех устройствах?" : "Выйти из аккаунта?"}>
                     <p>
                       {accountAction === "delete"
                         ? "Удаление аккаунта пока недоступно: сервисы ещё не поддерживают удаление связанных вакансий, переписки и данных подбора. Аккаунт и его данные сохранятся."
@@ -429,8 +314,7 @@ export default function App() {
                         </Action>
                       )}
                     </div>
-                  </section>
-                </motion.div>
+                </Dialog>
               )}
             </AnimatePresence>
             <main className="main-content">

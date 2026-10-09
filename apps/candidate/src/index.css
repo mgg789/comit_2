@@ -2,19 +2,9 @@
 @import "@comit/ui-kit/design.css";
 @import "@comit/ui-kit/auth.css";
 @import "./screens.css";
-.candidate-app .topbar { margin-top: 50rem; }
-.candidate-nav-label { padding-left: 14rem; }
 .candidate-settings { display: grid; gap: 24rem; max-width: 900rem; }
 .candidate-settings .action { justify-self: start; }
-.candidate-modal { position: fixed; inset: 0; display: grid; place-items: center; padding: 24rem; z-index: 100; background: var(--employer-paint-17171ae8); backdrop-filter: blur(16rem); }
-.candidate-dialog { width: min(650rem, 100%); display: grid; gap: 24rem; }
-.candidate-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 20rem; }
-.candidate-dialog-heading h2 { font-size: 30rem; }
-.candidate-dialog-heading .action { padding: 8rem 20rem; min-height: 44rem; }
-.candidate-dialog-actions { display: flex; gap: 20rem; justify-content: flex-end; }
-.candidate-dialog form { display: grid; gap: 24rem; }
 .candidate-legal pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
-@media (max-width: 700px) { .candidate-app .topbar { margin-top: 20rem; } .candidate-app .account-tools { gap: 10rem; padding-inline: 12rem; } .candidate-app .nav { max-width: calc(100vw - 20px); gap: 5rem; } .candidate-app .nav-item.selected { padding-inline: 12rem; } .candidate-nav-label { padding-left: 6rem; } }
 
 .candidate-app:not(.is-login) > .ambient { display: none; }
 .candidate-art { position: absolute; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }

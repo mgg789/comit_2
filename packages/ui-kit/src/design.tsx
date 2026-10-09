@@ -462,3 +462,10 @@ export function Reveal({
 }
 
 export { designAsset } from "./design-assets";
+
+/** Employer's existing tag group; variants reuse the platform palette, with optional pill geometry. */
+export function Tags({ values, variant = "light", shape = "rounded", className = "" }: {
+  values: readonly string[]; variant?: "light" | "blue" | "muted"; shape?: "rounded" | "pill"; className?: string;
+}) {
+  return <div className={`tags ${className}`.trim()}>{values.filter(Boolean).map((value, index) => <span key={`${value}-${index}`} className={`tag ${variant === "light" ? "" : variant} ${shape === "pill" ? "pill" : ""}`.trim()}>{value}</span>)}</div>;
+}

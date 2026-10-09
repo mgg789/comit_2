@@ -3,15 +3,13 @@
 .candidate-profile-hero h1 { font-size: 64rem; max-width: 100%; overflow-wrap: anywhere; }
 .candidate-profile-avatar { width: 300rem; height: 300rem; display: grid; place-items: center; font-family: var(--employer-display); font-size: 88rem; border-radius: 50%; background: var(--employer-gradient); color: var(--comit-text); box-shadow: 0 20rem 80rem var(--employer-paint-0000006b); }
 .candidate-profile-bio { width: min(900rem, 100%); white-space: pre-line; }
-.candidate-chips { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10rem; }
-.candidate-chip { padding: 12rem 20rem; border-radius: 100rem; background: var(--employer-paint-ededed); color: var(--employer-ink); font-size: 22rem; overflow-wrap: anywhere; max-width: 100%; }
+.candidate-chips { align-items: center; justify-content: center; margin-top: 0; }
 .candidate-profile-body { max-width: 1528rem; margin: 140rem auto 0; display: grid; gap: 70rem; }
 .candidate-profile-section { display: grid; gap: 28rem; }
 .candidate-profile-section > header { display: flex; align-items: center; justify-content: space-between; gap: 24rem; }
 .candidate-profile-section h2 { font-size: 40rem; color: var(--comit-text-muted); }
 .candidate-profile-section .primary { min-height: 56rem; padding: 16rem 64rem; border-radius: 20rem; }
 .candidate-skills { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 24rem; min-height: 120rem; padding: 30rem 36rem; }
-.candidate-skills .candidate-chip { background: var(--employer-paint-2f2f2d); color: var(--comit-text); }
 .candidate-skills .candidate-chips { justify-content: flex-start; }
 .candidate-narratives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22rem; }
 .candidate-narrative { display: grid; gap: 18rem; padding: 36rem 25rem; min-height: 160rem; }
@@ -46,7 +44,6 @@
 .candidate-offer-open h2 { font-family: var(--employer-font); font-size: 32rem; font-weight: 600; overflow-wrap: anywhere; }
 .candidate-offer-open p { color: var(--comit-text-muted); font-size: 22rem; }
 .candidate-offer-card .candidate-chips { justify-content: flex-start; }
-.candidate-offer-card .candidate-chip { background: var(--employer-blue); font-size: 20rem; border-radius: 20rem; }
 .candidate-offer-salary { font-family: var(--employer-display); font-size: 32rem; overflow-wrap: anywhere; }
 .candidate-offer-card footer { border-top: 1px solid var(--employer-line); padding-top: 18rem; margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 14rem; color: var(--comit-text-muted); }
 .candidate-offer-card footer > span { display: flex; align-items: center; gap: 12rem; font-size: 22rem; }
@@ -61,12 +58,6 @@
 .candidate-offer-progress article { display: grid; gap: 14rem; padding-top: 24rem; border-top: 1px solid var(--employer-line); }
 .candidate-decline { display: grid; gap: 20rem; }
 .candidate-process-chat { grid-column: 1 / -1; display: grid; gap: 24rem; }
-.candidate-chat-messages { max-height: 600rem; overflow-y: auto; display: grid; gap: 18rem; }
-.candidate-chat-messages article { justify-self: start; max-width: 75%; display: grid; gap: 10rem; padding: 22rem; border-radius: 24rem; background: var(--employer-paint-2f2f2d); }
-.candidate-chat-messages .is-own { justify-self: end; background: var(--employer-gradient); }
-.candidate-chat-messages p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.candidate-process-chat > form { display: flex; gap: 14rem; }
-.candidate-process-chat > form input { min-width: 0; }
 .candidate-statistics { display: grid; grid-template-columns: minmax(0, 655fr) minmax(0, 1073fr); gap: 32rem; }
 .candidate-stat-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32rem; border-radius: 16rem; align-content: start; }
 .candidate-stat-counts > div { display: flex; flex-direction: column; gap: 12rem; }
@@ -84,7 +75,6 @@
   .candidate-profile-hero { gap: 24rem; }
   .candidate-profile-hero h1 { font-size: 30rem; }
   .candidate-profile-avatar { width: 170rem; height: 170rem; font-size: 56rem; }
-  .candidate-chip { padding: 10rem 14rem; font-size: 16rem; }
   .candidate-profile-body { margin-top: 56rem; gap: 40rem; }
   .candidate-profile-section { gap: 18rem; }
   .candidate-profile-section h2 { font-size: 24rem; }
@@ -99,15 +89,12 @@
   .candidate-offer-open h2 { font-size: 24rem; }
   .candidate-offer-open p, .candidate-offer-card footer > span { font-size: 16rem; }
   .candidate-offer-salary { font-size: 26rem; }
-  .candidate-offer-card .candidate-chip { font-size: 14rem; }
   .candidate-offer-status { font-size: 14rem; }
   .candidate-stat-counts { gap: 16rem; }
   .candidate-stat-counts strong { font-size: 32rem; }
   .candidate-stat-counts span { font-size: 14rem; }
   .candidate-stat-counts small { font-size: 12rem; }
   .candidate-statistics h2 { font-size: 22rem; }
-  .candidate-chat-messages article { max-width: 95%; }
-  .candidate-process-chat > form { flex-wrap: wrap; }
 }
 
 /* Preserve the Figma panel hierarchy even when an API metric is unavailable. */
@@ -131,7 +118,7 @@
 .candidate-stat-market { min-height: 308rem; display: grid; align-content: start; gap: 24rem; border-radius: 16rem; }
 .candidate-market-salary { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 22rem; margin-top: 24rem; }
 .candidate-market-salary > div { display: grid; gap: 14rem; }
-.candidate-market-salary .candidate-chip { font-size: 18rem; }
+.candidate-market-salary .tag { font-size: 18rem; }
 .candidate-stat-small { display: grid; grid-template-columns: minmax(0, 391fr) minmax(0, 229fr); gap: 32rem; }
 .candidate-stat-skills, .candidate-stat-position { min-height: 351rem; }
 .candidate-stat-position { position: relative; overflow: hidden; display: grid; align-content: start; gap: 20rem; padding: 24rem 20rem; border-radius: 16rem; }

@@ -245,6 +245,9 @@ importers:
 
   packages/ui-kit:
     dependencies:
+      '@comit/shared':
+        specifier: workspace:*
+        version: link:../shared
       framer-motion:
         specifier: ^14.0.0
         version: 14.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)

@@ -612,12 +612,16 @@ try {
   ]);
   await policy
     .getByRole("heading", {
-      name: "Тестовая политика конфиденциальности Comit",
+      name: "Тестовое согласие на обработку персональных данных",
       exact: true,
     })
     .waitFor();
-  await policy.getByRole("link", { name: "Текст согласия", exact: true }).click();
   await policy.getByRole("heading", { name: "Аккаунт — account-v1", exact: true }).waitFor();
+  await policy.getByRole("link", { name: "политика конфиденциальности", exact: true }).click();
+  await policy.getByRole("heading", {
+    name: "Тестовая политика конфиденциальности Comit",
+    exact: true,
+  }).waitFor();
   await policy.close();
   assert.equal(await page.getByRole("checkbox").isChecked(), false);
   for (const width of [1920, 1024, 390]) {

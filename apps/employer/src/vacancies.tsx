@@ -1,3 +1,4 @@
+import { Tags } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
@@ -142,15 +143,7 @@ export function Vacancies({
                 {status(draft)}
               </div>
               <h3>{draft.fields.title || "Без названия"}</h3>
-              <div className="tags">
-                {Object.keys(draft.fields.stacks || {})
-                  .slice(0, 3)
-                  .map((key) => (
-                    <span className="tag" key={key}>
-                      {skillLabel(key)}
-                    </span>
-                  ))}
-              </div>
+              <Tags values={Object.keys(draft.fields.stacks || {}).slice(0, 3).map(skillLabel)} />
               <div className="salary-row">
                 <strong>
                   {vacancySalary(draft.fields.zp_min, draft.fields.zp_max)}

@@ -23,10 +23,6 @@
     margin-top: 24rem;
   }
 }
-.yandex {
-  display: grid;
-  place-items: center;
-}
 .vacancy-card:first-child .tag {
   background: var(--employer-blue);
 }
@@ -183,23 +179,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10rem;
-  margin-top: 20rem;
-}
-.tag {
-  padding: 10rem 20rem;
-  border-radius: 20rem;
-  background: var(--employer-paint-ededed);
-  color: var(--employer-ink);
-  font-size: 20rem;
-  line-height: 1.2;
-}
-.tag.blue {
-  background: var(--employer-blue);
-}
 .salary-row {
   display: flex;
   align-items: baseline;
@@ -277,26 +256,6 @@
   height: 63rem;
   object-fit: contain;
 }
-.modal-shade {
-  position: fixed;
-  inset: 0;
-  background: var(--employer-paint-0000006b);
-  backdrop-filter: blur(10rem);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 70rem 24rem;
-  overflow-y: auto;
-  z-index: 40;
-}
-.modal {
-  position: relative;
-  width: 484rem;
-  background: var(--employer-paint-191918);
-  border-radius: 30rem;
-  padding: 28rem;
-  color: var(--comit-text);
-}
 .modal.vacancy-editor {
   width: 726rem;
   max-width: calc(100vw - 144rem);
@@ -371,20 +330,6 @@
   gap: 20rem;
   font-size: 18rem;
   cursor: pointer;
-}
-.login {
-  min-height: 100vh;
-  padding: 36rem 40rem;
-}
-.yandex {
-  height: var(--login-control-height);
-  border-radius: 97rem;
-  background: var(--comit-text);
-  color: var(--comit-bg);
-  border: 0;
-  font-size: 48rem;
-  font-weight: 700;
-  letter-spacing: -2rem;
 }
 .legal-document {
   margin: 48rem auto;
@@ -739,10 +684,6 @@
   .vacancy-card h3 {
     font-size: 24rem;
   }
-  .tag {
-    font-size: 14rem;
-    padding: 8rem 14rem;
-  }
   .salary-row strong {
     font-size: 24rem;
   }
@@ -769,14 +710,6 @@
     width: 40rem;
     height: 40rem;
   }
-  .modal-shade {
-    padding: 50rem 20rem 100rem;
-  }
-  .modal {
-    width: 100%;
-    max-width: 484rem;
-    padding: 22rem;
-  }
   .modal-close {
     right: 0;
     top: -48rem;
@@ -798,13 +731,6 @@
   .checkbox {
     font-size: 14rem;
     gap: 12rem;
-  }
-  .login {
-    padding: 20rem;
-  }
-  .yandex {
-    font-size: 32rem;
-    height: 48rem;
   }
   .detail-columns,
   .resume-grid {

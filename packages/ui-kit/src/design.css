@@ -770,3 +770,65 @@ textarea::placeholder {
 :is(.employer-app, .candidate-app) :is(button, .icon, .tooltip, .vacancy-card, .discovery-search, .search-glyph, .copy-feedback) {
   --employer-feedback-transition: var(--employer-hover-duration);
 }
+
+/* Shared existing employer modal shell; app-specific editors keep their own sizing. */
+.modal-shade {
+  position: fixed;
+  inset: 0;
+  background: var(--employer-paint-0000006b);
+  backdrop-filter: blur(10rem);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 70rem 24rem;
+  overflow-y: auto;
+  z-index: 40;
+}
+.modal {
+  position: relative;
+  width: 484rem;
+  background: var(--employer-paint-191918);
+  border-radius: 30rem;
+  padding: 28rem;
+  color: var(--comit-text);
+}
+
+.account-confirmation form { display: grid; gap: 24rem; }
+@media (max-width: 760px) {
+  .modal-shade {
+    padding: 50rem 20rem 100rem;
+  }
+  .modal {
+    width: 100%;
+    max-width: 484rem;
+    padding: 22rem;
+  }
+}
+
+/* Original employer skill tags, shared across both cabinets. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rem;
+  margin-top: 20rem;
+}
+.tag {
+  padding: 10rem 20rem;
+  border-radius: 20rem;
+  background: var(--employer-paint-ededed);
+  color: var(--employer-ink);
+  font-size: 20rem;
+  line-height: 1.2;
+}
+.tag.blue {
+  background: var(--employer-blue);
+}
+.tag.pill { border-radius: 100rem; }
+.tag.muted { background: var(--employer-paint-2f2f2d); color: var(--comit-text); }
+.tag { overflow-wrap: anywhere; max-width: 100%; }
+@media (max-width: 760px) {
+  .tag {
+    font-size: 14rem;
+    padding: 8rem 14rem;
+  }
+}

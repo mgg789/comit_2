@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, MotionConfig } from "framer-motion";
+import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
-import { Action, Backdrop, Icon, PageTitle, State } from "@comit/ui-kit/design";
+import { Action, Backdrop, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
 import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen } from "./screens";
@@ -26,6 +27,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const menuRoot = useRef<HTMLDivElement>(null);
+  const menuPanel = useRef<HTMLDivElement>(null);
   async function checkAccount() {
     setChecking(true);
     setAuthError(null);
@@ -46,7 +48,7 @@ export default function App() {
   useEffect(() => {
     if (!menu)
       return;
-    const dismiss = (event: PointerEvent) => { if (event.target instanceof Node && !menuRoot.current?.contains(event.target))
+    const dismiss = (event: PointerEvent) => { if (event.target instanceof Node && !menuRoot.current?.contains(event.target) && !menuPanel.current?.contains(event.target))
       setMenu(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape")
       setMenu(false); };
@@ -88,36 +90,12 @@ export default function App() {
         </main>
           : !account ? <EmailLogin requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
             : <>
-    <header className="topbar">
-     <a className="brand glass" href="#/resume" aria-label="Comit — резюме">
-            <Icon name="logo"/>
-            <span className="brand-word">comit</span>
-            </a>
-     <nav className="nav" aria-label="Навигация кандидата">{navigation.map(item => <button key={item.path} className={`nav-item glass ${selected === item.path ? "selected" : ""}`} aria-label={item.label} aria-current={selected === item.path ? "page" : undefined} onClick={() => navigate(item.path)}>{item.path === "/resume" || item.path === "/offers" ? <span className="icon" aria-hidden="true">
-                <img src={`${import.meta.env.BASE_URL}design/${item.path === "/resume" ? "abd1b.svg" : "0f423.svg"}`} alt=""/>
-                </span> : <Icon name={item.icon}/>}<AnimatePresence initial={false}>{selected === item.path && <motion.span className="nav-label" initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ duration: .3 }}>
-                <span className="candidate-nav-label">{item.label}</span>
-                </motion.span>}</AnimatePresence>
-              <span className="tooltip">{item.label}</span>
-              </button>)}</nav>
-     <div className="account-tools glass" ref={menuRoot}>
-      <button className="plain-icon" aria-label="Поиск предложений" onClick={() => { setMenu(false); setSearch(true); }}>
-            <Icon name="search"/>
-            </button>
-      <button className="plain-icon" aria-label="Предложения работы" onClick={() => navigate("/offers")}>
-            <Icon name="bell"/>
-            </button>
-      <button className="plain-icon" aria-label="Меню аккаунта" aria-expanded={menu} onClick={() => setMenu(value => !value)}>
-            <span className="account-avatar">{account.email.slice(0, 1).toUpperCase()}</span>
-            <Icon name="chevron"/>
-            </button>
-      <AnimatePresence>{menu && <motion.div className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-              <p>{account.email}</p>
-              <Action onClick={() => navigate("/offers")}>Мои предложения</Action>
-              <Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action>
-              </motion.div>}</AnimatePresence>
-     </div>
-    </header>
+    <AppShellHeader brandHref="#/resume" brandLabel="Comit — резюме" navigationLabel="Навигация кандидата"
+      items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
+      menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
+      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); setSearch(true); }} secondaryLabel="Предложения работы" secondaryIcon="bell" onSecondary={() => navigate("/offers")}
+      menuContent={<><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
+    />
     <main className="main-content candidate-content" key={account.id}>
      {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
               <PageTitle title="Настройки"/>
@@ -131,7 +109,7 @@ export default function App() {
               </section>
               </> : <State empty="Страница не найдена" retry={() => navigate("/resume")}/>}
     </main>
-    {search && <Dialog title="Поиск предложений" close={() => setSearch(false)}>
+    <AnimatePresence>{search && <Dialog title="Поиск предложений" close={() => setSearch(false)}>
               <form onSubmit={event => { event.preventDefault(); navigate("/offers"); setSearch(false); }}>
               <label className="field">
               <span>Компания или название вакансии</span>
@@ -139,63 +117,17 @@ export default function App() {
               </label>
               <Action variant="primary" type="submit">Найти</Action>
               </form>
-              </Dialog>}
-    {logout && <Dialog title="Выйти из аккаунта?" close={() => { if (!busy)
+              </Dialog>}</AnimatePresence>
+    <AnimatePresence>{logout && <Dialog title="Выйти из аккаунта?" close={() => { if (!busy)
                 setLogout(false); }}>
-              <p>Для возвращения понадобится код из письма.</p>{failure && <p role="alert">{failure}</p>}<div className="candidate-dialog-actions">
+              <p>Для возвращения понадобится код из письма.</p>{failure && <p role="alert">{failure}</p>}<div className="account-confirmation-actions">
               <Action disabled={busy} onClick={() => setLogout(false)}>Отмена</Action>
               <Action variant="primary" disabled={busy} onClick={() => void signOut()}>{busy ? "Выходим…" : "Выйти"}</Action>
               </div>
-              </Dialog>}
+              </Dialog>}</AnimatePresence>
    </>}
  </div>
   </MotionConfig>;
-}
-/** Dialog traps keyboard focus, restores its trigger and locks background scrolling. */
-function Dialog({ title, close, children }: {
-  title: string;
-  close: () => void;
-  children: ReactNode;
-}) {
-  const panel = useRef<HTMLDivElement>(null);
-  const onClose = useRef(close);
-  onClose.current = close;
-  useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const controls = () => Array.from(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),a[href],[tabindex="0"]') ?? []);
-    (panel.current?.querySelector<HTMLElement>("input:not(:disabled)") ?? controls()[0])?.focus();
-    const key = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose.current();
-      }
-      if (event.key === "Tab") {
-        const list = controls();
-        const first = list[0];
-        const last = list[list.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last?.focus();
-        }
-        else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", key);
-    return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", key); previous?.focus(); };
-  }, []);
-  return <div className="candidate-modal" onClick={event => { if (event.target === event.currentTarget)
-    close(); }}>
-  <motion.div ref={panel} className="panel candidate-dialog" role="dialog" aria-modal="true" aria-label={title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-  <div className="candidate-dialog-heading">
-  <h2>{title}</h2>
-  <Action aria-label="Закрыть" onClick={close}>×</Action>
-  </div>{children}</motion.div>
-  </div>;
 }
 /** Exact exported backdrop art is static; account and portrait slots remain real data. */
 function CandidateArt({ route }: {

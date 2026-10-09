@@ -1,3 +1,27 @@
+/* The complete established employer auth surface is shared by both roles. */
+.login {
+  min-height: 100vh;
+  padding: 36rem 40rem;
+}
+.yandex {
+  display: grid;
+  place-items: center;
+  height: var(--login-control-height);
+  border-radius: 97rem;
+  background: var(--comit-text);
+  color: var(--comit-bg);
+  border: 0;
+  font-size: 48rem;
+  font-weight: 700;
+  letter-spacing: -2rem;
+}
+.login-card .checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rem;
+  font-size: 18rem;
+  cursor: pointer;
+}
 /* Shared email sign-in and six-digit OTP layout; API roles stay in each app. */
 @media (max-width: 760px) {
   .login-logo-asset {
@@ -469,4 +493,10 @@
     width: 6rem;
     height: 10rem;
   }
+}
+
+@media (max-width: 760px) {
+  .login { padding: 20rem; }
+  .yandex { font-size: 32rem; height: 48rem; }
+  .login-card .checkbox { gap: 12rem; }
 }

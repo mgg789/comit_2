@@ -9,7 +9,10 @@
     "./design": "./src/design.tsx",
     "./design.css": "./src/design.css",
     "./auth.css": "./src/auth.css",
-    "./email-login": "./src/email-login.tsx"
+    "./email-login": "./src/email-login.tsx",
+    "./app-shell": "./src/app-shell.tsx",
+    "./recruitment-conversation": "./src/recruitment-conversation.tsx",
+    "./conversation.css": "./src/conversation.css"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -18,7 +21,8 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "framer-motion": "^14.0.0"
+    "framer-motion": "^14.0.0",
+    "@comit/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

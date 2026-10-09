@@ -1,0 +1,179 @@
+.recruitment-messages {
+  height: 590rem;
+  overflow: auto;
+  padding: 48rem 0 24rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 38rem;
+}
+.message-bubble {
+  width: max-content;
+  max-width: 680rem;
+  border-radius: 20rem;
+  padding: 15rem 24rem;
+  font-size: 21rem;
+  line-height: 24rem;
+  position: relative;
+  flex-shrink: 0;
+}
+.message-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message-bubble.outgoing {
+  align-self: flex-end;
+  background: var(--employer-paint-181816);
+  color: var(--employer-paint-fff);
+}
+.message-bubble.incoming {
+  align-self: flex-start;
+  background: var(--employer-paint-fff);
+  color: var(--employer-paint-191921);
+}
+.message-bubble time {
+  display: block;
+  font-size: 12rem;
+  line-height: 16rem;
+  opacity: 0.45;
+  text-align: right;
+  margin-top: 5rem;
+}
+.message-file {
+  display: block;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  text-align: left;
+  margin-top: 10rem;
+  cursor: pointer;
+}
+.conversation-empty {
+  margin: auto;
+  color: var(--employer-paint-a5a5af);
+  font-size: 22rem;
+  text-align: center;
+}
+.communication-composer-wrap {
+  position: fixed;
+  bottom: 56rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 706rem;
+  z-index: 4;
+}
+.communication-composer {
+  border-radius: 80rem;
+  height: 80rem;
+  display: flex;
+  gap: 16rem;
+  align-items: center;
+  padding: 8rem;
+  box-shadow: inset 0 0 0 1rem var(--employer-paint-ffffff30);
+}
+.communication-composer > input:not([type="file"]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--employer-paint-fff);
+  font: inherit;
+  font-size: 20rem;
+  padding: 0;
+}
+.communication-composer input::placeholder {
+  color: var(--employer-paint-f5f4fb);
+}
+.attach-button {
+  width: 60rem;
+  height: 60rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1rem solid var(--employer-paint-b4e9ff50);
+  color: var(--employer-paint-fff);
+  font-size: 36rem;
+  font-weight: 300;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  background: var(--employer-gradient);
+  box-shadow: inset 0 0 15rem var(--employer-paint-fff4);
+  cursor: pointer;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.attach-button:hover {
+  transform: scale(1.06);
+}
+.attach-button:active {
+  transform: scale(0.98);
+}
+.communication-composer .send-button {
+  width: 60rem;
+  height: 60rem;
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+}
+.send-button .icon {
+  width: 25rem;
+  height: 25rem;
+}
+.communication-attribution {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5rem;
+  margin-top: 16rem;
+  color: var(--employer-paint-9c9da5);
+  font-size: 14rem;
+}
+.communication-attribution .icon {
+  width: 22rem;
+  height: 22rem;
+  margin-right: 3rem;
+  opacity: 0.5;
+}
+.communication-attribution span {
+  color: var(--employer-paint-5da6ed);
+}
+.communication-error {
+  font-size: 18rem;
+  background: var(--employer-paint-282020);
+  border-radius: 16rem;
+  padding: 12rem 18rem;
+  margin-bottom: 12rem;
+}
+.pending-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rem;
+  margin-bottom: 12rem;
+}
+.pending-files button {
+  background: var(--employer-paint-26262b);
+  color: var(--employer-paint-fff);
+  border: 0;
+  border-radius: 14rem;
+  padding: 8rem 14rem;
+  font-size: 16rem;
+}
+
+.recruitment-conversation { min-width: 0; }
+@media (max-width: 760px) {
+  .recruitment-messages { height: calc(100dvh - 470rem); min-height: 180rem; gap: 18rem; padding-top: 24rem; }
+  .message-bubble { max-width: 90%; padding: 12rem 15rem; font-size: 15rem; line-height: 20rem; border-radius: 16rem; }
+  .communication-composer-wrap { width: calc(100% - 36rem); bottom: 100rem; }
+  .communication-composer { height: 58rem; gap: 10rem; padding: 6rem; }
+  .attach-button, .communication-composer .send-button { width: 44rem; height: 44rem; font-size: 28rem; }
+  .communication-composer > input:not([type="file"]) { font-size: 14rem; }
+  .communication-attribution { font-size: 10rem; margin-top: 8rem; }
+  .communication-attribution .icon { width: 16rem; height: 16rem; }
+  .communication-error { font-size: 13rem; }
+  .pending-files button { font-size: 12rem; }
+}

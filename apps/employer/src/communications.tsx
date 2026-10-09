@@ -1,3 +1,4 @@
+import { RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import {
   useEffect,
   useLayoutEffect,
@@ -14,18 +15,22 @@ import type {
   AgentsOrganizationMessage,
   AgentsOrganizationTurn,
   AgentsPendingAnswer,
-  ChatFile,
-  ChatMessage,
   ContactsView,
   RecruitmentAction,
   RecruitmentView,
-  SendChatMessage,
 } from "@comit/shared";
 import { AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } from "./agent-messages";
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
 import { useEmployerPreferences } from "./preferences";
+
+const employerConversationTransport: ConversationTransport = {
+  getMessages: (id, after, limit) => api.getChatMessages("employer", id, after, limit),
+  sendMessage: (id, body) => api.sendChatMessage("employer", id, body),
+  uploadFile: (id, body) => api.uploadChatFile("employer", id, body),
+  downloadFile: (id, fileId) => api.downloadChatFile("employer", id, fileId),
+};
 
 const stateNames: Record<RecruitmentView["state"], string> = {
   sent: "Приглашение отправлено",
@@ -180,58 +185,7 @@ function RecruitmentThread({
 }) {
   const process = useResource(() => api.getRecruitment("employer", id), [id]);
   const [contacts, setContacts] = useState<ContactsView | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState("");
-  const [files, setFiles] = useState<ChatFile[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [command, setCommand] = useState<
-    "reject" | "withdraw" | "interview_propose" | "offer_send" | null
-  >(null);
-  const retry = useRef<SendChatMessage | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!process.data?.chat_available) {
-      setHistoryLoading(false);
-      return;
-    }
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
-    let cursor = 0;
-    const poll = async () => {
-      try {
-        const page = await api.getChatMessages("employer", id, cursor, 100);
-        if (!active) return;
-        setMessages((current) => {
-          const seen = new Set(current.map((item) => item.id));
-          return [
-            ...current,
-            ...page.messages.filter((item) => !seen.has(item.id)),
-          ].sort((a, b) => a.sequence - b.sequence);
-        });
-        cursor = page.next_sequence;
-        setHistoryLoading(false);
-        timer = setTimeout(poll, page.messages.length === 100 ? 50 : 2500);
-      } catch (reason) {
-        if (active) {
-          setError(errorText(reason));
-          setHistoryLoading(false);
-          timer = setTimeout(poll, 6000);
-        }
-      }
-    };
-    void poll();
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [id, process.data?.chat_available]);
-  useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length]);
+  const [command, setCommand] = useState<"reject" | "withdraw" | "interview_propose" | "offer_send" | null>(null);
   useEffect(() => {
     let active = true;
     setContacts(null);
@@ -268,57 +222,6 @@ function RecruitmentThread({
       clearInterval(timer);
     };
   }, [id]);
-  async function send(event: FormEvent) {
-    event.preventDefault();
-    if (sending || uploading || (!text.trim() && !files.length)) return;
-    setSending(true);
-    setError(null);
-    const body = retry.current || {
-      idempotency_key: crypto.randomUUID(),
-      text: text.trim(),
-      files,
-    };
-    retry.current = body;
-    try {
-      const message = await api.sendChatMessage("employer", id, body);
-      setMessages((current) =>
-        current.some((item) => item.id === message.id)
-          ? current
-          : [...current, message].sort((a, b) => a.sequence - b.sequence),
-      );
-      retry.current = null;
-      setText("");
-      setFiles([]);
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setSending(false);
-    }
-  }
-  async function upload(file?: File) {
-    if (!file) return;
-    if (!file.size || file.size > 8388608 || files.length >= 8) {
-      setError("Файл должен быть до 8 МБ. В сообщении — до 8 файлов.");
-      return;
-    }
-    setUploading(true);
-    setError(null);
-    try {
-      const uploaded = await api.uploadChatFile("employer", id, {
-        idempotency_key: crypto.randomUUID(),
-        name: file.name,
-        media_type: file.type || "application/octet-stream",
-        data_base64: await fileBase64(file),
-      });
-      setFiles((current) => [...current, uploaded]);
-      retry.current = null;
-    } catch (reason) {
-      setError(errorText(reason));
-    } finally {
-      setUploading(false);
-      if (input.current) input.current.value = "";
-    }
-  }
   const p = process.data;
   if (!p)
     return (
@@ -388,125 +291,7 @@ function RecruitmentThread({
           </div>
         </details>
       </header>
-      <div className="recruitment-messages" aria-live="polite">
-        {historyLoading && <State loading />}
-        {!p.chat_available && (
-          <State empty="Чат недоступен для этого приглашения" />
-        )}
-        {p.chat_available && !historyLoading && !messages.length && (
-          <p className="conversation-empty">Начните разговор с кандидатом</p>
-        )}
-        <AnimatePresence initial={false}>
-          {messages.map((message) => (
-            <motion.article
-              key={message.id}
-              className={`message-bubble ${message.sender_id === account.id ? "outgoing" : "incoming"}`}
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.18 }}
-            >
-              <p>{message.text}</p>
-              {message.files.map((file) => (
-                <button
-                  className="message-file"
-                  key={file.id}
-                  onClick={async () => {
-                    try {
-                      const value = await api.downloadChatFile(
-                        "employer",
-                        id,
-                        file.id,
-                      );
-                      saveFile(value.name, value.data_base64);
-                    } catch (reason) {
-                      setError(errorText(reason));
-                    }
-                  }}
-                >
-                  {file.name} · {(file.size / 1024).toFixed(0)} КБ ↓
-                </button>
-              ))}
-              <time dateTime={message.created_at}>
-                {new Date(message.created_at).toLocaleTimeString("ru-RU", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-            </motion.article>
-          ))}
-        </AnimatePresence>
-        <div ref={end} />
-      </div>
-      <div className="communication-composer-wrap">
-        {error && (
-          <p className="communication-error" role="alert">
-            {error}
-          </p>
-        )}
-        {files.length > 0 && (
-          <div className="pending-files">
-            {files.map((file) => (
-              <button
-                key={file.id}
-                onClick={() => {
-                  setFiles((current) =>
-                    current.filter((item) => item.id !== file.id),
-                  );
-                  retry.current = null;
-                }}
-              >
-                {file.name} ×
-              </button>
-            ))}
-          </div>
-        )}
-        {p.chat_available && !p.chat_writable && <p className="empty-note" role="status">Чат доступен только для чтения. Отправка сообщений и файлов сейчас недоступна.</p>}
-        <form className="communication-composer glass" onSubmit={send}>
-          <input
-            ref={input}
-            type="file"
-            hidden
-            onChange={(event) => void upload(event.target.files?.[0])}
-          />
-          <button
-            className="attach-button"
-            type="button"
-            aria-label="Прикрепить файл до 8 МБ"
-            disabled={!p.chat_writable || uploading || sending}
-            onClick={() => input.current?.click()}
-          >
-            {uploading ? "…" : "+"}
-          </button>
-          <input
-            aria-label="Сообщение кандидату"
-            placeholder={p.chat_writable ? "Отправьте сообщение" : "Чат доступен только для чтения"}
-            value={text}
-            maxLength={16000}
-            disabled={!p.chat_writable || sending}
-            onChange={(event) => {
-              setText(event.target.value);
-              retry.current = null;
-            }}
-          />
-          <Action
-            className="circle send-button"
-            type="submit"
-            disabled={
-              !p.chat_writable ||
-              sending ||
-              uploading ||
-              (!text.trim() && !files.length)
-            }
-            aria-label="Отправить сообщение"
-          >
-            {sending ? <span className="spinner" /> : <Icon name="arrow" />}
-          </Action>
-        </form>
-        <p className="communication-attribution">
-          <Icon name="logo" />
-          Защищено с <span>QGramm</span>
-        </p>
-      </div>
+      <RecruitmentConversation process={p} accountId={account.id} transport={employerConversationTransport} errorText={errorText} emptyText="Начните разговор с кандидатом" messageLabel="Сообщение кандидату" />
       {command && (
         <ProcessCommand
           process={p}
