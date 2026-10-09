@@ -1,6 +1,6 @@
-import { Avatar, Backdrop, Icon, Logo, cx, type IconName } from "@comit/ui-kit";
+import { Avatar, AnimatePresence, Backdrop, Icon, Logo, SPRING, TAP, cx, motion, type IconName } from "@comit/ui-kit";
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { AgentLauncher } from "../agent/AgentOverlay";
 import { useAccount, useSession } from "../auth/session";
 import { NotificationsMenu } from "./NotificationsMenu";
@@ -16,7 +16,7 @@ export const NAV_ITEMS: ReadonlyArray<{ to: string; label: string; icon: IconNam
 /** Authenticated layout (Figma header: 50px from the top, 80px side gutters on the 1920 artboard). */
 export function AppShell() {
   return (
-    <div className="relative min-h-dvh">
+    <div className="relative min-h-dvh overflow-x-clip">
       <Backdrop />
       <header className="px-4 pt-4 lg:px-[5rem] lg:pt-[3.125rem]">
         <div className="mx-auto flex max-w-[110rem] items-center justify-between gap-3">
@@ -31,17 +31,19 @@ export function AppShell() {
                 title={item.label}
                 className={({ isActive }) =>
                   cx(
-                    "inline-flex items-center justify-center transition-colors duration-150",
+                    "relative inline-flex items-center justify-center transition-[color,scale] duration-150 active:scale-95",
                     isActive
-                      ? "h-12 gap-[0.625rem] rounded-[2.0625rem] bg-light px-5 text-on-light shadow-pill lg:h-[4.0625rem] lg:px-[2.5rem]"
+                      ? "h-12 gap-[0.625rem] rounded-[2.0625rem] px-5 text-on-light lg:h-[4.0625rem] lg:px-[2.5rem]"
                       : "glass size-12 rounded-pill text-subtle hover:text-text lg:size-[4.125rem]",
                   )
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <Icon name={item.icon} size={item.iconSize} />
-                    <span className={cx("text-lg font-semibold lg:text-[1.5rem]", isActive ? "hidden md:inline" : "sr-only")}>{item.label}</span>
+                    {/* One light pill shared by all items: it glides to the active section. */}
+                    {isActive && <motion.span layoutId="nav-active-pill" transition={SPRING} className="absolute inset-0 rounded-[2.0625rem] bg-light shadow-pill" />}
+                    <Icon name={item.icon} size={item.iconSize} className="relative" />
+                    <span className={cx("relative text-lg font-semibold lg:text-[1.5rem]", isActive ? "hidden md:inline" : "sr-only")}>{item.label}</span>
                   </>
                 )}
               </NavLink>
@@ -51,10 +53,24 @@ export function AppShell() {
         </div>
       </header>
       <main className="mx-auto max-w-[120rem] px-4 pt-8 pb-40 lg:px-[5rem] lg:pt-[6.25rem]">
-        <Outlet />
+        <PageTransition />
       </main>
       <AgentLauncher />
     </div>
+  );
+}
+
+/**
+ * Fade-and-rise of the routed page on navigation. Nested dialog routes (`/new`) keep their parent
+ * mounted, so the list underneath does not reload when the dialog opens.
+ */
+function PageTransition() {
+  const { pathname } = useLocation();
+  const key = pathname.replace(/\/new$/, "");
+  return (
+    <motion.div key={key} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}>
+      <Outlet />
+    </motion.div>
   );
 }
 
@@ -99,8 +115,17 @@ function UserPill() {
           <Avatar name={account.email} size={50} shape="circle" />
           <Icon name="chevron-down" size={20} className={cx("transition-transform duration-150", open && "rotate-180")} />
         </button>
+        <AnimatePresence>
         {open && (
-          <div role="menu" className="glass absolute top-full right-0 z-40 mt-4 w-64 rounded-field p-2">
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={TAP}
+            style={{ transformOrigin: "top right" }}
+            className="glass absolute top-full right-0 z-40 mt-4 w-64 rounded-field p-2"
+          >
             <p className="truncate px-3 py-2 text-sm text-muted">{account.email}</p>
             <button
               type="button"
@@ -110,8 +135,9 @@ function UserPill() {
             >
               Выйти
             </button>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );

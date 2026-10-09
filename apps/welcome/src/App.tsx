@@ -1,4 +1,4 @@
-import { ACTION_ROW_BUTTON, ActionRow, Backdrop, LogoTile, Wordmark } from "@comit/ui-kit";
+import { ACTION_ROW_BUTTON, ActionRow, Backdrop, LogoTile, Wordmark, Reveal, StaggerItem, StaggerList } from "@comit/ui-kit";
 import employersIcon from "./assets/employers.svg";
 import seekersIcon from "./assets/seekers.svg";
 import showcaseIcon from "./assets/showcase.svg";
@@ -36,17 +36,19 @@ export default function App() {
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center px-4 py-10 lg:py-[6rem]">
       <Backdrop variant="auth" />
-      <div className="flex flex-col items-center gap-6 sm:flex-row lg:gap-[4.375rem]">
+      <Reveal className="flex flex-col items-center gap-6 sm:flex-row lg:gap-[4.375rem]">
         <LogoTile size={300} className="hidden sm:inline-flex" />
         <LogoTile size={140} className="sm:hidden" />
         <h1 className="text-text">
           <Wordmark height={144} className="hidden sm:inline-block" />
           <Wordmark height={64} className="sm:hidden" />
         </h1>
-      </div>
-      <nav aria-label="Разделы COMIT" className="mt-10 flex w-full max-w-[55.5rem] flex-col gap-4 lg:mt-[6.0625rem] lg:gap-[2.125rem]">
+      </Reveal>
+      <nav aria-label="Разделы COMIT" className="mt-10 w-full max-w-[55.5rem] lg:mt-[6.0625rem]">
+      <StaggerList step={0.08} delay={0.15} className="flex flex-col gap-4 lg:gap-[2.125rem]">
         {ENTRIES.map((entry) => (
-          <a key={entry.title} href={entry.href} className="group block rounded-[2rem] transition-transform duration-150 hover:-translate-y-0.5">
+          <StaggerItem key={entry.title}>
+          <a href={entry.href} className="group block rounded-[2rem] transition-transform duration-300 ease-out hover:-translate-y-1">
             <ActionRow
               leading={<img src={entry.icon} alt="" className="size-12 shrink-0 lg:size-[4.25rem]" />}
               title={entry.title}
@@ -54,7 +56,9 @@ export default function App() {
               action={<span className={ACTION_ROW_BUTTON}>{entry.action}</span>}
             />
           </a>
+          </StaggerItem>
         ))}
+      </StaggerList>
       </nav>
     </main>
   );

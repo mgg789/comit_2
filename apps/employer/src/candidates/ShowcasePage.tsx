@@ -1,14 +1,14 @@
 import type { AgentsDraftView, Grade, PublicCandidateCard, SearchFilters, SearchPage, ShowcaseMismatchWarning, Specialization } from "@comit/shared";
 import { GRADES, SPECIALIZATIONS } from "@comit/shared";
 import { ApiError } from "@comit/api-client";
-import { Avatar, Button, Dialog, Icon, SelectField, StateMessage } from "@comit/ui-kit";
+import { Avatar, Button, Dialog, Icon, SelectField, StateMessage, cx, StaggerItem, StaggerList } from "@comit/ui-kit";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { api, describeError, isUnauthorized, newIdempotencyKey } from "../api";
 import { useSession } from "../auth/session";
 import { PageHeader } from "../layout/PageHeader";
 import { GRADE_LABEL } from "../lib/explain";
-import { SPECIALIZATION_LABEL, formatSalaryRange, vacancyTitle } from "../lib/format";
+import { ROLE_LABEL, SPECIALIZATION_LABEL, candidateLabel, formatSalaryRange, vacancyTitle } from "../lib/format";
 import { useResource } from "../lib/use-resource";
 import { loadAllVacancies } from "../vacancies/VacanciesPage";
 
@@ -111,14 +111,26 @@ export function ShowcasePage() {
     setQuery(draftQuery);
   }
 
+  /** Dropdown filters apply immediately (design has no «apply» button); the text query applies on submit. */
+  function applyFilter(patch: Partial<Query>) {
+    setDraftQuery((previous) => ({ ...previous, ...patch }));
+    setQuery((previous) => ({ ...previous, ...patch }));
+  }
+
   const selectedVacancy = openVacancies.find((vacancy) => vacancy.draft_id === query.vacancyId) ?? null;
 
   return (
     <>
       <PageHeader
         title="Соискатели"
+        backTo="/vacancies"
+        backLabel="К вакансиям"
         actions={
-          <form onSubmit={submit} role="search" className="bg-accent-gradient flex h-[3.1875rem] items-center gap-2 rounded-pill pr-1 pl-5">
+          <form
+            onSubmit={submit}
+            role="search"
+            className="bg-accent-gradient flex h-11 items-center gap-[1rem] rounded-[1.6875rem] pr-[0.25rem] pl-[1.25rem] lg:h-[3.1875rem]"
+          >
             <label className="sr-only" htmlFor="showcase-q">
               Поиск: имя, роль, стек
             </label>
@@ -126,50 +138,57 @@ export function ShowcasePage() {
               id="showcase-q"
               value={draftQuery.q}
               onChange={(event) => setDraftQuery((previous) => ({ ...previous, q: event.target.value }))}
-              placeholder="Поиск: имя, роль, стек"
-              className="w-48 bg-transparent text-lg text-white outline-none placeholder:text-white/80 sm:w-64"
+              placeholder="Поиск: Имя, роль, стек"
+              className="w-44 bg-transparent text-base font-medium text-text outline-none placeholder:text-text sm:w-56 lg:w-[14.5rem] lg:text-[1.25rem]"
             />
-            <button type="submit" aria-label="Искать" className="inline-flex size-[2.6875rem] cursor-pointer items-center justify-center rounded-full bg-light text-on-light">
+            <button
+              type="submit"
+              aria-label="Искать"
+              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-full bg-light text-on-light lg:size-[2.6875rem]"
+            >
               <Icon name="magnifier" size={22} />
             </button>
           </form>
         }
       />
-      <form onSubmit={submit} className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_2fr_auto]">
+      <div className="mb-4 flex flex-wrap items-center gap-3 lg:mb-[3rem] lg:gap-[0.78rem]">
         <SelectField
           tone="light"
           aria-label="Специализация"
           placeholder="Специализация"
           value={draftQuery.specialization}
-          onChange={(value) => setDraftQuery((previous) => ({ ...previous, specialization: isSpecialization(value) ? value : "" }))}
+          onChange={(value) => applyFilter({ specialization: isSpecialization(value) ? value : "" })}
           options={SPECIALIZATIONS.map((value) => ({ value, label: SPECIALIZATION_LABEL[value] }))}
+          containerClassName="w-full sm:w-[26.875rem]"
         />
         <SelectField
           tone="light"
           aria-label="Грейд"
           placeholder="Грейд"
           value={draftQuery.grade}
-          onChange={(value) => setDraftQuery((previous) => ({ ...previous, grade: isGrade(value) ? value : "" }))}
+          onChange={(value) => applyFilter({ grade: isGrade(value) ? value : "" })}
           options={GRADES.map((value) => ({ value, label: GRADE_LABEL[value] }))}
+          containerClassName="w-[calc(50%-0.4rem)] sm:w-[13.0475rem]"
         />
-        <div className="hidden lg:block" />
         <SelectField
           tone="light"
           aria-label="Вакансия"
-          placeholder={openVacancies.length ? "Вакансия (фильтры и лайк)" : "Нет открытых вакансий"}
+          placeholder={openVacancies.length ? "Вакансия" : "Нет открытых вакансий"}
           value={draftQuery.vacancyId}
-          onChange={(value) => setDraftQuery((previous) => ({ ...previous, vacancyId: value }))}
+          onChange={(value) => applyFilter({ vacancyId: value })}
           options={openVacancies.map((vacancy) => ({ value: vacancy.draft_id, label: vacancyTitle(vacancy) }))}
+          containerClassName="w-[calc(50%-0.4rem)] sm:w-[13.0475rem]"
         />
-        <Button type="submit" size="md">
-          Применить
-        </Button>
-      </form>
-      {page && (
-        <p className="mb-4 text-sm text-muted">
-          {SEARCH_MODE_LABEL[page.mode]} · найдено {page.total}
-          {page.fallback_reason && " · смысловой поиск недоступен, показан текстовый"}
-          {selectedVacancy && ` · с учётом требований «${vacancyTitle(selectedVacancy)}»`}
+        {page && (
+          <p className="text-sm font-medium text-subtle sm:ml-auto lg:text-[1.125rem]">
+            {SEARCH_MODE_LABEL[page.mode]} · найдено {page.total}
+            {page.fallback_reason && " · смысловой поиск недоступен"}
+          </p>
+        )}
+      </div>
+      {selectedVacancy && (
+        <p className="mb-4 text-sm text-white/60 lg:text-[1.125rem]">
+          Учтены требования вакансии «{vacancyTitle(selectedVacancy)}». Кнопка «+» добавляет кандидата в её шортлист.
         </p>
       )}
 
@@ -188,13 +207,13 @@ export function ShowcasePage() {
       )}
       {status === "ready" && items.length === 0 && <StateMessage kind="empty" title="Никого не нашли" description="Ослабьте фильтры или измените запрос." />}
 
-      <ul className="flex flex-col gap-4">
+      <StaggerList step={0.03} className="flex flex-col gap-4 lg:gap-[1rem]">
         {items.map((candidate) => (
-          <li key={candidate.candidate_id}>
+          <StaggerItem key={candidate.candidate_id}>
             <CandidateRow candidate={candidate} vacancy={selectedVacancy} />
-          </li>
+          </StaggerItem>
         ))}
-      </ul>
+      </StaggerList>
       {page?.has_more && page.next_cursor && (
         <div className="mt-6 flex justify-center">
           <Button variant="secondary" loading={status === "loading"} onClick={() => void search(query, page.next_cursor)}>
@@ -211,7 +230,10 @@ function vacancyIdOf(vacancies: AgentsDraftView[], draftId: string): string {
   return vacancies.find((vacancy) => vacancy.draft_id === draftId)?.vacancy_id ?? draftId;
 }
 
-/** One showcase row: identity, public facts, PDF and «в вакансию» like with strict-filter confirmation. */
+/**
+ * Showcase row (design: #191917, 120px, radius 32): identity, public facts as dark pills, outlined PDF
+ * button and the like button — «+» into the selected vacancy's shortlist, red heart once saved.
+ */
 function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; vacancy: AgentsDraftView | null }) {
   const { expire } = useSession();
   const [liked, setLiked] = useState(false);
@@ -243,36 +265,32 @@ function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; 
     }
   }
 
-  const facts = [`${SPECIALIZATION_LABEL[candidate.category.specialization]} ${GRADE_LABEL[candidate.category.grade]}`, candidate.city, formatSalaryRange(candidate.salary.from_rub, candidate.salary.to_rub)];
+  const name = candidateLabel(candidate.display_name, candidate.candidate_id);
+  const facts = [SPECIALIZATION_LABEL[candidate.category.specialization], GRADE_LABEL[candidate.category.grade], candidate.city, formatSalaryRange(candidate.salary.from_rub, candidate.salary.to_rub)];
   const profileLink = `/candidates/${candidate.candidate_id}${vacancy ? `?vacancy=${vacancy.draft_id}` : ""}`;
+  const square = "inline-flex size-14 shrink-0 items-center justify-center rounded-[1.25rem] transition-colors duration-150 lg:size-[4.375rem]";
   return (
-    <div className="flex flex-col gap-4 rounded-[1.25rem] border border-glass-border bg-surface p-4 sm:flex-row sm:items-center">
-      <Link to={profileLink} className="flex min-w-0 items-center gap-4 sm:w-[22.5rem] sm:shrink-0">
-        <Avatar name={candidate.display_name} size={52} />
-        <div className="min-w-0">
-          <p className="truncate font-display text-lg leading-tight sm:text-xl">{candidate.display_name}</p>
-          <p className="truncate text-sm font-semibold text-muted">
-            {SPECIALIZATION_LABEL[candidate.category.specialization]} {GRADE_LABEL[candidate.category.grade]}
+    <div className="relative flex flex-col gap-4 overflow-hidden rounded-[2rem] bg-surface-dialog p-5 lg:min-h-[7.5rem] lg:flex-row lg:items-center lg:gap-0 lg:py-0 lg:pr-[1.5625rem] lg:pl-[1.5625rem]">
+      <Link to={profileLink} className="flex min-w-0 items-center gap-4 lg:w-[34rem] lg:shrink-0 lg:gap-[1.5rem]">
+        <Avatar name={name} size={70} />
+        <span className="flex min-w-0 flex-col gap-1 lg:gap-[0.5rem]">
+          <span className="truncate font-display text-xl leading-tight lg:text-[1.75rem]">{name}</span>
+          <span className="truncate text-base font-semibold tracking-[-0.021rem] text-white/60 lg:text-[1.25rem]">
+            {ROLE_LABEL[candidate.category.specialization]} {GRADE_LABEL[candidate.category.grade]}
             {candidate.category.grade_status === "self_reported" && " · грейд заявлен"}
-          </p>
-        </div>
+          </span>
+        </span>
       </Link>
-      <ul className="flex flex-1 flex-wrap gap-2">
+      <ul className="flex flex-1 flex-wrap gap-2 lg:gap-[1rem]">
         {facts.map((fact) => (
-          <li key={fact} className="rounded-chip bg-surface-raised px-4 py-2 text-base">
+          <li key={fact} className="inline-flex h-10 items-center rounded-full bg-field px-4 text-base font-medium tracking-[-0.023rem] lg:h-[3.375rem] lg:px-[1.25rem] lg:text-[1.375rem]">
             {fact}
           </li>
         ))}
       </ul>
-      <div className="flex shrink-0 items-center gap-3">
-        <a
-          href={candidate.resume_url}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`PDF резюме: ${candidate.display_name}`}
-          className="inline-flex size-[3.25rem] items-center justify-center rounded-field border-2 border-white/40 text-text hover:border-white/80"
-        >
-          <Icon name="resumes" size={24} />
+      <div className="flex shrink-0 items-center gap-3 lg:gap-[1.25rem]">
+        <a href={candidate.resume_url} target="_blank" rel="noreferrer" aria-label={`PDF резюме: ${name}`} className={cx(square, "border-2 border-white/60 text-text hover:border-white")}>
+          <Icon name="resumes" size={36} />
         </a>
         <button
           type="button"
@@ -280,13 +298,13 @@ function CandidateRow({ candidate, vacancy }: { candidate: PublicCandidateCard; 
           title={vacancy ? (liked ? "Уже в шортлисте вакансии" : `В шортлист «${vacancyTitle(vacancy)}»`) : "Выберите вакансию в фильтре"}
           aria-label={liked ? "В шортлисте" : "Добавить в шортлист вакансии"}
           onClick={() => void like(null)}
-          className="bg-accent-gradient inline-flex size-[3.25rem] cursor-pointer items-center justify-center rounded-field text-3xl text-white transition-[filter] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          className={cx(square, "cursor-pointer disabled:cursor-not-allowed", liked ? "bg-field text-danger" : "bg-accent-gradient text-white hover:brightness-110 disabled:opacity-40")}
         >
-          {liked ? "♥" : "+"}
+          <Icon name={liked ? "heart-filled" : "plus"} size={34} />
         </button>
       </div>
       {error && (
-        <p role="alert" className="text-sm text-danger-soft sm:basis-full">
+        <p role="alert" className="text-sm text-danger-soft lg:absolute lg:right-[1.5625rem] lg:bottom-1">
           {error}
         </p>
       )}

@@ -1,11 +1,12 @@
 import type { ChatFile, ChatMessage, RecruitmentView } from "@comit/shared";
 import { ApiError } from "@comit/api-client";
-import { Avatar, Icon, Spinner, StateMessage, cx } from "@comit/ui-kit";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Avatar, Icon, MessageBubble, MessageComposer, StateMessage, qgrammIconUrl } from "@comit/ui-kit";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { api, describeError, errorDetail, isUnauthorized, newIdempotencyKey } from "../api";
 import { useSession } from "../auth/session";
 import { PageHeader } from "../layout/PageHeader";
+import { candidateLabel } from "../lib/format";
 import { useCandidateNames } from "../lib/use-candidate-names";
 import { useResource } from "../lib/use-resource";
 import { RECRUITMENT_STATE_LABEL, TERMINAL_STATES } from "../recruitment/labels";
@@ -47,7 +48,7 @@ export function ChatPage() {
       </>
     );
   }
-  const name = names.get(process.data.candidate_id) ?? "Кандидат";
+  const name = candidateLabel(names.get(process.data.candidate_id) ?? "Кандидат", process.data.candidate_id);
   return <ChatRoom process={process.data} name={name} />;
 }
 
@@ -118,38 +119,40 @@ function ChatRoom({ process, name }: { process: RecruitmentView; name: string })
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4 lg:gap-x-[3.5rem]">
         <PageHeader title="К вакансии" backTo={`/vacancies/${process.draft_id}`} />
-        <div className="mb-6 flex min-w-0 flex-1 items-center gap-3 rounded-pill bg-light py-1.5 pr-6 pl-1.5 text-on-light sm:mb-8 lg:max-w-[43.75rem]">
-          <Avatar name={name} size={44} shape="circle" />
+        <div className="mb-6 flex h-14 min-w-0 flex-1 items-center gap-3 rounded-[6.25rem] bg-white pr-6 pl-1.5 text-on-chip lg:mb-[2rem] lg:h-[4.125rem] lg:max-w-[60.1875rem] lg:gap-[0.875rem] lg:pl-[0.375rem]">
+          <Avatar name={name} size={54} shape="circle" />
           <div className="min-w-0">
-            <p className="truncate font-display text-base">{name}</p>
-            <p className="truncate text-sm text-faint">{RECRUITMENT_STATE_LABEL[process.state]}</p>
+            <p className="truncate font-display text-base leading-tight lg:text-[1.25rem]">{name}</p>
+            <p className="truncate text-sm font-semibold text-on-chip/80 lg:text-[1.125rem]">{RECRUITMENT_STATE_LABEL[process.state]}</p>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-[43.75rem] flex-col gap-4">
-        <div ref={list} aria-live="polite" className="flex max-h-[calc(100dvh-380px)] min-h-[15rem] flex-col gap-4 overflow-y-auto pr-1">
+      <div className="mx-auto flex max-w-[60.1875rem] flex-col gap-6 pb-48 lg:pb-[14rem]">
+        <div ref={list} aria-live="polite" className="flex min-h-[15rem] flex-col gap-4 lg:gap-[2rem]">
           {status === "loading" && <StateMessage kind="loading" title="Загружаем переписку" />}
           {status === "error" && (
             <StateMessage kind="error" title={error?.unconfigured ? "Чат не настроен" : "Чат недоступен"} description={error?.message} />
           )}
           {status === "ready" && messages.length === 0 && (
-            <StateMessage kind="empty" title="Сообщений пока нет" description="Напишите кандидату — контакты откроются после принятия приглашения, а чат доступен уже сейчас." />
+            <StateMessage kind="empty" title="Сообщений пока нет" description="Напишите кандидату — чат открыт с момента приглашения, контакты откроются после принятия." />
           )}
           {messages.map((message) => (
             <Bubble key={message.id} message={message} mine={message.sender_id === process.owner_id} processId={process.id} />
           ))}
         </div>
-        {readOnly ? (
-          <p className="text-center text-sm text-muted">Процесс завершён — история доступна только для чтения.</p>
-        ) : (
-          <Composer processId={process.id} onSent={(message) => setMessages((previous) => mergeMessages(previous, [message]))} />
-        )}
-        <p className="text-center text-xs text-muted">
-          Защищено с <span className="text-primary">QGramm</span>
-        </p>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-6 z-20 flex justify-center px-4 lg:bottom-[3.75rem]">
+        <div className="w-full max-w-[44.1875rem]">
+          {readOnly ? (
+            <p className="glass rounded-pill px-6 py-4 text-center text-sm text-muted">Процесс завершён — история доступна только для чтения.</p>
+          ) : (
+            <Composer processId={process.id} onSent={(message) => setMessages((previous) => mergeMessages(previous, [message]))} />
+          )}
+        </div>
       </div>
     </>
   );
@@ -158,13 +161,12 @@ function ChatRoom({ process, name }: { process: RecruitmentView; name: string })
 function Bubble({ message, mine, processId }: { message: ChatMessage; mine: boolean; processId: string }) {
   const time = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.created_at));
   return (
-    <div className={cx("flex max-w-[80%] flex-col gap-2 rounded-[0.9375rem] px-4 py-3", mine ? "self-end bg-surface-raised text-text" : "self-start bg-light text-on-light")}>
-      {message.text && <p className="whitespace-pre-wrap break-words">{message.text}</p>}
+    <MessageBubble mine={mine} meta={time}>
+      {message.text && <p className="break-words whitespace-pre-wrap">{message.text}</p>}
       {message.files.map((file) => (
         <AttachmentLink key={file.id} file={file} processId={processId} />
       ))}
-      <span className={cx("self-end text-xs", mine ? "text-muted" : "text-faint")}>{time}</span>
-    </div>
+    </MessageBubble>
   );
 }
 
@@ -188,7 +190,8 @@ function AttachmentLink({ file, processId }: { file: ChatFile; processId: string
   }
   return (
     <button type="button" disabled={busy} onClick={() => void download()} className="cursor-pointer text-left text-sm underline disabled:opacity-60">
-      📎 {file.name} · {Math.ceil(file.size / 1024)} КБ
+      <Icon name="paperclip" size={14} className="mr-1 align-[-0.125rem]" />
+      {file.name} · {Math.ceil(file.size / 1024)} КБ
     </button>
   );
 }
@@ -227,8 +230,7 @@ function Composer({ processId, onSent }: { processId: string; onSent: (message: 
     }
   }
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
+  async function send() {
     if (!text.trim() && files.length === 0) return;
     pendingKey.current ??= newIdempotencyKey();
     setBusy(true);
@@ -248,64 +250,52 @@ function Composer({ processId, onSent }: { processId: string; onSent: (message: 
   }
 
   return (
-    <form onSubmit={send} className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       {files.length > 0 && (
-        <ul className="flex flex-wrap gap-2 text-sm">
+        <ul className="flex flex-wrap justify-center gap-2 text-sm">
           {files.map((file) => (
-            <li key={file.id} className="rounded-chip bg-surface-raised px-3 py-1">
-              📎 {file.name}
+            <li key={file.id} className="glass rounded-chip px-3 py-1">
+              <Icon name="paperclip" size={14} className="mr-1 align-[-0.125rem]" />
+              {file.name}
             </li>
           ))}
         </ul>
       )}
-      <div className="glass flex items-center gap-3 rounded-pill p-1.5">
-        <input
-          ref={fileInput}
-          type="file"
-          className="hidden"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void attach(file);
-            event.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          aria-label="Прикрепить файл"
-          disabled={busy}
-          onClick={() => fileInput.current?.click()}
-          className="bg-accent-gradient inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-2xl text-white disabled:opacity-50"
-        >
-          +
-        </button>
-        <label className="sr-only" htmlFor="chat-input">
-          Сообщение
-        </label>
-        <input
-          id="chat-input"
-          value={text}
-          maxLength={16000}
-          onChange={(event) => {
-            setText(event.target.value);
-            pendingKey.current = null;
-          }}
-          placeholder="Отправьте сообщение"
-          className="min-w-0 flex-1 bg-transparent text-lg text-text outline-none placeholder:text-text"
-        />
-        <button
-          type="submit"
-          aria-label="Отправить"
-          disabled={busy}
-          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text hover:bg-white/10 disabled:opacity-50"
-        >
-          {busy ? <Spinner size={18} /> : <Icon name="arrow-left" size={22} className="rotate-180" />}
-        </button>
-      </div>
+      <input
+        ref={fileInput}
+        type="file"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void attach(file);
+          event.target.value = "";
+        }}
+      />
+      <MessageComposer
+        value={text}
+        maxLength={16000}
+        onChange={(value) => {
+          setText(value);
+          pendingKey.current = null;
+        }}
+        onSubmit={() => void send()}
+        canSubmit={text.trim().length > 0 || files.length > 0}
+        busy={busy}
+        onAttach={() => fileInput.current?.click()}
+        footer={
+          <>
+            <img src={qgrammIconUrl} alt="" className="h-4 w-auto" />
+            <span>
+              Защищено с <span className="text-link-muted">QGramm</span>
+            </span>
+          </>
+        }
+      />
       {error && (
         <p role="alert" className="text-center text-sm text-danger-soft">
           {error}
         </p>
       )}
-    </form>
+    </div>
   );
 }

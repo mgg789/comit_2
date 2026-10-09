@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import {
   ArrowUpRight,
   BrainCircuit,
+  Check,
   Copy,
   Gauge,
   Heart,
@@ -25,6 +26,7 @@ import clockRotate from "./assets/icons/clock-rotate.svg";
 import gear from "./assets/icons/gear.svg";
 import magnifier from "./assets/icons/magnifier.svg";
 import people from "./assets/icons/people.svg";
+import usage from "./assets/icons/usage.svg";
 import resumes from "./assets/icons/resumes.svg";
 import { cx } from "./cx";
 
@@ -42,6 +44,7 @@ export const ICONS = {
   magnifier,
   people,
   resumes,
+  usage,
 } as const;
 
 /** The design draws the rest of its icons from lucide; these render as stroke icons in currentColor. */
@@ -49,6 +52,7 @@ const LUCIDE = {
   "arrow-up-right": ArrowUpRight,
   brain: BrainCircuit,
   chat: MessageCircle,
+  check: Check,
   close: X,
   copy: Copy,
   gauge: Gauge,

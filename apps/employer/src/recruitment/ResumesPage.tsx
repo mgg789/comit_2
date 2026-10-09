@@ -1,5 +1,5 @@
 import type { RecruitmentView } from "@comit/shared";
-import { ACTION_ROW_BUTTON, ActionRow, Avatar, Button, MatchBadge, StateMessage, cx } from "@comit/ui-kit";
+import { ACTION_ROW_BUTTON, ActionRow, Avatar, Button, MatchBadge, StateMessage, cx, StaggerItem, StaggerList } from "@comit/ui-kit";
 import { Link } from "react-router";
 import { api, describeError } from "../api";
 import { PageHeader } from "../layout/PageHeader";
@@ -79,14 +79,14 @@ export function ResumesPage() {
       {processes.status === "ready" && items.length === 0 && (
         <StateMessage kind="empty" title="Процессов найма пока нет" description="Лайкните кандидатов в ленте вакансии и пригласите их — здесь появится воронка по каждому." />
       )}
-      <ul className="flex flex-col gap-4 lg:gap-[1rem]">
+      <StaggerList className="flex flex-col gap-4 lg:gap-[1rem]">
         {items.map((process) => {
           const name = candidateLabel(names.get(process.candidate_id) ?? "Кандидат", process.candidate_id);
           const current = funnelStep(process.state, process.interviews.length > 0);
           const negative = TERMINAL_STATES.has(process.state) && process.state !== "hired";
           const score = processes.data?.scores.get(process.candidate_id);
           return (
-            <li key={process.id}>
+            <StaggerItem key={process.id}>
               <ActionRow
                 badge={score !== undefined ? <MatchBadge percent={score} /> : undefined}
                 leading={<Avatar name={name} size={70} />}
@@ -121,10 +121,10 @@ export function ResumesPage() {
                   })}
                 </ol>
               </ActionRow>
-            </li>
+            </StaggerItem>
           );
         })}
-      </ul>
+      </StaggerList>
       {processes.data?.truncated && <p className="mt-6 text-center text-sm text-muted">Показаны последние 300 процессов.</p>}
     </>
   );

@@ -32,6 +32,18 @@ export const SPECIALIZATION_LABEL: Record<NonNullable<AgentsDraftFields_Output["
   qa: "QA",
 };
 
+/** Role title per direction, as used in the design subtitles («Backend-разработчик Middle+»). */
+export const ROLE_LABEL: Record<NonNullable<AgentsDraftFields_Output["class"]>, string> = {
+  backend: "Backend-разработчик",
+  frontend: "Frontend-разработчик",
+  fullstack: "Fullstack-разработчик",
+  mobile: "Mobile-разработчик",
+  devops: "DevOps-инженер",
+  data: "Data-аналитик",
+  ml: "ML-инженер",
+  qa: "QA-инженер",
+};
+
 /** Requirement keys with the highest declared level first; ties keep insertion order. */
 export function topRequirements(levels: Record<string, number> | undefined, limit: number): string[] {
   return Object.entries(levels ?? {})

@@ -26,6 +26,11 @@
   --color-faint: var(--comit-text-faint);
   --color-on-light: var(--comit-text-on-light);
   --color-on-chip: var(--comit-text-on-chip);
+  --color-caption: var(--comit-text-caption);
+  --color-link-muted: var(--comit-link-muted);
+  --color-agent-accent: var(--comit-agent-accent);
+  --color-stage-likes: var(--comit-stage-likes);
+  --color-stat-muted: var(--comit-text-stat-muted);
 
   --color-primary: var(--comit-primary);
   --color-accent: var(--comit-accent);

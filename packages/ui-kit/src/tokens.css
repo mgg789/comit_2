@@ -40,6 +40,11 @@
   --comit-text-faint: #838383;
   --comit-text-on-light: #010101;
   --comit-text-on-chip: #272930;
+  --comit-text-caption: #8d8d8d;
+  --comit-link-muted: #5d7fb5;
+  --comit-agent-accent: #bfcfef;
+  --comit-stage-likes: #fc3f1d;
+  --comit-text-stat-muted: #a6a6a4;
 
   /* Accents and states */
   --comit-primary: #397ee4;

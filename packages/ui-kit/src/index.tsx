@@ -16,6 +16,8 @@ export {
   type IconButtonProps,
 } from "./controls";
 export { Dialog } from "./dialog";
+export { AnimatePresence, DURATION, EASE, MotionRoot, REVEAL, Reveal, SPRING, StaggerItem, StaggerList, TAP, fadeUp, motion } from "./motion";
+export { MessageBubble, MessageComposer } from "./composer";
 export { ACTION_ROW_BUTTON, ActionRow, Avatar, Backdrop, Chip, CountBadge, Logo, LogoTile, Wordmark, MatchBadge, Panel, ProgressBar, StateMessage, StatusDot, type ChipTone } from "./display";
 export {
   SelectField,
@@ -28,3 +30,5 @@ export {
 } from "./fields";
 export { default as agentOrbUrl } from "./assets/brand/agent-orb.png";
 export { default as plusDiscUrl } from "./assets/brand/plus-disc.svg";
+export { default as qgrammIconUrl } from "./assets/brand/qgramm.svg";
+export { default as droidjeIconUrl } from "./assets/brand/droidje.svg";

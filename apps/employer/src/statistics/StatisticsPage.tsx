@@ -1,5 +1,5 @@
 import type { EmployerStatistics, EmployerStatisticStage } from "@comit/shared";
-import { Button, Panel, SelectField, StateMessage, cx } from "@comit/ui-kit";
+import { Button, SelectField, StateMessage, cx, Icon, REVEAL, Reveal, motion } from "@comit/ui-kit";
 import { useState } from "react";
 import { Link } from "react-router";
 import { api, describeError } from "../api";
@@ -50,15 +50,15 @@ export function StatisticsPage() {
   return (
     <>
       <PageHeader title="Статистика" backTo="/vacancies" backLabel="К вакансиям" />
-      <div className="mb-6 flex flex-wrap gap-3">
-        <SelectField aria-label="Период" value={days} onChange={setDays} options={PERIODS} containerClassName="w-40" />
+      <div className="mb-6 flex flex-wrap gap-3 lg:mb-[2rem] lg:gap-[0.78rem]">
+        <SelectField aria-label="Период" value={days} onChange={setDays} options={PERIODS} containerClassName="w-44 lg:w-[13rem]" />
         <SelectField
           aria-label="Вакансия"
           placeholder="Все вакансии"
           value={vacancyId}
           onChange={setVacancyId}
           options={(vacancies.data?.items ?? []).filter((vacancy) => vacancy.publication).map((vacancy) => ({ value: vacancy.vacancy_id, label: vacancyTitle(vacancy) }))}
-          containerClassName="w-72"
+          containerClassName="w-72 lg:w-[26.875rem]"
         />
       </div>
       {!stats.data && stats.status === "loading" && <StateMessage kind="loading" title="Считаем статистику" />}
@@ -74,81 +74,98 @@ export function StatisticsPage() {
           }
         />
       )}
-      {stats.data && <Dashboard stats={stats.data} />}
+      {stats.data && <Dashboard stats={stats.data} period={periodRange(Number(days))} />}
     </>
   );
 }
 
-function Dashboard({ stats }: { stats: EmployerStatistics }) {
+/** Furthest milestone a vacancy reached in the period, shown with the design's stage colours. */
+export function vacancyStage(counts: EmployerStatistics["current"]): { label: string; className: string } {
+  if (counts.hired > 0) return { label: "Найм", className: "text-success-strong" };
+  if (counts.offered > 0) return { label: "Оффер", className: "text-success-strong" };
+  if (counts.interviewed > 0 || counts.accepted > 0) return { label: "Собеседование", className: "text-warning" };
+  if (counts.liked > 0 || counts.invited > 0) return { label: "Лайки", className: "text-stage-likes" };
+  return { label: "Старт", className: "bg-accent-gradient bg-clip-text text-transparent" };
+}
+
+const PANEL = "rounded-[1rem] bg-surface-dialog";
+
+function Dashboard({ stats, period }: { stats: EmployerStatistics; period: { from: string; to: string } }) {
   const likedChange = changePercent(stats.current.liked, stats.previous.liked);
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)]">
-      <div className="flex flex-col gap-6">
-        <Panel tone="solid" className="grid grid-cols-3 gap-4 p-5 sm:p-6">
+    <div className="grid items-start gap-6 lg:grid-cols-[40.9375rem_minmax(0,1fr)] lg:gap-[2rem]">
+      <div className="flex flex-col gap-6 lg:gap-[2rem]">
+        <Reveal className={cx(PANEL, "grid grid-cols-3 gap-4 p-5 lg:gap-[2rem] lg:p-[2rem]")}>
           <Kpi value={stats.current.delivered} label="показов в подборе" />
           <Kpi value={stats.current.liked} label="лайков" change={likedChange} />
-          <Kpi value={stats.current.interviewed} label="собеседований" />
-        </Panel>
-        <Panel tone="solid" className="flex flex-col gap-4 p-5 sm:p-6">
+          <Kpi value={stats.current.interviewed} label="собесов назначено" />
+        </Reveal>
+        <Reveal delay={0.06} className={cx(PANEL, "flex flex-col gap-4 px-5 py-5 lg:gap-[1.5rem] lg:px-[1.875rem] lg:py-[1.5625rem]")}>
           <div>
-            <h2 className="text-2xl">Воронка найма</h2>
-            <p className="text-sm text-muted">Уникальные пары вакансия–кандидат на каждом этапе за период</p>
+            <h2 className="text-xl font-semibold tracking-[-0.03rem] lg:text-[1.75rem]">Воронка найма</h2>
+            <p className="mt-1 text-sm font-medium text-white/60 lg:text-[1.125rem]">Уникальные пары вакансия–кандидат на каждом этапе за период</p>
           </div>
           <Funnel stats={stats} />
-        </Panel>
-        <Panel tone="solid" className="grid grid-cols-2 gap-4 p-5 text-sm sm:p-6">
-          <p>
-            <span className="block text-3xl">{stats.inventory.open}</span>открытых вакансий
-          </p>
-          <p>
-            <span className="block text-3xl">{stats.inventory.active_processes}</span>активных процессов
-          </p>
-          <p>
-            <span className="block text-3xl">{stats.inventory.saved_pairs}</span>в шортлистах
-          </p>
-          <p>
-            <span className="block text-3xl">{stats.unique_candidates}</span>уникальных кандидатов
-          </p>
-        </Panel>
+        </Reveal>
+        <Reveal delay={0.12} className={cx(PANEL, "grid grid-cols-2 gap-4 p-5 lg:gap-[1.5rem] lg:p-[2rem]")}>
+          <Kpi value={stats.inventory.open} label="открытых вакансий" />
+          <Kpi value={stats.inventory.active_processes} label="активных процессов" />
+          <Kpi value={stats.inventory.saved_pairs} label="в шортлистах" />
+          <Kpi value={stats.unique_candidates} label="уникальных кандидатов" />
+        </Reveal>
       </div>
-      <div className="flex flex-col gap-6">
-        <Panel tone="solid" className="flex flex-col gap-4 p-5 sm:p-6">
-          <h2 className="text-2xl">Показы по дням</h2>
-          <DailyChart stats={stats} />
-        </Panel>
-        <Panel tone="solid" className="flex flex-col gap-3 p-5 sm:p-6">
-          <h2 className="text-2xl">Активные вакансии</h2>
+      <div className="flex flex-col gap-6 lg:gap-[2rem]">
+        <Reveal delay={0.04} className={cx(PANEL, "flex flex-col gap-5 px-5 py-5 lg:gap-[1.5625rem] lg:px-[1.875rem] lg:py-[1.25rem]")}>
+          <Link to="/vacancies" className="flex w-fit items-center gap-2 text-xl font-semibold tracking-[-0.03rem] hover:opacity-80 lg:text-[1.75rem]">
+            Последние вакансии
+            <Icon name="angle-down" size={14} className="-rotate-90" />
+          </Link>
           {stats.top_vacancies.length === 0 ? (
-            <p className="text-sm text-muted">За период событий по вакансиям не было.</p>
+            <p className="text-base font-medium text-white/60 lg:text-[1.25rem]">За период событий по вакансиям не было.</p>
           ) : (
-            <ul className="flex flex-col divide-y divide-white/10">
+            <ul className="flex flex-col gap-5 lg:gap-[1.5625rem]">
               {stats.top_vacancies.map((vacancy) => (
-                <li key={vacancy.vacancy_id}>
-                  <Link to={`/vacancies/${vacancy.draft_id}`} className="grid grid-cols-[1fr_auto] items-center gap-4 py-3 hover:text-white">
-                    <span className="truncate text-lg">{vacancy.title}</span>
-                    <span className="text-right text-sm text-muted">
-                      {vacancy.events} событий · {vacancy.candidates} кандидатов
-                    </span>
-                  </Link>
-                </li>
+                <RecentVacancy key={vacancy.vacancy_id} vacancy={vacancy} period={period} />
               ))}
             </ul>
           )}
-        </Panel>
+        </Reveal>
+        <Reveal delay={0.1} className={cx(PANEL, "flex flex-col gap-4 px-5 py-5 lg:gap-[1.5rem] lg:px-[1.875rem] lg:py-[1.5625rem]")}>
+          <h2 className="text-xl font-semibold tracking-[-0.03rem] lg:text-[1.75rem]">Показы по дням</h2>
+          <DailyChart stats={stats} />
+        </Reveal>
       </div>
     </div>
+  );
+}
+
+/** Row of «Последние вакансии»: title · status and impressions · furthest stage in its colour. */
+function RecentVacancy({ vacancy, period }: { vacancy: EmployerStatistics["top_vacancies"][number]; period: { from: string; to: string } }) {
+  const detail = useResource(() => api.getEmployerStatistics({ ...period, vacancy_id: vacancy.vacancy_id }), [vacancy.vacancy_id, period.from, period.to]);
+  const stage = detail.data ? vacancyStage(detail.data.current) : null;
+  return (
+    <li>
+      <Link to={`/vacancies/${vacancy.draft_id}`} className="grid grid-cols-[1fr_9.625rem_9rem] items-center gap-4 hover:opacity-85">
+        <span className="truncate text-base font-medium tracking-[-0.021rem] lg:text-[1.25rem]">{vacancy.title}</span>
+        <span className="flex flex-col gap-[0.125rem]">
+          <span className="text-xs font-medium tracking-[-0.015rem] text-stat-muted lg:text-[0.875rem]">{vacancy.status === "open" ? "Активна" : vacancy.status === "closed" ? "Закрыта" : "Черновик"}</span>
+          <span className="text-sm font-medium tracking-[-0.056rem] lg:text-[1.125rem]">{detail.data ? detail.data.current.delivered : "…"} показов</span>
+        </span>
+        <span className={cx("text-base font-medium tracking-[-0.021rem] lg:text-[1.25rem]", stage?.className)}>{stage?.label ?? ""}</span>
+      </Link>
+    </li>
   );
 }
 
 function Kpi({ value, label, change }: { value: number; label: string; change?: number | null }) {
   return (
     <p className="flex flex-col">
-      <span className="text-4xl leading-none font-medium tabular-nums sm:text-5xl">{value}</span>
-      <span className="mt-2 text-base leading-tight">{label}</span>
+      <span className="text-3xl leading-none font-semibold tracking-[-0.14rem] tabular-nums lg:text-[2.875rem]">{value}</span>
+      <span className="mt-2 text-base leading-tight font-medium tracking-[-0.021rem] lg:mt-[0.875rem] lg:text-[1.25rem]">{label}</span>
       {change !== undefined && change !== null && (
-        <span className={cx("text-sm", change >= 0 ? "text-success" : "text-danger-soft")}>
+        <span className={cx("text-base font-medium lg:text-[1.25rem]", change >= 0 ? "text-success-strong" : "text-danger-soft")}>
           {change >= 0 ? "+" : "−"}
-          {Math.abs(change)}% к прошлому периоду
+          {Math.abs(change)}%
         </span>
       )}
     </p>
@@ -163,10 +180,15 @@ function Funnel({ stats }: { stats: EmployerStatistics }) {
       {STAGES.map((stage) => {
         const value = stats.current[stage.key];
         return (
-          <li key={stage.key} className="grid grid-cols-[150px_1fr_auto] items-center gap-3 text-sm">
+          <li key={stage.key} className="grid grid-cols-[9.375rem_1fr_auto] items-center gap-3 text-sm font-medium lg:text-[1.125rem]">
             <span className="text-subtle">{stage.label}</span>
             <span className="h-3 overflow-hidden rounded-r-[0.25rem] bg-white/5" aria-hidden>
-              <span className="block h-full rounded-r-[0.25rem] bg-primary" style={{ width: `${(value / max) * 100}%` }} />
+              <motion.span
+                className="block h-full rounded-r-[0.25rem] bg-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${(value / max) * 100}%` }}
+                transition={{ ...REVEAL, delay: 0.15 }}
+              />
             </span>
             <span className="w-10 text-right tabular-nums">{value}</span>
           </li>

@@ -1,7 +1,8 @@
 import type { FeedCard, FeedPage } from "@comit/shared";
 import { ApiError } from "@comit/api-client";
-import { Button, Chip, Icon, MatchBadge, StateMessage, cx } from "@comit/ui-kit";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence, Button, Chip, EASE, Icon, MatchBadge, REVEAL, StateMessage, cx, motion } from "@comit/ui-kit";
+import { useMotionValue, useTransform } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, describeError, errorDetail, isUnauthorized, newIdempotencyKey } from "../api";
 import { useSession } from "../auth/session";
 import { CLAIM_STATUS_LABEL, GRADE_LABEL, describeFeature, filterFactorLabels, matchPercent, scoreChannels } from "../lib/explain";
@@ -59,6 +60,8 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
   const impressionKeys = useRef(new Map<string, string>());
   const acknowledged = useRef(new Set<string>());
   const loadingMore = useRef(false);
+  /** +1 like (flies right), -1 dislike (flies left); read by the exiting card. */
+  const [exitDirection, setExitDirection] = useState<1 | -1>(1);
 
   const fail = useCallback(
     (error: unknown) => {
@@ -142,6 +145,7 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
       }
       setBusy(true);
       setActionError(null);
+      setExitDirection(action === "like" ? 1 : -1);
       try {
         await api.decideFeed(draftId, { exposure_id: top.exposure_id, action, idempotency_key: key });
         setCards((previous) => previous.filter((card) => card.exposure_id !== top.exposure_id));
@@ -214,9 +218,22 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
           if (event.key === "ArrowLeft") void decide("dislike");
         }}
       >
-        {cards[2] && <div aria-hidden className="glass-deck absolute inset-0 -translate-x-[1.5rem] -translate-y-[0.75rem] -rotate-[12.75deg] rounded-[1.25rem]" />}
-        {cards[1] && <div aria-hidden className="glass-deck absolute inset-0 translate-x-[1.5rem] -translate-y-[0.5rem] rotate-[8.5deg] rounded-[1.25rem]" />}
-        <SwipeCard key={top.exposure_id} card={top} disabled={busy} onSwipe={(action) => void decide(action)} />
+        {/* Stack behind the top card (design: -12.75° and +8.5°); fades out as the portion runs low. */}
+        <motion.div
+          aria-hidden
+          animate={{ opacity: cards[2] ? 1 : 0, rotate: -12.75 }}
+          transition={REVEAL}
+          className="glass-deck absolute inset-0 -translate-x-[1.5rem] -translate-y-[0.75rem] rounded-[1.25rem]"
+        />
+        <motion.div
+          aria-hidden
+          animate={{ opacity: cards[1] ? 1 : 0, rotate: 8.5 }}
+          transition={REVEAL}
+          className="glass-deck absolute inset-0 translate-x-[1.5rem] -translate-y-[0.5rem] rounded-[1.25rem]"
+        />
+        <AnimatePresence initial={false} custom={exitDirection} mode="popLayout">
+          <SwipeCard key={top.exposure_id} card={top} disabled={busy} onSwipe={(action) => void decide(action)} />
+        </AnimatePresence>
       </div>
       <p className="text-center text-sm text-muted">Свайп или ← / → · в порции ещё {cards.length - 1}</p>
       {actionError && (
@@ -228,32 +245,23 @@ export function FeedDeck({ draftId, onLiked }: FeedDeckProps) {
   );
 }
 
+/** Fly-out of a decided card in the swipe direction (`custom` = +1 right / -1 left). */
+const cardVariants = {
+  enter: { opacity: 0, scale: 0.94, y: 24 },
+  center: { opacity: 1, scale: 1, y: 0, x: 0, rotate: 0, transition: REVEAL },
+  exit: (direction: number) => ({ x: direction * 640, rotate: direction * 22, opacity: 0, transition: { duration: 0.35, ease: EASE } }),
+};
+
 /**
- * Draggable top card (design 509×603 glass): label, chips, three explanation boxes, and the 78px
- * action row — skip, like (save to shortlist), PDF résumé. Releases past SWIPE_THRESHOLD commit
- * like (right) or dislike (left).
+ * Draggable top card (design 509×603 glass): label, chips, three explanation boxes and the 78px
+ * action row — skip, like (save to shortlist), PDF résumé. A drag past SWIPE_THRESHOLD or a fast
+ * flick commits like (right) or dislike (left); otherwise the card springs back.
  */
 function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: boolean; onSwipe: (action: "like" | "dislike") => void }) {
-  const [dx, setDx] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const start = useRef<number | null>(null);
-
-  function onPointerDown(event: ReactPointerEvent<HTMLElement>) {
-    if (disabled || (event.target as HTMLElement).closest("a, button")) return;
-    start.current = event.clientX;
-    setDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-  function onPointerMove(event: ReactPointerEvent<HTMLElement>) {
-    if (start.current !== null) setDx(event.clientX - start.current);
-  }
-  function onPointerUp() {
-    if (start.current === null) return;
-    start.current = null;
-    setDragging(false);
-    if (Math.abs(dx) >= SWIPE_THRESHOLD) onSwipe(dx > 0 ? "like" : "dislike");
-    setDx(0);
-  }
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-300, 0, 300], [-14, 0, 14]);
+  const likeOpacity = useTransform(x, [30, SWIPE_THRESHOLD], [0, 1]);
+  const skipOpacity = useTransform(x, [-SWIPE_THRESHOLD, -30], [1, 0]);
 
   const { explanation, category } = card;
   const name = candidateLabel(card.display_name, card.candidate_id);
@@ -261,20 +269,40 @@ function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: bool
   const features = explanation.top_matched_features.slice(0, 3);
   const fsp = card.external_evidence?.filter((item) => item.kind === "fsp") ?? [];
   const actionButton =
-    "inline-flex size-16 cursor-pointer items-center justify-center rounded-[1.25rem] bg-surface-button text-text transition-colors duration-150 disabled:opacity-50 lg:size-[4.9rem]";
+    "inline-flex size-16 cursor-pointer items-center justify-center rounded-[1.25rem] bg-surface-button text-text transition-[background-color,scale] duration-150 active:scale-90 disabled:opacity-50 lg:size-[4.9rem]";
   return (
-    <article
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      style={{ transform: `translateX(${dx}px) rotate(${dx / 20}deg)` }}
-      className={cx(
-        "glass-deck relative flex min-h-[32rem] touch-pan-y flex-col overflow-hidden rounded-[1.25rem] px-5 pt-6 pb-5 select-none lg:min-h-[37.6875rem] lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[1.5rem]",
-        !dragging && "transition-transform duration-200",
-      )}
+    <motion.article
+      custom={0}
+      variants={cardVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      drag={disabled ? false : "x"}
+      dragSnapToOrigin
+      dragElastic={0.6}
+      onDragEnd={(_, info) => {
+        if (info.offset.x > SWIPE_THRESHOLD || info.velocity.x > 700) onSwipe("like");
+        else if (info.offset.x < -SWIPE_THRESHOLD || info.velocity.x < -700) onSwipe("dislike");
+      }}
+      style={{ x, rotate }}
+      whileDrag={{ cursor: "grabbing" }}
+      className="glass-deck relative flex min-h-[32rem] cursor-grab touch-pan-y flex-col overflow-hidden rounded-[1.25rem] px-5 pt-6 pb-5 select-none lg:min-h-[37.6875rem] lg:px-[1.875rem] lg:pt-[2.5rem] lg:pb-[1.5rem]"
     >
       <PortraitGlow name={name} />
+      <motion.span
+        aria-hidden
+        style={{ opacity: likeOpacity }}
+        className="pointer-events-none absolute top-6 right-6 z-10 rotate-12 rounded-[0.75rem] border-4 border-success-strong px-3 py-1 font-display text-xl text-success-strong lg:text-[1.75rem]"
+      >
+        В шортлист
+      </motion.span>
+      <motion.span
+        aria-hidden
+        style={{ opacity: skipOpacity }}
+        className="pointer-events-none absolute top-6 left-6 z-10 -rotate-12 rounded-[0.75rem] border-4 border-danger px-3 py-1 font-display text-xl text-danger lg:text-[1.75rem]"
+      >
+        Пропустить
+      </motion.span>
       <div className="relative flex items-start justify-between gap-3">
         <h3 className="truncate font-display text-2xl leading-none lg:text-[2rem]">{name}</h3>
         <MatchBadge percent={matchPercent(explanation)} shape="pill" className="shrink-0" />
@@ -339,6 +367,6 @@ function SwipeCard({ card, disabled, onSwipe }: { card: FeedCard; disabled: bool
           <Icon name="resumes" size={36} />
         </a>
       </div>
-    </article>
+    </motion.article>
   );
 }

@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { cx } from "./cx";
+import { REVEAL } from "./motion";
 
 interface DialogProps {
   /** Accessible dialog name; rendered visually only when `showTitle` is set. */
@@ -39,10 +41,18 @@ export function Dialog({ title, showTitle = false, onClose, children, className 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-md sm:items-center sm:py-8">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={REVEAL}
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-md sm:items-center sm:py-8"
+    >
       <button type="button" aria-label="Закрыть" tabIndex={-1} className="fixed inset-0 cursor-default" onClick={onClose} />
-      <div
+      <motion.div
         ref={panel}
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={REVEAL}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -53,7 +63,7 @@ export function Dialog({ title, showTitle = false, onClose, children, className 
           {title}
         </h2>
         {children}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

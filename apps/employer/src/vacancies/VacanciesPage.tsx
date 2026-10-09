@@ -1,5 +1,5 @@
 import type { AgentsDraftView } from "@comit/shared";
-import { Button, Chip, Icon, StateMessage, StatusDot, cx } from "@comit/ui-kit";
+import { Button, Chip, Icon, StateMessage, StatusDot, cx, SPRING, StaggerItem, StaggerList, motion } from "@comit/ui-kit";
 import { useState } from "react";
 import { Link, Outlet, useNavigate, useOutletContext } from "react-router";
 import { api, describeError } from "../api";
@@ -65,12 +65,22 @@ export function VacanciesPage() {
               aria-selected={selected}
               onClick={() => setFilter(entry.key)}
               className={cx(
-                "glass-tab h-12 cursor-pointer rounded-field px-3 text-left text-base font-medium transition-colors duration-150 lg:h-[3.875rem] lg:px-[2rem] lg:text-[1.375rem]",
+                "glass-tab relative h-12 cursor-pointer overflow-hidden rounded-field px-3 text-left text-base font-medium transition-colors duration-150 lg:h-[3.875rem] lg:px-[2rem] lg:text-[1.375rem]",
                 selected ? "text-text" : "text-white/60 hover:text-white/90",
               )}
             >
-              {entry.label}
-              {vacancies.status === "ready" && `(${count})`}
+              {selected && (
+                <motion.span
+                  layoutId="vacancy-tab-indicator"
+                  transition={SPRING}
+                  aria-hidden
+                  className="absolute inset-0 rounded-field ring-1 ring-white/35 ring-inset"
+                />
+              )}
+              <span className="relative">
+                {entry.label}
+                {vacancies.status === "ready" && `(${count})`}
+              </span>
             </button>
           );
         })}
@@ -102,13 +112,13 @@ export function VacanciesPage() {
       )}
 
       {visible.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-[1.25rem] lg:gap-y-[2.5rem]">
+        <StaggerList key={filter} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-x-[1.25rem] lg:gap-y-[2.5rem]">
           {visible.map((vacancy) => (
-            <li key={vacancy.draft_id}>
+            <StaggerItem key={vacancy.draft_id}>
               <VacancyCard vacancy={vacancy} />
-            </li>
+            </StaggerItem>
           ))}
-        </ul>
+        </StaggerList>
       )}
       {vacancies.data?.truncated && <p className="mt-6 text-center text-sm text-muted">Показаны первые 500 вакансий.</p>}
 
@@ -127,7 +137,7 @@ function VacancyCard({ vacancy }: { vacancy: AgentsDraftView }) {
   const stacks = topRequirements(fields.stacks, 3);
   const location = [fields.city, fields.type ? WORK_TYPE_LABEL[fields.type] : null].filter(Boolean).join(" · ");
   return (
-    <article className="glass-card group relative flex h-full flex-col overflow-hidden rounded-card p-4 lg:h-[22.1875rem] lg:px-[1rem] lg:pt-[1rem] lg:pb-0">
+    <article className="glass-card group relative flex h-full flex-col overflow-hidden rounded-card p-4 transition-transform duration-300 ease-out hover:-translate-y-1 lg:h-[22.1875rem] lg:px-[1rem] lg:pt-[1rem] lg:pb-0">
       <span className="glass inline-flex h-10 w-fit items-center gap-[0.75rem] rounded-chip px-[0.75rem] text-base font-medium lg:h-[2.875rem] lg:text-[1.125rem]">
         <StatusDot tone={badge.tone} />
         {badge.label}

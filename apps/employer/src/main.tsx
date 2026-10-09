@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
+import { MotionRoot } from "@comit/ui-kit";
 import "@comit/ui-kit/tokens.css";
 import "./index.css";
 import App from "./App";
@@ -13,7 +14,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter basename={basename}>
       <SessionProvider>
-        <App />
+        <MotionRoot>
+          <App />
+        </MotionRoot>
       </SessionProvider>
     </BrowserRouter>
   </StrictMode>,

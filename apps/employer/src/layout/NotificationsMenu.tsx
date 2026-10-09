@@ -1,5 +1,5 @@
 import type { RecruitmentEvent } from "@comit/shared";
-import { Icon, cx } from "@comit/ui-kit";
+import { AnimatePresence, Icon, SPRING, TAP, cx, motion } from "@comit/ui-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api";
@@ -71,14 +71,32 @@ export function NotificationsMenu() {
     <div ref={root} className="relative">
       <button type="button" aria-label={unseen ? `Уведомления: ${unseen} новых` : "Уведомления"} aria-expanded={open} onClick={toggle} className="relative inline-flex cursor-pointer text-text">
         <Icon name="bell" size={30} />
+        <AnimatePresence>
         {unseen > 0 && (
-          <span className="absolute -top-[0.25rem] left-[1.0625rem] inline-flex h-[1.125rem] min-w-[1.625rem] items-center justify-center rounded-[1.25rem] bg-light px-[0.375rem] text-[1rem] leading-none font-medium tracking-[-0.05em] text-on-light">
+          <motion.span
+            key={unseen}
+            initial={{ scale: 0.4, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.4, opacity: 0 }}
+            transition={SPRING}
+            className="absolute -top-[0.25rem] left-[1.0625rem] inline-flex h-[1.125rem] min-w-[1.625rem] items-center justify-center rounded-[1.25rem] bg-light px-[0.375rem] text-[1rem] leading-none font-medium tracking-[-0.05em] text-on-light">
             {unseen > 99 ? "99+" : unseen}
-          </span>
+          </motion.span>
         )}
+        </AnimatePresence>
       </button>
+      <AnimatePresence>
       {open && (
-        <div role="dialog" aria-label="Уведомления" className="glass absolute top-full right-0 z-40 mt-4 max-h-96 w-80 overflow-y-auto rounded-field p-2">
+        <motion.div
+          role="dialog"
+          aria-label="Уведомления"
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+          transition={TAP}
+          style={{ transformOrigin: "top right" }}
+          className="glass absolute top-full right-0 z-40 mt-4 max-h-96 w-80 overflow-y-auto rounded-field p-2"
+        >
           {events.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted">Событий найма пока нет.</p>
           ) : (
@@ -100,8 +118,9 @@ export function NotificationsMenu() {
                 ))}
             </ul>
           )}
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }

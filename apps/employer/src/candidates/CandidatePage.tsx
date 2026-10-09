@@ -1,5 +1,5 @@
 import type { PublicNarrative, PublicSkill, RecruitmentView } from "@comit/shared";
-import { Button, StateMessage, cx, plusDiscUrl } from "@comit/ui-kit";
+import { Button, StateMessage, cx, plusDiscUrl, AnimatePresence, REVEAL, fadeUp, motion } from "@comit/ui-kit";
 import { useState, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { api, describeError } from "../api";
@@ -85,7 +85,12 @@ export function CandidatePage() {
           Ожидания {formatSalaryRange(detail.salary.from_rub, detail.salary.to_rub)} в месяц
         </p>
 
-        <section className="mt-10 flex w-full flex-col gap-[1.1875rem] lg:mt-[5.25rem]">
+        <motion.section
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } } }}
+          className="mt-10 flex w-full flex-col gap-[1.1875rem] lg:mt-[5.25rem]"
+        >
           <h3 className="mb-3 font-display text-2xl tracking-[-0.075rem] text-white/60 lg:mb-[2.0625rem] lg:text-[2.5rem]">Информация о соискателе</h3>
           {profile.description && (
             <Section title="О себе">
@@ -131,7 +136,7 @@ export function CandidatePage() {
               </a>
             </div>
           )}
-        </section>
+        </motion.section>
       </div>
     </>
   );
@@ -172,7 +177,7 @@ function Section({ title, empty, children }: { title: string; empty?: string; ch
   const [open, setOpen] = useState(false);
   const hasContent = Boolean(children) && children !== false;
   return (
-    <div className="rounded-[2rem] bg-light text-on-chip">
+    <motion.div variants={fadeUp} className="overflow-hidden rounded-[2rem] bg-light text-on-chip">
       <button
         type="button"
         aria-expanded={open}
@@ -180,14 +185,23 @@ function Section({ title, empty, children }: { title: string; empty?: string; ch
         className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-3 text-left text-xl font-medium tracking-[-0.04875rem] lg:px-[1.5625rem] lg:py-[1.25rem] lg:text-[1.625rem]"
       >
         {title}
-        <img src={plusDiscUrl} alt="" className={cx("size-12 shrink-0 transition-transform duration-150 lg:size-[5rem]", open && "rotate-45")} />
+        <img src={plusDiscUrl} alt="" className={cx("size-12 shrink-0 transition-transform duration-300 ease-out lg:size-[5rem]", open && "rotate-45")} />
       </button>
-      {open && (
-        <div className="px-5 pb-6 text-base lg:px-[1.5625rem] lg:pb-[1.75rem] lg:text-[1.25rem]">
-          {hasContent ? children : <p className="text-on-chip/60">{empty}</p>}
-        </div>
-      )}
-    </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={REVEAL}
+          >
+            <div className="px-5 pb-6 text-base lg:px-[1.5625rem] lg:pb-[1.75rem] lg:text-[1.25rem]">
+              {hasContent ? children : <p className="text-on-chip/60">{empty}</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 

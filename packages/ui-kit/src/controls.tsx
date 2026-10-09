@@ -53,7 +53,7 @@ export function Button({ variant = "primary", size = "md", shape, loading = fals
       aria-busy={loading || undefined}
       className={cx(
         "inline-flex cursor-pointer items-center justify-center gap-2 font-semibold whitespace-nowrap",
-        "transition-[background-color,filter,opacity] duration-150 disabled:cursor-not-allowed disabled:opacity-50",
+        "transition-[background-color,filter,opacity,scale] duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
         VARIANT[variant],
         SIZE[size],
@@ -87,7 +87,7 @@ export function IconButton({ icon, label, size = 56, iconSize = 24, tone = "glas
       {...rest}
       style={{ width: `${size / 16}rem`, height: `${size / 16}rem` }}
       className={cx(
-        "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-pill text-subtle transition-colors duration-150",
+        "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-pill text-subtle transition-[color,background-color,scale] duration-150 active:scale-95",
         "hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50",
         tone === "glass" && "glass hover:bg-white/10",
         tone === "outline" && "rounded-field border-2 border-white/40 hover:border-white/70",

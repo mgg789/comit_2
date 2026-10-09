@@ -1,6 +1,6 @@
 import type { AgentsOrganizationBudget, AgentsOrganizationMessage, AgentsPendingAnswer } from "@comit/shared";
-import { Button, Icon, Spinner, StateMessage, agentOrbUrl, cx } from "@comit/ui-kit";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { agentOrbUrl, AnimatePresence, Button, cx, droidjeIconUrl, fadeUp, Icon, MessageComposer, motion, REVEAL, Spinner, StateMessage, TAP } from "@comit/ui-kit";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, describeError, isUnauthorized, newIdempotencyKey } from "../api";
 import { useSession } from "../auth/session";
 
@@ -48,15 +48,32 @@ export function AgentLauncher() {
 
   return (
     <>
-      {open && <AgentOverlay initialDraft={draft} />}
+      <AnimatePresence>{open && <AgentOverlay initialDraft={draft} />}</AnimatePresence>
       <button
         type="button"
         aria-label={open ? "Закрыть AI-агента" : "Открыть AI-агента"}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="glass fixed right-4 bottom-4 z-50 inline-flex size-20 cursor-pointer items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 sm:right-10 sm:bottom-10 sm:size-[6.5rem]"
+        className="glass fixed right-4 bottom-4 z-50 inline-flex size-20 cursor-pointer items-center justify-center rounded-full transition-[scale] duration-150 hover:scale-105 active:scale-95 lg:right-[2.4375rem] lg:bottom-[1.8125rem] lg:size-[6.5rem]"
       >
-        {open ? <span className="text-4xl text-text">×</span> : <img src={agentOrbUrl} alt="" className="size-14 sm:size-[3.9375rem]" />}
+        <AnimatePresence mode="wait" initial={false}>
+          {open ? (
+            <motion.span key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={TAP} className="text-text">
+              <Icon name="close" size={44} />
+            </motion.span>
+          ) : (
+            <motion.img
+              key="orb"
+              src={agentOrbUrl}
+              alt=""
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.6, opacity: 0 }}
+              transition={TAP}
+              className="size-14 lg:size-[3.9375rem]"
+            />
+          )}
+        </AnimatePresence>
       </button>
     </>
   );
@@ -116,8 +133,17 @@ function AgentOverlay({ initialDraft }: { initialDraft: string }) {
   const visible = messages.filter((message) => (message.role === "user" || message.role === "assistant") && message.content?.trim());
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="AI-агент компании" className="fixed inset-0 z-40 flex flex-col bg-black/70 px-4 pt-24 pb-6 backdrop-blur-xl sm:pt-28">
-      <div ref={list} aria-live="polite" className="mx-auto flex w-full max-w-[43.75rem] flex-1 flex-col gap-6 overflow-y-auto pb-4">
+    <motion.div
+      role="dialog"
+      aria-modal="true"
+      aria-label="AI-агент компании"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={REVEAL}
+      className="fixed inset-0 z-40 flex flex-col bg-black/85 px-4 pt-24 pb-6 backdrop-blur-[0.78rem] lg:pt-[5.375rem] lg:pb-[5rem]"
+    >
+      <div ref={list} aria-live="polite" className="mx-auto flex w-full max-w-[64.75rem] flex-1 flex-col gap-8 overflow-y-auto pb-6 lg:gap-[2.5rem]">
         {status === "loading" && <StateMessage kind="loading" title="Подключаем агента" />}
         {status === "error" && <StateMessage kind="error" title="Агент недоступен" description={error} />}
         {status === "ready" && visible.length === 0 && (
@@ -128,45 +154,87 @@ function AgentOverlay({ initialDraft }: { initialDraft: string }) {
           />
         )}
         <PendingQuestions />
-        {visible.map((message) =>
-          message.role === "user" ? (
-            <p key={message.message_id} className="max-w-[85%] self-end rounded-[1.5rem] bg-light px-5 py-3 text-lg text-on-light">
-              {message.content}
-            </p>
-          ) : (
-            <div key={message.message_id} className="flex gap-4">
-              <img src={agentOrbUrl} alt="" className="size-11 shrink-0" />
-              <div className="flex min-w-0 flex-col gap-2">
-                <p className="text-lg whitespace-pre-wrap text-text">{message.content}</p>
-                <CopyButton text={message.content ?? ""} />
-              </div>
-            </div>
-          ),
-        )}
+        <AnimatePresence initial={false}>
+          {visible.map((message) => (
+            <motion.div key={message.message_id} variants={fadeUp} initial="hidden" animate="show" layout="position">
+              {message.role === "user" ? (
+                <div className="flex flex-col items-end gap-3">
+                  <p className="max-w-[85%] rounded-[1.875rem] bg-light px-6 py-4 text-base font-medium text-on-light lg:rounded-[6.25rem] lg:px-[1.5rem] lg:py-[1.125rem] lg:text-[1.25rem]">
+                    {message.content}
+                  </p>
+                  <CopyButton text={message.content ?? ""} />
+                </div>
+              ) : (
+                <div className="flex gap-4 lg:gap-[1.25rem]">
+                  <img src={agentOrbUrl} alt="" className="size-11 shrink-0 lg:size-[3.75rem]" />
+                  <div className="flex min-w-0 flex-col items-start gap-4 lg:gap-[1.25rem]">
+                    {message.turn_id && <ThinkingTime turnId={message.turn_id} />}
+                    <AgentText text={message.content ?? ""} />
+                    <CopyButton text={message.content ?? ""} />
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-      <div className="mx-auto w-full max-w-[43.75rem]">
+      <div className="mx-auto w-full max-w-[44.1875rem]">
         <AgentComposer
           initialText={initialDraft}
           onQueued={() => void pull().catch(() => undefined)}
           onSettled={() => void pull().catch(() => undefined)}
         />
-        <p className="mt-2 text-center text-xs text-muted">Работает на Droidje AI · агент не принимает решений о найме</p>
       </div>
-      <div className="fixed right-4 bottom-28 flex flex-col items-end gap-3 sm:right-12 sm:bottom-40">
-        {panel === "budget" && <BudgetPopover />}
-        <div className="glass flex flex-col gap-1 rounded-pill p-1.5">
+      <div className="fixed right-4 bottom-28 flex items-end gap-3 lg:right-[3.75rem] lg:bottom-[9.6875rem]">
+        <AnimatePresence>{panel === "budget" && <BudgetPopover />}</AnimatePresence>
+        <div className="glass flex flex-col items-center gap-[1.125rem] rounded-pill px-[0.8125rem] py-[1.25rem]">
           <button
             type="button"
             aria-pressed={panel === "budget"}
+            aria-label="Расход агента"
+            title="Расход агента"
             onClick={() => setPanel((value) => (value === "budget" ? null : "budget"))}
-            className={cx("cursor-pointer rounded-full px-3 py-2 text-sm", panel === "budget" ? "bg-light text-on-light" : "text-text hover:bg-white/10")}
+            className={cx("inline-flex cursor-pointer rounded-full p-1 transition-[background-color,scale] duration-150 active:scale-90", panel === "budget" ? "bg-white/20" : "hover:bg-white/10")}
           >
-            Бюджет
+            <Icon name="usage" size={32} />
           </button>
         </div>
       </div>
+    </motion.div>
+  );
+}
+
+/** Agent answer text; bullet lines are tinted like the design's highlighted list items. */
+function AgentText({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-1 text-base font-medium tracking-[-0.017rem] whitespace-pre-wrap text-text lg:text-[1.25rem]">
+      {text.split("\n").map((line, index) => (
+        <p key={index} className={cx(/^\s*[•\-*]\s/.test(line) && "text-agent-accent", !line.trim() && "h-3")}>
+          {line}
+        </p>
+      ))}
     </div>
   );
+}
+
+/** «Думал N секунд» pill: server turn duration (created → updated), loaded once per turn. */
+function ThinkingTime({ turnId }: { turnId: string }) {
+  const [seconds, setSeconds] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.getOrganizationTurn(turnId).then(
+      (turn) => {
+        if (cancelled || !turn.created_at || !turn.updated_at || turn.status !== "succeeded") return;
+        setSeconds(Math.max(1, Math.round((Date.parse(turn.updated_at) - Date.parse(turn.created_at)) / 1000)));
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [turnId]);
+  if (seconds === null) return null;
+  return <span className="rounded-[6.25rem] bg-light px-5 py-3 text-sm font-medium text-black lg:px-[1.5rem] lg:py-[1rem] lg:text-[1rem]">Думал {seconds} с</span>;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -174,6 +242,8 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       type="button"
+      aria-label={copied ? "Скопировано" : "Копировать"}
+      title={copied ? "Скопировано" : "Копировать"}
       onClick={() =>
         void navigator.clipboard.writeText(text).then(
           () => {
@@ -183,9 +253,9 @@ function CopyButton({ text }: { text: string }) {
           () => undefined,
         )
       }
-      className="w-fit cursor-pointer text-xs text-muted hover:text-text"
+      className="inline-flex cursor-pointer text-text/80 transition-[color,scale] duration-150 hover:text-text active:scale-90"
     >
-      {copied ? "Скопировано" : "Копировать"}
+      <Icon name={copied ? "check" : "copy"} size={24} />
     </button>
   );
 }
@@ -199,21 +269,27 @@ function BudgetPopover() {
   }, []);
   const usage = budget ? budgetUsage(budget) : 0;
   return (
-    <div className="glass w-64 rounded-[1.5rem] p-4">
+    <motion.div
+      initial={{ opacity: 0, x: 12 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 12 }}
+      transition={TAP}
+      className="glass w-72 rounded-pill px-6 py-4"
+    >
       {error && <p className="text-sm text-danger-soft">{error}</p>}
       {!budget && !error && <Spinner />}
       {budget && (
         <>
-          <div className="flex items-center gap-3">
-            <span className="text-lg font-semibold">{Math.round(usage * 100)}%</span>
-            <div className="h-5 flex-1 overflow-hidden rounded-pill bg-black/40">
-              <div className="h-full rounded-pill bg-light" style={{ width: `${usage * 100}%` }} />
+          <div className="flex items-center gap-4">
+            <span className="text-xl font-semibold">{Math.round(usage * 100)}%</span>
+            <div className="h-6 flex-1 overflow-hidden rounded-pill bg-black/40">
+              <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(usage * 100, 4)}%` }} transition={REVEAL} className="h-full rounded-pill bg-light" />
             </div>
           </div>
           <p className="mt-2 text-xs text-muted">Расход агента за 7 дней от лимита аккаунта{budget.pricing_configured ? "" : " · тарифы не настроены"}</p>
         </>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -234,7 +310,7 @@ function PendingQuestions() {
         <form
           key={item.answer_id}
           className="flex flex-col gap-2"
-          onSubmit={(event: FormEvent) => {
+          onSubmit={(event) => {
             event.preventDefault();
             const answer = drafts[item.answer_id]?.trim();
             if (!answer) return;
@@ -270,8 +346,7 @@ function AgentComposer({ initialText, onQueued, onSettled }: { initialText: stri
   const [error, setError] = useState<string | null>(null);
   const pendingKey = useRef<string | null>(null);
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
+  async function send() {
     const message = text.trim();
     if (!message || thinking) return;
     pendingKey.current ??= newIdempotencyKey();
@@ -297,40 +372,50 @@ function AgentComposer({ initialText, onQueued, onSettled }: { initialText: stri
   }
 
   return (
-    <form onSubmit={send} className="flex flex-col gap-2">
-      {thinking && (
-        <p className="flex items-center gap-2 text-sm text-subtle">
-          <Spinner size={14} /> Агент думает…
-        </p>
-      )}
-      <div className="glass flex items-center gap-3 rounded-pill p-1.5 pl-5">
-        <label htmlFor="agent-input" className="sr-only">
-          Сообщение агенту
-        </label>
-        <input
-          id="agent-input"
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value);
-            pendingKey.current = null;
-          }}
-          placeholder="Отправьте сообщение"
-          className="min-w-0 flex-1 bg-transparent text-lg text-text outline-none placeholder:text-text"
-        />
-        <button
-          type="submit"
-          aria-label="Отправить"
-          disabled={thinking || !text.trim()}
-          className="glass inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text hover:bg-white/10 disabled:opacity-50"
-        >
-          <Icon name="arrow-left" size={22} className="rotate-180" />
-        </button>
-      </div>
+    <div className="flex flex-col gap-2">
+      <AnimatePresence>
+        {thinking && (
+          <motion.p initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={TAP} className="flex items-center justify-center gap-2 text-sm text-subtle">
+            <ThinkingDots /> Агент думает
+          </motion.p>
+        )}
+      </AnimatePresence>
+      <MessageComposer
+        value={text}
+        onChange={(value) => {
+          setText(value);
+          pendingKey.current = null;
+        }}
+        onSubmit={() => void send()}
+        busy={thinking}
+        footer={
+          <>
+            <img src={droidjeIconUrl} alt="" className="h-4 w-auto" />
+            Работает на Droidje AI · агент не принимает решений о найме
+          </>
+        }
+      />
       {error && (
         <p role="alert" className="text-center text-sm text-danger-soft">
           {error}
         </p>
       )}
-    </form>
+    </div>
+  );
+}
+
+/** Three pulsing dots while a turn is queued or running. */
+function ThinkingDots() {
+  return (
+    <span aria-hidden className="inline-flex gap-1">
+      {[0, 1, 2].map((index) => (
+        <motion.span
+          key={index}
+          className="size-1.5 rounded-full bg-current"
+          animate={{ opacity: [0.25, 1, 0.25], y: [0, -3, 0] }}
+          transition={{ duration: 0.9, repeat: Infinity, delay: index * 0.15, ease: "easeInOut" }}
+        />
+      ))}
+    </span>
   );
 }

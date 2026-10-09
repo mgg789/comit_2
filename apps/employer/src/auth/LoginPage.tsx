@@ -1,5 +1,5 @@
 import type { EmailCodeReceipt } from "@comit/shared";
-import { Backdrop, Button, Icon, Logo, Panel, cx } from "@comit/ui-kit";
+import { Backdrop, Button, Icon, LogoTile, Panel, Wordmark, cx } from "@comit/ui-kit";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, describeError, errorDetail } from "../api";
 import { CodeInput, OTP_LENGTH } from "./CodeInput";
@@ -91,26 +91,28 @@ export function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-dvh flex-col items-center px-4 py-6 sm:py-10">
+    <main className="relative flex min-h-dvh flex-col items-center px-4 py-6 lg:pt-[2.25rem]">
       <Backdrop variant="auth" />
-      <a href="/" className="flex items-center gap-4 self-start text-text">
-        <span className="glass inline-flex size-12 items-center justify-center rounded-pill sm:size-[4.125rem]">
-          <Icon name="arrow-left" size={26} />
+      <a href="/" className="flex items-center gap-4 self-start text-text lg:ml-[2.5625rem] lg:gap-[1.25rem]">
+        <span className="glass inline-flex size-12 items-center justify-center rounded-pill lg:size-[4.125rem]">
+          <Icon name="arrow-left" size={30} />
         </span>
-        <span className="font-display text-2xl sm:text-[2.5rem]">Назад</span>
+        <span className="font-display text-2xl leading-none lg:text-[2.5rem]">Назад</span>
       </a>
 
-      <div className="mt-8 flex flex-col items-center gap-3 sm:mt-4 sm:flex-row sm:gap-8">
-        <span className="inline-flex size-28 items-center justify-center rounded-[3rem] bg-light sm:size-[13.75rem] sm:rounded-[5rem]">
-          <Logo withWordmark={false} size={120} className="invert" />
-        </span>
-        <div className="flex flex-col items-center sm:items-start">
-          <span className="font-display text-6xl leading-none tracking-[0.04em] uppercase sm:text-[9.375rem]">comit</span>
-          <span className="font-display text-xl sm:text-[2.5rem]">Для бизнеса</span>
+      <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row lg:mt-[3.5rem] lg:gap-[4.375rem]">
+        <LogoTile size={300} className="hidden sm:inline-flex" />
+        <LogoTile size={120} className="sm:hidden" />
+        <div className="flex flex-col items-center gap-3 sm:items-start lg:gap-[1.75rem]">
+          <h1 className="text-text">
+            <Wordmark height={144} className="hidden sm:inline-block" />
+            <Wordmark height={56} className="sm:hidden" />
+          </h1>
+          <span className="font-display text-xl leading-none lg:text-[2.5rem]">Для бизнеса</span>
         </div>
       </div>
 
-      <Panel className="mt-8 w-full max-w-[43.125rem] px-5 py-8 sm:px-10">
+      <Panel className="mt-8 w-full max-w-[43.125rem] px-5 py-8 sm:px-10 lg:mt-[3.75rem]">
         {receipt === null ? (
           <form onSubmit={requestCode} className="flex flex-col items-center gap-6" noValidate>
             <h1 className="max-w-[33.9375rem] text-center text-2xl font-semibold sm:text-[2rem] sm:leading-tight">

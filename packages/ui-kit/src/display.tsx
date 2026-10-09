@@ -172,7 +172,7 @@ export function ActionRow({
 
 /** Dark action button used inside ActionRow (design: #272930, radius 20, 64/24 padding, 20px semibold). */
 export const ACTION_ROW_BUTTON =
-  "inline-flex h-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-dark-button px-8 text-base font-semibold tracking-[-0.0375rem] text-white transition-[filter] duration-150 hover:brightness-125 lg:h-[4.5rem] lg:px-[4rem] lg:text-[1.25rem]";
+  "inline-flex h-14 shrink-0 items-center justify-center rounded-[1.25rem] bg-dark-button px-8 text-base font-semibold tracking-[-0.0375rem] text-white transition-[filter,scale] duration-150 hover:brightness-125 active:scale-[0.97] lg:h-[4.5rem] lg:px-[4rem] lg:text-[1.25rem]";
 
 /**
  * Deterministic initials avatar: public candidate projections carry no photos.

@@ -1,5 +1,5 @@
 import type { AgentsDraftView, InterviewView, RecruitmentView, SavedCard } from "@comit/shared";
-import { ACTION_ROW_BUTTON, ActionRow, Avatar, Button, CountBadge, MatchBadge, Panel, ProgressBar, StateMessage, cx } from "@comit/ui-kit";
+import { ACTION_ROW_BUTTON, ActionRow, Avatar, Button, CountBadge, MatchBadge, Panel, ProgressBar, StateMessage, cx, Reveal, StaggerItem, StaggerList } from "@comit/ui-kit";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, describeError, isUnauthorized } from "../api";
@@ -77,21 +77,27 @@ export function VacancyPage() {
       />
       <div className="grid items-start gap-6 lg:grid-cols-[59.25rem_minmax(0,1fr)] lg:gap-x-[2.125rem] lg:pl-[5.375rem]">
         <div className="flex min-w-0 flex-col gap-6 lg:gap-[2rem]">
-          <VacancyDataPanel draft={draft} onChanged={vacancy.reload} onEdit={() => setEditing(true)} />
+          <Reveal>
+            <VacancyDataPanel draft={draft} onChanged={vacancy.reload} onEdit={() => setEditing(true)} />
+          </Reveal>
           {everPublished && (
             <>
-              <SavedStrip draftId={draftId} saved={saved.data?.items ?? []} status={saved.status} />
-              <InterviewsPanel draftId={draftId} saved={saved.data?.items ?? []} />
+              <Reveal delay={0.08}>
+                <SavedStrip draftId={draftId} saved={saved.data?.items ?? []} status={saved.status} />
+              </Reveal>
+              <Reveal delay={0.16}>
+                <InterviewsPanel draftId={draftId} saved={saved.data?.items ?? []} />
+              </Reveal>
             </>
           )}
         </div>
-        <div className="lg:sticky lg:top-[2rem] lg:pt-[1rem]">
+        <Reveal delay={0.12} className="lg:sticky lg:top-[2rem] lg:pt-[1rem]">
           {open && draft.publication?.status === "accepted" ? (
             <FeedDeck draftId={draftId} onLiked={saved.reload} />
           ) : (
             <PublicationState draft={draft} publishing={publishing} onEdit={() => setEditing(true)} />
           )}
-        </div>
+        </Reveal>
       </div>
       {editing && (
         <VacancyFormDialog
@@ -273,11 +279,11 @@ function SavedStrip({ draftId, saved, status }: { draftId: string; saved: SavedC
       {status === "error" && <p className="text-base text-danger-soft">Не удалось загрузить список.</p>}
       {status === "ready" && saved.length === 0 && <p className="text-base text-white/60 lg:text-[1.25rem]">Лайкнутые в ленте кандидаты появятся здесь.</p>}
       {saved.length > 0 && (
-        <ul className="-mx-1 flex snap-x gap-[1.625rem] overflow-x-auto px-1 pb-1">
+        <StaggerList step={0.05} className="-mx-1 flex snap-x gap-[1.625rem] overflow-x-auto px-1 pb-1">
           {saved.map((entry) => {
             const name = entry.card ? candidateLabel(entry.card.display_name, entry.candidate_id) : "Кандидат";
             return (
-              <li key={entry.candidate_id} className="shrink-0 snap-start">
+              <StaggerItem key={entry.candidate_id} className="shrink-0 snap-start">
                 <Link
                   to={`/candidates/${entry.candidate_id}?vacancy=${draftId}`}
                   className="relative flex h-[10rem] w-[13rem] flex-col justify-end overflow-hidden rounded-[1.25rem] bg-surface-dialog p-4 transition-transform duration-150 hover:-translate-y-0.5 lg:h-[14.3125rem] lg:w-[19.25rem] lg:px-[1.625rem] lg:pb-[1.75rem]"
@@ -291,10 +297,10 @@ function SavedStrip({ draftId, saved, status }: { draftId: string; saved: SavedC
                     </span>
                   )}
                 </Link>
-              </li>
+              </StaggerItem>
             );
           })}
-        </ul>
+        </StaggerList>
       )}
     </Panel>
   );
@@ -325,11 +331,11 @@ function InterviewsPanel({ draftId, saved }: { draftId: string; saved: SavedCard
       {processes.status === "ready" && upcoming.length === 0 && (
         <p className="text-base text-white/60 lg:text-[1.25rem]">Пока нет. Пригласите кандидата из «Понравились в ленте» и предложите время.</p>
       )}
-      <ul className="flex flex-col gap-4 lg:gap-[2rem]">
+      <StaggerList className="flex flex-col gap-4 lg:gap-[2rem]">
         {upcoming.map(({ process, interview }) => {
           const name = names.get(process.candidate_id) ?? "Кандидат";
           return (
-            <li key={interview.id}>
+            <StaggerItem key={interview.id}>
               <ActionRow
                 leading={<Avatar name={name} size={70} />}
                 title={name}
@@ -345,10 +351,10 @@ function InterviewsPanel({ draftId, saved }: { draftId: string; saved: SavedCard
                   </Link>
                 }
               />
-            </li>
+            </StaggerItem>
           );
         })}
-      </ul>
+      </StaggerList>
     </Panel>
   );
 }

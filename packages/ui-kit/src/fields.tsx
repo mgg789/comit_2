@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type KeyboardEvent, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { cx } from "./cx";
+import { TAP } from "./motion";
 import { Icon } from "./icon";
 
 /** Shape and focus only; colors are added per tone so no two utilities fight over one property. */
@@ -223,8 +225,14 @@ export function SelectField({
             <span className="truncate">{selected?.label ?? placeholder ?? ""}</span>
             <Icon name="chevron-down" size={20} className={cx("transition-transform duration-150", open && "rotate-180", light ? "text-on-light" : "text-text")} />
           </button>
+          <AnimatePresence>
           {open && (
-            <ul
+            <motion.ul
+              initial={{ opacity: 0, y: -6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={TAP}
+              style={{ transformOrigin: "top" }}
               ref={list}
               id={listId}
               role="listbox"
@@ -254,8 +262,9 @@ export function SelectField({
                   </li>
                 );
               })}
-            </ul>
+            </motion.ul>
           )}
+          </AnimatePresence>
         </div>
       )}
     </FieldFrame>
