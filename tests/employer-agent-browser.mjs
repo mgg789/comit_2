@@ -6,7 +6,10 @@ import { mkdir } from "node:fs/promises";
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chrome", headless: true });
-const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+const context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, reducedMotion: process.env.EMPLOYER_REDUCED_MOTION === "system" ? "reduce" : "no-preference" });
+if (process.env.EMPLOYER_REDUCED_MOTION === "app") {
+  await context.addInitScript(() => localStorage.setItem("comit.employer.preferences.v1", JSON.stringify({ reducedMotion: true })));
+}
 const page = await context.newPage();
 const failures = [];
 page.on("pageerror", (error) => failures.push(error.message));
@@ -87,6 +90,10 @@ try {
   await page.getByRole("button", { name: "Отправить сообщение агенту" }).click();
   await page.getByRole("status", { name: "Агент думает" }).waitFor();
   assert.equal(await page.locator(".agent-thinking .agent-think-dot").count(), 3);
+  if (process.env.EMPLOYER_REDUCED_MOTION) {
+    assert.equal(await page.locator(".agent-think-dot").first().evaluate(node => getComputedStyle(node).animationName), "none");
+    assert.equal(await page.locator(".organization-history").evaluate(node => getComputedStyle(node).transitionDuration), "1e-05s", "larger non-feedback transitions must remain reduced");
+  }
   assert.equal(await page.getByRole("textbox", { name: "Сообщение AI-агенту" }).inputValue(), "");
   await page.waitForFunction(() => {
     const node = document.querySelector(".organization-history");

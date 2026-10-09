@@ -562,10 +562,15 @@ small {
   flex-wrap: wrap;
   gap: 14rem;
 }
+/* Keep bounded hover feedback even when larger motion is reduced. This variable
+   is inherited by button artwork; other transitions still use the near-zero fallback. */
+.employer-app :is(button, .icon, .tooltip, .vacancy-card, .discovery-search, .search-glyph, .copy-feedback) {
+  --employer-feedback-transition: var(--employer-hover-duration);
+}
 .employer-app.reduce-motion *,
 .employer-app.reduce-motion *::before,
 .employer-app.reduce-motion *::after {
-  transition-duration: 0.01ms !important;
+  transition-duration: var(--employer-feedback-transition, 0.01ms) !important;
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   scroll-behavior: auto !important;
@@ -2112,7 +2117,7 @@ textarea::placeholder {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: var(--employer-feedback-transition, 0.01ms) !important;
     scroll-behavior: auto !important;
   }
 }
