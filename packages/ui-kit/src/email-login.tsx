@@ -123,7 +123,6 @@ export function EmailLogin<Account>({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12, duration: 0.3 }}
       >
-        {receipt && <p className="otp-label">Код подтверждения</p>}
         <h1>
           {receipt ? (
             <>
@@ -196,7 +195,7 @@ export function EmailLogin<Account>({
                     setCodePosition(Math.min(position, 5));
                   }}
                 >
-                  {code[index] || "_"}
+                  {code[index] ?? ""}
                 </span>
               ))}
             </div>

@@ -191,7 +191,7 @@ function Dialog({ title, close, children }: {
   <motion.div ref={panel} className="panel candidate-dialog" role="dialog" aria-modal="true" aria-label={title} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
   <div className="candidate-dialog-heading">
   <h2>{title}</h2>
-  <Action aria-label="Закрыть" onClick={close}>×</Action>
+  <Action aria-label="Закрыть" onClick={close}><Icon name="close" /></Action>
   </div>{children}</motion.div>
   </div>;
 }

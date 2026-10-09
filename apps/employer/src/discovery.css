@@ -227,16 +227,22 @@
   width: 485rem;
   min-width: 0;
 }
+/* One line per name keeps every row the same height; the full name is in the title. */
 .discovery-identity h3 {
   font-family: var(--employer-display);
   font-size: 28rem;
   line-height: 1.2;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .discovery-identity p {
   font-size: 20rem;
   color: var(--employer-paint-ffffff99);
   margin-top: 6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .discovery-row-tags {
   display: flex;
@@ -263,28 +269,35 @@
   border: 2rem solid var(--comit-text);
   border-radius: 20rem;
   background: transparent;
-  padding: 15rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
   transition: transform 0.16s;
 }
 .discovery-profile-button .icon {
-  width: 100%;
-  height: 100%;
+  width: 34rem;
+  height: 34rem;
+  color: var(--comit-text);
 }
 .discovery-like {
   width: 70rem;
   height: 70rem;
   border-radius: 20rem;
   border: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
   background: var(--employer-gradient);
   color: var(--comit-text);
-  font-size: 48rem;
-  line-height: 1;
   transition: transform 0.16s;
+}
+.discovery-like .icon {
+  width: 32rem;
+  height: 32rem;
 }
 .discovery-like.saved {
   background: var(--employer-paint-2e2e2d);
   color: var(--employer-paint-ff443e);
-  font-size: 42rem;
 }
 .discovery-like:hover,
 .discovery-profile-button:hover {
@@ -938,11 +951,10 @@
     width: 38rem;
     height: 38rem;
     border-radius: 12rem;
-    padding: 8rem;
-    font-size: 28rem;
   }
-  .discovery-like.saved {
-    font-size: 24rem;
+  .discovery-like .icon {
+    width: 20rem;
+    height: 20rem;
   }
   .discovery-confirm {
     width: 100%;

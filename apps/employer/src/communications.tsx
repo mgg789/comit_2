@@ -477,7 +477,7 @@ function RecruitmentThread({
             disabled={!p.chat_writable || uploading || sending}
             onClick={() => input.current?.click()}
           >
-            {uploading ? "…" : "+"}
+            {uploading ? <span className="spinner" /> : <Icon name="plus" />}
           </button>
           <input
             aria-label="Сообщение кандидату"

@@ -372,3 +372,52 @@
 .vacancy-review-tabs > button { transition: background 300ms cubic-bezier(.22, 1, .36, 1), color 250ms ease; }
 .vacancy-editor[data-reduced-motion="true"] .vacancy-review-panel,
 .vacancy-editor[data-reduced-motion="true"] .vacancy-review-tabs > button { transition: none; }
+
+/* Fields left empty after a submit attempt (form has noValidate, see VacancyEditor.save). */
+.show-invalid :is(input, textarea):invalid {
+  box-shadow: inset 0 0 0 1px var(--employer-danger);
+}
+
+/* Irreversible confirms (close, delete) read as destructive, not as the primary gradient. */
+.action.action-danger {
+  background: var(--employer-danger);
+  color: var(--comit-bg);
+}
+
+/* First visit: one clear next step instead of three empty columns. */
+.vacancy-first {
+  display: grid;
+  justify-items: center;
+  gap: 18rem;
+  text-align: center;
+  padding: 60rem 40rem;
+}
+.vacancy-first h2 {
+  font-family: var(--employer-display);
+  font-size: 32rem;
+}
+.vacancy-first p {
+  max-width: 640rem;
+  font-size: 20rem;
+  line-height: 1.5;
+  color: var(--comit-text-muted);
+}
+
+/* Figma 722:3687: «Стек» is a dropdown field like its neighbours, not a glass button. */
+.vacancy-editor .action.stack-toggle {
+  justify-content: space-between;
+  padding: 18rem 20rem;
+  border: 1px solid transparent;
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  box-shadow: none;
+  font-size: 20rem;
+  font-weight: 400;
+}
+.vacancy-editor .action.stack-toggle::before {
+  display: none;
+}
+.vacancy-editor .action.stack-toggle .icon {
+  width: 18rem;
+  height: 18rem;
+}

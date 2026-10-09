@@ -12,6 +12,8 @@ import {
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
+import { candidateName } from "./candidate-name";
+import { filterReasonLabel } from "./labels";
 import "./discovery.css";
 
 const evidenceLabels: Record<string, string> = {
@@ -110,9 +112,9 @@ function CandidateIdentity({
 }) {
   return (
     <>
-      <AnonymousAvatar name={candidate.display_name} />
+      <AnonymousAvatar name={candidateName(candidate.display_name)} />
       <div className="discovery-identity">
-        <h3>{candidate.display_name}</h3>
+        <h3 title={candidateName(candidate.display_name)}>{candidateName(candidate.display_name)}</h3>
         <p>
           {roleLabels[candidate.category.specialization]}{" "}
           {gradeLabels[candidate.category.grade]}
@@ -298,13 +300,17 @@ export function Showcase({
     candidate: PublicCandidateCard,
     confirm?: typeof warning,
   ) {
-    if (!draftId && !confirm) {
+    // With a single open vacancy the «+» needs no extra choice; otherwise the filter picks the target.
+    const target = draftId || (open.length === 1 ? open[0]!.draft_id : "");
+    if (!target && !confirm) {
       setNotice(
-        "Выберите открытую вакансию, чтобы добавить кандидата в подбор.",
+        open.length
+          ? "Выберите вакансию в фильтре «Вакансия», чтобы добавить кандидата в подбор."
+          : "Опубликуйте вакансию, чтобы добавлять кандидатов в подбор.",
       );
       return;
     }
-    const keyIdentity = `${draftId}:${candidate.candidate_id}:${candidate.profile_revision}`;
+    const keyIdentity = `${target}:${candidate.candidate_id}:${candidate.profile_revision}`;
     if (!likeKeys.current.has(keyIdentity))
       likeKeys.current.set(keyIdentity, crypto.randomUUID());
     const request = confirm
@@ -317,7 +323,7 @@ export function Showcase({
     setBusy(candidate.candidate_id);
     setNotice("");
     try {
-      await api.likeShowcaseCandidate(confirm?.draftId || draftId, request);
+      await api.likeShowcaseCandidate(confirm?.draftId || target, request);
       setSaved((previous) => [...previous, candidate.candidate_id]);
       setWarning(null);
       setNotice("Кандидат добавлен в избранное вакансии.");
@@ -329,7 +335,7 @@ export function Showcase({
         mismatch.profile_revision === request.profile_revision
       )
         setWarning({
-          draftId: confirm?.draftId || draftId,
+          draftId: confirm?.draftId || target,
           request,
           candidate,
           warning: mismatch,
@@ -348,12 +354,12 @@ export function Showcase({
   }
   return (
     <Reveal className="discovery-showcase">
-      <PageTitle title="Кандидаты">
+      <PageTitle title="Соискатели">
         <form onSubmit={submit} className="discovery-search">
           <input
             ref={searchInput}
             aria-label="Поиск по имени, роли или стеку"
-            placeholder="Имя, роль, стек"
+            placeholder="Поиск: Имя, роль, стек"
             value={q}
             onChange={(event) => setQ(event.target.value)}
           />
@@ -446,25 +452,25 @@ export function Showcase({
               <div className="discovery-row-actions">
                 <button
                   className="discovery-profile-button"
-                  aria-label={`Открыть резюме: ${candidate.display_name}`}
+                  aria-label={`Открыть резюме: ${candidateName(candidate.display_name)}`}
                   onClick={() =>
                     navigate(
                       `/resume/${candidate.candidate_id}${draftId ? `?draft=${draftId}` : ""}`,
                     )
                   }
                 >
-                  <Icon name="chevron-wide" />
+                  <Icon name="resumes" />
                 </button>
                 <button
                   className={`discovery-like ${saved.includes(candidate.candidate_id) ? "saved" : ""}`}
-                  aria-label="Добавить в избранное вакансии"
+                  aria-label={`Добавить в вакансию: ${candidateName(candidate.display_name)}`}
                   disabled={
                     busy === candidate.candidate_id ||
                     saved.includes(candidate.candidate_id)
                   }
                   onClick={() => void save(candidate)}
                 >
-                  {saved.includes(candidate.candidate_id) ? "♥" : "+"}
+                  <Icon name={saved.includes(candidate.candidate_id) ? "heart-filled" : "plus"} />
                 </button>
               </div>
             </motion.article>
@@ -496,7 +502,7 @@ export function Showcase({
               <p>Кандидат не соответствует обязательным фильтрам вакансии:</p>
               <ul>
                 {warning.warning.warnings.map((item) => (
-                  <li key={item}>{item}</li>
+                  <li key={item}>{filterReasonLabel(item)}</li>
                 ))}
               </ul>
               <div className="form-actions">
@@ -664,8 +670,8 @@ export function Resume({
         back={() => navigate(backPath)}
       />
       <header className="discovery-resume-hero">
-        <h1>{candidate.display_name}</h1>
-        <AnonymousAvatar name={candidate.display_name} large />
+        <h1>{candidateName(candidate.display_name)}</h1>
+        <AnonymousAvatar name={candidateName(candidate.display_name)} large />
         <div className="tags">
           <span className="tag">
             {roleLabels[candidate.category.specialization]}
@@ -835,7 +841,7 @@ export function Resume({
                         required
                         onChange={(event) => setSelected(event.target.value)}
                       >
-                        <option value="">Выберите вакансию</option>
+                        <option value="" hidden>Выберите вакансию</option>
                         {vacancies.data
                           ?.filter(
                             (item) =>
@@ -1172,7 +1178,7 @@ export function Resumes({ navigate }: Navigation) {
                   className="discovery-score"
                   title="Вычисленный score; не вероятность найма"
                 >
-                  {row.score.toFixed(2)}
+                  {Math.round(Math.max(0, Math.min(1, row.score)) * 100)}%
                 </span>
               )}
               {row.candidate ? (
@@ -1304,7 +1310,7 @@ export function VacancyResumes({
   data.data?.saved.items.forEach((item) =>
     rows.set(item.candidate_id, {
       candidate: item.card,
-      name: item.card?.display_name || "Анонимный профиль",
+      name: candidateName(item.card?.display_name, "Анонимный профиль"),
       process: data.data?.processes.items.find(
         (process) => process.candidate_id === item.candidate_id,
       ),
@@ -1348,7 +1354,7 @@ export function VacancyResumes({
                   className="discovery-score"
                   title="Вычисленный score; не вероятность найма"
                 >
-                  {row.score.toFixed(2)}
+                  {Math.round(Math.max(0, Math.min(1, row.score)) * 100)}%
                 </span>
               )}
               {row.candidate ? (

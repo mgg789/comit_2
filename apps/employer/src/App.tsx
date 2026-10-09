@@ -314,7 +314,7 @@ export default function App() {
                   [
                     { id: "vacancies", label: "Вакансии", path: "/vacancies" },
                     { id: "resumes", label: "Резюме", path: "/resumes" },
-                    { id: "candidates", label: "Кандидаты", path: "/showcase" },
+                    { id: "candidates", label: "Соискатели", path: "/showcase" },
                     {
                       id: "statistics",
                       label: "Статистика",

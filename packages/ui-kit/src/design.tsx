@@ -61,6 +61,7 @@ const lucide = {
   copy: Copy,
   check: Check,
   heart: Heart,
+  "heart-filled": Heart,
   close: X,
 } as const satisfies Record<string, LucideIcon>;
 
@@ -84,7 +85,7 @@ export function Icon({
     );
   else if (name in lucide) {
     const Glyph = lucide[name as keyof typeof lucide];
-    glyph = <Glyph strokeWidth={2} />;
+    glyph = <Glyph strokeWidth={2} fill={name === "heart-filled" ? "currentColor" : "none"} />;
   } else {
     const url = `url("${asset(glyphs[name as keyof typeof glyphs])}")`;
     glyph = (
@@ -130,6 +131,7 @@ export function Select({
         value?: string | number;
         children?: ReactNode;
         disabled?: boolean;
+        hidden?: boolean;
       }>(child) ||
       child.type !== "option"
     )
@@ -138,7 +140,9 @@ export function Select({
       {
         value: String(child.props.value ?? ""),
         label: child.props.children,
-        disabled: !!child.props.disabled,
+        // A hidden option is the trigger placeholder: never listed, never reachable by keyboard.
+        hidden: !!child.props.hidden,
+        disabled: !!child.props.disabled || !!child.props.hidden,
       },
     ];
   });
@@ -158,7 +162,7 @@ export function Select({
         ? rect.right + 8 : Math.max(8, rect.left - width - 8);
       const top = Math.max(8, Math.min(rect.top, window.innerHeight - height - 8));
       setGeometry({ left, top, width, maxHeight: window.innerHeight - top - 8 });
-      setActive(Math.max(0, selected));
+      setActive(selected >= 0 && !options[selected]?.hidden ? selected : Math.max(0, options.findIndex((option) => !option.disabled)));
       setOpen(true);
       return;
     }
@@ -173,7 +177,7 @@ export function Select({
         ? Math.min(height, rect.top - 16)
         : Math.max(80, available),
     });
-    setActive(Math.max(0, selected));
+    setActive(selected >= 0 && !options[selected]?.hidden ? selected : Math.max(0, options.findIndex((option) => !option.disabled)));
     setOpen(true);
   }
   function choose(index: number) {
@@ -306,7 +310,7 @@ export function Select({
             <div className="custom-select-caption">
               {props["aria-label"] || "Выберите вариант"}
             </div>
-            {options.map((option, index) => (
+            {options.map((option, index) => option.hidden ? null : (
               <button
                 key={`${option.value}-${index}`}
                 id={`${id}-${index}`}
@@ -320,7 +324,7 @@ export function Select({
                 onClick={() => choose(index)}
               >
                 <span className="custom-select-check">
-                  {index === selected ? "✓" : ""}
+                  {index === selected && <Icon name="check" />}
                 </span>
                 {option.label}
               </button>

@@ -119,20 +119,21 @@ small {
   position: absolute;
   max-width: none;
 }
+/* Figma frame geometry (1920 artboard): image box before rotation, centred in its rotated bounds. */
 .ambient-upper {
-  width: 1903rem;
-  height: 1269rem;
-  left: 357rem;
-  top: -410rem;
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: 397.4rem;
+  top: -352.9rem;
   transform: rotate(4.07deg);
   filter: blur(15rem);
   opacity: 0.28;
 }
 .ambient-lower {
-  width: 1803rem;
-  height: 1202rem;
-  left: -538rem;
-  top: 620rem;
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: -537.5rem;
+  top: 648.7rem;
   transform: rotate(156deg);
   filter: blur(15rem);
   opacity: 0.35;
@@ -467,8 +468,9 @@ small {
   animation-iteration-count: 1 !important;
   scroll-behavior: auto !important;
 }
+/* Bottom margin clears the floating AI button so the last line of a page stays readable. */
 .main-content {
-  margin: 90rem 80rem 80rem;
+  margin: 90rem 80rem 160rem;
   min-height: 700rem;
 }
 .page-heading {
@@ -565,8 +567,14 @@ small {
   background: var(--employer-blue);
 }
 .custom-select-check {
+  display: grid;
+  place-items: center;
   width: 20rem;
   flex-shrink: 0;
+}
+.custom-select-check .icon {
+  width: 18rem;
+  height: 18rem;
 }
 .state {
   padding: 50rem;

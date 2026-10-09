@@ -297,9 +297,15 @@
   padding: 28rem;
   color: var(--comit-text);
 }
+/* Figma 722:3687: the manual form is a 484px dialog; only the review step with skill radars is wide. */
 .modal.vacancy-editor {
-  width: 726rem;
+  width: 484rem;
   max-width: calc(100vw - 144rem);
+  padding: 27rem 27rem 20rem;
+  border-radius: 32rem;
+}
+.modal.vacancy-editor.is-review {
+  width: 726rem;
 }
 @media (max-width: 760px) {
   .modal.vacancy-editor {

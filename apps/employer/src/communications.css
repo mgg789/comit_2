@@ -215,6 +215,10 @@
   cursor: pointer;
   transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
+.attach-button .icon {
+  width: 24rem;
+  height: 24rem;
+}
 .attach-button:hover {
   transform: scale(1.06);
 }
