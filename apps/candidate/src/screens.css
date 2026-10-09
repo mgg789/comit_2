@@ -58,7 +58,8 @@
 .candidate-offer-progress article { display: grid; gap: 14rem; padding-top: 24rem; border-top: 1px solid var(--employer-line); }
 .candidate-decline { display: grid; gap: 20rem; }
 .candidate-process-chat { grid-column: 1 / -1; display: grid; gap: 24rem; }
-.candidate-statistics { display: grid; grid-template-columns: minmax(0, 655fr) minmax(0, 1073fr); gap: 32rem; }
+.candidate-statistics { display: grid; grid-template-columns: minmax(0, 655fr) minmax(0, 1073fr); gap: 32rem; align-items: stretch; }
+.candidate-statistics > section { min-width: 0; }
 .candidate-stat-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32rem; border-radius: 16rem; align-content: start; }
 .candidate-stat-counts > div { display: flex; flex-direction: column; gap: 12rem; }
 .candidate-stat-counts strong { font-size: 46rem; font-weight: 600; }
@@ -66,9 +67,9 @@
 .candidate-stat-counts small { font-size: 16rem; }
 .candidate-stat-history, .candidate-stat-skills, .candidate-stat-offers { display: grid; gap: 24rem; align-content: start; border-radius: 16rem; }
 .candidate-statistics h2 { font-family: var(--employer-font); font-size: 28rem; font-weight: 600; }
-.candidate-skill-map { display: grid; gap: 22rem; }
-.candidate-skill-map > div { display: grid; grid-template-columns: minmax(100rem, 1fr) 2fr auto; align-items: center; gap: 16rem; }
-.candidate-skill-map meter { width: 100%; height: 18rem; accent-color: var(--employer-blue); }
+.candidate-skill-map { display: block; width: 100%; max-width: 900rem; height: auto; max-height: 350rem; margin: auto; }
+.candidate-skill-track { fill: var(--employer-paint-2f2f2d); }
+.candidate-skill-value { fill: var(--employer-blue); }
 @media (max-width: 1200px) { .candidate-offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .candidate-statistics { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
   .candidate-profile-page { padding-top: 24rem; }
@@ -112,20 +113,13 @@
 .candidate-grade-test { display: flex; }
 .candidate-profile-actions { justify-content: center; margin-top: 40rem; }
 .candidate-profile-actions .action { width: 463rem; max-width: 100%; padding: 24rem 32rem; border-radius: 20rem; font-size: 24rem; }
-.candidate-stat-left, .candidate-stat-right { display: grid; align-content: start; gap: 32rem; min-width: 0; }
 .candidate-stat-counts { min-height: 172rem; }
 .candidate-stat-history { min-height: 338rem; }
 .candidate-stat-market { min-height: 308rem; display: grid; align-content: start; gap: 24rem; border-radius: 16rem; }
 .candidate-market-salary { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 22rem; margin-top: 24rem; }
 .candidate-market-salary > div { display: grid; gap: 14rem; }
 .candidate-market-salary .tag { font-size: 18rem; }
-.candidate-stat-small { display: grid; grid-template-columns: minmax(0, 391fr) minmax(0, 229fr); gap: 32rem; }
-.candidate-stat-skills, .candidate-stat-position { min-height: 351rem; }
-.candidate-stat-position { position: relative; overflow: hidden; display: grid; align-content: start; gap: 20rem; padding: 24rem 20rem; border-radius: 16rem; }
-.candidate-stat-position strong { font-size: 46rem; }
-.candidate-stat-position h2 { font-size: 22rem; }
-.candidate-stat-position img { position: absolute; width: 290rem; height: 290rem; object-fit: contain; left: 7rem; top: 142rem; pointer-events: none; }
-.candidate-stat-position p { position: relative; z-index: 1; }
+.candidate-stat-skills { grid-column: 1 / -1; min-height: 280rem; }
 .candidate-stat-offers { min-height: 517rem; }
 .candidate-stat-offer-count { display: flex; align-items: center; gap: 22rem; padding: 20rem 0; border-bottom: 1px solid var(--employer-line); }
 .candidate-stat-offer-count strong { font-size: 46rem; }
@@ -139,8 +133,8 @@
   .candidate-profile-body { gap: 32rem; }
   .candidate-profile-row h3 { font-size: 20rem; }
   .candidate-profile-actions .action { font-size: 18rem; }
-  .candidate-stat-small { grid-template-columns: minmax(0, 1fr); }
-  .candidate-stat-position { min-height: 260rem; }
-  .candidate-stat-position img { left: auto; right: -25rem; }
   .candidate-stat-offer-count { flex-wrap: wrap; }
 }
+
+.candidate-skill-assessment { display: flex; align-items: center; flex-wrap: wrap; gap: 20rem; }
+.candidate-skill-assessment > strong { flex: 1; min-width: 120rem; }

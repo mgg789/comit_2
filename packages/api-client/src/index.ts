@@ -11,7 +11,7 @@ import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, 
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
   EmployerStatisticsQuery, EmployerStatistics,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
+  CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
   AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
@@ -85,6 +85,8 @@ export interface ApiClient {
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
   getCandidateProfile(): Promise<CandidateProfileView>;
+  /** Read actual matching readiness for the authenticated candidate. */
+  getCandidatePipeline(): Promise<CandidatePipelineStatus>;
   /** CAS update; replace discards omitted editable fields, while PATCH preserves them. */
   saveCandidateProfile(body: CandidateProfileMutation, replace?: boolean): Promise<CandidateProfileView>;
   /** Retry the current failed matching handoff without changing profile revision. */
@@ -294,6 +296,7 @@ export function createApiClient({
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
+    getCandidatePipeline: () => request("GET", "/candidate/pipeline"),
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
     retryCandidateProjection: () => request("POST", "/candidate/profile/projection/retry", {}),
     getVacancyReady: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/ready`),

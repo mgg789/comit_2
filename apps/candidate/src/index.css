@@ -6,6 +6,8 @@
 .candidate-settings .action { justify-self: start; }
 .candidate-legal pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
 
+/* Contain main-content bottom margins so artwork covers the entire document. */
+.candidate-app { display: flow-root; }
 .candidate-app:not(.is-login) > .ambient { display: none; }
 .candidate-art { position: absolute; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
 .candidate-art img { position: absolute; object-fit: cover; opacity: .7; filter: blur(15rem); }
@@ -21,6 +23,3 @@
   .candidate-content { margin-bottom: calc(120rem + env(safe-area-inset-bottom)); }
   .candidate-app .nav { bottom: calc(18rem + env(safe-area-inset-bottom)); }
 }
-
-/* Keep the empty-state explanation readable over the original decorative artwork. */
-.candidate-stat-position p { background: var(--employer-paint-191918); border-radius: 12rem; padding: 8rem; }
