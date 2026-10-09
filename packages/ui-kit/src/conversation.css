@@ -177,3 +177,5 @@
   .communication-error { font-size: 13rem; }
   .pending-files button { font-size: 12rem; }
 }
+
+.attach-button .icon { width: 24rem; height: 24rem; }

@@ -11,40 +11,93 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { designAsset as asset } from "./design-assets";
+import {
+  ArrowUpRight,
+  Check,
+  Copy,
+  Heart,
+  MessageCircle,
+  Pencil,
+  ScrollText,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { designAsset as asset, type DesignAssetName } from "./design-assets";
 
-const icons = {
+/**
+ * Single-colour glyphs exported from Figma. Rendered as CSS masks so they take
+ * `currentColor` (active pills, light buttons) without per-context image filters.
+ */
+const glyphs = {
   vacancies: "6d4cf8ae48179dc57156f25db4b058cc5cb57a8e.svg",
-  ai: "268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg",
-  resumes: "268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg",
   plus: "43ffb38ed0f5604cad3f1adb9680d6c0b20d69c9.svg",
   send: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
-  candidates: "c56e9cc719a6147a0c25e9bc7877291a90ef720e.svg",
+  back: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
   statistics: "f82aa184ea85eb5960407a62897d24d7084bfd33.svg",
   settings: "944a3f714471682b2ae2b66d8711c46598ca1e19.svg",
   search: "6da721179169b7fd86cc9afd7a125e469ad945bd.svg",
   chevron: "be7a21bfb4b868880613999d5d0bc4a2650413ed.svg",
   "vacancy-chevron": "vacancy-card-chevron.svg",
-  edit: "vacancy-edit-pencil.svg",
+  "chevron-wide": "chevron-wide.svg",
   bell: "29795c078097fdcbdd8d396900a5dfd4a5309de8.svg",
-  message: "message-circle.svg",
   logo: "dec04dda54551634f35985932f0a53e8bcda20f5.svg",
-  back: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
   clock: "8af299778072944cf9ce5dadca62d1ec4137e491.svg",
-  arrow: "6e1dc9326ee3cba6de25bb4bcafc3823eaaaee71.svg",
-} as const;
+  at: "c179aee8cef2e1b481a0ab48e2c6a5af19c286b9.svg",
+  "clear-conversation": "clear-conversation.svg",
+  "usage-stats": "usage-stats.svg",
+  reasoning: "reasoning.svg",
+  "attached-file": "attached-file.svg",
+  "radar-remove": "radar-remove.svg",
+} as const satisfies Record<string, DesignAssetName>;
 
-/** Original exported Figma vector; wrapper preserves the source aspect ratio. */
+/** Glyphs the design takes from lucide; stroke icons in `currentColor`. */
+const lucide = {
+  resumes: ScrollText,
+  ai: ScrollText,
+  candidates: UsersRound,
+  edit: Pencil,
+  message: MessageCircle,
+  copy: Copy,
+  check: Check,
+  heart: Heart,
+  "heart-filled": Heart,
+  close: X,
+} as const satisfies Record<string, LucideIcon>;
+
+/** Every icon name: a Figma mask, a lucide glyph, or the light arrow disc of primary actions. */
+export type IconName = keyof typeof glyphs | keyof typeof lucide | "arrow";
+
+/** Design icon; the `.icon` wrapper keeps per-context sizing in CSS, colour comes from `color`. */
 export function Icon({
   name,
   className = "",
 }: {
-  name: keyof typeof icons;
+  name: IconName;
   className?: string;
 }) {
+  let glyph: ReactNode;
+  if (name === "arrow")
+    glyph = (
+      <span className="icon-disc">
+        <ArrowUpRight strokeWidth={2.5} />
+      </span>
+    );
+  else if (name in lucide) {
+    const Glyph = lucide[name as keyof typeof lucide];
+    glyph = <Glyph strokeWidth={2} fill={name === "heart-filled" ? "currentColor" : "none"} />;
+  } else {
+    const url = `url("${asset(glyphs[name as keyof typeof glyphs])}")`;
+    glyph = (
+      <span
+        className="icon-mask"
+        style={{ maskImage: url, WebkitMaskImage: url }}
+      />
+    );
+  }
   return (
     <span className={`icon icon-${name} ${className}`} aria-hidden="true">
-      <img src={asset(icons[name])} alt="" />
+      {glyph}
     </span>
   );
 }
@@ -57,7 +110,7 @@ export function Select({
   placement = "bottom",
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & {
-  triggerIcon?: keyof typeof icons;
+  triggerIcon?: IconName;
   placement?: "bottom" | "right";
 }) {
   const native = useRef<HTMLSelectElement>(null);
@@ -78,6 +131,7 @@ export function Select({
         value?: string | number;
         children?: ReactNode;
         disabled?: boolean;
+        hidden?: boolean;
       }>(child) ||
       child.type !== "option"
     )
@@ -86,7 +140,9 @@ export function Select({
       {
         value: String(child.props.value ?? ""),
         label: child.props.children,
-        disabled: !!child.props.disabled,
+        // A hidden option is the trigger placeholder: never listed, never reachable by keyboard.
+        hidden: !!child.props.hidden,
+        disabled: !!child.props.disabled || !!child.props.hidden,
       },
     ];
   });
@@ -106,7 +162,7 @@ export function Select({
         ? rect.right + 8 : Math.max(8, rect.left - width - 8);
       const top = Math.max(8, Math.min(rect.top, window.innerHeight - height - 8));
       setGeometry({ left, top, width, maxHeight: window.innerHeight - top - 8 });
-      setActive(Math.max(0, selected));
+      setActive(selected >= 0 && !options[selected]?.hidden ? selected : Math.max(0, options.findIndex((option) => !option.disabled)));
       setOpen(true);
       return;
     }
@@ -121,7 +177,7 @@ export function Select({
         ? Math.min(height, rect.top - 16)
         : Math.max(80, available),
     });
-    setActive(Math.max(0, selected));
+    setActive(selected >= 0 && !options[selected]?.hidden ? selected : Math.max(0, options.findIndex((option) => !option.disabled)));
     setOpen(true);
   }
   function choose(index: number) {
@@ -254,7 +310,7 @@ export function Select({
             <div className="custom-select-caption">
               {props["aria-label"] || "Выберите вариант"}
             </div>
-            {options.map((option, index) => (
+            {options.map((option, index) => option.hidden ? null : (
               <button
                 key={`${option.value}-${index}`}
                 id={`${id}-${index}`}
@@ -268,7 +324,7 @@ export function Select({
                 onClick={() => choose(index)}
               >
                 <span className="custom-select-check">
-                  {index === selected ? "✓" : ""}
+                  {index === selected && <Icon name="check" />}
                 </span>
                 {option.label}
               </button>

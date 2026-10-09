@@ -23,6 +23,15 @@
   cursor: pointer;
 }
 /* Shared email sign-in and six-digit OTP layout; API roles stay in each app. */
+.login {
+  min-height: 100vh;
+  padding: 36rem 40rem;
+}
+@media (max-width: 760px) {
+  .login {
+    padding: 20rem;
+  }
+}
 @media (max-width: 760px) {
   .login-logo-asset {
     width: 66rem !important;
@@ -145,8 +154,8 @@
   width: 200rem;
   height: 200rem;
 }
-.login-mark img {
-  filter: brightness(0);
+.login-mark .icon {
+  color: var(--comit-bg);
 }
 .login-word {
   font-family: var(--employer-logo);
@@ -187,13 +196,6 @@
   align-items: center;
   backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
-}
-.otp-card .otp-label {
-  position: absolute;
-  top: -38rem;
-  left: 0;
-  font-size: 22rem;
-  color: var(--comit-text-muted);
 }
 .otp-card h1 {
   width: 543rem;

@@ -242,7 +242,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
             disabled={!process.chat_writable || uploading || sending || !!retry.current}
             onClick={() => input.current?.click()}
           >
-            {uploading ? "…" : "+"}
+            {uploading ? <span className="spinner" /> : <Icon name="plus" />}
           </button>
           <input
             aria-label={messageLabel}

@@ -11,6 +11,8 @@ import type {
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
+import { candidateName } from "./candidate-name";
+import { domainChoices, featureLabel, softChoices, specializationLabel, stackChoices } from "./labels";
 import "./vacancies.css";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
@@ -49,13 +51,6 @@ function vacancyDate(draft: AgentsDraftView): string {
   return Number.isNaN(date.getTime())
     ? `${label}: дата не указана`
     : `${label} ${new Intl.DateTimeFormat("ru-RU").format(date)}`;
-}
-
-/** Vacancy cards show salary in whole rubles, matching the backend currency unit. */
-function vacancySalary(from?: number | null, to?: number | null): string {
-  if (from == null || to == null) return "Зарплата не указана";
-  const format = (value: number) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(value);
-  return `${format(from)}–${format(to)}р`;
 }
 
 /** Keep a circular badge for counts up to 99, widening only the capped value. */
@@ -122,6 +117,18 @@ export function Vacancies({
           error={resource.error}
           retry={resource.refresh}
         />
+      ) : !items.some((draft) => !draft.archived) ? (
+        <section className="state glass vacancy-first" role="status">
+          <h2>Создайте первую вакансию</h2>
+          <p>
+            После публикации подбор сразу покажет подходящих кандидатов: листайте ленту, сохраняйте
+            понравившихся и приглашайте их в чат.
+          </p>
+          <Action variant="primary" onClick={onCreate}>
+            Добавить вакансию
+            <Icon name="arrow" />
+          </Action>
+        </section>
       ) : (
         <div className="vacancy-columns">
           {[["draft", "Черновики"], ["open", "Открытые"], ["closed", "Закрытые"]].map(([key, label]) => (
@@ -146,7 +153,7 @@ export function Vacancies({
               <Tags values={Object.keys(draft.fields.stacks || {}).slice(0, 3).map(skillLabel)} />
               <div className="salary-row">
                 <strong>
-                  {vacancySalary(draft.fields.zp_min, draft.fields.zp_max)}
+                  {salary(draft.fields.zp_min, draft.fields.zp_max)}
                 </strong>
                 <small>за месяц, на руки</small>
               </div>
@@ -176,51 +183,7 @@ export function Vacancies({
 }
 
 type SkillLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-// Canonical stack keys from matching_engine/strict.py INITIAL_GROUPS; keep labels human-readable.
-const stackChoices = [
-  ["python", "Python"],
-  ["node", "Node.js"],
-  ["go", "Go"],
-  ["php", "PHP"],
-  ["react", "React"],
-  ["vue", "Vue"],
-  ["angular", "Angular"],
-  ["html_css_jquery", "HTML / CSS / jQuery"],
-  ["tailwind", "Tailwind CSS"],
-  ["electron", "Electron"],
-  ["figma", "Figma"],
-  ["postgres", "PostgreSQL"],
-  ["mongo", "MongoDB"],
-  ["sqlite", "SQLite"],
-  ["mysql", "MySQL"],
-  ["docker", "Docker"],
-] as const;
 const skillLevels: readonly SkillLevel[] = [1, 2, 3, 4, 5, 6, 7];
-const domainChoices = [
-  ["ux_userflow", "UX и пользовательские сценарии"],
-  ["architecture_thinking", "Архитектура систем"],
-  ["rest_api", "REST API"],
-  ["sql", "SQL"],
-  ["doc_databases", "Документные базы данных"],
-  ["data_analytics_stats", "Аналитика и статистика"],
-  ["math", "Математика"],
-  ["algorithms", "Алгоритмы"],
-  ["lowlevel_optimization", "Низкоуровневая оптимизация"],
-  ["cybersecurity", "Информационная безопасность"],
-  ["devops", "DevOps"],
-  ["ai_agents", "AI-агенты"],
-  ["nlp_and_arbitrary_data", "NLP и неструктурированные данные"],
-  ["neural_nets", "Нейронные сети"],
-  ["classical_ml", "Классическое машинное обучение"],
-] as const;
-const softChoices = [
-  ["teamwork", "Командная работа"],
-  ["representation", "Презентация и коммуникация"],
-  ["leadership", "Лидерство"],
-  ["project_management", "Управление проектами"],
-  ["time_management", "Управление временем"],
-  ["self_organization", "Самоорганизация"],
-] as const;
 // Visual neighborhoods only: design/front-end, runtimes, storage and infrastructure.
 // No matching coordinate indices or scoring weights change here.
 const stackOrder = ["figma", "html_css_jquery", "tailwind", "react", "vue", "angular", "electron", "node", "php", "go", "python", "postgres", "mysql", "sqlite", "mongo", "docker"];
@@ -377,8 +340,17 @@ export function VacancyEditor({
   function showSaveError(reason: unknown) {
     setError(reason instanceof Error && !("status" in reason) ? reason.message : errorText(reason));
   }
-  const save = async (event: FormEvent) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // In-app validation instead of native browser bubbles: outline the gaps and focus the first one.
+    const form = event.currentTarget;
+    if (!form.checkValidity()) {
+      form.classList.add("show-invalid");
+      form.querySelector<HTMLElement>(":invalid")?.focus();
+      setError("Заполните выделенные поля.");
+      return;
+    }
+    form.classList.remove("show-invalid");
     if (saveLock.current || creationUncertain) return;
     saveLock.current = true;
     setBusy(true);
@@ -455,7 +427,9 @@ export function VacancyEditor({
       }}
     >
       <motion.section
-        className="modal vacancy-editor"
+        className={`modal vacancy-editor${confirm ? " is-review" : ""}`}
+        layout
+        transition={{ layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
         data-reduced-motion={reduceMotion ? "true" : "false"}
         role="dialog"
         aria-modal="true"
@@ -530,7 +504,7 @@ export function VacancyEditor({
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
                     transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                    <SkillRadar removeIcon={<span className="radar-remove-mark"><img src={asset("skill-radar-remove-source.svg")} alt="" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
@@ -549,7 +523,7 @@ export function VacancyEditor({
                         panel.setValues((values) => ({ ...values, [choice[0]]: 4 }));
                         setReviewDirty(true);
                       }}>
-                      <option value="">Добавить {panel.id === "stacks" ? "стек" : panel.id === "domens" ? "хард-навык" : "софт-навык"}</option>
+                      <option value="" hidden>Добавить {panel.id === "stacks" ? "стек" : panel.id === "domens" ? "хард-навык" : "софт-навык"}</option>
                       {panel.choices.filter(([key]) => panel.values[key] === undefined).map(([key, name]) => <option key={key} value={key}>{name}</option>)}
                     </Select>
                     </SkillRadar>
@@ -580,7 +554,7 @@ export function VacancyEditor({
             <div className="progress-track">
               <span style={{ width: `${completion}%` }} />
             </div>
-            <form className="form-grid" onSubmit={save}>
+            <form className="form-grid" onSubmit={save} noValidate>
               <fieldset
                 className="invite-fields"
                 disabled={busy || creationUncertain}
@@ -639,7 +613,7 @@ export function VacancyEditor({
                           setSkills((value) => ({ ...value, [choice[0]]: 4 }));
                       }}
                     >
-                      <option value="">Добавить навык</option>
+                      <option value="" hidden>Добавить навык</option>
                       {stackChoices
                         .filter(([key]) => skills[key] === undefined)
                         .map(([key, label]) => (
@@ -739,7 +713,7 @@ export function VacancyEditor({
                   </Select>
                   <input
                     aria-label="График работы"
-                    placeholder="График: 5/2"
+                    placeholder="График работы"
                     value={daily}
                     onChange={(event) => setDaily(event.target.value)}
                     required
@@ -811,6 +785,13 @@ async function feedPreparation(draftId: string, retry = false): Promise<boolean>
     throw reason;
   }
 }
+
+/** Per-browser memory of the company name used in invitations (not personal data). */
+const COMPANY_KEY = "comit.employer.invite_company";
+
+/** Minimum drag distance (CSS px) or horizontal speed (px/s) that counts as a swipe decision. */
+const SWIPE_DISTANCE = 90;
+const SWIPE_VELOCITY = 600;
 
 function CandidateDeck({
   draftId,
@@ -918,18 +899,21 @@ function CandidateDeck({
     const identity = prior || { action, key: crypto.randomUUID() };
     decisions.current.set(card.exposure_id, identity);
     try {
-      await api.decideFeed(draftId, {
-        exposure_id: card.exposure_id,
-        action,
-        idempotency_key: identity.key,
-      });
-      await controls.start({
-        x: action === "like" ? window.innerWidth : -window.innerWidth,
-        y: 0,
-        opacity: 0,
-        rotate: action === "like" ? 18 : -18,
-        transition: { duration: reducedMotion ? 0 : 0.28 },
-      });
+      // Fly out immediately; the card comes back below if the decision is rejected.
+      await Promise.all([
+        api.decideFeed(draftId, {
+          exposure_id: card.exposure_id,
+          action,
+          idempotency_key: identity.key,
+        }),
+        controls.start({
+          x: action === "like" ? window.innerWidth : -window.innerWidth,
+          y: 0,
+          opacity: 0,
+          rotate: action === "like" ? 18 : -18,
+          transition: { duration: reducedMotion ? 0 : 0.32, ease: [0.4, 0, 1, 1] },
+        }),
+      ]);
       if (action === "like") onLiked();
       const page = resource.data;
       if (
@@ -1016,18 +1000,23 @@ function CandidateDeck({
           dragMomentum={false}
           onDragStart={() => controls.stop()}
           onDragEnd={(_, info) => {
+            // A short or slow drag is not a decision: return the card to the stack.
+            if (Math.hypot(info.offset.x, info.offset.y) < SWIPE_DISTANCE && Math.abs(info.velocity.x) < SWIPE_VELOCITY) {
+              void controls.start({ x: 0, y: 0, rotate: 0, transition: { type: "spring", stiffness: 420, damping: 30 } });
+              return;
+            }
             const bounds = visible.current?.closest(".selection-stack")?.getBoundingClientRect() || visible.current?.getBoundingClientRect();
             if (bounds) void decide(info.point.x >= bounds.left + bounds.width / 2 ? "like" : "dislike");
           }}
         >
-          <h2>{card.display_name}</h2>
+          <h2>{candidateName(card.display_name)}</h2>
           <div className="tags">
-            <span className="tag">{card.category.specialization}</span>
+            <span className="tag">{specializationLabel(card.category.specialization)}</span>
             {card.explanation.top_matched_features
               .slice(0, 2)
               .map((feature) => (
                 <span className="tag" key={feature.key}>
-                  {feature.key}
+                  {featureLabel(feature.key)}
                 </span>
               ))}
           </div>
@@ -1040,7 +1029,7 @@ function CandidateDeck({
                   className="candidate-factor"
                   key={`${feature.group}:${feature.key}`}
                 >
-                  {feature.key}: {feature.candidate_level}/7 · нужно{" "}
+                  {featureLabel(feature.key)}: {feature.candidate_level}/7 · нужно{" "}
                   {feature.target_level}/7
                 </p>
               ))}
@@ -1060,14 +1049,14 @@ function CandidateDeck({
           </div>
           <div className="candidate-controls" onPointerDown={(event) => event.stopPropagation()}>
             <Action aria-label="Пропустить кандидата" disabled={pending} onClick={() => void decide("dislike")}>
-              <img className="deck-icon" src={asset("swipe.svg")} alt="" />
+              <Icon name="close" className="deck-icon" />
             </Action>
             <Action aria-label="Открыть резюме" disabled={pending}
               onClick={() => navigate(`/resume/${card.candidate_id}?draft=${draftId}&from=vacancy`)}>
-              <img className="deck-icon" src={asset("19847931f7f73800e0a10424c71729ddc8c55930.svg")} alt="" />
+              <Icon name="resumes" className="deck-icon" />
             </Action>
             <Action aria-label="Сохранить кандидата" disabled={pending} onClick={() => void decide("like")}>
-              <img className="deck-icon" src={asset("heart.svg")} alt="" />
+              <Icon name="heart" className="deck-icon" />
             </Action>
           </div>
         </motion.div>
@@ -1103,7 +1092,14 @@ export function VacancyDetail({
     [draftId],
   );
   const [invite, setInvite] = useState<SavedCard | null>(null);
-  const [company, setCompany] = useState("");
+  // The company is typed once per browser: there is no company profile endpoint yet.
+  const [company, setCompany] = useState(() => {
+    try {
+      return window.localStorage.getItem(COMPANY_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1169,6 +1165,21 @@ export function VacancyDetail({
       setBusy(false);
     }
   }
+  // Republishing restores saved cards asynchronously; poll briefly until they come back.
+  const missingCards = !!saved.data?.items.some((item) => !item.card);
+  const cardPolls = useRef(0);
+  useEffect(() => {
+    if (!missingCards || draft.data?.business_status !== "open") {
+      cardPolls.current = 0;
+      return;
+    }
+    if (cardPolls.current >= 20) return;
+    const timer = window.setTimeout(() => {
+      cardPolls.current += 1;
+      saved.refresh();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [missingCards, draft.data?.business_status, saved.data]);
   const fields = draft.data?.fields;
   const interviews = (processes.data?.items || []).flatMap((process) =>
     process.interviews
@@ -1190,6 +1201,11 @@ export function VacancyDetail({
         description: description.trim(),
         idempotency_key: inviteKey.current,
       });
+      try {
+        window.localStorage.setItem(COMPANY_KEY, company.trim());
+      } catch {
+        // Blocked storage only means the name is typed again next time.
+      }
       setInvite(null);
       processes.refresh();
       navigate(`/chat/${process.id}`);
@@ -1209,7 +1225,7 @@ export function VacancyDetail({
     );
   return (
     <Reveal>
-      <PageTitle title="Вакансия" back={() => navigate("/vacancies")}>
+      <PageTitle title="К вакансиям" back={() => navigate("/vacancies")}>
         <Action
           variant="primary"
           disabled={lifecyclePending || status === "closed"}
@@ -1276,7 +1292,7 @@ export function VacancyDetail({
               ))}
               {!Object.keys(fields.stacks || {}).length && (
                 <p className="muted">
-                  Специализация: {fields.class || "Не указана"}
+                  Специализация: {fields.class ? specializationLabel(fields.class) : "Не указана"}
                 </p>
               )}
             </div>
@@ -1292,7 +1308,12 @@ export function VacancyDetail({
                 Все →
               </button>
             </div>
-            {saved.loading || saved.error ? (
+            {saved.error && draft.data?.business_status !== "open" ? (
+              // Unpublished drafts have no selection yet; the API answers 404 rather than an empty page.
+              <p className="empty-note">
+                Кандидаты появятся после публикации вакансии
+              </p>
+            ) : saved.loading || saved.error ? (
               <State
                 loading={saved.loading}
                 error={saved.error}
@@ -1308,6 +1329,7 @@ export function VacancyDetail({
                   <div className="saved-card" key={item.candidate_id}>
                     <button
                       className="saved-resume"
+                      aria-label={`Резюме: ${candidateName(item.card?.display_name)}`}
                       onClick={() =>
                         navigate(
                           `/resume/${item.candidate_id}?draft=${draftId}&from=vacancy`,
@@ -1315,26 +1337,39 @@ export function VacancyDetail({
                       }
                     >
                       <span className="saved-initial">
-                        {(item.card?.display_name || "К").slice(0, 1)}
+                        {candidateName(item.card?.display_name).slice(0, 1)}
                       </span>
-                      <h3>{item.card?.display_name || "Кандидат"}</h3>
+                      <h3>{candidateName(item.card?.display_name)}</h3>
                       <small>
-                        {item.card?.category.specialization ||
-                          "Профиль обновлён"}
+                        {item.card
+                          ? specializationLabel(item.card.category.specialization)
+                          : "Профиль сейчас недоступен"}
                       </small>
                     </button>
-                    <Action
-                      onClick={() => {
-                        inviteKey.current = crypto.randomUUID();
-                        setError(null);
-                        setInvite(item);
-                      }}
-                      disabled={
-                        !item.card || draft.data?.business_status !== "open"
-                      }
-                    >
-                      Пригласить
-                    </Action>
+                    {(() => {
+                      // An invited candidate already has a process: open its chat instead of a second invite.
+                      const process = processes.data?.items.find(
+                        (entry) => entry.candidate_id === item.candidate_id,
+                      );
+                      return process ? (
+                        <Action onClick={() => navigate(`/chat/${process.id}`)}>
+                          Открыть чат
+                        </Action>
+                      ) : (
+                        <Action
+                          onClick={() => {
+                            inviteKey.current = crypto.randomUUID();
+                            setError(null);
+                            setInvite(item);
+                          }}
+                          disabled={
+                            !item.card || draft.data?.business_status !== "open"
+                          }
+                        >
+                          Пригласить
+                        </Action>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -1358,9 +1393,9 @@ export function VacancyDetail({
                 <div className="interview-row" key={interview.id}>
                   <div>
                     <h3>
-                      {saved.data?.items.find(
+                      {candidateName(saved.data?.items.find(
                         (item) => item.candidate_id === process.candidate_id,
-                      )?.card?.display_name || "Кандидат"}
+                      )?.card?.display_name)}
                     </h3>
                     <small>
                       {new Date(interview.starts_at).toLocaleString("ru-RU", {
@@ -1421,7 +1456,7 @@ export function VacancyDetail({
               {error && <p role="alert" className="form-error">{error}</p>}
               <div className="account-confirmation-actions">
                 <Action disabled={busy} onClick={() => setLifecycle(null)}>Отмена</Action>
-                <Action variant="primary" disabled={busy} onClick={() => void confirmLifecycle()}>{busy ? "Выполняем…" : lifecycleLabels[lifecycle]}</Action>
+                <Action variant="primary" className={lifecycle === "close" || lifecycle === "delete" ? "action-danger" : ""} disabled={busy} onClick={() => void confirmLifecycle()}>{busy ? "Выполняем…" : lifecycleLabels[lifecycle]}</Action>
               </div>
             </section>
           </motion.div>
@@ -1448,7 +1483,7 @@ export function VacancyDetail({
                 ×
               </Action>
               <h2>Приглашение</h2>
-              <p>{invite.card?.display_name || "Кандидат"}</p>
+              <p>{candidateName(invite.card?.display_name)}</p>
               <p className="salary-row">
                 {salary(fields.zp_min, fields.zp_max)}
               </p>

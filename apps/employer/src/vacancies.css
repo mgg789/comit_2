@@ -349,7 +349,7 @@
 }
 
 .radar-remove-mark { position: relative; display: block; width: 16px; height: 16px; }
-.radar-remove-mark img { position: absolute; left: 50%; top: 50%; max-width: none; transform: translate(-50%, -50%) rotate(45deg) scale(.28); }
+.radar-remove-mark .icon { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%) rotate(45deg) scale(.28); }
 
 .vacancy-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20rem; align-items: start; }
 .vacancy-column { min-width: 0; }
@@ -366,9 +366,65 @@
 .vacancy-review-panel[aria-hidden="false"] { transition-delay: 0s; }
 .vacancy-info { display: flex; flex-direction: column; }
 .vacancy-info > .vacancy-review-actions { margin-top: auto; padding-top: 24rem; }
-.radar-remove-mark img { transform: translate(-50%, -50%) rotate(45deg) scale(.38); }
+.radar-remove-mark .icon { width: 34px; transform: translate(-50%, -50%) rotate(45deg) scale(.38); height: 34px; }
 @media (prefers-reduced-motion: reduce) { .vacancy-review-panel { transition: none; } }
 
 .vacancy-review-tabs > button { transition: background 300ms cubic-bezier(.22, 1, .36, 1), color 250ms ease; }
 .vacancy-editor[data-reduced-motion="true"] .vacancy-review-panel,
 .vacancy-editor[data-reduced-motion="true"] .vacancy-review-tabs > button { transition: none; }
+
+/* Fields left empty after a submit attempt (form has noValidate, see VacancyEditor.save). */
+.show-invalid :is(input, textarea):invalid {
+  box-shadow: inset 0 0 0 1px var(--employer-danger);
+}
+
+/* Irreversible confirms (close, delete) read as destructive, not as the primary gradient. */
+.action.action-danger {
+  background: var(--employer-danger);
+  color: var(--comit-bg);
+}
+
+/* First visit: one clear next step instead of three empty columns. */
+.vacancy-first {
+  display: grid;
+  justify-items: center;
+  gap: 18rem;
+  text-align: center;
+  padding: 60rem 40rem;
+}
+.vacancy-first h2 {
+  font-family: var(--employer-display);
+  font-size: 32rem;
+}
+.vacancy-first p {
+  max-width: 640rem;
+  font-size: 20rem;
+  line-height: 1.5;
+  color: var(--comit-text-muted);
+}
+
+/* Figma 722:3687: «Стек» is a dropdown field like its neighbours, not a glass button. */
+.vacancy-editor .action.stack-toggle {
+  justify-content: space-between;
+  padding: 18rem 20rem;
+  border: 1px solid transparent;
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  box-shadow: none;
+  font-size: 20rem;
+  font-weight: 400;
+}
+.vacancy-editor .action.stack-toggle::before {
+  display: none;
+}
+.vacancy-editor .action.stack-toggle .icon {
+  width: 18rem;
+  height: 18rem;
+}
+
+/* Cards have a fixed Figma height: tags stay on one line instead of pushing the footer out. */
+.vacancy-card .tags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, var(--employer-paint-000) 85%, transparent);
+}

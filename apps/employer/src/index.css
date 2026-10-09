@@ -62,7 +62,7 @@
   color: var(--employer-ink);
 }
 .discovery-filters .custom-select-trigger .icon {
-  filter: brightness(0);
+  color: var(--comit-bg);
 }
 .discovery-search {
   transform-origin: left center;
@@ -229,7 +229,7 @@
 .edit-badge .icon {
   width: 18rem;
   height: 18rem;
-  filter: brightness(0);
+  color: var(--comit-bg);
 }
 .card-link {
   position: absolute;
@@ -257,8 +257,13 @@
   object-fit: contain;
 }
 .modal.vacancy-editor {
-  width: 726rem;
+  width: 484rem;
   max-width: calc(100vw - 144rem);
+  padding: 27rem 27rem 20rem;
+  border-radius: 32rem;
+}
+.modal.vacancy-editor.is-review {
+  width: 726rem;
 }
 @media (max-width: 760px) {
   .modal.vacancy-editor {
@@ -819,4 +824,4 @@
 @supports (backdrop-filter: url("#glass-refraction")) {
   .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
 }
-.deck-icon { width: 34rem; height: 34rem; filter: brightness(0) invert(1); }
+.deck-icon { width: 34rem; height: 34rem; color: var(--comit-text); }

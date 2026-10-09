@@ -3,13 +3,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Icon } from "./design";
 
 /** Existing employer header; role-specific navigation, API actions and assistant lifecycle stay in the application. */
-export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, selected, navigate, email, menu, toggleMenu, menuContent, toolsRef, menuRef, searchLabel, onSearch, secondaryLabel, onSecondary, secondaryIcon = "message", assistantOpen = false }: {
+export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, selected, navigate, email, menu, toggleMenu, menuContent, toolsRef, menuRef, searchLabel, onSearch, secondaryLabel, onSecondary, secondaryIcon = "message", assistantOpen = false, toolsContent, overlayContent }: {
   brandHref: string; brandLabel: string; navigationLabel: string;
   items: readonly { id: string; label: string; path: string; icon: ComponentProps<typeof Icon>["name"] }[];
   selected: string; navigate: (path: string) => void; email: string;
   menu: boolean; toggleMenu: () => void; menuContent: ReactNode;
   toolsRef?: Ref<HTMLDivElement>; menuRef?: Ref<HTMLDivElement>;
   searchLabel: string; onSearch: () => void; secondaryLabel: string; onSecondary: () => void;
+  toolsContent?: ReactNode; overlayContent?: ReactNode;
   secondaryIcon?: ComponentProps<typeof Icon>["name"]; assistantOpen?: boolean;
 }) {
   return <header className={`topbar ${assistantOpen ? "assistant-open" : ""}`}>
@@ -19,9 +20,11 @@ export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, 
     </button>)}</nav>
     <div className="account-tools glass" ref={toolsRef}>
       <button className="plain-icon" aria-label={searchLabel} onClick={onSearch}><Icon name="search" /></button>
+      {toolsContent}
       <button className="plain-icon" aria-label={secondaryLabel} onClick={onSecondary}><Icon name={secondaryIcon} /></button>
       <button className="plain-icon" onClick={toggleMenu} aria-label="Открыть меню аккаунта" aria-expanded={menu}><span className="account-avatar">{email.slice(0, 1).toUpperCase()}</span><Icon name="chevron" /></button>
     </div>
+    {overlayContent}
     <AnimatePresence>{menu && <motion.div ref={menuRef} className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><p>{email}</p>{menuContent}</motion.div>}</AnimatePresence>
   </header>;
 }

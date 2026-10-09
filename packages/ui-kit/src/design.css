@@ -119,20 +119,21 @@ small {
   position: absolute;
   max-width: none;
 }
+/* Figma frame geometry (1920 artboard): image box before rotation, centred in its rotated bounds. */
 .ambient-upper {
-  width: 1903rem;
-  height: 1269rem;
-  left: 357rem;
-  top: -410rem;
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: 397.4rem;
+  top: -352.9rem;
   transform: rotate(4.07deg);
   filter: blur(15rem);
   opacity: 0.28;
 }
 .ambient-lower {
-  width: 1803rem;
-  height: 1202rem;
-  left: -538rem;
-  top: 620rem;
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: -537.5rem;
+  top: 648.7rem;
   transform: rotate(156deg);
   filter: blur(15rem);
   opacity: 0.35;
@@ -245,10 +246,44 @@ small {
   height: 26rem;
   flex-shrink: 0;
 }
-.icon img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.icon > svg,
+.icon-mask {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.icon-mask {
+  background-color: currentColor;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+/* Figma draws these glyphs in the muted grey; contexts below recolour them through `color`. */
+.icon-resumes,
+.icon-ai,
+.icon-candidates,
+.icon-statistics,
+.icon-settings,
+.icon-clock,
+.icon-at {
+  color: var(--comit-text-muted);
+}
+/* Primary action arrow: dark lucide arrow on a light disc. */
+.icon-disc {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--comit-text);
+  color: var(--comit-bg);
+}
+.icon-disc > svg {
+  width: 56%;
+  height: 56%;
 }
 .icon-logo {
   width: 38rem;
@@ -323,11 +358,11 @@ small {
   color: var(--comit-bg);
   padding: 20rem 40rem;
 }
-.nav-item.selected img {
-  filter: brightness(0);
+.nav-item.selected .icon {
+  color: var(--comit-bg);
 }
-.nav-item:not(.selected) img {
-  filter: brightness(0) invert(0.68);
+.nav-item:not(.selected) .icon {
+  color: var(--employer-nav-icon);
 }
 .icon-send {
   transform: rotate(180deg);
@@ -433,8 +468,9 @@ small {
   animation-iteration-count: 1 !important;
   scroll-behavior: auto !important;
 }
+/* Bottom margin clears the floating AI button so the last line of a page stays readable. */
 .main-content {
-  margin: 90rem 80rem 80rem;
+  margin: 90rem 80rem 160rem;
   min-height: 700rem;
 }
 .page-heading {
@@ -531,8 +567,14 @@ small {
   background: var(--employer-blue);
 }
 .custom-select-check {
+  display: grid;
+  place-items: center;
   width: 20rem;
   flex-shrink: 0;
+}
+.custom-select-check .icon {
+  width: 18rem;
+  height: 18rem;
 }
 .state {
   padding: 50rem;
@@ -831,4 +873,26 @@ textarea::placeholder {
     font-size: 14rem;
     padding: 8rem 14rem;
   }
+}
+
+/* Dialogs rise in with their backdrop; the vacancy editor animates itself with framer-motion. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14rem) scale(0.97);
+  }
+}
+.modal-shade > .modal:not(.vacancy-editor),
+.modal-shade > section.glass {
+  animation: modal-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-shade > .modal:not(.vacancy-editor),
+  .modal-shade > section.glass {
+    animation: none;
+  }
+}
+.reduce-motion .modal-shade > .modal:not(.vacancy-editor),
+.reduce-motion .modal-shade > section.glass {
+  animation: none;
 }

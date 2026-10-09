@@ -48,7 +48,7 @@
 .anonymous-avatar .icon {
   width: 30rem;
   height: 30rem;
-  filter: invert(1);
+  color: var(--comit-bg);
 }
 .participant-name {
   display: flex;
@@ -215,7 +215,7 @@
 .assistant-avatar .icon {
   width: 38rem;
   height: 38rem;
-  filter: brightness(0.4);
+  color: var(--employer-assistant-mark);
 }
 .copy-message {
   display: block;
@@ -283,7 +283,7 @@
   background: transparent;
   cursor: pointer;
 }
-.agent-attached-document button img {
+.agent-attached-document button .icon {
   width: 100%;
   height: 100%;
 }
@@ -431,7 +431,7 @@
   opacity: 0.45;
   cursor: default;
 }
-.agent-tools button > img {
+.agent-tools button > .icon {
   display: block;
   width: 28rem;
   height: 28rem;
@@ -749,7 +749,7 @@
     width: 22rem;
     height: 22rem;
   }
-  .agent-tools button > img {
+  .agent-tools button > .icon {
     width: 22rem;
     height: 22rem;
   }
@@ -830,7 +830,7 @@
 .assistant-avatar {
   background: none;
 }
-.agent-tools > button > img {
+.agent-tools > button > .icon {
   width: 28rem;
   height: 28rem;
   object-fit: contain;
@@ -862,7 +862,7 @@
   }
 }
 @media (max-width: 760px) {
-  .agent-tools > button > img {
+  .agent-tools > button > .icon {
     width: 22rem;
     height: 22rem;
   }
@@ -901,7 +901,7 @@
 }
 .copy-message { position: relative; display: grid; place-items: center; line-height: 1; transition: opacity var(--employer-hover-duration) var(--employer-hover-ease); }
 .copy-message:hover { opacity: 1; }
-.copy-message img { display: block; width: 24rem; height: 24rem; }
+.copy-message .icon { display: block; width: 24rem; height: 24rem; }
 .agent-answer-actions { display: flex; gap: 12rem; align-items: center; margin-top: 16rem; }
 .agent-answer-actions .copy-message { margin-top: 0; width: 40rem; height: 40rem; border-radius: 10rem; }
 .copy-message > span:first-child:not(.copy-feedback) { font-size: 22rem; }

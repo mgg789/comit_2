@@ -17,6 +17,14 @@ export interface EmailLoginVerification {
   consent: { processing: true; version: string };
 }
 
+/** Digits in the api-core email code. */
+export const OTP_LENGTH = 6;
+
+/** Keep only digits, capped at the code length: typed, pasted and autofilled codes alike. */
+export function otpDigits(value: string): string {
+  return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+}
+
 /** Shared email sign-in with injected role-specific APIs; session cookies remain server-managed. */
 export function EmailLogin<Account>({
   requestCode,
@@ -115,7 +123,6 @@ export function EmailLogin<Account>({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12, duration: 0.3 }}
       >
-        {receipt && <p className="otp-label">Код подтверждения</p>}
         <h1>
           {receipt ? (
             <>
@@ -167,7 +174,7 @@ export function EmailLogin<Account>({
                   const field = event.currentTarget;
                   const position = field.value.slice(0, field.selectionStart ?? field.value.length).replace(/\D/g, "").length;
                   setCodePosition(Math.min(position, 5));
-                  setCode(field.value.replace(/\D/g, "").slice(0, 6));
+                  setCode(otpDigits(field.value));
                 }}
               />
               {Array.from({ length: 6 }, (_, index) => (
@@ -188,7 +195,7 @@ export function EmailLogin<Account>({
                     setCodePosition(Math.min(position, 5));
                   }}
                 >
-                  {code[index] || "_"}
+                  {code[index] ?? ""}
                 </span>
               ))}
             </div>

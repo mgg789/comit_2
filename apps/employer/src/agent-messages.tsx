@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { AgentsOrganizationMessage, AgentsOrganizationMessagePage } from "@comit/shared";
-import { asset } from "./runtime";
+import { Icon } from "./ui";
 import { useEmployerPreferences } from "./preferences";
 
 /** Public messages of one durable turn; private provider reasoning is never included. */
@@ -86,7 +86,7 @@ export function CopyMessage({ text }: { text: string }) {
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => setState("idle"), 1400);
     }}>
-    {state === "copied" ? <span aria-hidden="true">✓</span> : <img src={asset("copy.svg")} alt="" />}
+    <Icon name={state === "copied" ? "check" : "copy"} />
     <span className="copy-feedback" role="status">{state === "idle" ? "" : label}</span>
   </motion.button>;
 }

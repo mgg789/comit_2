@@ -21,7 +21,7 @@ export interface SkillRadarProps {
   ariaLabel: string;
 }
 
-const GRADES = ["intern", "junior", "junior+", "middle", "middle+", "senior", "senior+"];
+const GRADES = ["Intern", "Junior", "Junior+", "Middle", "Middle+", "Senior", "Senior+"];
 const CENTER = { x: 450, y: 330 };
 const RADIUS = 200;
 
@@ -31,7 +31,7 @@ function gradeValue(value: number): number {
 
 /** Returns the grade name for a selected 1–7 level, rounding and clamping invalid input. */
 export function gradeLabel(level: number): string {
-  return GRADES[gradeValue(level) - 1] ?? "intern";
+  return GRADES[gradeValue(level) - 1] ?? "Intern";
 }
 
 function direction(index: number, count: number): { x: number; y: number } {
@@ -122,7 +122,7 @@ export function SkillRadar({ axes, disabled = false, onChange, onRemove, removeI
   return (
     <section className="skill-radar" aria-label={ariaLabel}>
       <p className="skill-radar__hint" id={`${id}-hint`}>
-        Перетащите точки: intern ближе к центру, senior+ — на внешнем круге.
+        Перетащите точки: Intern ближе к центру, Senior+ — на внешнем круге.
       </p>
       <svg ref={svgRef} className="skill-radar__chart" viewBox="0 0 900 660"
         role="group" aria-label={ariaLabel} aria-describedby={`${id}-hint`}

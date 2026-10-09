@@ -4,13 +4,18 @@ import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
-import { Action, Backdrop, Icon, Reveal, State } from "./ui";
+import { Action, Backdrop, Icon, State } from "./ui";
 import { Login } from "./login";
 import { LegalDocument } from "./legal";
 import { Settings } from "./settings";
 import { useEmployerPreferences } from "./preferences";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
 import { Vacancies, VacancyDetail, VacancyEditor } from "./vacancies";
+import {
+  NotificationsButton,
+  NotificationsPanel,
+  useRecruitmentNotifications,
+} from "./notifications-menu";
 import {
   Resume,
   Resumes,
@@ -36,6 +41,9 @@ export default function App() {
   }
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsSeenBefore, setNotificationsSeenBefore] = useState(0);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const accountToolsRef = useRef<HTMLDivElement>(null);
   const [accountAction, setAccountAction] = useState<
     "logout" | "logout-all" | "delete" | null
@@ -43,6 +51,7 @@ export default function App() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const { preferences } = useEmployerPreferences();
+  const notifications = useRecruitmentNotifications(account?.id);
   function confirmAccountAction(action: "logout" | "logout-all" | "delete") {
     setMenu(false);
     setAccountActionError(null);
@@ -158,8 +167,21 @@ export default function App() {
   }, []);
   useEffect(() => {
     setMenu(false);
+    setNotificationsOpen(false);
     window.scrollTo(0, 0);
   }, [route]);
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !notificationsRef.current?.contains(event.target) &&
+        !accountToolsRef.current?.contains(event.target)
+      ) setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [notificationsOpen]);
   useEffect(() => {
     if (!menu) return;
     const outside = (event: PointerEvent) => {
@@ -179,6 +201,7 @@ export default function App() {
         setAccountAction(null);
         setAgent(false);
         setMenu(false);
+        setNotificationsOpen(false);
       }
     };
     window.addEventListener("keydown", escape);
@@ -282,15 +305,17 @@ export default function App() {
               items={[
                 { id: "vacancies", label: "Вакансии", path: "/vacancies", icon: "vacancies" },
                 { id: "resumes", label: "Резюме", path: "/resumes", icon: "resumes" },
-                { id: "candidates", label: "Кандидаты", path: "/showcase", icon: "candidates" },
+                { id: "candidates", label: "Соискатели", path: "/showcase", icon: "candidates" },
                 { id: "statistics", label: "Статистика", path: "/statistics", icon: "statistics" },
                 { id: "settings", label: "Настройки", path: "/settings", icon: "settings" },
-              ]} selected={selected} navigate={navigate} email={account.email} menu={menu} toggleMenu={() => setMenu(value => !value)}
+              ]} selected={selected} navigate={navigate} email={account.email} menu={menu} toggleMenu={() => { setNotificationsOpen(false); setMenu(value => !value); }}
               toolsRef={accountToolsRef} menuRef={menuRef} assistantOpen={agent}
               searchLabel="Поиск кандидатов" onSearch={() => leaveAgent(() => {
                 if (pieces[0] === "showcase") window.dispatchEvent(new Event("employer:focus-candidate-search"));
                 else navigate("/showcase?search=1");
               })} secondaryLabel="Переписка и приглашения" onSecondary={() => leaveAgent(() => navigate("/chat"))}
+              toolsContent={<NotificationsButton unseen={notifications.unseen} open={notificationsOpen} onClick={() => { setMenu(false); if (!notificationsOpen) setNotificationsSeenBefore(notifications.markSeen()); setNotificationsOpen(!notificationsOpen); }} />}
+              overlayContent={<AnimatePresence>{notificationsOpen && <NotificationsPanel ref={notificationsRef} events={notifications.events} seenBefore={notificationsSeenBefore} onSelect={processId => { setNotificationsOpen(false); leaveAgent(() => navigate(`/chat/${processId}`)); }} />}</AnimatePresence>}
               menuContent={<><Action onClick={() => leaveAgent(() => navigate("/chat"))}>Мои чаты</Action><Action onClick={() => confirmAccountAction("logout")}>Выйти</Action><Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action></>}
             />
             <AnimatePresence>
@@ -319,7 +344,16 @@ export default function App() {
             </AnimatePresence>
             <main className="main-content">
               <AnimatePresence mode="wait">
-                <Reveal key={`${route}:${checkpoint}`}>{screen}</Reveal>
+                {/* Plain crossfade: each screen brings its own Reveal, so a second slide would double the motion. */}
+                <motion.div
+                  key={`${route}:${checkpoint}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  {screen}
+                </motion.div>
               </AnimatePresence>
             </main>
             <Action

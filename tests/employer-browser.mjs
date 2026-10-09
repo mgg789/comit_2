@@ -682,7 +682,7 @@ try {
   for (const width of [1920, 1024, 390]) await capture("new-vacancy", width);
   await page.keyboard.press("Escape");
   await page.getByRole("dialog").waitFor({ state: "hidden" });
-  await page.getByRole("button", { name: "Кандидаты", exact: true }).focus();
+  await page.getByRole("button", { name: "Соискатели", exact: true }).focus();
   await page.keyboard.press("Enter");
   await page.waitForURL(/#\/showcase/);
   await page
