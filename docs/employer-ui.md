@@ -40,11 +40,17 @@
 
 ## Визуальная система
 
-Оригинальные экспортированные ассеты находятся в `apps/employer/public/design`. Inter, Murs Gothic Wide Dark и Moon Walk поставляются локально. Employer-токены в `packages/ui-kit/src/tokens.css` ограничены `.employer-app`; остальные приложения сохраняют прежнюю палитру. Desktop-геометрия масштабируется относительно макета шириной 1920 px; до 760 px используется самостоятельный мобильный layout. Motion учитывает `prefers-reduced-motion`.
+Оригинальные экспортированные ассеты находятся в `apps/employer/public/design`; иконки — только через `Icon` из ui-kit (маски Figma и lucide, см. [ui-kit.md](ui-kit.md#иконки)). Inter, Murs Gothic Wide Dark и Moon Walk поставляются локально. Employer-токены в `packages/ui-kit/src/tokens.css` ограничены `.employer-app`; остальные приложения сохраняют прежнюю палитру. Desktop-геометрия масштабируется относительно макета шириной 1920 px; до 760 px используется самостоятельный мобильный layout. Motion учитывает `prefers-reduced-motion`.
 
 Стеклянные поверхности используют SVG displacement с двухканальной картой преломления у краёв, backdrop blur, насыщенность и световые границы. Поддержка SVG backdrop filters зависит от браузера; при отсутствии поддержки остаются blur и световые границы. CSS `@supports` подтверждает синтаксис, но не одинаковый результат рендеринга во всех браузерах.
 
+## Уведомления
+
+Колокольчик в капсуле аккаунта показывает число новых событий найма (смена статуса приглашения, оффер, найм) из `GET /employer/recruitment-events`. События не содержат контактов. Список опрашивается раз в 30 секунд; открытие меню отмечает события просмотренными, новые строки выделены. Строка ведёт в переписку процесса `#/chat/:process_id`; при открытом AI переход ждёт закрытия оверлея. Курсор «просмотрено» хранится в `localStorage` этого браузера (`comit.employer.seen_event_sequence`): на другом устройстве счётчик начнётся заново, пока нет серверного курсора прочтения.
+
 ## Неподдержанные контракты макета
+
+- Серверный курсор прочтения уведомлений: endpoint отсутствует, курсор хранится в браузере (`apps/employer/src/notifications.ts`).
 
 - OAuth Яндекса: endpoint отсутствует; кнопка проверяет согласие и явно объясняет необходимость входа по email.
 - Фото работодателя/кандидата: поля отсутствуют в `AccountView` и публичных профилях. Используются анонимные аватары; люди из макета не выдаются за реальные записи.
@@ -61,8 +67,11 @@ pnpm install --frozen-lockfile
 COMIT_API_URL=http://127.0.0.1:8080 pnpm --filter @comit/web-employer dev --host 127.0.0.1
 pnpm --filter @comit/web-employer build
 pnpm typecheck
+pnpm --filter @comit/web-employer test
 node tests/employer-browser.mjs
 ```
+
+Unit-тесты запускаются `node:test` через `tsx` (как в `apps/api`), конфигурация JSX — `apps/employer/tests/tsconfig.json`: курсор и счётчики уведомлений, процент бюджета AI, формат зарплатной вилки, тексты ошибок API, группировка и Markdown ответов агента.
 
 Dev proxy удаляет `/api` перед обращением к API-core. Для входа и рабочих данных backend должен быть настроен согласно [auth.md](auth.md), [agents.md](agents.md), [chat.md](chat.md) и [vacancy-crud.md](vacancy-crud.md).
 

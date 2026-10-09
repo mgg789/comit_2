@@ -11,6 +11,11 @@ import { useEmployerPreferences } from "./preferences";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
 import { Vacancies, VacancyDetail, VacancyEditor } from "./vacancies";
 import {
+  NotificationsButton,
+  NotificationsPanel,
+  useRecruitmentNotifications,
+} from "./notifications-menu";
+import {
   Resume,
   Resumes,
   Showcase,
@@ -35,6 +40,9 @@ export default function App() {
   }
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsSeenBefore, setNotificationsSeenBefore] = useState(0);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const accountToolsRef = useRef<HTMLDivElement>(null);
   const [accountAction, setAccountAction] = useState<
     "logout" | "logout-all" | "delete" | null
@@ -42,6 +50,7 @@ export default function App() {
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountActionError, setAccountActionError] = useState<string | null>(null);
   const { preferences } = useEmployerPreferences();
+  const notifications = useRecruitmentNotifications(account?.id);
   function confirmAccountAction(action: "logout" | "logout-all" | "delete") {
     setMenu(false);
     setAccountActionError(null);
@@ -157,8 +166,21 @@ export default function App() {
   }, []);
   useEffect(() => {
     setMenu(false);
+    setNotificationsOpen(false);
     window.scrollTo(0, 0);
   }, [route]);
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !notificationsRef.current?.contains(event.target) &&
+        !accountToolsRef.current?.contains(event.target)
+      ) setNotificationsOpen(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [notificationsOpen]);
   useEffect(() => {
     if (!menu) return;
     const outside = (event: PointerEvent) => {
@@ -178,6 +200,7 @@ export default function App() {
         setAccountAction(null);
         setAgent(false);
         setMenu(false);
+        setNotificationsOpen(false);
       }
     };
     window.addEventListener("keydown", escape);
@@ -340,6 +363,16 @@ export default function App() {
                 >
                   <Icon name="search" />
                 </button>
+                <NotificationsButton
+                  unseen={notifications.unseen}
+                  open={notificationsOpen}
+                  onClick={() => {
+                    setMenu(false);
+                    if (!notificationsOpen)
+                      setNotificationsSeenBefore(notifications.markSeen());
+                    setNotificationsOpen(!notificationsOpen);
+                  }}
+                />
                 <button
                   className="plain-icon"
                   aria-label="Переписка и приглашения"
@@ -349,7 +382,10 @@ export default function App() {
                 </button>
                 <button
                   className="plain-icon"
-                  onClick={() => setMenu((value) => !value)}
+                  onClick={() => {
+                    setNotificationsOpen(false);
+                    setMenu((value) => !value);
+                  }}
                   aria-label="Открыть меню аккаунта"
                   aria-expanded={menu}
                 >
@@ -359,6 +395,19 @@ export default function App() {
                   <Icon name="chevron" />
                 </button>
               </div>
+              <AnimatePresence>
+                {notificationsOpen && (
+                  <NotificationsPanel
+                    ref={notificationsRef}
+                    events={notifications.events}
+                    seenBefore={notificationsSeenBefore}
+                    onSelect={(processId) => {
+                      setNotificationsOpen(false);
+                      leaveAgent(() => navigate(`/chat/${processId}`));
+                    }}
+                  />
+                )}
+              </AnimatePresence>
               <AnimatePresence>
                 {menu && (
                   <motion.div

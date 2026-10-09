@@ -50,7 +50,7 @@
   flex-shrink: 0;
 }
 .resume-filter-arrow .icon {
-  filter: brightness(0);
+  color: var(--comit-bg);
   transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .resume-vacancy-filter[open] summary .icon {
@@ -149,8 +149,8 @@
   width: 25rem;
   height: 25rem;
 }
-.discovery-search img {
-  filter: brightness(0.5);
+.discovery-search .icon {
+  color: var(--employer-search-icon);
 }
 .discovery-filters {
   display: flex;
@@ -266,7 +266,7 @@
   padding: 15rem;
   transition: transform 0.16s;
 }
-.discovery-profile-button img {
+.discovery-profile-button .icon {
   width: 100%;
   height: 100%;
 }

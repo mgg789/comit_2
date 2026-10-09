@@ -537,7 +537,7 @@ export function VacancyEditor({
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
                     transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                    <SkillRadar removeIcon={<span className="radar-remove-mark"><img src={asset("skill-radar-remove-source.svg")} alt="" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
@@ -1067,14 +1067,14 @@ function CandidateDeck({
           </div>
           <div className="candidate-controls" onPointerDown={(event) => event.stopPropagation()}>
             <Action aria-label="Пропустить кандидата" disabled={pending} onClick={() => void decide("dislike")}>
-              <img className="deck-icon" src={asset("swipe.svg")} alt="" />
+              <Icon name="close" className="deck-icon" />
             </Action>
             <Action aria-label="Открыть резюме" disabled={pending}
               onClick={() => navigate(`/resume/${card.candidate_id}?draft=${draftId}&from=vacancy`)}>
-              <img className="deck-icon" src={asset("19847931f7f73800e0a10424c71729ddc8c55930.svg")} alt="" />
+              <Icon name="resumes" className="deck-icon" />
             </Action>
             <Action aria-label="Сохранить кандидата" disabled={pending} onClick={() => void decide("like")}>
-              <img className="deck-icon" src={asset("heart.svg")} alt="" />
+              <Icon name="heart" className="deck-icon" />
             </Action>
           </div>
         </motion.div>

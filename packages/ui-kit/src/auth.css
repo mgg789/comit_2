@@ -121,8 +121,8 @@
   width: 200rem;
   height: 200rem;
 }
-.login-mark img {
-  filter: brightness(0);
+.login-mark .icon {
+  color: var(--comit-bg);
 }
 .login-word {
   font-family: var(--employer-logo);

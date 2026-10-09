@@ -453,10 +453,7 @@ export function Showcase({
                     )
                   }
                 >
-                  <img
-                    src={asset("960c343bdbc580b9cb079db098fc15486587476b.svg")}
-                    alt=""
-                  />
+                  <Icon name="chevron-wide" />
                 </button>
                 <button
                   className={`discovery-like ${saved.includes(candidate.candidate_id) ? "saved" : ""}`}

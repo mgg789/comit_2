@@ -32,6 +32,10 @@
   --comit-text: #f0f0f0;
   --comit-text-muted: #c0c0c0;
   --employer-ink: #272930;
+  /* Icon tints that used to be image filters on exported artwork. */
+  --employer-nav-icon: #adadad;
+  --employer-search-icon: #787878;
+  --employer-assistant-mark: #606060;
   --employer-blue: #bfe2ff;
   --employer-violet: #a49bf7;
   --employer-glass: linear-gradient(145deg, rgb(52 53 54 / 82%), rgb(34 35 36 / 94%));

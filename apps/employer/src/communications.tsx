@@ -25,9 +25,11 @@ import { AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } fro
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
+import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
 
-const stateNames: Record<RecruitmentView["state"], string> = {
+/** Process states as both sides see them (TZ §2.2); shared with the notifications bell. */
+export const recruitmentStateNames: Record<RecruitmentView["state"], string> = {
   sent: "Приглашение отправлено",
   viewed: "Приглашение просмотрено",
   accepted: "Приглашение принято",
@@ -345,7 +347,7 @@ function RecruitmentThread({
           onClick={() => onProfile(p.candidate_id)}
         >
           <strong>{contacts?.display_name || "Кандидат"}</strong>
-          <small>{stateNames[p.state]}</small>
+          <small>{recruitmentStateNames[p.state]}</small>
         </button>
         <details className="process-menu">
           <summary aria-label="Действия с кандидатом">···</summary>
@@ -1016,20 +1018,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   if (currentId && (thinking || turn?.status === "failed") && !visible.some((row) => "messages" in row && row.id === currentId)) {
     visible.push({ id: currentId, messages: [], startedAt: turn?.created_at || outgoing?.created_at || null });
   }
-  const percentage =
-    budget && Number(budget.limit_micro_usd) > 0
-      ? Math.max(
-          0,
-          Math.min(
-            100,
-            Math.round(
-              (Number(budget.available_micro_usd) /
-                Number(budget.limit_micro_usd)) *
-                100,
-            ),
-          ),
-        )
-      : null;
+  const percentage = budget ? budgetRemainingPercent(budget) : null;
   return (
     <motion.section
       className={`organization-overlay${reducedMotion ? " reduce-motion" : ""}`}
@@ -1149,11 +1138,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
                   className="agent-attached-document"
                   key={document.document_id}
                 >
-                  <img
-                    className="agent-attached-document-icon"
-                    src={asset("attached-file-icon.svg")}
-                    alt=""
-                  />
+                  <Icon name="attached-file" className="agent-attached-document-icon" />
                   <span title={document.name}>{document.name}</span>
                   <button
                     type="button"
@@ -1170,7 +1155,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
                       pending.current = null;
                     }}
                   >
-                    <img src={asset("attached-file-remove.svg")} alt="" />
+                    <Icon name="close" />
                   </button>
                 </div>
               ))}
@@ -1282,10 +1267,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           disabled={loading || clearing}
           onClick={() => { setClearError(null); setConfirmClear(true); }}
         >
-          <img
-            src={asset("cb79bcac8a5b1ef4846052c9915814f7ef84aea8.svg")}
-            alt=""
-          />
+          <Icon name="clear-conversation" />
         </button>
         <button
           type="button"
@@ -1296,10 +1278,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
           onBlur={() => setShowBudget(false)}
           onClick={() => setShowBudget((value) => !value)}
         >
-          <img
-            src={asset("85f60c52ed44e925a0abfc46008446040627dd6a.svg")}
-            alt=""
-          />
+          <Icon name="usage-stats" />
         </button>
         <div
           className="agent-reasoning-control"
@@ -1318,10 +1297,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             aria-controls="agent-reasoning-options"
             onClick={() => setShowReasoning(true)}
           >
-            <img
-              src={asset("36de0441b18c0a44358f7a80a61cac89e2b38031.svg")}
-              alt=""
-            />
+            <Icon name="reasoning" />
           </button>
           <AnimatePresence>
             {showReasoning && (

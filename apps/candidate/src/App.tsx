@@ -93,9 +93,7 @@ export default function App() {
             <Icon name="logo"/>
             <span className="brand-word">comit</span>
             </a>
-     <nav className="nav" aria-label="Навигация кандидата">{navigation.map(item => <button key={item.path} className={`nav-item glass ${selected === item.path ? "selected" : ""}`} aria-label={item.label} aria-current={selected === item.path ? "page" : undefined} onClick={() => navigate(item.path)}>{item.path === "/resume" || item.path === "/offers" ? <span className="icon" aria-hidden="true">
-                <img src={`${import.meta.env.BASE_URL}design/${item.path === "/resume" ? "abd1b.svg" : "0f423.svg"}`} alt=""/>
-                </span> : <Icon name={item.icon}/>}<AnimatePresence initial={false}>{selected === item.path && <motion.span className="nav-label" initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ duration: .3 }}>
+     <nav className="nav" aria-label="Навигация кандидата">{navigation.map(item => <button key={item.path} className={`nav-item glass ${selected === item.path ? "selected" : ""}`} aria-label={item.label} aria-current={selected === item.path ? "page" : undefined} onClick={() => navigate(item.path)}><Icon name={item.icon}/><AnimatePresence initial={false}>{selected === item.path && <motion.span className="nav-label" initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }} transition={{ duration: .3 }}>
                 <span className="candidate-nav-label">{item.label}</span>
                 </motion.span>}</AnimatePresence>
               <span className="tooltip">{item.label}</span>

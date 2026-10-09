@@ -349,7 +349,7 @@
 }
 
 .radar-remove-mark { position: relative; display: block; width: 16px; height: 16px; }
-.radar-remove-mark img { position: absolute; left: 50%; top: 50%; max-width: none; transform: translate(-50%, -50%) rotate(45deg) scale(.28); }
+.radar-remove-mark .icon { position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; transform: translate(-50%, -50%) rotate(45deg) scale(.28); }
 
 .vacancy-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20rem; align-items: start; }
 .vacancy-column { min-width: 0; }
@@ -366,7 +366,7 @@
 .vacancy-review-panel[aria-hidden="false"] { transition-delay: 0s; }
 .vacancy-info { display: flex; flex-direction: column; }
 .vacancy-info > .vacancy-review-actions { margin-top: auto; padding-top: 24rem; }
-.radar-remove-mark img { transform: translate(-50%, -50%) rotate(45deg) scale(.38); }
+.radar-remove-mark .icon { width: 34px; transform: translate(-50%, -50%) rotate(45deg) scale(.38); height: 34px; }
 @media (prefers-reduced-motion: reduce) { .vacancy-review-panel { transition: none; } }
 
 .vacancy-review-tabs > button { transition: background 300ms cubic-bezier(.22, 1, .36, 1), color 250ms ease; }

@@ -66,7 +66,7 @@
   color: var(--employer-ink);
 }
 .discovery-filters .custom-select-trigger .icon {
-  filter: brightness(0);
+  color: var(--comit-bg);
 }
 .discovery-search {
   transform-origin: left center;
@@ -250,7 +250,7 @@
 .edit-badge .icon {
   width: 18rem;
   height: 18rem;
-  filter: brightness(0);
+  color: var(--comit-bg);
 }
 .card-link {
   position: absolute;
@@ -893,4 +893,4 @@
 @supports (backdrop-filter: url("#glass-refraction")) {
   .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
 }
-.deck-icon { width: 34rem; height: 34rem; filter: brightness(0) invert(1); }
+.deck-icon { width: 34rem; height: 34rem; color: var(--comit-text); }

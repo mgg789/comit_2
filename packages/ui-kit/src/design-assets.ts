@@ -27,9 +27,18 @@ const artwork = {
   "6f0a38215d44082a8500e6aa08c4a16a70316dc5.png": new URL("./design-assets/6f0a38215d44082a8500e6aa08c4a16a70316dc5.png", import.meta.url).href,
   "otp-glass-effect-2.svg": new URL("./design-assets/otp-glass-effect-2.svg", import.meta.url).href,
   "otp-extra-vector.svg": new URL("./design-assets/otp-extra-vector.svg", import.meta.url).href,
+  "clear-conversation.svg": new URL("./design-assets/clear-conversation.svg", import.meta.url).href,
+  "usage-stats.svg": new URL("./design-assets/usage-stats.svg", import.meta.url).href,
+  "reasoning.svg": new URL("./design-assets/reasoning.svg", import.meta.url).href,
+  "attached-file.svg": new URL("./design-assets/attached-file.svg", import.meta.url).href,
+  "chevron-wide.svg": new URL("./design-assets/chevron-wide.svg", import.meta.url).href,
+  "radar-remove.svg": new URL("./design-assets/radar-remove.svg", import.meta.url).href,
 } as const;
 
+/** Name of a bundled design asset. */
+export type DesignAssetName = keyof typeof artwork;
+
 /** Resolve shared artwork without depending on another application deployment. */
-export function designAsset(name: keyof typeof artwork): string {
+export function designAsset(name: DesignAssetName): string {
   return artwork[name];
 }

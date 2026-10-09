@@ -245,10 +245,44 @@ small {
   height: 26rem;
   flex-shrink: 0;
 }
-.icon img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+.icon > svg,
+.icon-mask {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.icon-mask {
+  background-color: currentColor;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+/* Figma draws these glyphs in the muted grey; contexts below recolour them through `color`. */
+.icon-resumes,
+.icon-ai,
+.icon-candidates,
+.icon-statistics,
+.icon-settings,
+.icon-clock,
+.icon-at {
+  color: var(--comit-text-muted);
+}
+/* Primary action arrow: dark lucide arrow on a light disc. */
+.icon-disc {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--comit-text);
+  color: var(--comit-bg);
+}
+.icon-disc > svg {
+  width: 56%;
+  height: 56%;
 }
 .icon-logo {
   width: 38rem;
@@ -323,11 +357,11 @@ small {
   color: var(--comit-bg);
   padding: 20rem 40rem;
 }
-.nav-item.selected img {
-  filter: brightness(0);
+.nav-item.selected .icon {
+  color: var(--comit-bg);
 }
-.nav-item:not(.selected) img {
-  filter: brightness(0) invert(0.68);
+.nav-item:not(.selected) .icon {
+  color: var(--employer-nav-icon);
 }
 .icon-send {
   transform: rotate(180deg);
