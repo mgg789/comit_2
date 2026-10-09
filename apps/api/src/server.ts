@@ -4,6 +4,7 @@
  * visibility rules of TZ §2.2. Engines stay behind it (context/40-architecture.md).
  */
 import Fastify, { type FastifyInstance } from "fastify";
+import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
@@ -16,11 +17,26 @@ import { Pool } from "pg";
 import { loadAuthConfig } from "./auth/config.js";
 import { installOperations, validatedRequestId } from "./operations/index.js";
 
+/** Trust only explicitly configured proxy addresses/CIDRs; hostnames and trust-all flags fail closed. */
+export function proxyTrustConfig(value: string | undefined): false | string[] {
+  if (!value?.trim()) return false;
+  const addresses = value.split(",").map(address => address.trim());
+  for (const address of addresses) {
+    const [ip, prefix, extra] = address.split("/");
+    const version = isIP(ip ?? "");
+    if (!version || extra !== undefined || (prefix !== undefined &&
+      (!/^\d+$/.test(prefix) || Number(prefix) < 1 || Number(prefix) > (version === 4 ? 32 : 128)))) {
+      throw new Error("TRUST_PROXY requires explicit IP addresses or non-universal CIDRs");
+    }
+  }
+  return addresses;
+}
+
 /** Build the complete production route graph without listening, enabling registration regressions. */
 export async function createApiServer({ logger = true }: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: logger ? { redact: ["req.headers.authorization", "req.headers.cookie", "req.headers.x-internal-token", "res.headers.set-cookie"] } : false,
-    trustProxy: process.env.TRUST_PROXY?.split(",").filter(Boolean) ?? false,
+    trustProxy: proxyTrustConfig(process.env.TRUST_PROXY),
     ajv: { customOptions: candidateValidationOptions },
     requestIdHeader: false,
     genReqId: request => validatedRequestId(request.headers["x-request-id"]),

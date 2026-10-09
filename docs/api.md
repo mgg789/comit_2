@@ -579,3 +579,17 @@ in-flight provider call или started tool journal. Активная работ
 После HTTP200 frontend сбрасывает сообщения, выбранные turn и курсор опроса;
 при ошибке локальная история сохраняется. Подтверждение выполняется модалкой
 пользователя; в tool registry очистка не предлагается модели.
+
+Клиент `getCandidatePipeline()` читает существующий `GET /api/candidate/pipeline` как `CandidatePipelineStatus`. Готовность относится к `profile_revision`; подтверждение доставки исходного профиля не равнозначно состоянию `ready`.
+
+
+### Внутренний combine: обязательный контекст владельца
+
+`/internal/vacancies/{vacancy_id}/combine` (POST/GET), `/combine/retry`,
+`/selections` и `/selection-state/{candidate_id}` требуют UUID `X-Owner-ID`
+вместе с `X-Internal-Token`. Matching всегда проверяет владельца вакансии,
+отсутствующий или неверный UUID отклоняется до обращения к подбору.
+Internal gateway сохраняет проверенный заголовок, browser API берёт владельца
+из сессии. На внешнем nginx `/api/internal` и `/api/internal/*` закрыты (404);
+сервисные клиенты используют прямой внутренний URL. Схема OpenAPI генерируется
+из matching routes командой `python tests/generate_candidate_contract.py`.

@@ -9,7 +9,7 @@ services:
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       AUTH_KEY_ID: ${AUTH_KEY_ID:-v1}
       ACCOUNT_CONSENT_VERSION: ${ACCOUNT_CONSENT_VERSION:-account-v1}
-      TRUST_PROXY: ${TRUST_PROXY:-}
+      TRUST_PROXY: ${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}
       SMTP_HOST: ${SMTP_HOST:-mail.droidje.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:?Set existing SMTP credentials}
