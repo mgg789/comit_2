@@ -20,6 +20,8 @@ Trigger (vacancy.ready | candidate.ready/withdrawn | ручной вызов)
   4. R₀ rerank-worker → sort-only порядок активного артефакта либо main_fallback
   5. Лента: порции R₀ top-k, preference-поправка unserved suffix,
      paired research-карточки (2/18), like/dislike → saved/visited-блокировка
+  6. feed-refill-worker — low-water/pool-change добор immutable batch-ами
+     из reserve того же rerank-run либо после свежей пары combine/rerank
 ```
 
 ## Инварианты (нарушать нельзя)
@@ -32,7 +34,7 @@ Trigger (vacancy.ready | candidate.ready/withdrawn | ручной вызов)
 - Рейтинг (очки подтверждённого профиля) — отдельная ось от категории (категория присваивается только тестом).
 - Тиндер-фидбек (уточнение context/51 заменяет раннюю формулу коррекции вектора из context/50 — она не реализована): реакции не переписывают уровни, evidence или ML-score. Like → saved; dislike → immutable структурный снимок и блокировка нового отбора для вакансии. Персонализация — vacancy-local preference-модель поверх R₀, переставляющая только непоказанный суффикс.
 - Переотбор: ручной Visited (PUT selection-state) — никогда; Pending — не трогаем; disliked возвращаются через порог изменения профиля (`feed-delta-v1`: структурное расстояние > 1.0, строгий N > K → `visited_updated`).
-- Автоматическое пополнение (добор) короткой выдачи не реализовано; пополнение/исчерпание резерва — отдельное решение (context/51 §6).
+- Автоматическое пополнение ленты (context/51 §6) реализовано `feed-refill-worker`: low-water=4, batch=12, сначала reserve того же rerank-run, иначе свежая пара combine/rerank; уже выданные позиции и курсоры неизменны ([feed-refill.md](feed-refill.md)).
 
 ## Валидация (обязательна к сдаче)
 
@@ -209,7 +211,7 @@ selections endpoints возвращали 409. Финал: 199 кандидат�
 `tests/artifacts/combine/`; скрипт воспроизводит весь проход.
 
 Это проверка контрактов на синтетике, не Precision/MRR качества найма.
-Веса main-v1 не обучены; FSP/freshness и feedback learning не реализованы.
+Веса main-v1 не обучены; FSP-буст и freshness как отдельный сигнал скоринга не подключены. Vacancy-local preference learning и feed-refill реализованы отдельно ([preference-learning.md](preference-learning.md), [feed-refill.md](feed-refill.md)).
 Структурированного расписания кандидата ещё нет: vacancy daily сохраняется,
 но автоматическое сравнение графиков не выполняется. JWT/ownership работодателя
 нужны перед подключением internal методов к браузерному интерфейсу.
@@ -496,9 +498,18 @@ quality gate, source consent locks и отдельный реестр не ме�
 Применение переставляет только unserved suffix и сохраняет delivered receipts.
 Rollback/reset доступны владельцу вакансии. [Правила](preference-learning.md).
 
+## Durable feed refill
+
+`feed-refill-worker` добирает хвост той же feed-сессии immutable batch-ами:
+low-water 4 необслуженных карточек, batch 12, порог изменения пула K1=0.10.
+Сначала берутся уже оценённые reserve-карточки того же rerank-run; при нехватке
+ставится свежая пара combine/rerank. Исчерпание фиксируется после успешного
+пустого batch. Saved/visited/pending исключаются; `visited_updated` допускается.
+Миграция `014_feed_refill.sql`. [Контракт и команды](feed-refill.md).
+
 ## Проверка локальных гипотез
 
-[Matched-pair exploration](hypothesis-learning.md) подключена к feed delivery после preference refresh:2 research cards на18 обычных unique deliveries, сохраняемые вероятности выбора/порядка, full snapshot eligibility и bounded сравнения. H1–H8/H10 проверяются по доступным фактам, H9 не имеет таксономии. Frozen20 decisive batch сообщает локальные свидетельства; learner получает исходные explicit actions один раз, новые обязательные фильтры не создаются. Основное пополнение/исчерпание §6 отдельно.
+[Matched-pair exploration](hypothesis-learning.md) подключена к feed delivery после preference refresh:2 research cards на18 обычных unique deliveries, сохраняемые вероятности выбора/порядка, full snapshot eligibility и bounded сравнения. H1–H8/H10 проверяются по доступным фактам, H9 не имеет таксономии. Frozen20 decisive batch сообщает локальные свидетельства; learner получает исходные explicit actions один раз, новые обязательные фильтры не создаются. Основное пополнение/исчерпание буфера (context/51 §6) — [feed-refill.md](feed-refill.md).
 
 Общая [витрина кандидатов](candidate-showcase.md) объединяет PostgreSQL
 full-text и независимый Harrier query RRF60, с фильтрами и явным lexical
