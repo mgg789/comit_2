@@ -70,6 +70,13 @@
   z-index: 80;
 }
 @media (max-width: 760px) {
+  .notifications-badge {
+    left: 10rem;
+    top: -8rem;
+    min-width: 20rem;
+    height: 16rem;
+    font-size: max(11rem, 10px);
+  }
   .notifications-menu {
     width: min(370rem, calc(100vw - 32px));
   }

@@ -421,3 +421,10 @@
   width: 18rem;
   height: 18rem;
 }
+
+/* Cards have a fixed Figma height: tags stay on one line instead of pushing the footer out. */
+.vacancy-card .tags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, var(--employer-paint-000) 85%, transparent);
+}

@@ -1,4 +1,13 @@
 /* Shared email sign-in and six-digit OTP layout; API roles stay in each app. */
+.login {
+  min-height: 100vh;
+  padding: 36rem 40rem;
+}
+@media (max-width: 760px) {
+  .login {
+    padding: 20rem;
+  }
+}
 @media (max-width: 760px) {
   .login-logo-asset {
     width: 66rem !important;

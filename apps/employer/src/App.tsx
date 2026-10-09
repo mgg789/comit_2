@@ -3,7 +3,7 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
 import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
-import { Action, Backdrop, Icon, Reveal, State } from "./ui";
+import { Action, Backdrop, Icon, State } from "./ui";
 import { Login } from "./login";
 import { LegalDocument } from "./legal";
 import { Settings } from "./settings";
@@ -484,7 +484,16 @@ export default function App() {
             </AnimatePresence>
             <main className="main-content">
               <AnimatePresence mode="wait">
-                <Reveal key={`${route}:${checkpoint}`}>{screen}</Reveal>
+                {/* Plain crossfade: each screen brings its own Reveal, so a second slide would double the motion. */}
+                <motion.div
+                  key={`${route}:${checkpoint}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  {screen}
+                </motion.div>
               </AnimatePresence>
             </main>
             <Action

@@ -378,10 +378,6 @@
   font-size: 18rem;
   cursor: pointer;
 }
-.login {
-  min-height: 100vh;
-  padding: 36rem 40rem;
-}
 .yandex {
   height: var(--login-control-height);
   border-radius: 97rem;
@@ -805,9 +801,6 @@
     font-size: 14rem;
     gap: 12rem;
   }
-  .login {
-    padding: 20rem;
-  }
   .yandex {
     font-size: 32rem;
     height: 48rem;
@@ -900,3 +893,25 @@
   .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
 }
 .deck-icon { width: 34rem; height: 34rem; color: var(--comit-text); }
+
+/* Dialogs rise in with their backdrop; the vacancy editor animates itself with framer-motion. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14rem) scale(0.97);
+  }
+}
+.modal-shade > .modal:not(.vacancy-editor),
+.modal-shade > section.glass {
+  animation: modal-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-shade > .modal:not(.vacancy-editor),
+  .modal-shade > section.glass {
+    animation: none;
+  }
+}
+.reduce-motion .modal-shade > .modal:not(.vacancy-editor),
+.reduce-motion .modal-shade > section.glass {
+  animation: none;
+}

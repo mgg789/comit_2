@@ -952,9 +952,14 @@
     height: 38rem;
     border-radius: 12rem;
   }
-  .discovery-like .icon {
+  .discovery-like .icon,
+  .discovery-profile-button .icon {
     width: 20rem;
     height: 20rem;
+  }
+  /* The stack filter is a text field; match the full-width dropdown filters on phones. */
+  .discovery-filters > input {
+    width: 100%;
   }
   .discovery-confirm {
     width: 100%;
