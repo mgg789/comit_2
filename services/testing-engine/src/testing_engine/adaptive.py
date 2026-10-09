@@ -1,0 +1,95 @@
+"""Pure adaptive grading engine: ability tracking, level bisection, early stop.
+
+Design (docs/testing-design.md §4): the session tracks a posterior over the
+four grades (intern, junior, middle, senior). Each answer shifts the posterior
+by comparing the item level against the current most-likely ability. The next
+item level is the boundary of maximal uncertainty (bisection); the session
+stops early when one grade holds a decisive share and the adjacent-grade
+likelihood ratio cannot flip anymore (SPRT-like), or when the task cap is hit.
+Pure functions and a small state class - no I/O, fully deterministic given the
+answer sequence.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+
+GRADES: tuple[str, ...] = ("intern", "junior", "middle", "senior")
+LEVELS: tuple[int, ...] = (1, 2, 3, 4)
+# Item level L targets the boundary in front of grade index L (level 1 separates
+# intern from junior, level 4 confirms senior). Chance of a lucky guess.
+GUESS_PROBABILITY = 0.25
+# Posterior share that settles the grade (early-stop threshold).
+DECISION_PROBABILITY = 0.70
+# A wrong answer at the decided grade must not immediately flip the verdict:
+# the runner requires the runner-up to trail by this likelihood ratio.
+FLIP_RATIO = 2.0
+
+
+@dataclass
+class AdaptiveState:
+    """Mutable per-session tracking state; JSON-serializable via to_dict()."""
+
+    posterior: list[float] = field(default_factory=lambda: [0.25, 0.25, 0.25, 0.25])
+    answered: int = 0
+    correct: int = 0
+    next_level: int = 2
+
+    def to_dict(self) -> dict[str, object]:
+        return {"posterior": self.posterior, "answered": self.answered,
+                "correct": self.correct, "next_level": self.next_level}
+
+    @classmethod
+    def from_dict(cls, value: dict[str, object]) -> AdaptiveState:
+        posterior = [float(x) for x in value.get("posterior", [0.25] * 4)]
+        if len(posterior) != len(GRADES):
+            raise ValueError("invalid posterior length")
+        return cls(posterior=posterior, answered=int(value.get("answered", 0)),
+                   correct=int(value.get("correct", 0)), next_level=int(value.get("next_level", 2)))
+
+
+def normalize(posterior: list[float]) -> list[float]:
+    total = math.fsum(posterior)
+    if total <= 0 or not math.isfinite(total):
+        return [0.25] * len(posterior)
+    return [value / total for value in posterior]
+
+
+def update(state: AdaptiveState, level: int, correct: bool) -> AdaptiveState:
+    """Bayesian-style update: success supports grades at/above the level, failure below."""
+    likelihood = []
+    for index in range(len(GRADES)):
+        # Grade index >= level means the candidate is at or above this level's bar.
+        expected_correct = GUESS_PROBABILITY + (1 - GUESS_PROBABILITY) / (1 + math.exp(-(index + 1 - level)))
+        likelihood.append(expected_correct if correct else 1 - expected_correct)
+    state.posterior = normalize(
+        [posterior * likelihood[index] for index, posterior in enumerate(state.posterior)])
+    state.answered += 1
+    state.correct += int(correct)
+    state.next_level = _next_level(state)
+    return state
+
+
+def _next_level(state: AdaptiveState) -> int:
+    """Bisect: probe the boundary where the posterior is most undecided."""
+    leader = max(range(len(state.posterior)), key=lambda index: state.posterior[index])
+    below = sum(state.posterior[index] for index in range(leader))
+    above = sum(state.posterior[index] for index in range(leader + 1)) + state.posterior[leader] * 0.5
+    return max(1, min(4, leader + 1)) if below >= above else max(1, min(4, leader + 2))
+
+
+def decided_grade(state: AdaptiveState) -> str | None:
+    """Return the settled grade when the early-stop criterion holds, else None."""
+    ranked = sorted(range(len(state.posterior)), key=lambda index: -state.posterior[index])
+    leader, runner_up = ranked[0], ranked[1]
+    if state.posterior[leader] < DECISION_PROBABILITY:
+        return None
+    if state.answered >= 2 and state.posterior[runner_up] * FLIP_RATIO > state.posterior[leader]:
+        return None
+    return GRADES[leader]
+
+
+def session_complete(state: AdaptiveState, *, max_tasks: int = 30) -> bool:
+    """Early stop on a decided grade, otherwise only at the task cap."""
+    return decided_grade(state) is not None or state.answered >= max_tasks
