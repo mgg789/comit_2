@@ -1,1 +1,36 @@
 @import "tailwindcss";
+@import "@comit/ui-kit/design.css";
+@import "@comit/ui-kit/auth.css";
+@import "./screens.css";
+.candidate-app .topbar { margin-top: 50rem; }
+.candidate-nav-label { padding-left: 14rem; }
+.candidate-settings { display: grid; gap: 24rem; max-width: 900rem; }
+.candidate-settings .action { justify-self: start; }
+.candidate-modal { position: fixed; inset: 0; display: grid; place-items: center; padding: 24rem; z-index: 100; background: var(--employer-paint-17171ae8); backdrop-filter: blur(16rem); }
+.candidate-dialog { width: min(650rem, 100%); display: grid; gap: 24rem; }
+.candidate-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 20rem; }
+.candidate-dialog-heading h2 { font-size: 30rem; }
+.candidate-dialog-heading .action { padding: 8rem 20rem; min-height: 44rem; }
+.candidate-dialog-actions { display: flex; gap: 20rem; justify-content: flex-end; }
+.candidate-dialog form { display: grid; gap: 24rem; }
+.candidate-legal pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
+@media (max-width: 700px) { .candidate-app .topbar { margin-top: 20rem; } .candidate-app .account-tools { gap: 10rem; padding-inline: 12rem; } .candidate-app .nav { max-width: calc(100vw - 20px); gap: 5rem; } .candidate-app .nav-item.selected { padding-inline: 12rem; } .candidate-nav-label { padding-left: 6rem; } }
+
+.candidate-app:not(.is-login) > .ambient { display: none; }
+.candidate-art { position: absolute; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
+.candidate-art img { position: absolute; object-fit: cover; opacity: .7; filter: blur(15rem); }
+.candidate-art-resume .candidate-art-one { width: 2148.406rem; height: 1432.27rem; left: -707.691rem; top: 759.469rem; transform: rotate(-158.38deg); opacity: .35; }
+.candidate-art-resume .candidate-art-two { width: 2148.406rem; height: 1432.27rem; left: -439.691rem; top: 1817.469rem; transform: rotate(21.62deg); opacity: .35; }
+.candidate-art-resume .candidate-art-three { width: 1802.65rem; height: 1201.767rem; left: 397.364rem; top: -372.561rem; transform: rotate(4.07deg); opacity: .28; }
+.candidate-art-offers .candidate-art-one { width: 1346rem; height: 2020rem; left: 440rem; top: -512rem; opacity: .8; }
+.candidate-art-statistics .candidate-art-one { width: 1256rem; height: 1884rem; left: calc(50% + 90rem); top: -700rem; transform: scaleY(-1); opacity: .56; }
+.candidate-art-statistics .candidate-art-two { width: 1256rem; height: 1884rem; left: -557rem; top: 142rem; transform: scaleX(-1); opacity: .8; }
+
+.candidate-offer-card { --employer-feedback-transition: var(--employer-hover-duration); }
+@media (max-width: 700px) {
+  .candidate-content { margin-bottom: calc(120rem + env(safe-area-inset-bottom)); }
+  .candidate-app .nav { bottom: calc(18rem + env(safe-area-inset-bottom)); }
+}
+
+/* Keep the empty-state explanation readable over the original decorative artwork. */
+.candidate-stat-position p { background: var(--employer-paint-191918); border-radius: 12rem; padding: 8rem; }
