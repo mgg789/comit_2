@@ -325,9 +325,10 @@ small {
   font-weight: 600;
   font-size: 20rem;
   transition:
-    transform 0.16s,
-    background 0.16s,
-    box-shadow 0.16s;
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    scale var(--employer-hover-duration) var(--employer-hover-ease),
+    background-color var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
   border-radius: 27rem;
 }
 .action:hover:not(:disabled) {
@@ -337,7 +338,7 @@ small {
     0 6rem 24rem var(--employer-paint-bfe2ff1a);
 }
 .action:active:not(:disabled) {
-  transform: scale(0.96);
+  scale: 0.98;
 }
 .primary {
   background: var(--employer-gradient);
@@ -442,9 +443,9 @@ small {
   font-weight: 600;
   white-space: nowrap;
   transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    background 0.32s;
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    padding var(--employer-hover-duration) var(--employer-hover-ease),
+    background-color var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .nav-item.selected {
   background: var(--comit-text);
@@ -483,7 +484,7 @@ small {
   padding: 18rem 24rem;
   font-size: 20rem;
   color: var(--comit-text);
-  transition: 0.16s;
+  transition: opacity var(--employer-hover-duration) var(--employer-hover-ease), transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .nav-item:hover .tooltip,
 .nav-item:focus-visible .tooltip {
@@ -508,12 +509,12 @@ small {
   gap: 12rem;
 }
 .account-tools .plain-icon > .icon {
-  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .account-tools .plain-icon:hover > .icon-search,
 .account-tools .plain-icon:hover > .icon-bell,
 .account-tools .plain-icon:hover > .icon-message {
-  transform: scale(1.09);
+  transform: scale(1.06);
 }
 .account-tools .plain-icon:hover > .icon-chevron {
   transform: rotate(18deg);
@@ -686,8 +687,8 @@ small {
 .discovery-search {
   transform-origin: left center;
   transition:
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .page-heading > .discovery-search:focus-within {
   transform: translateY(7rem) scale(1.045);
@@ -698,7 +699,7 @@ small {
 }
 .discovery-search button,
 .discovery-search .search-glyph {
-  transition: scale 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .discovery-search:focus-within button,
 .discovery-search:focus-within .search-glyph {
@@ -759,12 +760,12 @@ small {
   border-radius: 30rem;
   position: relative;
   transition:
-    transform 0.2s,
-    border-color 0.2s;
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    border-color var(--employer-hover-duration) var(--employer-hover-ease);
   text-align: left;
 }
 .vacancy-card:hover {
-  transform: translateY(-6rem);
+  transform: translateY(-3rem);
   border-color: var(--employer-border);
 }
 .status-pill {

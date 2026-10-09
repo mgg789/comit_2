@@ -117,6 +117,33 @@ try {
     assert.equal(overflow, false, `viewport ${width} must not overflow horizontally`);
     await page.screenshot({ path: `${output}/answer-${width}.png` });
   }
+  const attach = page.locator(".organization-composer .attach-button");
+  await page.mouse.move(1, 1);
+  await attach.hover();
+  const motionSamples = await attach.evaluate(async node => {
+    const values = [];
+    const started = performance.now();
+    while (performance.now() - started < 340) {
+      values.push(new DOMMatrixReadOnly(getComputedStyle(node).transform).a);
+      await new Promise(requestAnimationFrame);
+    }
+    return { values, duration: getComputedStyle(node).transitionDuration };
+  });
+  assert.equal(motionSamples.duration, "0.3s");
+  assert.ok(new Set(motionSamples.values.map(value => value.toFixed(3))).size >= 4, "hover must pass through intermediate positions");
+  assert.ok(Math.abs(motionSamples.values.at(-1) - 1.06) < 0.002);
+  await page.mouse.move(1, 1);
+  const reverseSamples = await attach.evaluate(async node => {
+    const values = [];
+    const started = performance.now();
+    while (performance.now() - started < 340) {
+      values.push(new DOMMatrixReadOnly(getComputedStyle(node).transform).a);
+      await new Promise(requestAnimationFrame);
+    }
+    return values;
+  });
+  assert.ok(new Set(reverseSamples.map(value => value.toFixed(3))).size >= 4, "hover exit must also interpolate");
+  assert.ok(Math.abs(reverseSamples.at(-1) - 1) < 0.002);
   await page.getByRole("button", { name: "Очистить историю AI", exact: true }).click();
   const clearDialog = page.getByRole("dialog", { name: "Очистить историю AI", exact: true });
   await clearDialog.waitFor();
@@ -149,7 +176,7 @@ try {
   await page.getByRole("button", { name: "Открыть меню аккаунта", exact: true }).click();
   assert.equal(await page.locator(".account-menu p").evaluate(node => getComputedStyle(node).textAlign), "center");
   assert.deepEqual(failures, []);
-  console.log(JSON.stringify({ result: "passed", checks: ["full terminal-page recovery", "left/right/center scroll", "background lock and restoration", "three-dot waiting", "non-interactive time pill", "no ratings", "copy feedback alignment", "header chat hover", "real answer Markdown", "optimistic replacement", "1920/1024/390", "clear cancel/Escape/busy/success", "AI removed before chat navigation", "centered account email"], screenshots: output }));
+  console.log(JSON.stringify({ result: "passed", checks: ["full terminal-page recovery", "left/right/center scroll", "background lock and restoration", "three-dot waiting", "non-interactive time pill", "no ratings", "copy feedback alignment", "header chat hover", "real answer Markdown", "optimistic replacement", "1920/1024/390", "clear cancel/Escape/busy/success", "AI removed before chat navigation", "centered account email", "smooth hover entry and exit"], screenshots: output }));
 } finally {
   await browser.close();
 }

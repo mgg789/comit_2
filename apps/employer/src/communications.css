@@ -213,13 +213,13 @@
   background: var(--employer-gradient);
   box-shadow: inset 0 0 15rem var(--employer-paint-fff4);
   cursor: pointer;
-  transition: transform 0.15s;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .attach-button:hover {
   transform: scale(1.06);
 }
 .attach-button:active {
-  transform: scale(0.92);
+  transform: scale(0.98);
 }
 .communication-composer .send-button {
   width: 60rem;
@@ -501,7 +501,7 @@
   box-shadow: none;
 }
 .organization-composer .send-button {
-  transition: none;
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease), opacity var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .organization-history .agent-turn-state {
   margin-left: 42rem;
@@ -583,13 +583,13 @@
   padding: 0;
   color: var(--employer-paint-fff);
   cursor: pointer;
-  transition: transform 0.15s;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
   display: grid;
   place-items: center;
 }
 .agent-tools > button:hover,
 .agent-reasoning-control > button:hover {
-  transform: scale(1.12);
+  transform: scale(1.06);
 }
 .agent-tools > button:disabled {
   opacity: 0.45;
@@ -1063,7 +1063,7 @@
   .organization-message .agent-thought-label { font-size: 13rem; padding: 12rem 16rem; }
   .organization-message.user { font-size: 15rem; }
 }
-.copy-message { position: relative; display: grid; place-items: center; line-height: 1; transition: opacity 150ms; }
+.copy-message { position: relative; display: grid; place-items: center; line-height: 1; transition: opacity var(--employer-hover-duration) var(--employer-hover-ease); }
 .copy-message:hover { opacity: 1; }
 .copy-message img { display: block; width: 24rem; height: 24rem; }
 .agent-answer-actions { display: flex; gap: 12rem; align-items: center; margin-top: 16rem; }

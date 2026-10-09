@@ -50,6 +50,8 @@
   --employer-radius: 30px;
   --employer-gap: 20px;
   --employer-interaction: 160ms;
+  --employer-hover-duration: 300ms;
+  --employer-hover-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Additional employer surface paints, shared by all employer modules. */
