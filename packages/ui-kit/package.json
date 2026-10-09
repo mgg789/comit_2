@@ -5,7 +5,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.tsx",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./design": "./src/design.tsx",
+    "./design.css": "./src/design.css",
+    "./auth.css": "./src/auth.css",
+    "./email-login": "./src/email-login.tsx"
   },
   "scripts": {
     "build": "tsc --noEmit",
@@ -13,7 +17,8 @@
   },
   "dependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "framer-motion": "^14.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

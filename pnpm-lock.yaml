@@ -62,6 +62,9 @@ importers:
       '@comit/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
+      framer-motion:
+        specifier: ^14.0.0
+        version: 14.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: ^19.0.0
         version: 19.3.0
@@ -242,6 +245,9 @@ importers:
 
   packages/ui-kit:
     dependencies:
+      framer-motion:
+        specifier: ^14.0.0
+        version: 14.0.0(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: ^19.0.0
         version: 19.3.0
