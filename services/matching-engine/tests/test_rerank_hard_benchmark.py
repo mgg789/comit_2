@@ -3,16 +3,40 @@
 import json
 from pathlib import Path
 
-from matching_engine.rerank_cohort_provider import validate_candidate
+import pytest
+
+from matching_engine.rerank_cohort_provider import CohortProviders, validate_candidate
 from matching_engine.rerank_hard_benchmark import (
     BENCHMARK_DIRECTIONS,
     FAMILY_SIZE,
+    BenchmarkProviders,
     _difficulty,
     _isolation,
     _oracle_headroom,
     family_specs,
     pilot_cases,
 )
+from matching_engine.rerank_providers import LIMITS, BudgetExceeded
+
+
+@pytest.mark.parametrize("pilot", [False, True])
+def test_benchmark_ceiling_does_not_expand_shared_cohort_budget(tmp_path: Path, pilot: bool) -> None:
+    """Benchmark grade720 is explicit, cumulative, and cannot leak into ordinary600 calls."""
+    ledger = tmp_path / "usage.json"
+    ledger.write_text(json.dumps({"grade": 600}), encoding="utf-8")
+    ordinary = CohortProviders(tmp_path, cohort_id="cohort-budget-regression")
+    benchmark = BenchmarkProviders(tmp_path, pilot=pilot)
+    with pytest.raises(BudgetExceeded):
+        ordinary._reserve("grade")
+    assert benchmark._reserve("grade") == 601
+    with pytest.raises(BudgetExceeded):
+        ordinary._reserve("grade")
+    ledger.write_text(json.dumps({"grade": 719}), encoding="utf-8")
+    assert benchmark._reserve("grade") == 720
+    with pytest.raises(BudgetExceeded):
+        benchmark._reserve("grade")
+    assert json.loads(ledger.read_text(encoding="utf-8"))["grade"] == 720
+    assert LIMITS["grade"] == 600
 
 
 def _candidate(grade: str, status: str, level: int, salary: int = 80000,

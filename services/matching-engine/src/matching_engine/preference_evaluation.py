@@ -15,6 +15,11 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
+from matching_engine.preference_live_policy import (
+    MIN_CLASS_COUNT,
+    MIN_HOLDOUT_ROWS,
+    MIN_TRAIN_ROWS,
+)
 from matching_engine.preference_model import (
     PREFERENCE_PROJECTION_VERSION,
     PREFERENCE_SCHEMA_HASH,
@@ -27,8 +32,8 @@ from matching_engine.rerank_model import validate_artifact
 
 BOOTSTRAP_ITERATIONS = 2000
 BOOTSTRAP_SEED = 2000
-MINIMUMS = {"train": 24, "validation": 8, "golden": 8}
-MINIMUM_CLASS_COUNT = 2
+MINIMUMS = {"train": MIN_TRAIN_ROWS, "validation": MIN_HOLDOUT_ROWS, "golden": MIN_HOLDOUT_ROWS}
+MINIMUM_CLASS_COUNT = MIN_CLASS_COUNT
 
 # This is an intentionally small, frozen worker contract.  The model worker
 # may use these values for its own bounded optimizer, but validation must be

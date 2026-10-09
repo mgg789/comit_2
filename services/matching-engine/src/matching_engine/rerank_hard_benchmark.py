@@ -75,6 +75,20 @@ FAMILY_SIZE = 7
 # grades beyond the original 600 ceiling. The cumulative ledger is preserved;
 # only the hard ceiling moves, and the raise is recorded in the manifest.
 BENCHMARK_LIMITS = {**LIMITS, "grade": 720}
+
+
+class BenchmarkProviders(CohortProviders):
+    """Scope the authorized benchmark ceiling to its fixed teacher namespace only."""
+
+    def __init__(self, directory: Path, *, pilot: bool = False) -> None:
+        """Bind the benchmark cohort and shared cumulative ledger, without reading secrets."""
+        super().__init__(directory, cohort_id=VERSION if pilot else LABEL_COHORT_ID)
+
+    def _budget_limit(self, kind: str) -> int:
+        """Reserve benchmark attempts against the explicit operator-approved ceiling."""
+        return BENCHMARK_LIMITS[kind]
+
+
 BENCHMARK_DIRECTIONS = ("backend", "frontend", "data", "ml")
 BENCHMARK_BRANCHES = ("mixed", "class_only", "stack_only")
 # Frozen per-family requirement levels for the mixed/stack_only branches.
@@ -461,7 +475,7 @@ def run_pilot(directory: Path, manifest: dict) -> dict:
                 report["report_hash"] = digest(report)
                 _seal(report_path, report)
                 return report
-    provider = CohortProviders(directory / "provider-cache", cohort_id=VERSION)
+    provider = BenchmarkProviders(directory / "provider-cache", pilot=True)
 
     def pair(job: tuple[dict, bool]) -> dict:
         case, reverse = job
@@ -504,7 +518,7 @@ def label(directory: Path) -> dict:
     if not pilot["passed"]:
         return {"state": "pilot_failed", "pilot": pilot}
     pilot_spend = 0 if pilot.get("reused_from") else 1
-    provider = CohortProviders(directory / "provider-cache", cohort_id=LABEL_COHORT_ID)
+    provider = BenchmarkProviders(directory / "provider-cache")
     target = directory / VERSION
     used_path = target / "attempt-budget.json"
     with (target / ".budget.lock").open("a+") as handle:

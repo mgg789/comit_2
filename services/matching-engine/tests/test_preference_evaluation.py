@@ -6,6 +6,7 @@ import json
 from importlib.resources import files
 
 import pytest
+
 from matching_engine import preference_evaluation as evaluation
 from matching_engine.rerank_model import validate_artifact
 
@@ -43,12 +44,37 @@ def test_cold_start_is_explicit_and_never_fits(monkeypatch: pytest.MonkeyPatch) 
         raise AssertionError("fit must not run for insufficient data")
 
     monkeypatch.setattr(evaluation, "fit_preference_model", unavailable)
-    report = evaluation.evaluate({"cold": context(train=23)}, BASELINE, "synthetic", "dataset", "split")
+    report = evaluation.evaluate({"cold": context(train=13)}, BASELINE, "synthetic", "dataset", "split")
     assert report["status"] == "needs_more_data"
     assert report["contexts"]["cold"]["status"] == "needs_more_data"
     assert report["contexts"]["cold"]["fit"] is None
     assert not called
     assert report["mode"] == "SHADOW" and report["test_only"] is True
+
+
+def test_first_fit_uses_thirty_reactions_and_preserves_holdouts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The live 14/8/8 first split reaches fitting without training on held-out rows."""
+    from matching_engine.preference_live_policy import (
+        INITIAL_ACTION_THRESHOLD,
+        MIN_HOLDOUT_ROWS,
+        MIN_TRAIN_ROWS,
+    )
+
+    observed: list[str] = []
+    real_fit = evaluation.fit_preference_model
+
+    def fit(rows, baseline_artifact):
+        observed.extend(item["candidate_key"] for item in rows)
+        return real_fit(rows, baseline_artifact)
+
+    monkeypatch.setattr(evaluation, "fit_preference_model", fit)
+    first = context(train=MIN_TRAIN_ROWS, validation=MIN_HOLDOUT_ROWS, golden=MIN_HOLDOUT_ROWS)
+    assert sum(len(first[split]) for split in evaluation.MINIMUMS) == INITIAL_ACTION_THRESHOLD
+    report = evaluation.evaluate({"first": first}, BASELINE, "synthetic", "dataset", "split")
+    assert report["fit_performed"] is True
+    assert observed == [item["candidate_key"] for item in first["train"]]
+    assert report["contexts"]["first"]["validation"]["n"] == MIN_HOLDOUT_ROWS
+    assert report["contexts"]["first"]["golden"]["n"] == MIN_HOLDOUT_ROWS
 
 
 def test_fit_receives_train_labels_only(monkeypatch: pytest.MonkeyPatch) -> None:
