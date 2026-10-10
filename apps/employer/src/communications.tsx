@@ -20,7 +20,7 @@ import type {
   RecruitmentAction,
   RecruitmentView,
 } from "@comit/shared";
-import { AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } from "./agent-messages";
+import { AGENT_HISTORY_START, AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } from "./agent-messages";
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
@@ -528,7 +528,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   }, []);
   useEffect(() => {
     let active = true;
-    let cursor = 0;
+    let cursor = AGENT_HISTORY_START;
     let recovered = false;
     let lastUserTurn: string | null = null;
     let timer: ReturnType<typeof setTimeout>;

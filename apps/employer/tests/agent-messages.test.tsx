@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { AgentsOrganizationMessage } from "@comit/shared";
-import { AgentMarkdown, AgentReply, agentHistoryProgress, groupAgentMessages, thoughtLabel } from "../src/agent-messages";
+import { AGENT_HISTORY_START, AgentMarkdown, AgentReply, agentHistoryProgress, groupAgentMessages, thoughtLabel } from "../src/agent-messages";
 
 const message = (id: string, role: AgentsOrganizationMessage["role"], content: string,
   tool_calls: AgentsOrganizationMessage["tool_calls"] = []): AgentsOrganizationMessage => ({
@@ -34,6 +34,13 @@ test("thinking time uses Russian plural forms", () => {
   assert.equal(thoughtLabel(1), "Думал 1 секунду");
   assert.equal(thoughtLabel(22), "Думал 22 секунды");
   assert.equal(thoughtLabel(11, true), "Думаю 11 секунд");
+});
+
+test("history starts before sequence 0 so the first question of a new chat is fetched", () => {
+  // The server pages with sequence > cursor and numbers a new chat from 0.
+  const first = { ...message("q", "user", "Первый вопрос"), sequence: 0 };
+  assert.ok(first.sequence > AGENT_HISTORY_START);
+  assert.deepEqual(agentHistoryProgress({ items: [first], next_sequence: null }, AGENT_HISTORY_START), { cursor: 0, hasMore: false });
 });
 
 test("terminal full page advances the live cursor and finishes history recovery", () => {

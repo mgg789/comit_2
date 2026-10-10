@@ -13,6 +13,12 @@ export interface AgentReplyGroup {
   startedAt: string | null;
 }
 
+/**
+ * Initial `after_sequence` for agent history. The server returns rows strictly after the
+ * cursor and numbers a new chat from 0, so starting at 0 would drop the first user message.
+ */
+export const AGENT_HISTORY_START = -1;
+
 /** Advance past consumed rows; a null continuation ends paging even for a full page. */
 export function agentHistoryProgress(page: AgentsOrganizationMessagePage, cursor: number) {
   return { cursor: page.next_sequence ?? page.items.at(-1)?.sequence ?? cursor,
