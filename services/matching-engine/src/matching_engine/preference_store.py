@@ -15,7 +15,12 @@ from matching_engine.combine_store import _lock
 from matching_engine.database import connect
 from matching_engine.preference_dataset import timestamp
 from matching_engine.preference_evaluation import evaluate
-from matching_engine.preference_live_policy import activation_gate, policy_hash
+from matching_engine.preference_live_policy import (
+    FOLLOWUP_ACTION_THRESHOLD,
+    INITIAL_ACTION_THRESHOLD,
+    activation_gate,
+    policy_hash,
+)
 from matching_engine.preference_model import PreferenceModel, apply
 from matching_engine.rerank_hash import digest
 from matching_engine.rerank_model import RerankArtifact
@@ -159,7 +164,7 @@ class PreferenceStore:
             connection.execute("UPDATE preference_pipeline.controls SET state='observation_limit' WHERE vacancy_id=%s", (control["vacancy_id"],))
             return None
         fresh = sum(control["last_attempt_at"] is None or timestamp(row["decision_at"]) > control["last_attempt_at"] for row in rows)
-        if len(rows) < 30 or (control["last_attempt_at"] is not None and fresh < 16):
+        if len(rows) < INITIAL_ACTION_THRESHOLD or (control["last_attempt_at"] is not None and fresh < FOLLOWUP_ACTION_THRESHOLD):
             return None
         job_id = uuid4()
         connection.execute("INSERT INTO preference_pipeline.jobs(job_id,vacancy_id,context_hash,epoch) VALUES(%s,%s,%s,%s)",
@@ -258,7 +263,7 @@ class PreferenceStore:
             self._verify_rows(selected, artifact)
             context = {"identity": control["identity"], "train": selected[:-16],
                        "validation": selected[-16:-8], "golden": selected[-8:]}
-            fresh_audit = bool(len(selected) >= 30 and (control["last_attempt_at"] is None
+            fresh_audit = bool(len(selected) >= INITIAL_ACTION_THRESHOLD and (control["last_attempt_at"] is None
                               or timestamp(selected[-16]["decision_at"]) > control["last_attempt_at"]))
             input_hash = digest(selected)
             plan = {"context_hash": control["context_hash"], "epoch": control["epoch"], "input_hash": input_hash,

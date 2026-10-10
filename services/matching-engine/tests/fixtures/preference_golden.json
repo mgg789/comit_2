@@ -5,17 +5,16 @@
   "score": 0.5,
   "uncertainty": 0.0
  },
- "calibration_intercept": 0.09019893774723402,
+ "calibration_intercept": 0.0901989377,
  "calibration_slope": 0.0,
- "coefficients_digest": "465f2b69ed3ad6d05827bce36cdadf96766bbadd1b52c4cce13fc95cf2560f8a",
- "content_hash": "689de1adbe9b21934cd6371e2e959cc0497d4013790668a2c7aa20b06183042c",
+ "coefficients_digest": "daf7e69c35ec0ff6601e9434a93b0b0e38d1b0b6f51b628d64feecee467bc0ff",
  "diagnostics": {
   "class_balance": 1.0,
   "iterations": 5,
   "n_examples": 24
  },
- "gamma": 0.2717426602821851,
- "means_digest": "a4218d76864974c93bc4aad3b309ea8a72323f0db21305cc1901d6cb3d2f417b",
- "scales_digest": "5c2d85a74b4e2b7e9d4941cf5df159f7d51e7cc863f7cc36f1350f0e2bc05202",
- "trust": 0.2717426602821851
+ "gamma": 0.2717426603,
+ "means_digest": "2e28b664632a2781e229a7fdb4ea9cdef99b6baf072fd7c02e04ef7ad7807fc5",
+ "scales_digest": "78421aa220b2589cbbc4fc504d1a51fbf74968876556b202f20127cb7c6594e7",
+ "trust": 0.2717426603
 }

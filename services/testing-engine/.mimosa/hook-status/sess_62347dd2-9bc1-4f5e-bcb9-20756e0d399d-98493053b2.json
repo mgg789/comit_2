@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "mimosa-hook-status/v1",
+  "recordedAt": "2026-10-09T11:25:01.726Z",
+  "sessionId": "sess_62347dd2-9bc1-4f5e-bcb9-20756e0d399d",
+  "event": "PostToolUse",
+  "toolName": "Write",
+  "file": "/Users/mike/Projects/comit_2/services/code-judge/src/code_judge/dmoj.py",
+  "outcome": "inconclusive",
+  "coverage": "partial",
+  "findingCount": 0,
+  "durationMs": 2,
+  "hostState": "hook_complete",
+  "reportHint": ".mimosa/reports/"
+}

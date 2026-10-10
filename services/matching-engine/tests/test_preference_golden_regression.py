@@ -39,25 +39,38 @@ def _examples(artifact: dict) -> list[dict]:
     return rows
 
 
+def _round_floats(value: object, digits: int = 10) -> object:
+    """Canonicalize floats so cross-platform last-ulp drift cannot flip the digest."""
+    if isinstance(value, float):
+        return round(value, digits)
+    if isinstance(value, dict):
+        return {key: _round_floats(item, digits) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_round_floats(item, digits) for item in value]
+    return value
+
+
 def _fingerprint(artifact: dict) -> dict:
     model = train(_examples(artifact), artifact)
     snapshot = _examples(artifact)[3]["features"]
     result = apply(snapshot, 0.5, model, artifact)
+    # content_hash is excluded: it digests full-precision floats whose last ulp
+    # is platform-dependent (libm); everything meaningful is kept at 1e-10.
     return {
-        "content_hash": model.content_hash,
-        "gamma": model.gamma,
-        "trust": model.trust,
-        "calibration_intercept": model.calibration_intercept,
-        "calibration_slope": model.calibration_slope,
-        "coefficients_digest": digest(model.coefficients),
-        "means_digest": digest(model.means),
-        "scales_digest": digest(model.scales),
+        "gamma": _round_floats(model.gamma),
+        "trust": _round_floats(model.trust),
+        "calibration_intercept": _round_floats(model.calibration_intercept),
+        "calibration_slope": _round_floats(model.calibration_slope),
+        "coefficients_digest": digest(_round_floats(model.coefficients)),
+        "means_digest": digest(_round_floats(model.means)),
+        "scales_digest": digest(_round_floats(model.scales)),
         "diagnostics": {"n_examples": model.diagnostics["n_examples"],
                         "iterations": model.diagnostics["iterations"],
-                        "class_balance": model.diagnostics["class_balance"]},
-        "apply": {"score": result["score"], "adjustment": result["adjustment"],
-                  "uncertainty": result["uncertainty"],
-                  "contributions_digest": digest(result["contributions"])},
+                        "class_balance": _round_floats(model.diagnostics["class_balance"])},
+        "apply": {"score": _round_floats(result["score"]),
+                  "adjustment": _round_floats(result["adjustment"]),
+                  "uncertainty": _round_floats(result["uncertainty"]),
+                  "contributions_digest": digest(_round_floats(result["contributions"]))},
     }
 
 
