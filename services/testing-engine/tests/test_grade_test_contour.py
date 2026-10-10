@@ -51,19 +51,17 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path) -> None:
             break
         task = response.json()
         task_payload = task["task"]
-        if task_payload["type"] != "mcq":
-            function_name = task_payload["function_name"]
-            answer = client.post(f"/testing/sessions/{session_id}/answer", json={
-                "item_id": task_payload["item_id"],
-                "code": f"def {function_name}(*args):\n    return None"})
-            assert answer.json()["judge_status"] == "auto"
-            continue
-        options = task_payload["options"]
-        correct_index = _correct_index(task_payload["prompt"])
+        function_name = task_payload.get("function_name")
         answer = client.post(f"/testing/sessions/{session_id}/answer", json={
-            "item_id": task_payload["item_id"], "answer": correct_index})
+            "item_id": task_payload["item_id"],
+            **({"code": f"def {function_name}(*args):\n    return None"}
+               if task_payload["type"] == "code"
+               else {"answer": _correct_index(task_payload["prompt"])
+                     if task_payload["type"] == "mcq" else "развернутый ответ"})})
         body = answer.json()
-        assert body["correct"] is True, (task_payload["prompt"], options)
+        assert body["judge_status"] == "auto", body
+        if task_payload["type"] == "mcq":
+            assert body["correct"] is True, (task_payload["prompt"], task_payload["options"])
         if body["status"] == "finished":
             break
 

@@ -20,6 +20,21 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _today() -> str:
+    return datetime.now(UTC).date().isoformat()
+
+
+def _days_between(from_date: str, to_date: str) -> int:
+    from datetime import date
+
+    try:
+        start = date.fromisoformat(from_date[:10])
+        end = date.fromisoformat(to_date[:10])
+    except ValueError:
+        return 0
+    return max(0, (end - start).days)
+
+
 def _atomic_write(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -40,7 +55,12 @@ class TestingStore:
             _atomic_write(self.items_path, [])
 
     def seed_items(self, items: list[dict]) -> int:
-        """Insert bank items; existing item_ids are never overwritten."""
+        """Insert bank items; existing item_ids are never overwritten.
+
+        Seed items carry origin="seed": they are immune to the age-based
+        moratorium (they are the permanent baseline bank), while generated
+        items rotate out per the instance moratorium policy.
+        """
         with self._lock:
             bank = json.loads(self.items_path.read_text(encoding="utf-8")) if self.items_path.exists() else []
             known = {row["item_id"] for row in bank}
@@ -50,20 +70,84 @@ class TestingStore:
                 if item_id in known:
                     continue
                 bank.append({"item_id": item_id, "family": item["family"], "level": item["level"],
-                             "type": item["type"], "payload": item, "exposure_count": 0, "retired": False})
+                             "type": item["type"], "payload": item, "exposure_count": 0, "retired": False,
+                             "origin": "seed", "created_date": _today(), "last_served_date": None})
                 inserted += 1
             _atomic_write(self.items_path, bank)
         return inserted
 
+    def add_generated_item(self, item: dict) -> str | None:
+        """Append one generator-produced item; duplicate prompts are rejected."""
+        prompt_key = " ".join(str(item.get("prompt", "")).lower().split())
+        item_id = f'gen-{item["family"]}-L{item["level"]}-{_now().replace("-", "").replace(":", "").replace("+00:00", "Z")}'
+        with self._lock:
+            bank = json.loads(self.items_path.read_text(encoding="utf-8")) if self.items_path.exists() else []
+            for row in bank:
+                if row["family"] != item["family"] or row["level"] != item["level"]:
+                    continue
+                existing_key = " ".join(str(row["payload"].get("prompt", "")).lower().split())
+                if existing_key == prompt_key:
+                    return None
+            record = {"item_id": item_id, "family": item["family"], "level": item["level"],
+                      "type": item["type"], "payload": item, "exposure_count": 0, "retired": False,
+                      "origin": "generated", "created_date": _today(), "last_served_date": None}
+            bank.append(record)
+            _atomic_write(self.items_path, bank)
+        return item_id
+
+    def mark_served(self, item_id: str) -> None:
+        """Record that the item was presented today (drives the moratorium)."""
+        with self._lock:
+            bank = json.loads(self.items_path.read_text(encoding="utf-8"))
+            for row in bank:
+                if row["item_id"] == item_id:
+                    row["last_served_date"] = _today()
+            _atomic_write(self.items_path, bank)
+
+    def retire_expired(self, *, max_exposure: int = 3, max_age_days: int = 1) -> int:
+        """Retire generated items past the exposure or age moratorium; seeds stay."""
+        today = _today()
+        retired = 0
+        with self._lock:
+            bank = json.loads(self.items_path.read_text(encoding="utf-8"))
+            for row in bank:
+                if row["retired"] or row.get("origin") != "generated":
+                    continue
+                age = _days_between(row.get("created_date", today), today)
+                if row["exposure_count"] >= max_exposure or age >= max_age_days:
+                    row["retired"] = True
+                    retired += 1
+            if retired:
+                _atomic_write(self.items_path, bank)
+        return retired
+
+    def count_active(self, family: str, level: int, *, today: str | None = None) -> int:
+        """Active, not-served-today items available for new sessions."""
+        with self._lock:
+            bank = json.loads(self.items_path.read_text(encoding="utf-8"))
+        day = today or _today()
+        return sum(1 for row in bank
+                   if row["family"] == family and row["level"] == level
+                   and not row["retired"] and row.get("last_served_date") != day)
+
     def list_items(self, family: str, level: int, limit: int = 5) -> list[dict]:
+        """Usable items for a new presentation; items served today rotate out.
+
+        When everything valid was served today, the strict filter is relaxed
+        (better a repeated variant than no session) - repeats are still ordered
+        by lowest exposure first.
+        """
         with self._lock:
             bank = json.loads(self.items_path.read_text(encoding="utf-8"))
         usable = [row for row in bank
                   if row["family"] == family and row["level"] == level
                   and not row["retired"]]
-        usable.sort(key=lambda row: (row["exposure_count"], row["item_id"]))
+        strict = [row for row in usable if row.get("last_served_date") != _today()]
+        chosen = strict or usable
+        chosen.sort(key=lambda row: (row["exposure_count"], row["item_id"]))
         return [{**row["payload"], "item_id": row["item_id"], "exposure_count": row["exposure_count"]}
-                for row in usable[:limit]]
+                for row in chosen[:limit]]
+
 
     def bump_exposure(self, item_id: str) -> None:
         with self._lock:

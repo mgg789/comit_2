@@ -125,8 +125,14 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
             store.write_session(session)
             raise HTTPException(status_code=409, detail="bank_exhausted")
         record = dict(item)
-        record.pop("answer_index", None)
+        presented_answer = record.pop("answer_index", None)
         record.pop("exposure_count", None)
+        store.mark_served(item["item_id"])
+        session["items"].append({"item_id": item["item_id"], "level": item["level"],
+                                 "payload": item, "presented_answer": presented_answer,
+                                 "answer": None, "correct": None,
+                                 "judge_status": "presented", "answered_at": None})
+        store.write_session(session)
         return {"session_id": session_id, "answered": state.answered,
                 "decided_grade": adaptive.decided_grade(state), "task": record}
 
@@ -137,28 +143,21 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail="session_finished")
         state = adaptive.AdaptiveState.from_dict(session["state"])
         item_id = str(body.get("item_id", ""))
-        candidates = [row for level in LEVELS
-                      for row in store.list_items(_family_for(session["specialization"]), level, 100)]
-        payload = next((row for row in candidates if row["item_id"] == item_id), None)
-        if payload is None:
+        presented = next((row for row in session["items"] if row["item_id"] == item_id), None)
+        if presented is None or presented.get("answer") is not None:
             raise HTTPException(status_code=404, detail="item_not_presented")
+        payload = presented["payload"]
         answer = body.get("answer", body.get("code", ""))
         answer_text = answer if isinstance(answer, str) else json.dumps(answer, ensure_ascii=False)
         if payload["type"] == "mcq":
-            correct, judge_status = (payload.get("answer_index") == answer), "auto"
+            correct, judge_status = (presented.get("presented_answer") == answer), "auto"
         else:
             correct, judge_status = judge_answer(payload, answer_text)
         if correct is not None:
             adaptive.update(state, payload["level"], correct)
         store.bump_exposure(item_id)
-        entry = next((row for row in session["items"] if row["item_id"] == item_id), None)
-        if entry is None:
-            entry = {"item_id": item_id, "level": payload["level"], "answer": answer_text,
-                     "correct": correct, "judge_status": judge_status,
-                     "answered_at": None}
-            session["items"].append(entry)
-        else:
-            entry.update(answer=answer_text, correct=correct, judge_status=judge_status)
+        presented.update(answer=answer_text, correct=correct, judge_status=judge_status,
+                         answered_at=None)
         done = adaptive.session_complete(state)
         grade = adaptive.decided_grade(state)
         session.update(state=state.to_dict(), tasks_given=state.answered,
@@ -176,7 +175,9 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
                 "decided_grade": session["decided_grade"], "answered": state.answered,
                 "correct": state.correct, "tasks_given": session["tasks_given"],
                 "posterior": dict(zip(adaptive.GRADES, state.posterior)),
-                "items": session["items"]}
+                "items": [{key: row[key] for key in
+                           ("item_id", "level", "answer", "correct", "judge_status")}
+                          for row in session["items"]]}
 
     return app
 
