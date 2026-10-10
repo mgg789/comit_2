@@ -109,7 +109,7 @@ jobs:
     name: API tests and coverage (isolated PostgreSQL)
     runs-on: [self-hosted, ci]
     container:
-      image: node:22-bookworm
+      image: python:3.12-bookworm
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -126,14 +126,14 @@ jobs:
       COVERAGE_TEST_DATABASE_URL: postgresql://comit:comit-coverage@postgres:5432/coverage_test
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
       - name: Install runtimes
         run: |
           npm install -g pnpm@9.14.2
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
       - name: Install agents schema migration dependency
         run: |
           python -m venv /tmp/coverage-schema

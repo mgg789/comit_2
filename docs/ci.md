@@ -16,12 +16,12 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
 | `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
-| `api` | node:22-bookworm + Python 3.12 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
+| `api` | python:3.12-bookworm + Node 22 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
 | `python` | python:3.12-bookworm | matching/testing/integration/agents/verification `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip |
 | `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов с disposable PostgreSQL → line/branch gates каждого пакета |
 | `smoke` | хост (нужен docker) | explicit `docker-compose.dev.yml --profile dev`, проект `comit-ci`, порты 38xxx, real pinned Harrier cache → `SMOKE_MODE=dev ./tests/smoke.sh` → `down -v` |
 
-- Джобы `js`, `python` и `regression` выполняются в контейнерах — хосту не нужны node/python.
+- Джобы `js`, `python`, `api` и `regression` выполняются в контейнерах — хосту не нужны node/python. API использует официальный Python 3.12 image и `setup-node` для Node 22: `setup-python` не поддерживает Debian 12 образ Node и не используется.
 - Smoke не может идти параллельно сам с собой (порты): `concurrency: smoke-host`, без cancel.
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 - Smoke использует `--env-file /dev/null`: defaults только явного dev compose, без `.env` продакшена.
