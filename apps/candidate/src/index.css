@@ -16,7 +16,7 @@
 .candidate-art-resume .candidate-art-three { width: 1802.65rem; height: 1201.767rem; left: 397.364rem; top: -372.561rem; transform: rotate(4.07deg); opacity: .28; }
 .candidate-art-offers .candidate-art-one { width: 1346rem; height: 2020rem; left: 440rem; top: -512rem; opacity: .8; }
 .candidate-art-statistics .candidate-art-one { width: 1256rem; height: 1884rem; left: calc(50% + 90rem); top: -700rem; transform: scaleY(-1); opacity: .56; }
-.candidate-art-statistics .candidate-art-two { width: 1256rem; height: 1884rem; left: -557rem; top: 142rem; transform: scaleX(-1); opacity: .8; }
+.candidate-art-statistics .candidate-art-two { width: 1256rem; height: 1884rem; left: -557rem; bottom: -240rem; transform: scaleX(-1); opacity: .8; }
 
 .candidate-offer-card { --employer-feedback-transition: var(--employer-hover-duration); }
 @media (max-width: 700px) {

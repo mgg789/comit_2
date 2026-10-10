@@ -122,7 +122,7 @@ export function useRoute() {
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const update = () => setRoute(read());
-    window.addEventListener("hashchange", update);
+    window.addEventListener("hashchange", update); update();
     return () => window.removeEventListener("hashchange", update);
   }, []);
   const navigate = useCallback((path: string) => {

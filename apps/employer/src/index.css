@@ -43,14 +43,6 @@
 .topbar.assistant-open .account-menu {
   z-index: 80;
 }
-.account-tools .plain-icon:hover > .icon-search,
-.account-tools .plain-icon:hover > .icon-bell,
-.account-tools .plain-icon:hover > .icon-message {
-  transform: scale(1.06);
-}
-.account-tools .plain-icon:hover > .icon-chevron {
-  transform: rotate(18deg);
-}
 .discovery-filters > .custom-select {
   width: 210rem;
 }
@@ -208,23 +200,6 @@
   display: flex;
   align-items: center;
   gap: 12rem;
-}
-.card-arrow {
-  height: 46rem;
-  width: 46rem;
-  border: 2rem solid var(--employer-paint-ffffff66);
-  border-radius: 16rem;
-  display: grid;
-  place-items: center;
-  background: transparent;
-  color: inherit;
-  font-size: 30rem;
-}
-.card-arrow .icon {
-  width: 20rem;
-  height: 20rem;
-  translate: -2rem 0;
-  rotate: -90deg;
 }
 .edit-badge .icon {
   width: 18rem;
@@ -697,12 +672,6 @@
   }
   .vacancy-footer {
     font-size: 16rem;
-  }
-  .card-arrow {
-    width: 34rem;
-    height: 34rem;
-    border-radius: 12rem;
-    font-size: 24rem;
   }
   .agent-launcher {
     width: 64rem;

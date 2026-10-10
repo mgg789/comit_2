@@ -1,3 +1,4 @@
+import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 import { RecruitmentChatList, RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import {
   useEffect,
@@ -28,6 +29,7 @@ import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
 
 const employerConversationTransport: ConversationTransport = {
+  markRead: (id, through_sequence) => api.acknowledgeChatRead("employer", id, { through_sequence }),
   getMessages: (id, after, limit) => api.getChatMessages("employer", id, after, limit),
   sendMessage: (id, body) => api.sendChatMessage("employer", id, body),
   uploadFile: (id, body) => api.uploadChatFile("employer", id, body),
@@ -99,18 +101,48 @@ export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, 
 /** Fetch only list snapshots here; selecting a tile opens a separate message route. */
 function RecruitmentChats({ onOpen }: { onOpen: (id: string) => void }) {
   const list = useResource(() => api.getRecruitmentList("employer", 100));
+  const loaded = useRef(list.data?.items || []);
+  loaded.current = list.data?.items || [];
+  const paginationEpoch = useRef(0);
+  const moreInFlight = useRef(false);
+  useEffect(() => {
+    let active = true, refreshing = false;
+    const update = async () => {
+      if (refreshing || moreInFlight.current || document.visibilityState !== "visible") return;
+      refreshing = true;
+      const epoch = paginationEpoch.current;
+      const known = new Set(loaded.current.map(item => item.id));
+      try {
+        let page = await api.getRecruitmentList("employer", 100);
+        const unique = new Map(page.items.map(item => [item.id, item]));
+        const targetSize = Math.max(100, known.size + page.items.filter(item => !known.has(item.id)).length);
+        while (active && page.has_more && unique.size < targetSize) {
+          const previousSize = unique.size;
+          page = await api.getRecruitmentList("employer", Math.min(100, targetSize - unique.size), page.next_cursor || undefined, unique.size);
+          page.items.forEach(item => unique.set(item.id, item));
+          if (unique.size === previousSize) break;
+        }
+        if (active && epoch === paginationEpoch.current) list.setData({ ...page, items: [...unique.values()] });
+      } catch { /* Keep the last server snapshot and the explicit reload control. */ }
+      finally { refreshing = false; }
+    };
+    const timer = setInterval(() => void update(), 5000);
+    return () => { active = false; clearInterval(timer); };
+  }, []);
   const [moreError, setMoreError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   async function loadMore() {
-    if (loadingMore || !list.data?.has_more) return;
+    if (moreInFlight.current || loadingMore || !list.data?.has_more) return;
+    paginationEpoch.current += 1;
+    moreInFlight.current = true;
     setLoadingMore(true); setMoreError(null);
     try {
       const page = await api.getRecruitmentList("employer", 100, list.data.next_cursor || undefined, list.data.items.length);
       list.setData(current => current ? { ...page, items: [...current.items, ...page.items.filter(item => !current.items.some(prior => prior.id === item.id))] } : page);
-    } catch (reason) { setMoreError(errorText(reason)); } finally { setLoadingMore(false); }
+    } catch (reason) { setMoreError(errorText(reason)); } finally { moreInFlight.current = false; paginationEpoch.current += 1; setLoadingMore(false); }
   }
   return <section><PageTitle title="Чаты" />
-    <RecruitmentChatList items={(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state] }))}
+    <RecruitmentChatList items={(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))}
       loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
       hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
     {moreError && <p className="communication-error" role="alert">{moreError}</p>}
@@ -265,6 +297,11 @@ function ProcessCommand({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const formKey = `process:${process.id}:${process.revision}:${command}:fields`;
+  const clearDraft = useClearPersistentState();
+  const defaults = { reason: "", kind: "technical", starts_at: "", duration: "60", format: "remote", location: "", salary: "", description: "", expires_at: "" };
+  const [fields, setFields] = usePersistentState<Record<string, string>>(formKey, defaults, (value): value is Record<string, string> => !!value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([name, item]) => Object.hasOwn(defaults, name) && typeof item === "string"));
+  const bind = (name: keyof typeof defaults) => ({ value: fields[name] ?? defaults[name], onChange: (event: { target: { value: string } }) => setFields(prior => ({ ...prior, [name]: event.target.value })) });
   const key = useRef(crypto.randomUUID());
   const request = useRef<RecruitmentAction | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -300,9 +337,9 @@ function ProcessCommand({
     setError(null);
     request.current ||= action;
     try {
-      onDone(
-        await api.actOnRecruitment("employer", process.id, request.current),
-      );
+      const updated = await api.actOnRecruitment("employer", process.id, request.current);
+      clearDraft(formKey);
+      onDone(updated);
     } catch (reason) {
       setError(errorText(reason));
     } finally {
@@ -336,49 +373,48 @@ function ProcessCommand({
         </h2>
         {command === "reject" || command === "withdraw" ? (
           <Field label="Причина">
-            <textarea name="reason" required maxLength={4000} />
+            <textarea name="reason" {...bind("reason")} required maxLength={4000} />
           </Field>
         ) : command === "interview_propose" ? (
           <>
             <Field label="Вид интервью">
-              <select name="kind">
+              <select name="kind" {...bind("kind")}>
                 <option value="technical">Техническое</option>
                 <option value="general">Общее</option>
               </select>
             </Field>
             <Field label="Дата и время">
-              <input type="datetime-local" name="starts_at" required />
+              <input type="datetime-local" name="starts_at" {...bind("starts_at")} required />
             </Field>
             <Field label="Длительность, минут">
               <input
                 type="number"
-                name="duration"
+                name="duration" {...bind("duration")}
                 min={5}
                 max={480}
-                defaultValue={60}
                 required
               />
             </Field>
             <Field label="Формат">
-              <select name="format">
+              <select name="format" {...bind("format")}>
                 <option value="remote">Онлайн</option>
                 <option value="onsite">Очно</option>
               </select>
             </Field>
             <Field label="Ссылка или адрес">
-              <input name="location" required maxLength={2000} />
+              <input name="location" {...bind("location")} required maxLength={2000} />
             </Field>
           </>
         ) : (
           <>
             <Field label="Зарплата, ₽">
-              <input type="number" name="salary" min={1} step={1} required />
+              <input type="number" name="salary" {...bind("salary")} min={1} step={1} required />
             </Field>
             <Field label="Условия">
-              <textarea name="description" required maxLength={4000} />
+              <textarea name="description" {...bind("description")} required maxLength={4000} />
             </Field>
             <Field label="Действует до">
-              <input type="datetime-local" name="expires_at" required />
+              <input type="datetime-local" name="expires_at" {...bind("expires_at")} required />
             </Field>
           </>
         )}
@@ -405,7 +441,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [questions, setQuestions] = useState<AgentsPendingAnswer[]>([]);
   const [turn, setTurn] = useState<AgentsOrganizationTurn | null>(null);
   const [budget, setBudget] = useState<AgentsOrganizationBudget | null>(null);
-  const [text, setText] = useState("");
+  const [text, setText] = usePersistentState("assistant:text", "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLoading, setShowLoading] = useState(false);
@@ -785,34 +821,9 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
         {questions.length > 0 && (
           <div className="agent-questions agent-pending-questions panel glass">
             <h2>Вопросы от агента</h2>
-            {questions.map((question) => (
-              <form
-                key={question.answer_id}
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  const answer = String(
-                    new FormData(event.currentTarget).get("answer") || "",
-                  );
-                  try {
-                    await api.answerOrganizationQuestion(question.answer_id, {
-                      answer,
-                    });
-                    setQuestions((current) =>
-                      current.filter(
-                        (item) => item.answer_id !== question.answer_id,
-                      ),
-                    );
-                  } catch (reason) {
-                    setError(errorText(reason));
-                  }
-                }}
-              >
-                <Field label={question.prompt}>
-                  <input name="answer" required />
-                </Field>
-                <Action type="submit">Ответить</Action>
-              </form>
-            ))}
+            {questions.map(question => <PendingQuestion key={question.answer_id} question={question}
+              onDone={() => setQuestions(current => current.filter(item => item.answer_id !== question.answer_id))}
+              onError={reason => setError(errorText(reason))} />)}
           </div>
         )}
         <div ref={end} />
@@ -1055,4 +1066,15 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
       </Action>
     </motion.section>
   );
+}
+
+/** A pending assistant answer is a browser draft until its authorized API acknowledgement succeeds. */
+function PendingQuestion({ question, onDone, onError }: { question: AgentsPendingAnswer; onDone: () => void; onError: (reason: unknown) => void }) {
+  const [answer, setAnswer] = usePersistentState(`assistant:question:${question.answer_id}`, "");
+  const [busy, setBusy] = useState(false);
+  return <form onSubmit={async event => {
+    event.preventDefault(); if (busy) return; setBusy(true);
+    try { await api.answerOrganizationQuestion(question.answer_id, { answer }); setAnswer(""); onDone(); }
+    catch (reason) { onError(reason); } finally { setBusy(false); }
+  }}><Field label={question.prompt}><input name="answer" required value={answer} disabled={busy} onChange={event => setAnswer(event.target.value)} /></Field><Action type="submit" disabled={busy}>Ответить</Action></form>;
 }

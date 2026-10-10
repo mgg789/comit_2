@@ -61,7 +61,7 @@ export async function readProfile(): Promise<CandidateProfileView | null> {
 export function useRoute() {
   const read = () => window.location.hash.slice(1) || "/resume";
   const [route, setRoute] = useState(read);
-  useEffect(() => { const update = () => setRoute(read()); window.addEventListener("hashchange", update); return () => window.removeEventListener("hashchange", update); }, []);
+  useEffect(() => { const update = () => setRoute(read()); window.addEventListener("hashchange", update); update(); return () => window.removeEventListener("hashchange", update); }, []);
   const navigate = useCallback((path: string) => { window.location.hash = withChatOrigin(path, window.location.hash.slice(1) || "/resume", "/resume"); }, []);
   return { route, navigate };
 }

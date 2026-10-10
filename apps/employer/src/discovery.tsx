@@ -13,7 +13,7 @@ import {
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import { candidateName } from "./candidate-name";
-import { filterReasonLabel } from "./labels";
+import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 import "./discovery.css";
 
 const evidenceLabels: Record<string, string> = {
@@ -175,14 +175,26 @@ export function Showcase({
     return () =>
       window.removeEventListener("employer:focus-candidate-search", focus);
   }, [focusSearch]);
-  const [q, setQ] = useState("");
-  const [query, setQuery] = useState("");
-  const [specialization, setSpecialization] = useState("");
-  const [grade, setGrade] = useState("");
-  const [stack, setStack] = useState("");
-  const [draftId, setDraftId] = useState("");
-  const vacancies = useResource(() => api.getVacancyDrafts());
-  const selected = vacancies.data?.find((item) => item.draft_id === draftId);
+  const [q, setQ] = usePersistentState("showcase.q", "");
+  const [query, setQuery] = usePersistentState("showcase.query", "");
+  const [specialization, setSpecialization] = usePersistentState("showcase.specialization", "",
+    (value): value is string => typeof value === "string" && (value === "" || SPECIALIZATIONS.some(item => item === value)));
+  const [grade, setGrade] = usePersistentState("showcase.grade", "",
+    (value): value is string => typeof value === "string" && (value === "" || GRADES.some(item => item === value)));
+  const [stack, setStack] = usePersistentState("showcase.stack", "");
+  const [draftId, setDraftId] = usePersistentState("showcase.draftId", "");
+  const vacancies = useResource(async () => {
+    const items: Awaited<ReturnType<typeof api.getVacancyDrafts>> = [];
+    for (let offset = 0; ; offset += 50) {
+      const page = await api.getVacancyDrafts(50, offset);
+      items.push(...page);
+      if (page.length < 50) return items;
+    }
+  });
+  const selected = vacancies.data?.find((item) => item.draft_id === draftId && !item.archived && item.business_status === "open");
+  useEffect(() => {
+    if (vacancies.data && draftId && !selected) setDraftId("");
+  }, [vacancies.data, draftId, selected, setDraftId]);
   const pool = useResource(
     () =>
       api.searchCandidates({
@@ -279,74 +291,49 @@ export function Showcase({
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<string[]>([]);
-  const [warning, setWarning] = useState<{
-    draftId: string;
-    request: ShowcaseLikeRequest;
-    candidate: PublicCandidateCard;
-    warning: ShowcaseMismatchWarning;
-  } | null>(null);
+  const [choosing, setChoosing] = useState<PublicCandidateCard | null>(null);
+  const saveLock = useRef(false);
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) setWarning(null);
+      if (event.key === "Escape" && !saveLock.current) setChoosing(null);
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [busy]);
-  const open =
-    vacancies.data?.filter(
-      (item) => !item.archived && item.business_status === "open",
-    ) || [];
-  async function save(
-    candidate: PublicCandidateCard,
-    confirm?: typeof warning,
-  ) {
-    // With a single open vacancy the «+» needs no extra choice; otherwise the filter picks the target.
-    const target = draftId || (open.length === 1 ? open[0]!.draft_id : "");
-    if (!target && !confirm) {
-      setNotice(
-        open.length
-          ? "Выберите вакансию в фильтре «Вакансия», чтобы добавить кандидата в подбор."
-          : "Опубликуйте вакансию, чтобы добавлять кандидатов в подбор.",
-      );
+  }, []);
+  const open = vacancies.data?.filter(
+    (item) => !item.archived && item.business_status === "open",
+  ) || [];
+  /** The explicit plus/target choice authorizes force-add; the server still validates its signed, source-bound mismatch receipt. */
+  async function save(candidate: PublicCandidateCard, target: string) {
+    if (saveLock.current) return;
+    if (!target) { setChoosing(candidate); setNotice(""); return; }
+    if (!open.some(item => item.draft_id === target)) {
+      setNotice("Эта вакансия больше не открыта. Обновите список и выберите другую.");
       return;
     }
     const keyIdentity = `${target}:${candidate.candidate_id}:${candidate.profile_revision}`;
-    if (!likeKeys.current.has(keyIdentity))
-      likeKeys.current.set(keyIdentity, crypto.randomUUID());
-    const request = confirm
-      ? { ...confirm.request, mismatch_token: confirm.warning.mismatch_token }
-      : {
-          candidate_id: candidate.candidate_id,
-          profile_revision: candidate.profile_revision,
-          idempotency_key: likeKeys.current.get(keyIdentity)!,
-        };
+    if (!likeKeys.current.has(keyIdentity)) likeKeys.current.set(keyIdentity, crypto.randomUUID());
+    const request: ShowcaseLikeRequest = {
+      candidate_id: candidate.candidate_id,
+      profile_revision: candidate.profile_revision,
+      idempotency_key: likeKeys.current.get(keyIdentity)!,
+    };
+    saveLock.current = true;
     setBusy(candidate.candidate_id);
     setNotice("");
     try {
-      await api.likeShowcaseCandidate(confirm?.draftId || target, request);
-      setSaved((previous) => [...previous, candidate.candidate_id]);
-      setWarning(null);
-      setNotice("Кандидат добавлен в избранное вакансии.");
-    } catch (reason) {
-      const mismatch = mismatchFrom(reason);
-      if (
-        mismatch &&
-        mismatch.candidate_id === request.candidate_id &&
-        mismatch.profile_revision === request.profile_revision
-      )
-        setWarning({
-          draftId: confirm?.draftId || target,
-          request,
-          candidate,
-          warning: mismatch,
-        });
-      else {
-        setWarning(null);
-        setNotice(errorText(reason));
+      try { await api.likeShowcaseCandidate(target, request); }
+      catch (reason) {
+        const mismatch = mismatchFrom(reason);
+        if (!mismatch || mismatch.candidate_id !== request.candidate_id ||
+          mismatch.profile_revision !== request.profile_revision) throw reason;
+        await api.likeShowcaseCandidate(target, { ...request, mismatch_token: mismatch.mismatch_token });
       }
-    } finally {
-      setBusy(null);
-    }
+      setSaved(previous => [...previous, `${target}:${candidate.candidate_id}`]);
+      setChoosing(null);
+      setNotice("Кандидат добавлен в избранное вакансии.");
+    } catch (reason) { setNotice(errorText(reason)); }
+    finally { saveLock.current = false; setBusy(null); }
   }
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -436,8 +423,7 @@ export function Showcase({
       ) : (
         <div className="discovery-list">
           {pool.data.items.map((candidate) => (
-            <motion.article
-              layout
+            <article
               className="discovery-row"
               key={candidate.candidate_id}
             >
@@ -462,18 +448,18 @@ export function Showcase({
                   <Icon name="resumes" />
                 </button>
                 <button
-                  className={`discovery-like ${saved.includes(candidate.candidate_id) ? "saved" : ""}`}
+                  className={`discovery-like ${saved.includes(`${draftId}:${candidate.candidate_id}`) ? "saved" : ""}`}
                   aria-label={`Добавить в вакансию: ${candidateName(candidate.display_name)}`}
                   disabled={
                     busy === candidate.candidate_id ||
-                    saved.includes(candidate.candidate_id)
+                    saved.includes(`${draftId}:${candidate.candidate_id}`)
                   }
-                  onClick={() => void save(candidate)}
+                  onClick={() => void save(candidate, draftId)}
                 >
-                  <Icon name={saved.includes(candidate.candidate_id) ? "heart-filled" : "plus"} />
+                  <Icon name={saved.includes(`${draftId}:${candidate.candidate_id}`) ? "heart-filled" : "plus"} />
                 </button>
               </div>
-            </motion.article>
+            </article>
           ))}
           {pool.data.has_more && (
             <div className="pagination">
@@ -485,38 +471,19 @@ export function Showcase({
         </div>
       )}
       <AnimatePresence>
-        {warning && (
-          <motion.div
-            className="modal-shade"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <section
-              className="modal discovery-confirm"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Несоответствие требованиям"
-            >
-              <h2>Проверьте требования</h2>
-              <p>Кандидат не соответствует обязательным фильтрам вакансии:</p>
-              <ul>
-                {warning.warning.warnings.map((item) => (
-                  <li key={item}>{filterReasonLabel(item)}</li>
-                ))}
-              </ul>
-              <div className="form-actions">
-                <Action onClick={() => setWarning(null)}>Отмена</Action>
-                <Action
-                  variant="primary"
-                  disabled={busy !== null}
-                  onClick={() => {
-                    void save(warning.candidate, warning);
-                  }}
-                >
-                  Всё равно добавить
-                </Action>
-              </div>
+        {choosing && (
+          <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <section className="modal discovery-confirm" role="dialog" aria-modal="true" aria-label="Выберите вакансию">
+              <h2>Добавить в вакансию</h2>
+              <p>{candidateName(choosing.display_name)} будет добавлен независимо от требований вакансии.</p>
+              {vacancies.loading || vacancies.error ? <State {...vacancies} retry={vacancies.refresh} /> : !open.length ? (
+                <p>Сначала опубликуйте вакансию, чтобы добавлять кандидатов.</p>
+              ) : <div className="discovery-targets">
+                {open.map(item => <Action key={item.draft_id} disabled={busy !== null}
+                  onClick={() => void save(choosing, item.draft_id)}>{item.fields.title || "Без названия"}</Action>)}
+              </div>}
+              {notice && <p role="alert" className="form-error">{notice}</p>}
+              <Action disabled={busy !== null} onClick={() => setChoosing(null)}>Отмена</Action>
             </section>
           </motion.div>
         )}
@@ -550,9 +517,11 @@ export function Resume({
     (item) => item.candidate_id === candidateId,
   );
   const [invite, setInvite] = useState(false);
-  const [selected, setSelected] = useState(draftId || "");
-  const [company, setCompany] = useState("");
-  const [description, setDescription] = useState("");
+  const clearDraft = useClearPersistentState();
+  const formKey = `resume.${candidateId}.${draftId || "all"}`;
+  const [selected, setSelected] = usePersistentState(`${formKey}.selected`, draftId || "");
+  const [company, setCompany] = usePersistentState(`${formKey}.company`, "");
+  const [description, setDescription] = usePersistentState(`${formKey}.description`, "");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const mutationKeys = useRef(new Map<string, string>());
@@ -564,7 +533,7 @@ export function Resume({
     return key;
   }
   const [reject, setReject] = useState(false);
-  const [reason, setReason] = useState("");
+  const [reason, setReason] = usePersistentState(`${formKey}.reason`, "");
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) {
@@ -595,6 +564,7 @@ export function Resume({
           ]),
         ),
       });
+      clearDraft(`${formKey}.description`);
       setInvite(false);
       navigate(`/chat/${result.id}`);
     } catch (error) {
@@ -635,6 +605,7 @@ export function Resume({
             ]),
           ),
         });
+      clearDraft(`${formKey}.reason`);
       setReject(false);
       recruitment.refresh();
       setNotice("Решение сохранено.");
@@ -960,7 +931,8 @@ type ResumeVacancyPage = {
 
 /** Owner-wide saved resumes retain vacancy-specific recruitment states and public identities. */
 export function Resumes({ navigate }: Navigation) {
-  const [selection, setSelection] = useState<string[] | null>(null);
+  const [selection, setSelection] = usePersistentState<string[] | null>("resumes.selection", null,
+    (value): value is string[] | null => value === null || (Array.isArray(value) && value.every(item => typeof item === "string")));
   const [moreBusy, setMoreBusy] = useState(false);
   const [moreError, setMoreError] = useState("");
   const drafts = useResource(async () => {

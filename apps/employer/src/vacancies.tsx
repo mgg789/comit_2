@@ -1,4 +1,4 @@
-import { Tags } from "@comit/ui-kit/design";
+import { Tags, VacancyCardArrow } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
@@ -16,6 +16,7 @@ import { domainChoices, featureLabel, softChoices, specializationLabel, stackCho
 import "./vacancies.css";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
+import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 
 type Navigate = (path: string) => void;
 const formats = { onsite: "Офис", remote: "Удалённо", hybrid: "Гибрид" };
@@ -81,7 +82,7 @@ export function Vacancies({
     } while (cursor);
     return items;
   });
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePersistentState("vacancies.query", "");
   const items = resource.data || [];
   const matches = (draft: AgentsDraftView, name: string) =>
     !draft.archived && draft.business_status === name;
@@ -162,9 +163,7 @@ export function Vacancies({
                   <Icon name="clock" />
                   {vacancyDate(draft)}
                 </span>
-                <span className="card-arrow">
-                  <Icon name="vacancy-chevron" />
-                </span>
+                <VacancyCardArrow />
               </div>
               <button
                 className="card-link"
@@ -226,30 +225,34 @@ export function VacancyEditor({
   const { preferences } = useEmployerPreferences();
   const reduceMotion = systemReduceMotion || preferences.reducedMotion;
   const [current, setCurrent] = useState(draft);
-  const [title, setTitle] = useState(draft?.fields.title || "");
-  const [specialization, setSpecialization] = useState<(typeof classes)[number]>(
+  const clearDraft = useClearPersistentState();
+  const formKey = `vacancy-editor.${draft?.draft_id || "new"}.${draft?.revision || 0}.`;
+  const validRequirements = (value: unknown): value is SkillRequirements => value !== null && typeof value === "object" && !Array.isArray(value) &&
+    Object.values(value).every(level => typeof level === "number" && Number.isInteger(level) && level >= 0 && level <= 7);
+  const [title, setTitle] = usePersistentState(`${formKey}title`, draft?.fields.title || "");
+  const [specialization, setSpecialization] = usePersistentState<(typeof classes)[number]>(`${formKey}specialization`,
     classes.find((value) => value === draft?.fields.class) || "frontend",
+    (value): value is (typeof classes)[number] => classes.some(item => item === value),
   );
-  const [skills, setSkills] = useState<
-    NonNullable<AgentsDraftFields_Input["stacks"]>
-  >(selectedRequirements(draft?.fields.stacks));
-  const [domains, setDomains] = useState<SkillRequirements>(selectedRequirements(draft?.fields.domens));
-  const [softSkills, setSoftSkills] = useState<SkillRequirements>(selectedRequirements(draft?.fields.soft_skills));
+  const [skills, setSkills] = usePersistentState<SkillRequirements>(`${formKey}skills`, selectedRequirements(draft?.fields.stacks), validRequirements);
+  const [domains, setDomains] = usePersistentState<SkillRequirements>(`${formKey}domains`, selectedRequirements(draft?.fields.domens), validRequirements);
+  const [softSkills, setSoftSkills] = usePersistentState<SkillRequirements>(`${formKey}softSkills`, selectedRequirements(draft?.fields.soft_skills), validRequirements);
   const [reviewTab, setReviewTab] = useState<ReviewTab>("info");
   const [reviewDirty, setReviewDirty] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
-  const [from, setFrom] = useState(
+  const [from, setFrom] = usePersistentState(`${formKey}from`,
     draft?.fields.zp_min == null ? "" : String(draft.fields.zp_min / 1000),
   );
-  const [to, setTo] = useState(
+  const [to, setTo] = usePersistentState(`${formKey}to`,
     draft?.fields.zp_max == null ? "" : String(draft.fields.zp_max / 1000),
   );
-  const [city, setCity] = useState(draft?.fields.city || "");
-  const [work, setWork] = useState<"onsite" | "remote" | "hybrid">(
+  const [city, setCity] = usePersistentState(`${formKey}city`, draft?.fields.city || "");
+  const [work, setWork] = usePersistentState<"onsite" | "remote" | "hybrid">(`${formKey}work`,
     draft?.fields.type || "hybrid",
+    (value): value is "onsite" | "remote" | "hybrid" => value === "onsite" || value === "remote" || value === "hybrid",
   );
-  const [daily, setDaily] = useState(draft?.fields.daily || "");
-  const [bio, setBio] = useState(draft?.fields.bio || "");
+  const [daily, setDaily] = usePersistentState(`${formKey}daily`, draft?.fields.daily || "");
+  const [bio, setBio] = usePersistentState(`${formKey}bio`, draft?.fields.bio || "");
   const [busy, setBusy] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
   const saveLock = useRef(false);
@@ -278,6 +281,7 @@ export function VacancyEditor({
         if (active) {
           onSaved(current);
           onClose();
+          clearDraft(formKey);
         }
       } catch {
         if (active) {
@@ -377,6 +381,7 @@ export function VacancyEditor({
     try {
       const saved = reviewDirty ? await persistFields() : current;
       onSaved(saved);
+      clearDraft(formKey);
     } catch (reason) {
       showSaveError(reason);
     } finally {
@@ -787,7 +792,6 @@ async function feedPreparation(draftId: string, retry = false): Promise<boolean>
 }
 
 /** Per-browser memory of the company name used in invitations (not personal data). */
-const COMPANY_KEY = "comit.employer.invite_company";
 
 /** Minimum drag distance (CSS px) or horizontal speed (px/s) that counts as a swipe decision. */
 const SWIPE_DISTANCE = 90;
@@ -1092,15 +1096,9 @@ export function VacancyDetail({
     [draftId],
   );
   const [invite, setInvite] = useState<SavedCard | null>(null);
-  // The company is typed once per browser: there is no company profile endpoint yet.
-  const [company, setCompany] = useState(() => {
-    try {
-      return window.localStorage.getItem(COMPANY_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [description, setDescription] = useState("");
+  const clearDraft = useClearPersistentState();
+  const [company, setCompany] = usePersistentState("invitation.company", "");
+  const [description, setDescription] = usePersistentState(`vacancy.${draftId}.invitation.description`, "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inviteKey = useRef(crypto.randomUUID());
@@ -1201,11 +1199,7 @@ export function VacancyDetail({
         description: description.trim(),
         idempotency_key: inviteKey.current,
       });
-      try {
-        window.localStorage.setItem(COMPANY_KEY, company.trim());
-      } catch {
-        // Blocked storage only means the name is typed again next time.
-      }
+      clearDraft(`vacancy.${draftId}.invitation.description`);
       setInvite(null);
       processes.refresh();
       navigate(`/chat/${process.id}`);

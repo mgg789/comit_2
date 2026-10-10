@@ -1,3 +1,4 @@
+import { PersistentStateScope } from "@comit/ui-kit/ui-state";
 import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -278,7 +279,7 @@ export default function App() {
       <Vacancies navigate={navigate} onCreate={() => setEditor("new")} />
     );
   return (
-    <MotionConfig reducedMotion={preferences.reducedMotion ? "always" : "user"}>
+    <PersistentStateScope scope={`employer:${account?.id || "guest"}`}><MotionConfig reducedMotion={preferences.reducedMotion ? "always" : "user"}>
       <div className={`employer-app ${account ? "" : "is-login"} ${preferences.reducedMotion ? "reduce-motion" : ""}`}>
         <Backdrop />
         {pieces[0] === "legal" ? (
@@ -400,6 +401,6 @@ export default function App() {
           </>
         )}
       </div>
-    </MotionConfig>
+    </MotionConfig></PersistentStateScope>
   );
 }

@@ -531,3 +531,8 @@ export function Tags({ values, variant = "light", shape = "rounded", className =
 export function Checkbox({ className = "", ...props }: Omit<ComponentPropsWithRef<"input">, "type">) {
   return <input {...props} type="checkbox" className={`comit-checkbox ${className}`} />;
 }
+
+/** The employer vacancy card navigation glyph, shared by candidate offer cards. */
+export function VacancyCardArrow() {
+  return <span className="card-arrow" aria-hidden="true"><Icon name="vacancy-chevron" /></span>;
+}

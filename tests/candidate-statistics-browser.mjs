@@ -25,17 +25,23 @@ try {
     const geometry = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, appBottom: document.querySelector(".candidate-app").getBoundingClientRect().bottom + scrollY, width: innerWidth, scrollWidth: document.documentElement.scrollWidth, cards: [...document.querySelectorAll(".candidate-statistics > section")].map(card => ({ top: card.getBoundingClientRect().top, bottom: card.getBoundingClientRect().bottom })) }));
     if (process.env.CANDIDATE_STATS_BEFORE) { console.log(width, geometry); continue; }
     assert.ok(geometry.scrollWidth <= width + 1); assert.ok(geometry.appBottom >= geometry.height - 1, JSON.stringify(geometry));
-    if (width > 1200) for (const [left, right] of [[0, 1], [2, 3]]) { assert.ok(Math.abs(geometry.cards[left].top - geometry.cards[right].top) < 1); assert.ok(Math.abs(geometry.cards[left].bottom - geometry.cards[right].bottom) < 1); }
+    if (width > 1200) for (const [left, right] of [[0, 1], [2, 3], [4, 5]]) { assert.ok(Math.abs(geometry.cards[left].top - geometry.cards[right].top) < 1); assert.ok(Math.abs(geometry.cards[left].bottom - geometry.cards[right].bottom) < 1); }
     assert.equal(await page.getByText("Вы на платформе", { exact: true }).count(), 0);
     assert.equal(await page.locator(".candidate-stat-skills").innerText(), "");
-    const bars = await page.locator(".candidate-skill-map .candidate-skill-value").evaluateAll(nodes => nodes.map(node => Number(node.getAttribute("width")))); assert.deepEqual(bars, [500 * 5 / 7, 500 * 4 / 7, 500 * 3 / 7]);
+    const bars = await page.locator(".candidate-skill-map .candidate-skill-value").evaluateAll(nodes => nodes.map(node => Number(node.getAttribute("width")))); assert.deepEqual(bars, [500 * 4 / 7, 500 * 3 / 7]);
+    assert.equal(await page.locator(".page-heading .circle").count(), 0);
+    assert.equal(await page.locator(".candidate-domain-grid").count(), 5);
+    assert.equal(await page.getByRole("img", { name: "web: 5 из 7, указано вами", exact: true }).count(), 1);
+    assert.equal(await page.locator(".candidate-domain-label").textContent(), "web");
+    const dataPolygon = await page.locator(".candidate-domain-value").getAttribute("points");
+    assert.match(dataPolygon, /150,78\.571/);
     await page.screenshot({ path: `${output}/statistics-${width}.png`, fullPage: true });
     await page.goto(base + "#/resume"); await page.getByRole("heading", { name: "Тестовый кандидат", exact: true }).waitFor(); await page.waitForTimeout(400);
     assert.ok(await page.evaluate(() => document.querySelector(".candidate-app").getBoundingClientRect().bottom + scrollY >= document.documentElement.scrollHeight - 1), `resume background at ${width}`);
   }
   if (!process.env.CANDIDATE_STATS_BEFORE) {
-    emptySkills = true; await page.goto(base + "#/statistics"); await page.getByRole("img", { name: "Навыки пока не указаны" }).waitFor(); assert.equal(await page.locator(".candidate-skill-value").count(), 0);
-    failProfile = true; await page.reload(); await page.getByRole("alert").waitFor(); await page.getByRole("button", { name: "Обновить", exact: true }).waitFor(); failProfile = false; await page.getByRole("button", { name: "Обновить", exact: true }).click(); await page.getByRole("img", { name: "Навыки пока не указаны" }).waitFor();
-    assert.deepEqual(errors, []); console.log(`PASS aligned dashboard rows, actual skill bars without visible labels, empty/error states and full background at 1920/1024/390; ${output}`);
+    emptySkills = true; await page.goto(base + "#/statistics"); await page.getByText("Навыки пока не указаны", { exact: true }).waitFor(); assert.equal(await page.locator(".candidate-skill-value").count(), 0);
+    failProfile = true; await page.reload(); await page.getByRole("alert").first().waitFor(); await page.getByRole("button", { name: "Обновить", exact: true }).first().waitFor(); failProfile = false; await page.getByRole("button", { name: "Обновить", exact: true }).first().click(); await page.getByText("Навыки пока не указаны", { exact: true }).waitFor();
+    assert.deepEqual(errors, []); console.log(`PASS aligned dashboard rows, actual domain radar plus skill bars without visible labels, no back button, readable empty/error states and full background at 1920/1024/390; ${output}`);
   }
 } finally { await browser.close(); }

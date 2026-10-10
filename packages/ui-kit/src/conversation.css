@@ -274,3 +274,12 @@
 }
 
 .message-composer .attach-button .icon { width: 28rem; height: 28rem; }
+
+/* Fine alignment of the shared participant capsule. */
+.participant-header { padding-left: 10rem; }
+.participant-name small { transform: translateY(-2rem); }
+
+.chat-read-edge { height: 1px; }
+.chat-tile-state.has-unread { color: var(--employer-blue); }
+
+@media (max-width: 760px) { .participant-header { padding-left: 6rem; } }

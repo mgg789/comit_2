@@ -1,3 +1,4 @@
+import { usePersistentState } from "./ui-state";
 import { useLayoutEffect, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ChatFile, ChatMessage, ChatPage, DownloadChatFile, RecruitmentView, SendChatMessage, UploadChatFile } from "@comit/shared";
@@ -9,6 +10,7 @@ const qgrammMark = new URL("./qgramm-mark.svg", import.meta.url).href;
 /** Callbacks bind the caller's authenticated role; this component never selects authority. */
 export interface ConversationTransport {
   getMessages(id: string, after: number, limit: number): Promise<ChatPage>;
+  markRead?(id: string, throughSequence: number): Promise<{ read_sequence: number; unread_count: number }>;
   sendMessage(id: string, body: SendChatMessage): Promise<ChatMessage>;
   uploadFile(id: string, body: UploadChatFile): Promise<ChatFile>;
   downloadFile(id: string, fileId: string): Promise<DownloadChatFile>;
@@ -50,7 +52,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
   const id = process.id;
   const reduced = useReducedMotion();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState("");
+  const [text, setText] = usePersistentState(`chat:${accountId}:${id}:text`, "");
   const [files, setFiles] = useState<ChatFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -59,7 +61,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
   const retry = useRef<SendChatMessage | null>(null);
   const currentId = useRef(id); currentId.current = id;
   const transportRef = useRef(transport); transportRef.current = transport;
-  useEffect(() => { setMessages([]); setText(""); setFiles([]); retry.current = null; setError(null); setSending(false); setUploading(false); setHistoryLoading(process.chat_available); }, [id]);
+  useEffect(() => { setMessages([]); setFiles([]); retry.current = null; setError(null); setSending(false); setUploading(false); setHistoryLoading(process.chat_available); }, [id]);
   const input = useRef<HTMLInputElement>(null);
   const history = useRef<HTMLDivElement>(null);
   const composer = useRef<HTMLDivElement>(null);
@@ -116,6 +118,31 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
   useEffect(() => {
     end.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
   }, [messages.length]);
+  const acknowledged = useRef(0);
+  useEffect(() => { acknowledged.current = 0; }, [id]);
+  useEffect(() => {
+    if (!process.chat_available || !transportRef.current.markRead) return;
+    const lastIncoming = Math.max(0, ...messages.filter(message => message.sender_id !== accountId).map(message => message.sequence));
+    if (lastIncoming <= acknowledged.current) return;
+    let active = true, busy = false;
+    const mark = async () => {
+      const list = history.current, edge = end.current;
+      if (!active || busy || document.visibilityState !== "visible" || !list || !edge || lastIncoming <= acknowledged.current) return;
+      const bounds = list.getBoundingClientRect(), bottom = edge.getBoundingClientRect();
+      if (bottom.bottom > Math.min(bounds.bottom, innerHeight) + 2 || bottom.top < Math.max(bounds.top, 0)) return;
+      busy = true;
+      try { const status = await transportRef.current.markRead?.(id, lastIncoming); if (active && status) acknowledged.current = Math.max(acknowledged.current, status.read_sequence); }
+      catch { /* A read receipt failure must not block the conversation; retry while visible. */ }
+      finally { busy = false; }
+    };
+    const observer = new IntersectionObserver(() => void mark(), { root: history.current });
+    if (end.current) observer.observe(end.current);
+    document.addEventListener("visibilitychange", mark);
+    history.current?.addEventListener("scroll", mark);
+    const list = history.current, timer = setInterval(() => void mark(), 5000);
+    void mark();
+    return () => { active = false; observer.disconnect(); clearInterval(timer); document.removeEventListener("visibilitychange", mark); list?.removeEventListener("scroll", mark); };
+  }, [id, process.chat_available, messages, accountId]);
   async function send(event: FormEvent) {
     event.preventDefault();
     if (!process.chat_writable || sending || uploading || (!text.trim() && !files.length)) return;
@@ -216,7 +243,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
             </motion.article>
           ))}
         </AnimatePresence>
-        <div ref={end} />
+        <div ref={end} className="chat-read-edge" />
       </div>
       <div ref={composer} className="communication-composer-wrap">
         {error && (
@@ -262,7 +289,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
 
 /** The same list tiles for both roles; listing chats never mounts a conversation or fetches its messages. */
 export function RecruitmentChatList({ items, loading, error, emptyText, retry, onOpen, hasMore, loadMore, loadingMore }: {
-  items: readonly { id: string; title: string; subtitle: string; state: string }[];
+  items: readonly { id: string; title: string; subtitle: string; state: string; unread?: number | null }[];
   loading: boolean; error: string | null; emptyText: string; retry: () => void;
   onOpen: (id: string) => void; hasMore?: boolean; loadMore?: () => void; loadingMore?: boolean;
 }) {
@@ -271,8 +298,14 @@ export function RecruitmentChatList({ items, loading, error, emptyText, retry, o
     {items.map(item => <button key={item.id} className="recruitment-chat-tile panel" onClick={() => onOpen(item.id)}>
       <span className="anonymous-avatar"><Icon name="candidates" /></span>
       <span className="chat-tile-label"><strong>{item.title}</strong><small>{item.subtitle}</small></span>
-      <span className="chat-tile-state">{item.state}</span><Icon name="arrow" />
+      <span className={`chat-tile-state${item.unread && item.unread > 0 ? " has-unread" : ""}`}>{item.unread && item.unread > 0 ? unreadMessageLabel(item.unread) : item.state}</span><Icon name="arrow" />
     </button>)}
     {hasMore && loadMore && <Action disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Загружаем…" : "Другие разговоры"}</Action>}
   </div>;
+}
+
+/** Russian incoming-message counter; only positive, server-confirmed counts replace process status. */
+export function unreadMessageLabel(count: number): string {
+  const tail = count % 100, digit = count % 10;
+  return `${count} ${tail >= 11 && tail <= 14 ? "новых сообщений" : digit === 1 ? "новое сообщение" : digit >= 2 && digit <= 4 ? "новых сообщения" : "новых сообщений"}`;
 }

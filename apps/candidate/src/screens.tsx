@@ -1,10 +1,11 @@
 import { ApiError } from "@comit/api-client";
 import { Dialog } from "@comit/ui-kit/app-shell";
+import { clearPersistentState, usePersistentState } from "@comit/ui-kit/ui-state";
 import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { RecruitmentConversation, RecruitmentChatList, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { GRADES, SPECIALIZATIONS, type CandidateDeclaredNarrative, type CandidateDeclaredSkill, type CandidateProfileFields, type CandidateProfileMutation, type CandidateProfileView, type RecruitmentAction, type RecruitmentState, type RecruitmentView } from "@comit/shared";
-import { Action, Checkbox, Field, Icon, PageTitle, Reveal, Select, State, Tags } from "@comit/ui-kit/design";
+import { Action, Checkbox, Field, Icon, PageTitle, Reveal, Select, State, Tags, VacancyCardArrow } from "@comit/ui-kit/design";
 import { api, errorText, readInvitations, readProfile, salary, useResource } from "./runtime";
 
 type Navigate = (path: string) => void;
@@ -38,13 +39,13 @@ export function ProfileScreen({ navigate }: { navigate: Navigate }) {
     <section className="candidate-profile-section candidate-external-achievements"><h2>Достижения — внешний контур + ФСП</h2><article className="panel candidate-profile-row"><h3>ФСП</h3><p className="muted">{fields.fsp_id ? `Указан ID участника: ${fields.fsp_id}. Подтверждённые записи здесь пока не доступны.` : "Подключение учётной записи ФСП здесь пока недоступно."}</p></article><article className="panel candidate-profile-row"><h3>GitHub</h3><p className="muted">{fields.projects?.length ? `Указано проектов: ${fields.projects.length}. Проверенные репозитории здесь пока не доступны.` : "Добавьте проекты в резюме. Проверенные репозитории здесь пока не доступны."}</p></article></section>
     <section className="candidate-profile-section candidate-grade-section"><h2>Уровни навыков</h2><p className="muted">У каждого навыка своя оценка от 0 до 7. Указанный вами уровень и результат проверки показаны отдельно.</p>{(["domains", "stacks", "soft_skills"] as const).map(group => <article className="panel candidate-profile-row" key={group}><h3>{{ domains: "Домены", stacks: "Стеки", soft_skills: "Личные навыки" }[group]}</h3>{fields[group]?.length ? fields[group].map(skill => <div className="candidate-skill-assessment" key={skill.key}><strong>{skill.key}</strong><span>{skill.level} / 7</span><span className="muted">{{ confirmed: "Подтверждено", partial: "Частично подтверждено", self_reported: "Указано вами", pending: "Проверяется", rejected: "Не подтверждено" }[profile.evidence[`${group}:${skill.key}`]?.status || "self_reported"]}</span></div>) : <p className="muted">Пока не указаны</p>}</article>)}</section>
     {narrativeGroups.filter(group => fields[group]?.length).map(group => <NarrativeSection key={group} title={groupLabels[group]} items={fields[group] || []} edit={() => setEditing(true)} />)}
-    <ProfileVisibility profile={profile} edit={() => setEditing(true)} reload={resource.refresh} />
+    <ProfileVisibility profile={profile} edit={() => setEditing(true)} reload={resource.refresh} saved={value => { resource.setData(value); setMessage(value.consents.pool ? "Резюме отправлено в подбор" : "Резюме отозвано из подбора"); }} />
     <div className="candidate-profile-actions"><Action onClick={() => navigate("/offers")}>К предложениям</Action><Action variant="primary" onClick={() => setEditing(true)}>Редактировать резюме</Action></div></div>
   </Reveal>;
 }
 
 /** Consent and current revision readiness are independent; delivery alone never means publication. */
-function ProfileVisibility({ profile, edit, reload }: { profile: CandidateProfileView; edit: () => void; reload: () => void }) {
+function ProfileVisibility({ profile, edit, reload, saved }: { profile: CandidateProfileView; edit: () => void; reload: () => void; saved: (value: CandidateProfileView) => void }) {
   const pipeline = useResource(async () => {
     if (!profile.consents.pool || !profile.consents.processing || profile.projection.state !== "delivered" || profile.projection.source_revision !== profile.revision) return null;
     try { return await api.getCandidatePipeline(); } catch (reason) {
@@ -54,10 +55,11 @@ function ProfileVisibility({ profile, edit, reload }: { profile: CandidateProfil
   }, [profile.revision, profile.consents.pool, profile.consents.processing, profile.projection.state, profile.projection.source_revision, profile.projection.projected_revision]);
   const [retrying, setRetrying] = useState(false), [retryError, setRetryError] = useState<string | null>(null);
   const [retried, setRetried] = useState(false);
+  const [publishing, setPublishing] = useState(false), [publicationError, setPublicationError] = useState<string | null>(null), [withdrawalOpen, setWithdrawalOpen] = useState(false);
   const labels: Record<string, string> = { display_name: "имя", email_verified: "подтверждённая почта", city: "город", salary: "зарплатные ожидания", primary_direction: "направление", processing_consent: "согласие на обработку", pool_consent: "согласие на показ работодателям", consent_timestamp: "сохранённое согласие", consent_version: "актуальное согласие", approved_grade_result: "общий уровень опыта для категории подбора" };
   const current = pipeline.data?.profile_revision === profile.projection.projected_revision ? pipeline.data : null;
   let text = "Резюме сохранено. Готовим его для подбора.";
-  if (!profile.consents.pool) text = "Показ работодателям выключен. Чтобы участвовать в подборе, включите его при редактировании резюме.";
+  if (!profile.consents.pool) text = "Показ работодателям выключен. Опубликуйте резюме, чтобы участвовать в подборе.";
   else if (!profile.consents.processing) text = "Для подбора нужно согласие на обработку резюме.";
   else if (profile.projection.state === "failed" && !retried) text = "Не удалось передать резюме в подбор. Можно повторить отправку.";
   else if (current?.missing_requirements.length) text = `Для подбора добавьте: ${current.missing_requirements.map(key => labels[key] || "недостающие данные профиля").join(", ")}.`;
@@ -68,13 +70,53 @@ function ProfileVisibility({ profile, edit, reload }: { profile: CandidateProfil
     setRetrying(true); setRetryError(null);
     try { await api.retryCandidateProjection(); setRetried(true); reload(); } catch (reason) { setRetryError(errorText(reason)); } finally { setRetrying(false); }
   }
-  return <section className="candidate-profile-section"><h2>Видимость профиля</h2><div className="panel candidate-profile-row"><p role="status">{text}</p>{pipeline.error && <State error="Не удалось проверить готовность подбора." retry={pipeline.refresh} />}{retryError && <p role="alert">{retryError}</p>}{!profile.consents.pool || !profile.consents.processing || current?.missing_requirements.length ? <Action onClick={edit}>Настроить резюме</Action> : profile.projection.state === "failed" && !retried ? <Action disabled={retrying} onClick={() => void retry()}>Повторить отправку</Action> : <Action disabled={pipeline.loading} onClick={pipeline.refresh}>Обновить статус</Action>}</div></section>;
+  async function publish(pool: boolean) {
+    if (publishing) return;
+    if (pool) {
+      const fields = profile.fields;
+      const missing = [!profile.consents.processing && "согласие на обработку данных", !fields.display_name?.trim() && "имя", !fields.city?.trim() && "город", !fields.salary && "зарплатные ожидания", !fields.primary_direction && "направление", !fields.declared_grade && "категорию опыта"].filter(Boolean);
+      if (missing.length) { setPublicationError(`Для публикации заполните в резюме: ${missing.join(", ")}.`); return; }
+    }
+    setPublishing(true); setPublicationError(null);
+    try {
+      const training = Boolean(pool && profile.consents.training);
+      saved(await api.saveCandidateProfile({ expected_revision: profile.revision, fields: {}, consent: { processing: profile.consents.processing, pool, version: profile.consents.version || "profile-v1", training, ...(training ? { training_version: profile.consents.training_version || "training-v1" } : {}) } }));
+      setWithdrawalOpen(false);
+    } catch (reason) { setPublicationError(errorText(reason)); } finally { setPublishing(false); }
+  }
+  return <section className="candidate-profile-section"><h2>Видимость профиля</h2><div className="panel candidate-profile-row"><p role="status">{text}</p>{pipeline.error && <State error="Не удалось проверить готовность подбора." retry={pipeline.refresh} />}{retryError && <p role="alert">{retryError}</p>}{!profile.consents.pool || !profile.consents.processing || current?.missing_requirements.length ? <Action onClick={edit}>Настроить резюме</Action> : profile.projection.state === "failed" && !retried ? <Action disabled={retrying} onClick={() => void retry()}>Повторить отправку</Action> : <Action disabled={pipeline.loading} onClick={pipeline.refresh}>Обновить статус</Action>}<div className="candidate-publication-actions"><Action variant={profile.consents.pool ? "glass" : "primary"} disabled={publishing} onClick={() => { setPublicationError(null); if (profile.consents.pool) setWithdrawalOpen(true); else void publish(true); }}>{publishing ? "Сохраняем…" : profile.consents.pool ? "Отозвать резюме" : "Опубликовать резюме"}</Action></div>{publicationError && !withdrawalOpen && <><p className="form-error" role="alert">{publicationError}</p><Action onClick={edit}>Редактировать резюме</Action><Action onClick={reload}>Загрузить актуальное резюме</Action></>}</div>{withdrawalOpen && <Dialog title="Отозвать резюме из подбора?" close={() => { if (!publishing) setWithdrawalOpen(false); }}><p>Работодатели больше не увидят резюме в подборе. Предыдущая переписка останется доступной для чтения, пока включено согласие на обработку данных. Данные резюме останутся сохранены, и вы сможете опубликовать его снова.</p>{publicationError && <p className="form-error" role="alert">{publicationError}</p>}<div className="form-actions"><Action disabled={publishing} onClick={() => setWithdrawalOpen(false)}>Отмена</Action><Action disabled={publishing} onClick={() => void publish(false)}>{publishing ? "Отзываем…" : "Отозвать резюме"}</Action></div>{publicationError && <Action disabled={publishing} onClick={reload}>Загрузить актуальное резюме</Action>}</Dialog>}</section>;
+}
+
+/** Restore only known editable field shapes; browser drafts never restore evidence or consent. */
+function validProfileDraft(value: unknown): value is CandidateProfileFields {
+  const record = (item: unknown): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item);
+  const strings = (item: unknown): item is string[] => Array.isArray(item) && item.length <= 2000 && item.every(part => typeof part === "string");
+  const finite = (item: unknown): item is number => typeof item === "number" && Number.isFinite(item);
+  const nullableString = (item: unknown) => item === null || typeof item === "string";
+  const skill = (item: unknown) => record(item) && Object.keys(item).every(key => ["key", "level"].includes(key)) && typeof item.key === "string" && finite(item.level) && item.level >= 0 && item.level <= 7;
+  const facts = (item: unknown) => item === null || record(item) && Object.entries(item).every(([key, part]) => key === "domains" || key === "stacks" ? strings(part) : key === "duration_months" ? part === null || finite(part) && part >= 0 : key === "production_support" ? part === null || typeof part === "boolean" : key === "role" && (part === null || ["developer", "lead", "architect", "analyst", "designer", "researcher", "qa", "devops", "other"].some(role => role === part)));
+  const narrative = (item: unknown) => record(item) && typeof item.title === "string" && Object.entries(item).every(([key, part]) => key === "facts" ? facts(part) : ["link", "organization"].includes(key) ? nullableString(part) : ["id", "title", "description"].includes(key) && typeof part === "string");
+  if (!record(value)) return false;
+  return Object.entries(value).every(([key, part]) => {
+    if (["display_name", "city", "description"].includes(key)) return typeof part === "string";
+    if (["phone", "fsp_id", "fsp_claim_id"].includes(key)) return nullableString(part);
+    if (["relocation_cities", "preferences"].includes(key)) return strings(part);
+    if (key === "work_types") return part === null || Array.isArray(part) && part.every(item => ["onsite", "remote", "hybrid"].some(type => type === item));
+    if (key === "relocation_ready") return part === null || typeof part === "boolean";
+    if (key === "salary") return part === null || record(part) && Object.keys(part).every(field => ["from_rub", "to_rub"].includes(field)) && finite(part.from_rub) && finite(part.to_rub) && part.from_rub >= 0 && part.to_rub >= 0;
+    if (key === "primary_direction") return part === null || SPECIALIZATIONS.some(direction => direction === part);
+    if (key === "declared_grade") return part === null || GRADES.some(grade => grade === part);
+    if (["domains", "stacks", "soft_skills"].includes(key)) return Array.isArray(part) && part.every(skill);
+    if (["projects", "experience", "achievements"].includes(key)) return Array.isArray(part) && part.every(narrative);
+    return false;
+  });
 }
 
 function ProfileEditor({ profile, onCancel, onSave, onReload }: { profile: CandidateProfileView | null; onCancel?: () => void; onReload: () => void; onSave: (profile: CandidateProfileView) => void }) {
-  const [fields, setFields] = useState<CandidateProfileFields>(() => structuredClone(profile?.fields || {}));
-  const [relocationText, setRelocationText] = useState((profile?.fields.relocation_cities || []).join(", "));
-  const [preferenceText, setPreferenceText] = useState((profile?.fields.preferences || []).join("\n"));
+  const draftKey = `profile-editor:${profile?.revision || 0}:`;
+  const [fields, setFields] = usePersistentState<CandidateProfileFields>(`${draftKey}fields`, () => structuredClone(profile?.fields || {}), validProfileDraft);
+  const [relocationText, setRelocationText] = usePersistentState(`${draftKey}relocation`, (profile?.fields.relocation_cities || []).join(", "));
+  const [preferenceText, setPreferenceText] = usePersistentState(`${draftKey}preferences`, (profile?.fields.preferences || []).join("\n"));
   const [processing, setProcessing] = useState(profile?.consents.processing || false);
   const [pool, setPool] = useState(profile?.consents.pool || false);
   const [withdrawalOpen, setWithdrawalOpen] = useState(false);
@@ -86,7 +128,8 @@ function ProfileEditor({ profile, onCancel, onSave, onReload }: { profile: Candi
     if (busy || !profile) return;
     setBusy(true); setError(null);
     try {
-      onSave(await api.saveCandidateProfile({ expected_revision: profile.revision, fields: {}, consent: { processing: false, pool: false, version: profile.consents.version || "profile-v1", training: false } }));
+      const saved = await api.saveCandidateProfile({ expected_revision: profile.revision, fields: {}, consent: { processing: false, pool: false, version: profile.consents.version || "profile-v1", training: false } });
+      clearPersistentState(`candidate:${saved.candidate_id}`, draftKey); onSave(saved);
     } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
   }
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -100,7 +143,7 @@ function ProfileEditor({ profile, onCancel, onSave, onReload }: { profile: Candi
     const editableFields = { ...fields }; delete editableFields.fsp_id; delete editableFields.fsp_claim_id;
     const body: CandidateProfileMutation = { expected_revision: profile?.revision || 0, fields: { ...editableFields, relocation_cities: relocationText.split(",").map(value => value.trim()).filter(Boolean), preferences: preferenceText.split("\n").map(value => value.trim()).filter(Boolean) } };
     if (!profile || processing !== profile.consents.processing || pool !== profile.consents.pool) body.consent = { processing, pool, version: profile?.consents.version || "profile-v1", training: Boolean(profile?.consents.training && processing && pool), ...(profile?.consents.training && processing && pool ? { training_version: "training-v1" } : {}) };
-    try { onSave(await api.saveCandidateProfile(body)); } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+    try { const saved = await api.saveCandidateProfile(body); clearPersistentState(`candidate:${saved.candidate_id}`, draftKey); onSave(saved); } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
   }
   return <Reveal className="candidate-profile-editor"><PageTitle title={profile ? "Редактировать резюме" : "Создать резюме"} back={onCancel} /><form onSubmit={save} noValidate><fieldset disabled={busy}><div className="form-grid"><div className="form-row"><Field label="Ваше имя"><input required maxLength={160} value={fields.display_name || ""} onChange={event => update("display_name", event.target.value)} /></Field><Field label="Город"><input maxLength={160} value={fields.city || ""} onChange={event => update("city", event.target.value)} /></Field></div>
     <div className="form-row"><Field label="Направление"><Select aria-label="Направление" value={fields.primary_direction || ""} onChange={event => { const value = event.target.value; update("primary_direction", SPECIALIZATIONS.find(item => item === value) || null); }}><option value="">Не выбрано</option>{SPECIALIZATIONS.map(value => <option value={value} key={value}>{directions[value]}</option>)}</Select></Field><Field label="Общая категория опыта" hint="Нужна для категории подбора. Уровень каждого навыка задаётся отдельно ниже."><Select aria-label="Указанный вами грейд" value={fields.declared_grade || ""} onChange={event => update("declared_grade", GRADES.find(item => item === event.target.value) || null)}><option value="">Не выбран</option>{GRADES.map(value => <option key={value} value={value}>{grades[value]}</option>)}</Select></Field></div>
@@ -119,25 +162,25 @@ function ProfileEditor({ profile, onCancel, onSave, onReload }: { profile: Candi
 /** Owner-scoped invitation list; all salary and lifecycle data come from immutable API terms. */
 export function OffersScreen({ navigate, query = "" }: { navigate: Navigate; query?: string }) {
   const resource = useResource(readInvitations);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = usePersistentState("offers:filter", "all", (value): value is string => typeof value === "string" && ["all", "new", "accepted"].includes(value));
   if (resource.loading || resource.error) return <State loading={resource.loading} error={resource.error} retry={resource.refresh} />;
   const items = (resource.data || []).filter(item => item.terms && (filter === "all" || (filter === "new" ? item.state === "sent" || item.state === "viewed" : ["accepted", "offer_sent", "hired"].includes(item.state))) && (!query || `${item.terms.company_name} ${item.terms.vacancy_title || ""}`.toLocaleLowerCase("ru-RU").includes(query.toLocaleLowerCase("ru-RU"))));
   return <Reveal><PageTitle title="Входящие предложения" /><div className="candidate-offer-filters"><Select aria-label="Показать предложения" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Все предложения</option><option value="new">Новые приглашения</option><option value="accepted">Принятые приглашения</option></Select><span className="muted">{items.length} предложений</span></div>{items.length ? <div className="candidate-offer-grid">{items.map(item => <InvitationCard key={item.id} item={item} navigate={navigate} />)}</div> : <State empty={query ? "По этому запросу предложений нет" : "Здесь появятся предложения работодателей"} />}</Reveal>;
 }
 function InvitationCard({ item, navigate }: { item: RecruitmentView; navigate: Navigate }) {
   const terms = item.terms; if (!terms) return null;
-  return <article className="candidate-offer-card"><div className="candidate-offer-card-head"><span className="candidate-offer-status">{states[item.state]}</span><span className="candidate-company-initial" aria-hidden="true">{initials(terms.company_name)}</span></div><button className="candidate-offer-open" onClick={() => navigate(`/offer/${item.id}`)} aria-label={`Открыть предложение ${terms.company_name}`}><h2>{terms.vacancy_title || "Предложение о работе"}</h2><p>{terms.company_name}</p></button><Tags className="candidate-chips" variant="blue" values={[terms.city, workTypes[terms.work_type as keyof typeof workTypes] ?? terms.work_type, terms.daily]} /><div className="candidate-offer-salary">{salary(terms.salary.from_rub, terms.salary.to_rub)}</div><footer><span><Icon name="clock" />{date(item.invited_at || item.created_at)}</span><Action className="candidate-offer-arrow" onClick={() => navigate(`/offer/${item.id}`)} aria-label={`Подробнее о предложении ${terms.company_name}`}><Icon name="vacancy-chevron" /></Action></footer></article>;
+  return <article className="candidate-offer-card"><div className="candidate-offer-card-head"><span className="candidate-offer-status">{states[item.state]}</span></div><button className="candidate-offer-open" onClick={() => navigate(`/offer/${item.id}`)} aria-label={`Открыть предложение ${terms.company_name}`}><h2>{terms.vacancy_title || "Предложение о работе"}</h2><p>{terms.company_name}</p></button><Tags className="candidate-chips" variant="blue" values={[terms.city, workTypes[terms.work_type as keyof typeof workTypes] ?? terms.work_type, terms.daily]} /><div className="candidate-offer-salary">{salary(terms.salary.from_rub, terms.salary.to_rub)}</div><footer><span><Icon name="clock" />{date(item.invited_at || item.created_at)}</span><button className="candidate-offer-arrow-button" onClick={() => navigate(`/offer/${item.id}`)} aria-label={`Подробнее о предложении ${terms.company_name}`}><VacancyCardArrow /></button></footer></article>;
 }
 
 /** Invitation details enforce server allowed_actions, revisions, and stable retry identities for every mutation. */
 export function OfferScreen({ id, navigate }: { id: string; navigate: Navigate }) {
   const resource = useResource(() => api.getRecruitment("candidate", id), [id]);
-  const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [declining, setDeclining] = useState(false), [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [declining, setDeclining] = useState(false), [reason, setReason] = usePersistentState(`offer:${id}:reason`, "");
   const identities = useRef(new Map<string, string>());
   const viewed = useRef(new Set<string>());
   const [decliningInterview, setDecliningInterview] = useState<string | null>(null);
   const currentId = useRef(id); currentId.current = id;
-  useEffect(() => { setBusy(false); setError(null); setDeclining(false); setDecliningInterview(null); setReason(""); }, [id]);
+  useEffect(() => { setBusy(false); setError(null); setDeclining(false); setDecliningInterview(null); }, [id]);
   async function act(action: RecruitmentAction["action"], extra?: { reason?: string; offer_id?: string; interview_id?: string }) {
     const item = resource.data; if (!item || item.id !== id || busy || !item.allowed_actions.includes(action)) return;
     const key = `${id}:${item.revision}:${action}:${extra?.offer_id || extra?.interview_id || ""}:${extra?.reason || ""}`;
@@ -162,11 +205,12 @@ export function OfferScreen({ id, navigate }: { id: string; navigate: Navigate }
   const item = resource.data, terms = item?.terms;
   if (!item || !terms) return <State empty="Предложение не найдено" />;
   return <Reveal><PageTitle title={`${terms.company_name} · ${terms.vacancy_title || "Предложение о работе"}`} back={() => navigate("/offers")} /><div className="candidate-offer-detail"><section className="panel candidate-offer-terms"><span className="candidate-offer-status">{states[item.state]}</span><h2>{terms.company_name}</h2><div className="candidate-offer-salary">{salary(terms.salary.from_rub, terms.salary.to_rub)}</div><Tags className="candidate-chips" variant="blue" values={[terms.city, workTypes[terms.work_type as keyof typeof workTypes] ?? terms.work_type, terms.daily]} /><p>{terms.description}</p><small>Приглашение от {date(item.invited_at || item.created_at)}</small><div className="candidate-offer-actions">{item.allowed_actions.includes("accept") && <Action variant="primary" disabled={busy} onClick={() => void act("accept")}>Принять приглашение</Action>}{item.allowed_actions.includes("decline") && <Action disabled={busy} onClick={() => setDeclining(true)}>Отклонить приглашение</Action>}<Action disabled={busy} onClick={resource.refresh}>Обновить</Action></div>{declining && <form className="candidate-decline" onSubmit={event => { event.preventDefault(); void act("decline", { reason: reason.trim() }); }}><Field label="Причина отказа"><textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field><div className="candidate-offer-actions"><Action type="button" disabled={busy} onClick={() => setDeclining(false)}>Отмена</Action><Action type="submit" disabled={busy}>Подтвердить отказ</Action></div></form>}{error && <p role="alert" className="form-error">{error}</p>}</section>
-    {(item.interviews.length > 0 || item.offers.length > 0) && <section className="panel candidate-offer-progress"><h2>Собеседования и офферы</h2>{item.interviews.map(interview => <article key={interview.id}><h3>{interview.kind === "technical" ? "Техническое собеседование" : "Собеседование"}</h3><p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} · {interview.time_zone}</p><p>{interview.location}</p>{interview.state === "proposed" && item.allowed_actions.includes("interview_accept") && <Action disabled={busy} onClick={() => void act("interview_accept", { interview_id: interview.id })}>Подтвердить время</Action>}{interview.state === "proposed" && item.allowed_actions.includes("interview_decline") && <Action disabled={busy} onClick={() => { setDecliningInterview(interview.id); setReason(""); }}>Отклонить время собеседования</Action>}{decliningInterview === interview.id && <form className="candidate-decline" onSubmit={event => { event.preventDefault(); void act("interview_decline", { interview_id: interview.id, reason: reason.trim() }); }}><Field label="Почему время не подходит?"><textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field><div className="candidate-offer-actions"><Action type="button" disabled={busy} onClick={() => setDecliningInterview(null)}>Отмена</Action><Action type="submit" disabled={busy}>Отправить ответ</Action></div></form>}</article>)}{item.offers.map(offer => <article key={offer.id}><h3>Предложение о работе</h3><p>{new Intl.NumberFormat("ru-RU").format(offer.salary_rub)} ₽</p><p>{offer.description}</p><small>Действует до {date(offer.expires_at)}</small>{offer.state === "sent" && item.allowed_actions.includes("offer_accept") && <Action variant="primary" disabled={busy} onClick={() => void act("offer_accept", { offer_id: offer.id })}>Принять оффер</Action>}{offer.state === "sent" && item.allowed_actions.includes("offer_decline") && <Action disabled={busy} onClick={() => void act("offer_decline", { offer_id: offer.id })}>Отклонить оффер</Action>}</article>)}</section>}
-    {item.chat_available ? <Action onClick={() => navigate(`/chat/${item.id}`)}>Перейти в чат</Action> : <p className="muted">Переписка по этому приглашению пока недоступна.</p>}</div></Reveal>;
+    {(item.interviews.length > 0 || item.offers.length > 0) && <section className="panel candidate-offer-progress"><h2>Собеседования и офферы</h2>{item.interviews.map(interview => <article key={interview.id}><h3>{interview.kind === "technical" ? "Техническое собеседование" : "Собеседование"}</h3><p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} · {interview.time_zone}</p><p>{interview.location}</p>{interview.state === "proposed" && item.allowed_actions.includes("interview_accept") && <Action disabled={busy} onClick={() => void act("interview_accept", { interview_id: interview.id })}>Подтвердить время</Action>}{interview.state === "proposed" && item.allowed_actions.includes("interview_decline") && <Action disabled={busy} onClick={() => { setDecliningInterview(interview.id); }}>Отклонить время собеседования</Action>}{decliningInterview === interview.id && <form className="candidate-decline" onSubmit={event => { event.preventDefault(); void act("interview_decline", { interview_id: interview.id, reason: reason.trim() }); }}><Field label="Почему время не подходит?"><textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field><div className="candidate-offer-actions"><Action type="button" disabled={busy} onClick={() => setDecliningInterview(null)}>Отмена</Action><Action type="submit" disabled={busy}>Отправить ответ</Action></div></form>}</article>)}{item.offers.map(offer => <article key={offer.id}><h3>Предложение о работе</h3><p>{new Intl.NumberFormat("ru-RU").format(offer.salary_rub)} ₽</p><p>{offer.description}</p><small>Действует до {date(offer.expires_at)}</small>{offer.state === "sent" && item.allowed_actions.includes("offer_accept") && <Action variant="primary" disabled={busy} onClick={() => void act("offer_accept", { offer_id: offer.id })}>Принять оффер</Action>}{offer.state === "sent" && item.allowed_actions.includes("offer_decline") && <Action disabled={busy} onClick={() => void act("offer_decline", { offer_id: offer.id })}>Отклонить оффер</Action>}</article>)}</section>}
+    {item.chat_available ? <div className="candidate-offer-chat-link"><Action onClick={() => navigate(`/chat/${item.id}`)}>Перейти в чат</Action></div> : <p className="muted">Переписка по этому приглашению пока недоступна.</p>}</div></Reveal>;
 }
 
 const candidateConversationTransport: ConversationTransport = {
+  markRead: (id, throughSequence) => api.acknowledgeChatRead("candidate", id, { through_sequence: throughSequence }),
   getMessages: (id, after, limit) => api.getChatMessages("candidate", id, after, limit),
   sendMessage: (id, body) => api.sendChatMessage("candidate", id, body),
   uploadFile: (id, body) => api.uploadChatFile("candidate", id, body),
@@ -176,8 +220,20 @@ const candidateConversationTransport: ConversationTransport = {
 /** The chat directory reads invitation metadata only; private messages load after choosing a thread. */
 export function ChatsScreen({ navigate }: { navigate: Navigate }) {
   const resource = useResource(readInvitations);
-  const items = (resource.data || []).flatMap(item => item.chat_available && item.terms ? [{ id: item.id, title: item.terms.company_name, subtitle: item.terms.vacancy_title || "Предложение о работе", state: states[item.state] }] : []);
-  return <Reveal><PageTitle title="Чаты" /><RecruitmentChatList items={items} loading={resource.loading} error={resource.error} retry={resource.refresh} emptyText="Здесь появятся чаты с работодателями" onOpen={id => navigate(`/chat/${id}`)} /></Reveal>;
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try { const items = await readInvitations(); if (active) { resource.setData(items); setRefreshError(null); } }
+      catch (reason) { if (active) setRefreshError(errorText(reason)); }
+      finally { if (active) timer = setTimeout(poll, 5000); }
+    };
+    timer = setTimeout(poll, 5000);
+    return () => { active = false; clearTimeout(timer); };
+  }, []);
+  const items = (resource.data || []).flatMap(item => item.chat_available && item.terms ? [{ id: item.id, title: item.terms.company_name, subtitle: item.terms.vacancy_title || "Предложение о работе", state: states[item.state], unread: item.chat_unread_count }] : []);
+  return <Reveal><PageTitle title="Чаты" />{refreshError && <p className="form-error" role="alert">{refreshError}</p>}<RecruitmentChatList items={items} loading={resource.loading} error={resource.error} retry={resource.refresh} emptyText="Здесь появятся чаты с работодателями" onOpen={id => navigate(`/chat/${id}`)} /></Reveal>;
 }
 
 /** A standalone authorized conversation keeps the caller in its URL and refreshes server permissions. */
@@ -203,18 +259,36 @@ export function ChatScreen({ id, route, navigate }: { id: string; route: string;
   return <section className="recruitment-screen"><div className="chat-back"><Action className="circle" aria-label="Вернуться" onClick={() => navigate(chatReturnRoute(route, "/chat"))}><Icon name="back" /></Action><h1>Чат</h1></div>{resource.loading || resource.error ? <div className="recruitment-thread"><State loading={resource.loading} error={resource.error} retry={resource.refresh} /></div> : item ? <div className="recruitment-thread"><header className="participant-header"><span className="anonymous-avatar" aria-hidden="true"><Icon name="candidates" /></span><div className="participant-name"><strong>{item.terms?.company_name || "Работодатель"}</strong><small>{states[item.state]}</small></div></header>{pollError && <p className="form-error" role="alert">{pollError}</p>}<RecruitmentConversation key={item.id} process={item} accountId={item.candidate_id} transport={candidateConversationTransport} errorText={errorText} emptyText="Напишите работодателю, чтобы начать разговор." messageLabel="Сообщение работодателю" /></div> : <div className="recruitment-thread"><State empty="Чат не найден" /></div>}</section>;
 }
 
+/** Radar shows declared domain levels only; empty axes do not imply assessed skills. */
+function DomainRadar({ domains }: { domains: CandidateDeclaredSkill[] }) {
+  const axes = Math.max(6, domains.length);
+  const point = (index: number, radius: number) => {
+    const angle = index * Math.PI * 2 / axes - Math.PI / 2;
+    return [150 + Math.cos(angle) * radius, 150 + Math.sin(angle) * radius] as const;
+  };
+  const ring = (radius: number) => Array.from({ length: axes }, (_, index) => point(index, radius).join(",")).join(" ");
+  return <svg className="candidate-domain-radar" viewBox="0 0 300 300" role="img" aria-label="Указанные вами уровни доменов, шкала от 0 до 7">
+    {[1, 2, 3, 4, 5].map(level => <polygon key={level} className="candidate-domain-grid" points={ring(level * 20)} />)}
+    {Array.from({ length: axes }, (_, index) => { const [x, y] = point(index, 100); return <line key={index} className="candidate-domain-axis" x1="150" y1="150" x2={x} y2={y} />; })}
+    <polygon className="candidate-domain-value" points={Array.from({ length: axes }, (_, index) => point(index, 100 * (domains[index]?.level || 0) / 7).join(",")).join(" ")} />
+    {domains.map((domain, index) => { const [x, y] = point(index, 100 * domain.level / 7), [labelX, labelY] = point(index, 123); return <g key={domain.key} role="img" aria-label={`${domain.key}: ${domain.level} из 7, указано вами`}><circle className="candidate-domain-dot" cx={x} cy={y} r="3" /><text className="candidate-domain-label" x={labelX} y={labelY} textAnchor={labelX < 140 ? "end" : labelX > 160 ? "start" : "middle"} dominantBaseline="middle">{domain.key}</text></g>; })}
+  </svg>;
+}
+
 /** Owner dashboard with shared grid rows; only declared per-skill levels are charted. */
 export function StatisticsScreen({ navigate }: { navigate: Navigate }) {
   const invitations = useResource(readInvitations), profile = useResource(readProfile);
   const items = (invitations.data || []).filter(item => item.terms);
   const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const recent = items.filter(item => Date.parse(item.invited_at || item.created_at) >= cutoff);
-  const skills = (["domains", "stacks", "soft_skills"] as const).flatMap(group => (profile.data?.fields[group] || []).map(skill => ({ ...skill, group })));
-  return <Reveal><PageTitle title="Твой профиль в цифрах" back={() => navigate("/resume")} /><div className="candidate-statistics">
+  const domains = profile.data?.fields.domains || [];
+  const skills = (["stacks", "soft_skills"] as const).flatMap(group => (profile.data?.fields[group] || []).map(skill => ({ ...skill, group })));
+  return <Reveal><PageTitle title="Твой профиль в цифрах" /><div className="candidate-statistics">
     <section className="panel candidate-stat-counts"><div><strong>—</strong><span>показов в подборе</span><small>Данные пока недоступны</small></div><div><strong>{invitations.loading || invitations.error ? "—" : recent.length}</strong><span>приглашений за 30 дней</span></div><div><strong>—</strong><span>рейтинг профиля</span><small>Данные пока недоступны</small></div></section>
     <section className="panel candidate-stat-history"><h2>История оценок и тестов</h2><p className="muted">История тестирования пока недоступна.</p><p>Каждое направление, стек и гибкий навык оцениваются отдельно.</p></section>
     <section className="panel candidate-stat-market"><h2>Рынок З/П</h2><p className="muted">Рыночные зарплаты по категориям пока недоступны.</p><div className="candidate-market-salary"><div><p>Рыночная вилка</p><Tags className="candidate-chips" shape="pill" values={["Данные недоступны"]} /></div><div><p>Ваши ожидания</p><Tags className="candidate-chips" shape="pill" values={[profile.data?.fields.salary ? salary(profile.data.fields.salary.from_rub, profile.data.fields.salary.to_rub) : "Не указаны"]} /></div></div></section>
     <section className="panel candidate-stat-offers"><h2>Приглашения работодателей</h2>{invitations.loading || invitations.error ? <State loading={invitations.loading} error={invitations.error} retry={invitations.refresh} /> : <><div className="candidate-stat-offer-count"><strong>{items.filter(item => ["accepted", "offer_sent", "hired"].includes(item.state)).length}</strong><span>принятых приглашений</span></div><div className="candidate-stat-offer-count"><strong>{items.filter(item => item.state === "sent" || item.state === "viewed").length}</strong><span>ожидают ответа</span></div><Action onClick={() => navigate("/offers")}>Посмотреть предложения</Action></>}</section>
-    <section className="panel candidate-stat-skills" aria-label="Диаграмма навыков">{profile.loading || profile.error ? <State loading={profile.loading} error={profile.error} retry={profile.refresh} /> : <svg className="candidate-skill-map" viewBox={`0 0 500 ${Math.max(1, skills.length) * 42}`} role="img" aria-label={skills.length ? "Указанные вами уровни навыков, шкала от 0 до 7" : "Навыки пока не указаны"}>{skills.map((skill, index) => <g key={`${skill.group}:${skill.key}`} role="img" aria-label={`${skill.key}: ${skill.level} из 7, указано вами`}><rect className="candidate-skill-track" x="0" y={index * 42} width="500" height="24" rx="12" /><rect className="candidate-skill-value" x="0" y={index * 42} width={500 * skill.level / 7} height="24" rx="12" /></g>)}</svg>}</section>
+    <section className="panel candidate-stat-domains" aria-label="Диаграмма доменов">{profile.loading || profile.error ? <State loading={profile.loading} error={profile.error} retry={profile.refresh} /> : domains.length ? <DomainRadar domains={domains} /> : <div className="candidate-chart-empty"><p>Домены пока не указаны</p><Action onClick={() => navigate("/resume")}>Добавить в резюме</Action></div>}</section>
+    <section className="panel candidate-stat-skills" aria-label="Диаграмма навыков">{profile.loading || profile.error ? <State loading={profile.loading} error={profile.error} retry={profile.refresh} /> : !skills.length ? <div className="candidate-chart-empty"><p>Навыки пока не указаны</p><Action onClick={() => navigate("/resume")}>Добавить в резюме</Action></div> : <svg className="candidate-skill-map" viewBox={`0 0 500 ${Math.max(1, skills.length) * 42}`} role="img" aria-label={skills.length ? "Указанные вами уровни навыков, шкала от 0 до 7" : "Навыки пока не указаны"}>{skills.map((skill, index) => <g key={`${skill.group}:${skill.key}`} role="img" aria-label={`${skill.key}: ${skill.level} из 7, указано вами`}><rect className="candidate-skill-track" x="0" y={index * 42} width="500" height="24" rx="12" /><rect className="candidate-skill-value" x="0" y={index * 42} width={500 * skill.level / 7} height="24" rx="12" /></g>)}</svg>}</section>
   </div></Reveal>;
 }

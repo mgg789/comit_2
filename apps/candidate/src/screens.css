@@ -39,7 +39,6 @@
 .candidate-offer-card:hover { transform: translateY(-3rem); box-shadow: 0 12rem 36rem var(--employer-paint-0000006b); }
 .candidate-offer-card-head { display: flex; justify-content: space-between; align-items: center; gap: 16rem; min-height: 58rem; }
 .candidate-offer-status { display: inline-flex; align-items: center; padding: 14rem 12rem; border-radius: 20rem; background: var(--employer-glass); font-size: 18rem; }
-.candidate-company-initial { display: grid; place-items: center; border-radius: 20rem; background: var(--employer-paint-2f2f2d); color: var(--comit-text-muted); height: 62rem; width: 62rem; font-weight: 600; flex-shrink: 0; }
 .candidate-offer-open { border: 0; padding: 0; text-align: left; background: transparent; color: inherit; display: grid; gap: 12rem; }
 .candidate-offer-open h2 { font-family: var(--employer-font); font-size: 32rem; font-weight: 600; overflow-wrap: anywhere; }
 .candidate-offer-open p { color: var(--comit-text-muted); font-size: 22rem; }
@@ -47,8 +46,12 @@
 .candidate-offer-salary { font-family: var(--employer-display); font-size: 32rem; overflow-wrap: anywhere; }
 .candidate-offer-card footer { border-top: 1px solid var(--employer-line); padding-top: 18rem; margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 14rem; color: var(--comit-text-muted); }
 .candidate-offer-card footer > span { display: flex; align-items: center; gap: 12rem; font-size: 22rem; }
-.candidate-offer-arrow { width: 46rem; height: 46rem; padding: 0; min-height: 0; border-radius: 16rem; border: 2px solid var(--employer-paint-ffffff66); }
-.candidate-offer-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32rem; }
+.candidate-offer-arrow-button { border: 0; padding: 0; background: transparent; color: inherit; }
+.candidate-offer-detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32rem; }
+.candidate-offer-chat-link { display: flex; justify-content: center; }
+.candidate-offer-chat-link .action { min-height: 60rem; padding: 16rem 32rem; }
+.candidate-publication-actions { display: flex; flex-wrap: wrap; gap: 16rem; }
+.candidate-publication-actions .action { width: auto; justify-self: start; }
 .candidate-offer-terms { display: grid; gap: 30rem; }
 .candidate-offer-terms .candidate-offer-status { justify-self: start; }
 .candidate-offer-terms .candidate-chips { justify-content: flex-start; }
@@ -118,7 +121,15 @@
 .candidate-market-salary { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 22rem; margin-top: 24rem; }
 .candidate-market-salary > div { display: grid; gap: 14rem; }
 .candidate-market-salary .tag { font-size: 18rem; }
-.candidate-stat-skills { grid-column: 1 / -1; min-height: 280rem; }
+.candidate-stat-skills, .candidate-stat-domains { min-height: 280rem; }
+.candidate-stat-domains { display: grid; place-items: center; border-radius: 16rem; }
+.candidate-domain-radar { width: min(400rem, 100%); height: auto; overflow: visible; }
+.candidate-domain-grid { fill: none; stroke: var(--employer-line); stroke-width: 1; }
+.candidate-domain-axis { stroke: var(--employer-line); stroke-width: 1; }
+.candidate-domain-value { fill: var(--employer-violet); fill-opacity: .25; stroke: var(--employer-violet); stroke-width: 2; }
+.candidate-domain-dot { fill: var(--employer-violet); }
+.candidate-domain-label { fill: var(--comit-text); font-family: var(--employer-font); font-size: 12px; }
+.candidate-chart-empty { display: grid; justify-items: center; align-content: center; gap: 20rem; min-height: 220rem; color: var(--comit-text-muted); }
 .candidate-stat-offers { min-height: 517rem; }
 .candidate-stat-offer-count { display: flex; align-items: center; gap: 22rem; padding: 20rem 0; border-bottom: 1px solid var(--employer-line); }
 .candidate-stat-offer-count strong { font-size: 46rem; }

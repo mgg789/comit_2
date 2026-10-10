@@ -14,7 +14,8 @@
     "./recruitment-conversation": "./src/recruitment-conversation.tsx",
     "./conversation.css": "./src/conversation.css",
     "./chat-navigation": "./src/chat-navigation.ts",
-    "./chat-composer": "./src/chat-composer.tsx"
+    "./chat-composer": "./src/chat-composer.tsx",
+    "./ui-state": "./src/ui-state.tsx"
   },
   "scripts": {
     "build": "tsc --noEmit",

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
+import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state";
 import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
@@ -23,7 +24,7 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
   const [search, setSearch] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = usePersistentState(`candidate:${account?.id || "anonymous"}:search`, "");
   const [logout, setLogout] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -66,7 +67,6 @@ export default function App() {
       await api.logout("candidate");
       setAccount(null);
       setLogout(false);
-      setQuery("");
     }
     catch (reason) {
       setFailure(errorText(reason));
@@ -75,7 +75,7 @@ export default function App() {
       setBusy(false);
     }
   }
-  const selected = route.startsWith("/offer") ? "/offers" : route;
+  const selected = route.startsWith("/offer") || route.startsWith("/chat") ? "/offers" : route;
   return <MotionConfig reducedMotion="user">
   <div className={`candidate-app comit-design ${!account ? "is-login" : ""}`}>
   <Backdrop />{account && <CandidateArt route={route}/>}
@@ -90,7 +90,7 @@ export default function App() {
         <State error={authError} retry={() => void checkAccount()}/>
         </main>
           : !account ? <EmailLogin requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
-            : <>
+            : <PersistentStateScope scope={`candidate:${account.id}`}>
     <AppShellHeader brandHref="#/resume" brandLabel="Comit — резюме" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
@@ -126,7 +126,7 @@ export default function App() {
               <Action variant="primary" disabled={busy} onClick={() => void signOut()}>{busy ? "Выходим…" : "Выйти"}</Action>
               </div>
               </Dialog>}</AnimatePresence>
-   </>}
+   </PersistentStateScope>}
  </div>
   </MotionConfig>;
 }

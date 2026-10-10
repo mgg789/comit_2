@@ -197,8 +197,8 @@
   padding: 24rem 25rem;
   position: relative;
   transition:
-    transform 0.18s,
-    box-shadow 0.18s;
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .discovery-row:hover {
   transform: translateY(-3rem);
@@ -272,7 +272,7 @@
   display: grid;
   place-items: center;
   padding: 0;
-  transition: transform 0.16s;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .discovery-profile-button .icon {
   width: 34rem;
@@ -289,7 +289,7 @@
   padding: 0;
   background: var(--employer-gradient);
   color: var(--comit-text);
-  transition: transform 0.16s;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
 }
 .discovery-like .icon {
   width: 32rem;
@@ -1131,3 +1131,8 @@
     font-size: 12rem;
   }
 }
+
+.discovery-targets { display: grid; gap: 12rem; margin: 24rem 0; max-height: 340rem; overflow-y: auto; }
+.discovery-targets .action { min-height: 56rem; }
+
+.statistics-vacancy-row b { transition: color var(--employer-hover-duration) var(--employer-hover-ease); }
