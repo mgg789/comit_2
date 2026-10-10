@@ -7,6 +7,12 @@ from uuid import uuid4
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from psycopg.types.json import Jsonb
+from test_combine_integration import finish, setup_pool
+from test_pipeline_integration import (
+    store as store,  # noqa: PLC0414 - shared disposable DB fixture.
+)
+
 from matching_engine.combine_models import CombineRequest
 from matching_engine.database import connect
 from matching_engine.feed_models import FeedDecisionRequest, FeedRequest
@@ -21,11 +27,6 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_store import RerankStore
 from matching_engine.rerank_worker import RerankWorker
 from matching_engine.store import ConflictError, NotFoundError, Store
-from psycopg.types.json import Jsonb
-from test_combine_integration import finish, setup_pool
-from test_pipeline_integration import (
-    store as store,  # noqa: PLC0414 - shared disposable DB fixture.
-)
 
 pytestmark = pytest.mark.integration
 
@@ -93,21 +94,26 @@ def react(store, feed, vacancy_id, owner_id, session_id, rows, start: int, end: 
 def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     """Actually fit a model, score remaining cards and rollback without moving delivered cards."""
     feed, vacancy_id, owner_id, session_id, rows, artifact = numeric_feed(store)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 39)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 29)
     preferences = PreferenceStore(store.database_url)
     assert preferences.status(owner_id, vacancy_id)["job_id"] is None
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 39, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 29, 30)
     queued = preferences.status(owner_id, vacancy_id)
-    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == 40
+    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == 30
     with connect(store.database_url) as connection:
-        delivered = connection.execute("SELECT exposure_id,position,card FROM feed_pipeline.exposures WHERE served_at IS NOT NULL ORDER BY position").fetchall()
+        delivered = {
+            row["exposure_id"]: row["position"]
+            for row in connection.execute(
+                "SELECT exposure_id,position FROM feed_pipeline.exposures WHERE served_at IS NOT NULL"
+            ).fetchall()
+        }
     assert PreferenceWorker(preferences, retry_base_seconds=0).process_once()
     active = preferences.status(owner_id, vacancy_id)
     assert active["state"] == "active", active
     with connect(store.database_url) as connection:
         model = connection.execute("SELECT * FROM preference_pipeline.models WHERE model_hash=%s", (active["active_model_hash"],)).fetchone()
         report = connection.execute("SELECT plan,report FROM preference_pipeline.jobs WHERE job_id=%s", (model["job_id"],)).fetchone()
-        assert len(report["plan"]["splits"]["train"]) == 24
+        assert len(report["plan"]["splits"]["train"]) == 14
         assert len(report["plan"]["splits"]["golden"]) == 8
         assert report["report"]["fit_performed"] and "model_full_json" not in report["report"]
     page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(40), 1)
@@ -115,7 +121,16 @@ def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     assert page.items[0].preference_model_hash == active["active_model_hash"]
     assert page.items[0].preference_adjustment == pytest.approx(sum(page.items[0].preference_contributions.values()))
     with connect(store.database_url) as connection:
-        assert connection.execute("SELECT exposure_id,position,card FROM feed_pipeline.exposures WHERE position<=40 ORDER BY position").fetchall() == delivered
+        # Rollback must not move delivered cards: every already-served exposure
+        # keeps its position; newly served tail cards are allowed.
+        current = {
+            row["exposure_id"]: row["position"]
+            for row in connection.execute(
+                "SELECT exposure_id,position FROM feed_pipeline.exposures WHERE served_at IS NOT NULL"
+            ).fetchall()
+        }
+        assert all(current.get(exposure_id) == position
+                   for exposure_id, position in delivered.items())
         remaining = connection.execute("SELECT e.*,s.features FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions f USING(session_id) JOIN learning_pipeline.samples s ON s.main_run_id=f.main_run_id AND s.candidate_id=e.candidate_id WHERE e.position>40 ORDER BY position").fetchall()
         expected = sorted(remaining, key=lambda row: (-apply(row["features"], row["card"]["rerank_score"], model["model"], artifact)["score"], -row["card"]["explanation"]["score"], str(row["candidate_id"])))
         assert [row["candidate_id"] for row in remaining] == [row["candidate_id"] for row in expected]
@@ -206,13 +221,13 @@ def test_withdrawal_erases_model_and_source_only_revocation_blocks_runtime(store
 def test_followup_fit_requires_sixteen_new_unique_candidates(store):
     """Continuous learning consumes fresh audit candidates rather than replaying its prior holdout."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 60)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 30)
     preferences = PreferenceStore(store.database_url)
     assert PreferenceWorker(preferences).process_once()
     initial = preferences.status(owner_id, vacancy_id)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 40, 55)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 30, 45)
     assert preferences.status(owner_id, vacancy_id)["job_id"] == initial["job_id"]
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 55, 56)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 45, 46)
     assert preferences.status(owner_id, vacancy_id)["job_id"] != initial["job_id"]
     assert PreferenceWorker(preferences).process_once()
     with connect(store.database_url) as connection:

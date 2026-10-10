@@ -48,3 +48,6 @@ export async function testingIntegrationRoutes(app: FastifyInstance,
     }
   });
 }
+
+/** Compatibility entry point retained for the testing contour; same authenticated HTTP contract. */
+export const registerTestingIntegration = testingIntegrationRoutes;

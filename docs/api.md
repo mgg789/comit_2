@@ -83,6 +83,13 @@ JWT и отзываемая DB-сессия. Нормализованный emai
 ревизии. Нулевая ревизия создаёт профиль. Поля proof, grade result, candidate ID,
 email и серверное время согласия запрещены в mutation.
 
+`fsp_id`/`fsp_claim_id` — server-managed поля: mutation профиля их отклоняет
+(`server_managed_field`). ФСП ID привязывается только демо-контуром
+`POST /candidate/profile/fsp/demo/authorize` → `/candidate/profile/fsp/demo/callback`;
+импортированные достижения реестра получают `confirmed`, сама привязка — evidence
+`partial` (демо-реестр). Отсутствие истории ФСП ничего не блокирует. Контур и
+коды ошибок — [verification.md](verification.md), [integration.md](integration.md).
+
 Editable narrative claims получают стабильный UUID на сервере. `facts` (домены,
 стеки, длительность, роль, production support) — структурированная декларация,
 а ссылка сама по себе не является evidence. Evidence возвращается отдельно и
@@ -634,3 +641,5 @@ read-only списки без сессии и без detail/PDF/contact-дост
 Доверенный producer `POST /internal/testing/session-result` принимает `X-Internal-Token`, сверяемый с `TESTING_ENGINE_TOKEN`, и поля `candidate_id`, `session_id`, `specialization`, `decided_grade`, `tasks_answered`, необязательный `supervision_badge`. Browser JWT не даёт права отправлять результаты. Запись результата, подтверждённое свидетельство `grade:trusted`, revision профиля и outbox проекции изменяются одной транзакцией. Повтор идентичного результата возвращает прежний результат без повторного начисления активности; повтор session_id с другим владельцем или содержимым — 409. Повторный тест разрешён через 7 дней, повышение оценки — через 30 дней.
 
 Этот контракт совместим с адаптивным publisher основного checkout. В данной ветке testing-engine предоставляет только blueprints и не содержит адаптивного publisher: автоматическая публикация требует подключения настоящего доверенного testing contour с `TESTING_API_URL` и `TESTING_ENGINE_TOKEN`. Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
+
+`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.

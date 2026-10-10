@@ -120,6 +120,28 @@ function factsFor(map: Map<string, ProfileEvidenceRow>, group: string, id: strin
   };
 }
 
+/**
+ * Grade result from the declared grade, upgraded to "approved" when the
+ * trusted testing contour has confirmed exactly this grade. Any mismatch
+ * (different grade, missing session) falls back to self_reported - the
+ * approved status is never inferred.
+ */
+function trustedGradeResult(map: Map<string, ProfileEvidenceRow>, declaredGrade: "intern" | "junior" | "middle" | "senior"): {
+  grade: "intern" | "junior" | "middle" | "senior";
+  status: "approved" | "self_reported";
+  test_session_id: string | null; approved_at: string | null;
+} {
+  const row = map.get("grade:trusted");
+  if (row?.status === "confirmed" && row.verified_value
+      && typeof row.verified_value === "object" && !Array.isArray(row.verified_value)
+      && (row.verified_value as Record<string, JsonValue>)["grade"] === declaredGrade) {
+    return { grade: declaredGrade, status: "approved",
+             test_session_id: String((row.verified_value as Record<string, JsonValue>)["session_id"] ?? ""),
+             approved_at: projectionTimestamp(row.checked_at) };
+  }
+  return { grade: declaredGrade, status: "self_reported", test_session_id: null, approved_at: null };
+}
+
 function narratives(fields: CandidateProfileFields, group: "projects" | "experience" | "achievements", map: Map<string, ProfileEvidenceRow>): ProjectionNarrative[] {
   return (fields[group] ?? []).map((item) => {
     const id = item.id as string;
@@ -142,6 +164,8 @@ function narratives(fields: CandidateProfileFields, group: "projects" | "experie
  * Build the exact matching intake from the API-owned source row.
  * Email is copied only from a verified account; declared grade is deliberately
  * self-reported and has no invented test session or approval timestamp.
+ * The FSP block is copied only from a server-confirmed registry evidence row;
+ * the registry display name never enters the snapshot.
  */
 export function projectCandidateIntake(
   account: ProjectionAccount,
@@ -173,7 +197,9 @@ export function projectCandidateIntake(
     ...(fields.relocation_cities !== undefined ? { relocation_cities: fields.relocation_cities } : {}),
     ...(fields.salary !== undefined ? { salary: fields.salary } : {}),
     ...(fields.primary_direction !== undefined ? { primary_direction: fields.primary_direction } : {}),
-    ...(declaredGrade ? { grade_result: { grade: declaredGrade, status: "self_reported" as const, test_session_id: null, approved_at: null } } : {}),
+    ...(declaredGrade
+      ? { grade_result: trustedGradeResult(map, declaredGrade as "intern" | "junior" | "middle" | "senior") }
+      : {}),
     consents: {
       processing: consent.processing,
       pool: consent.pool,

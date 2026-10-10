@@ -27,6 +27,9 @@ const PROFILE_CONSENT_VERSION = "profile-v1";
 const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY = /^[a-z][a-z0-9_-]*$/;
+const RETAKE_COOLDOWN_DAYS = 7;
+const UPGRADE_COOLDOWN_DAYS = 30;
+const GRADE_RANK: Record<string, number> = { intern: 0, junior: 1, middle: 2, senior: 3 };
 const FIELD_NAMES = new Set([
   "display_name", "phone", "city", "work_types", "relocation_ready", "relocation_cities", "salary",
   "primary_direction", "declared_grade", "domains", "stacks", "soft_skills", "description", "projects",
@@ -933,9 +936,8 @@ export class CandidateProfileStore {
         "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1", [candidateId])).rows[0];
       if (last) {
         const days = (Date.now() - last.decided_at.getTime()) / 86400000;
-        if (days < 7) throw new ProfileError(409, "retake_cooldown");
-        const ranks: Record<string, number> = { intern: 0, junior: 1, middle: 2, senior: 3 };
-        if (ranks[input.grade]! > ranks[last.grade]! && days < 30) throw new ProfileError(409, "grade_upgrade_cooldown");
+        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
+        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
       }
       const decidedAt = new Date();
       await client.query(`INSERT INTO candidate_grade_results

@@ -324,7 +324,7 @@ preference identity/order/score и исходный R₀; propensity остаё�
 
 ## Журнал сопоставимых гипотез
 
-Миграция `011_hypothesis_exploration.sql` добавляет `hypothesis_pipeline.controls/pairs/batches/commands`: owner/context/epoch, policy и comparison hashes, immutable allocation draw/probabilities, ссылки двух exposures, контраст и frozen first20 decisive batch. Отзыв consent/ревизии удаляет parameters/report payloads, оставляет audit/hash и invalidated marker. `feed_pipeline.exposures.exploration_suppressed` скрывает отменённые не доставленные добавления; served cards не меняются. `learning_pipeline.samples.sample_scope=main_top_k|exploration` отличает исходные selections от явно выбранных вне top-k research inputs; cohort counts main не переписываются. HMAC экспорт псевдонимизирует pair IDs, условные вероятности идут отдельно от null global propensity. [Подробности](hypothesis-learning.md).
+Миграция `012_hypothesis_exploration.sql` (исторически `011_…`, см. [matching-migrations.md](matching-migrations.md)) добавляет `hypothesis_pipeline.controls/pairs/batches/commands`: owner/context/epoch, policy и comparison hashes, immutable allocation draw/probabilities, ссылки двух exposures, контраст и frozen first20 decisive batch. Отзыв consent/ревизии удаляет parameters/report payloads, оставляет audit/hash и invalidated marker. `feed_pipeline.exposures.exploration_suppressed` скрывает отменённые не доставленные добавления; served cards не меняются. `learning_pipeline.samples.sample_scope=main_top_k|exploration` отличает исходные selections от явно выбранных вне top-k research inputs; cohort counts main не переписываются. HMAC экспорт псевдонимизирует pair IDs, условные вероятности идут отдельно от null global propensity. [Подробности](hypothesis-learning.md).
 
 Миграция `011_candidate_showcase.sql`: GIN публичной проекции, query-embedding
 cache 640D, источник feed-сессии tinder/showcase и manual exposure kind.
@@ -355,9 +355,16 @@ consent_version/consent_accepted_at, а не подменяют их време�
 # Внешняя верификация и документы
 
 `candidate_profile_evidence` хранит canonical input SHA-256, provider status, verified value и provenance. `candidate_verification_ledger` append-only записывает каждый provider result до замены latest evidence. Каждое подтверждение поднимает source revision и создаёт новый immutable outbox snapshot; профильная правка с изменённым input сбрасывает старый status. `candidate_fsp_demo_auth_states` хранит только hash short-lived state, выбранный fixture, revision и одноразовую отметку consumption. Imported facts несут immutable `provider_version` и server `imported_at`. `candidate_verification_documents` хранит только AES-256-GCM ciphertext и metadata со статусом `pending`; загрузка не является подтверждением.
+
+## ANN-индекс пула и durable feed refill
+
+Миграция matching `013_pool_ann.sql` добавляет HNSW cosine index по Harrier `vector(640)` для семантического канала витрины ([search-index.md](search-index.md)).
+
+Миграция `014_feed_refill.sql` расширяет `feed_pipeline.sessions` полями pool snapshot/hash/`refill_state`, создаёт `feed_pipeline.batches` и `feed_pipeline.refill_jobs` (partial unique на queued/running/retrying), а также lineage-поля на exposures. Уже выданные позиции не переписываются; [контракт](feed-refill.md).
+
 ## Статистика работодателя: чтение агрегатов
 
-API статистики читает общую PostgreSQL без новых таблиц и изменений исходных событий: source vacancy drafts, feed exposures/decisions/impressions и recruitment events. Один SQL-снимок, owner scope на всех источниках, таймаут 5 секунд; [определения метрик](employer-statistics.md). Приватные профили и learning features не входят в ответ.
+API статистики читает общую PostgreSQL без новых таблиц и изменений исходных событий: source vacancy drafts, feed exposures/decisions/impressions и recruitment events. Индексы для bounded owner/time чтений — API `008_statistics_reads.sql` и matching `015_statistics_reads.sql`. Один SQL-снимок, owner scope на всех источниках, таймаут 5 секунд; [определения метрик](employer-statistics.md). Приватные профили и learning features не входят в ответ.
 
 ## Глобальный агент и приватный vault
 
@@ -410,3 +417,5 @@ API-миграция `018_employer_expenses.sql` добавляет `employer_ex
 ### Подтверждённые результаты тестирования
 
 Миграция `019_testing_grades.sql` добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
+
+Миграция `020_training_consent_not_null.sql` закрывает SQL NULL-обход CHECK: включённое согласие требует явную версию v1/v2 и дату. Недопустимые старые строки не получают выдуманное согласие: миграция отклоняется до ручного исправления.

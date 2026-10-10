@@ -20,6 +20,9 @@ from matching_engine.rerank_hash import digest
 QWEN = "mlx-community/Qwen3.5-4B-MLX-4bit"
 LAYA = "aac6fef/laya-multilingual-mlx"
 PROMPT_VERSION = "rerank-synthetic-v1"
+# The shared experiment ceiling stays at the original 600: the cohort budget
+# is derived from it, and widening it silently relaxed the cohort invariants
+# (issue #12). The hard benchmark keeps its own separate allowance instead.
 LIMITS = {"generation": 120, "pair": 3000, "grade": 600}
 ENDPOINTS = {"generation": "/api/v1/chat/completions", "pair": "/v1/choice", "grade": "/v1/score"}
 SYSTEMONE_URL = "https://ai.sverk.tech/v1/systemone"

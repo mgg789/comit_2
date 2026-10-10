@@ -1,43 +1,50 @@
 # Opt-in accounts domain. SMTP remains the existing external LCT server, without provisioning changes.
+---
 services:
   api:
-    environment: &auth-env
+    environment: &1
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
-      AUTH_SECRET: ${AUTH_SECRET:-}
-      JWT_SECRET: ${JWT_SECRET:-}
-      AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:?Set explicit browser origins}
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
-      AUTH_KEY_ID: ${AUTH_KEY_ID:-v1}
-      ACCOUNT_CONSENT_VERSION: ${ACCOUNT_CONSENT_VERSION:-account-v1}
-      TRUST_PROXY: ${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}
-      SMTP_HOST: ${SMTP_HOST:-mail.droidje.com}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:?Set existing SMTP credentials}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:?Set existing SMTP credentials}
-      SMTP_FROM: ${SMTP_FROM:-Comit <noreply@mail.droidje.com>}
-      SMTP_TLS_SERVERNAME: ${SMTP_TLS_SERVERNAME:-mail.droidje.com}
+      AUTH_SECRET: "${AUTH_SECRET:-}"
+      JWT_SECRET: "${JWT_SECRET:-}"
+      AUTH_ALLOWED_ORIGINS: "${AUTH_ALLOWED_ORIGINS:?Set explicit browser origins}"
+      AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:-true}"
+      AUTH_KEY_ID: "${AUTH_KEY_ID:-v1}"
+      ACCOUNT_CONSENT_VERSION: "${ACCOUNT_CONSENT_VERSION:-account-v1}"
+      TRUST_PROXY: "${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}"
+      SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
+      SMTP_PORT: "${SMTP_PORT:-2525}"
+      SMTP_USER: "${SMTP_USER:?Set existing SMTP credentials}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:?Set existing SMTP credentials}"
+      SMTP_FROM: "${SMTP_FROM:-Comit <noreply@mail.droidje.com>}"
+      SMTP_TLS_SERVERNAME: "${SMTP_TLS_SERVERNAME:-mail.droidje.com}"
     depends_on:
       auth-migrate:
         condition: service_completed_successfully
-
+    extra_hosts:
+    - host.docker.internal:host-gateway
   auth-migrate:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/api.Dockerfile
-    command: ["node", "dist/auth/migrate.js"]
+    command:
+    - node
+    - dist/auth/migrate.js
     environment:
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
     depends_on:
       postgres:
         condition: service_healthy
-
   auth-mail-worker:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/api.Dockerfile
-    command: ["node", "dist/auth/mail-worker.js"]
-    environment: *auth-env
+    command:
+    - node
+    - dist/auth/mail-worker.js
+    environment: *1
     depends_on:
       auth-migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+    extra_hosts:
+    - host.docker.internal:host-gateway

@@ -155,3 +155,14 @@ tests/candidate-pipeline.test.ts tests/operations.test.ts`. Matching ownership:
 `PYTHONPATH=services/matching-engine/src python -m pytest
 services/matching-engine/tests/test_combine_routes.py -q`. Database integration
 отдельно требует выделенного `PIPELINE_TEST_DATABASE_URL` и не выполняется на live БД.
+
+## Локальная доставка кода в dev
+
+По умолчанию используется SMTP. Только при одновременных `NODE_ENV=development`
+и `DEV_AUTH_EXPOSE_CODE=true` API возвращает дополнительное поле `dev_code`
+в receipt обоих role endpoints. Это настоящий случайный OTP текущего challenge:
+HMAC, срок действия, лимиты, consent и одноразовая проверка остаются прежними.
+В этом режиме SMTP не нужен и запись в mail outbox не создаётся. Общий EmailLogin
+автоматически подставляет код при каждом запросе; подтверждение остаётся ручным.
+Код не пишется в логи. При включённом флаге вне development auth отказывает
+в конфигурации; production receipt никогда не содержит `dev_code`.

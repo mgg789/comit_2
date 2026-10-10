@@ -7,6 +7,8 @@ import { Action, Checkbox, Icon } from "./design";
 export interface EmailLoginReceipt {
   challenge_id: string;
   resend_after: string;
+  /** Present only when API development delivery is explicitly enabled. */
+  dev_code?: string;
 }
 
 /** Verification payload preserves the existing consent version and six-digit API contract. */
@@ -23,6 +25,11 @@ export const OTP_LENGTH = 6;
 /** Keep only digits, capped at the code length: typed, pasted and autofilled codes alike. */
 export function otpDigits(value: string): string {
   return value.replace(/\D/g, "").slice(0, OTP_LENGTH);
+}
+
+/** Use only a complete server-issued development code; production receipts clear stale input. */
+export function receiptCode(receipt: EmailLoginReceipt): string {
+  return receipt.dev_code && /^[0-9]{6}$/.test(receipt.dev_code) ? receipt.dev_code : "";
 }
 
 /** Shared email sign-in with injected role-specific APIs; session cookies remain server-managed. */
@@ -74,9 +81,12 @@ export function EmailLogin<Account>({
     setBusy(true);
     setError(null);
     try {
-      if (!receipt)
-        setReceipt(await requestCode(email.trim()));
-      else {
+      if (!receipt) {
+        const issued = await requestCode(email.trim());
+        setReceipt(issued);
+        setCode(receiptCode(issued));
+        setCodePosition(0);
+      } else {
         const session = await verifyCode({
           email: email.trim(),
           challenge_id: receipt.challenge_id,
@@ -130,7 +140,7 @@ export function EmailLogin<Account>({
         <h1>
           {receipt ? (
             <>
-              Мы отправили вам код на email:
+              {receipt.dev_code ? "Код для входа в dev уже подставлен:" : "Мы отправили вам код на email:"}
               <br />
               <span>{email}</span>
             </>
@@ -211,7 +221,7 @@ export function EmailLogin<Account>({
               Продолжить
             </Action>
             <p className="otp-note">
-              Проверьте папки Рассылки и Спам если не видите письмо во Входящих
+              {receipt.dev_code ? "Режим разработки: нажмите Продолжить для входа." : "Проверьте папки Рассылки и Спам если не видите письмо во Входящих"}
             </p>
           </>
         ) : (

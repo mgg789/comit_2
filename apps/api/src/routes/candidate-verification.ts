@@ -128,6 +128,7 @@ export async function candidateVerificationRoutes(app: FastifyInstance, options:
     schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], body: candidateVerificationRequestSchema, response: { 200: resultSchema } }, onRequest: guard,
   }, async (request, reply) => {
     const identity = identities.get(request);
+    if (process.env.NODE_ENV !== "development" || process.env.FSP_DEMO_ENABLED !== "true") return reply.code(503).send({ detail: "fsp_demo_disabled" });
     const fixture = request.body.demo_fixture_id;
     if (!identity || (fixture !== "fsp-001" && fixture !== "fsp-002")) return reply.code(400).send({ detail: "demo_fixture_required" });
     try {
@@ -141,6 +142,7 @@ export async function candidateVerificationRoutes(app: FastifyInstance, options:
   app.post<{ Body: { expected_revision: number; state: string; code: string }; Reply: unknown }>("/candidate/profile/fsp/demo/callback", {
     schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], body: { type: "object", additionalProperties: false, required: ["expected_revision", "state", "code"], properties: { expected_revision: { type: "integer", minimum: 1 }, state: { type: "string", minLength: 20, maxLength: 256 }, code: { type: "string", minLength: 20, maxLength: 256 } } }, response: { 200: candidateProfileViewSchema } }, onRequest: guard,
   }, async (request, reply) => {
+    if (process.env.NODE_ENV !== "development" || process.env.FSP_DEMO_ENABLED !== "true") return reply.code(503).send({ detail: "fsp_demo_disabled" });
     const identity = identities.get(request);
     if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
     try {

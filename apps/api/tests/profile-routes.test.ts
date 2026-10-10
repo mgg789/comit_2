@@ -62,6 +62,7 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
     let impressionCalls = 0;
     let mutateExposureAfterPdf = false, exposureReads = 0;
     const forwarded: Array<{ path: string; owner: string | null }> = [];
+    let published = true;
     const transport: typeof fetch = async (input, init) => {
       const url = new URL(String(input));
       const owner = new Headers(init?.headers).get("x-owner-id");
@@ -69,7 +70,7 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
       if (url.pathname.startsWith("/internal/vacancy-drafts/")) {
         if (owner !== employer.id) return Response.json({ detail: "owner_record_not_found" }, { status: 404 });
         return Response.json({ draft_id: draftId, vacancy_id: vacancyId, owner_id: employer.id, revision: 1,
-          state: "created", fields: {}, publication: { status: "accepted", source_revision: 1 } });
+          state: "created", business_status: published ? "open" : "draft", archived: false, fields: {}, publication: { status: "accepted", source_revision: 1 } });
       }
       if (url.pathname.includes("/feed/exposures/")) {
         exposureReads += 1;
@@ -130,6 +131,13 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
     const path = `/employer/vacancy-drafts/${draftId}`;
     const employerHeaders = { authorization: employer.authorization, "x-owner-id": foreignEmployer.id };
     assert.equal((await app.inject({ url: `${path}/selections`, headers: { authorization: foreignEmployer.authorization, "x-owner-id": employer.id } })).statusCode, 404);
+    published = false;
+    const beforeUnpublished = forwarded.length;
+    const unavailable = await app.inject({ url: `${path}/selections`, headers: employerHeaders });
+    assert.equal(unavailable.statusCode, 409, unavailable.body);
+    assert.equal(unavailable.json().detail, "vacancy_not_published");
+    assert.equal(forwarded.length, beforeUnpublished + 1, "unpublished source must not reach matching");
+    published = true;
     const selection = await app.inject({ url: `${path}/selections?limit=1&offset=0`, headers: employerHeaders });
     assert.equal(selection.statusCode, 200, selection.body);
     assert.equal(selection.json<SelectionPage>().items[0].resume_url, `/api${path}/candidates/${candidate.id}/resume.pdf`);

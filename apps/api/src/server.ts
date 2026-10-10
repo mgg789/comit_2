@@ -42,7 +42,7 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
     genReqId: request => validatedRequestId(request.headers["x-request-id"]),
   });
 
-  let operationConfig;
+  let operationConfig: ReturnType<typeof loadAuthConfig> | undefined;
   try { operationConfig = loadAuthConfig(); } catch { /* Offline APIs still receive a bounded local quota. */ }
   const operationsPool = operationConfig && process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL,
     max: 4, connectionTimeoutMillis: 5000, statement_timeout: 5000 }) : undefined;
@@ -71,7 +71,11 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
     limit: Number(process.env.API_RATE_LIMIT ?? 240), windowSeconds: Number(process.env.API_RATE_WINDOW_SECONDS ?? 60),
     maxFallbackKeys: Number(process.env.API_RATE_FALLBACK_KEYS ?? 10000) });
   await app.register(swaggerUi, { routePrefix: "/docs" });
-  await app.register(healthRoutes);
+  await app.register(healthRoutes, { readiness: async () => {
+    if (!operationConfig || !operationsPool) return false;
+    const result = await operationsPool.query("SELECT 1 FROM auth_migrations WHERE name=$1", ["020_training_consent_not_null.sql"]);
+    return result.rowCount === 1;
+  } });
   await app.register(cookie);
   await app.register(candidatePipelineRoutes);
   await app.register(agentsRoutes);

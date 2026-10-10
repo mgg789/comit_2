@@ -5,7 +5,7 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @comit/api build
+RUN pnpm --filter @comit/shared --filter @comit/api build
 # deploy prunes to production deps for this workspace package only
 RUN pnpm --filter @comit/api deploy --prod /out
 

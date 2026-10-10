@@ -87,7 +87,7 @@ export interface ApiClient {
   downloadOrganizationDocument(documentId: string): Promise<AgentsDocumentDownload>;
   /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
   getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
-  /** Queue a role-bound code; the receipt never contains the OTP. */
+  /** Request a role-bound code; explicit development delivery may return dev_code. */
   requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
   /** Verify a code, including account consent only for first registration. */
   verifyLoginCode(role: AccountRole, body: EmailCodeVerification): Promise<AuthenticatedSession>;

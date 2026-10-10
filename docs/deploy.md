@@ -1,33 +1,159 @@
-# Deploy — mgg-server
+# Deploy — production по умолчанию
 
-> Решение 2026-10-05: деплой в `/home/mgg/comit` под пользователем `mgg` (без sudo), сам сборщик — deploy-workflow на self-hosted раннере.
+`infra/docker-compose.yml` содержит полный production runtime. `docker-compose.prod.yml`
+сохраняет совместимость существующего deploy workflow и содержит тот же стек.
+Наружу публикуется один web: `/`, `/candidate/`, `/employer/`, `/api/`.
+Testing UI исключён; testing-engine остаётся внутренним backend. Его порт, как и
+порты API/engines, опубликован только на loopback для smoke и диагностики.
 
-## Схема
+## Подготовка
 
+Скопировать `.env.example` в приватный `.env`, заполнить все обязательные значения.
+Compose намеренно останавливается при пустом production секрете. Обязательны:
+`POSTGRES_PASSWORD`, `AUTH_SECRET` (не менее 32 байт), `AUTH_ALLOWED_ORIGINS` (HTTPS),
+`PUBLIC_SITE_URL` (HTTPS), `TRUST_PROXY` (доверенные proxy IP/CIDR),
+`CANDIDATE_PIPELINE_TOKEN`, `AGENTS_SERVICE_TOKEN`, `VERIFICATION_ENGINE_TOKEN`,
+`VERIFICATION_DOCUMENT_KEY`, `TESTING_ENGINE_TOKEN`, `CHAT_SERVICE_TOKEN`,
+`CHAT_DEVICE_SECRET`, `CHAT_SIGNING_KEY`, `QGRAMM_MANAGEMENT_SECRET`,
+`QGRAMM_MASTER_KEY`, `QGRAMM_HPKE_KEY`, `SMTP_USER`, `SMTP_PASSWORD`,
+`DEEPSEEK_API_KEY`. `JEV_API_KEY` и `JEV_LOCAL_URL` — дополнительные провайдеры: без них соответствующие ИИ-возможности явно недоступны, ручное редактирование остаётся доступным.
+Ключи QGramm сохранять неизменными вместе с `chat-data`; base64 ключи должны
+декодироваться в 32 байта. Значения API pricing должны соответствовать реальным тарифам.
+
+Перед первым запуском provision точную Harrier revision в `harrier_cache`:
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml build matching-engine
+docker compose --env-file .env -f infra/docker-compose.yml run --rm --no-deps matching-engine python -c 'from huggingface_hub import snapshot_download; from matching_engine.embeddings import MODEL_ID, MODEL_REVISION; snapshot_download(MODEL_ID, revision=MODEL_REVISION)'
+docker compose --env-file .env -f infra/docker-compose.yml config --quiet
+make up
+make smoke
 ```
-push main ──► deploy.yml (runner mgg-ci-*, контейнер docker на сервере)
-                ├─ cp /home/mgg/comit/.env .env  (+ *_PORT из него в env smoke)
-                ├─ docker compose -p comit --env-file .env -f infra/docker-compose.prod.yml up -d --build
-                ├─ ./tests/smoke.sh  (порты из серверного .env)
-                └─ docker image prune -f
+
+Provisioning скачивает публичную модель; runtime использует только точный локальный
+snapshot. `/ready` matching возвращает 503 при отсутствии модели или миграций.
+Ни модель, ни сторонние AI/SMTP endpoints не разворачиваются автоматически.
+По разрешению пользователя production использует существующий SMTP relay Navix:
+`SMTP_HOST=host.docker.internal`, `SMTP_PORT=2525`. API и mail worker получают
+`host.docker.internal:host-gateway`; SMTP credentials и sender повторно используются
+только через приватное server env. `SMTP_TLS_SERVERNAME=mail.droidje.com` сохраняет
+проверку сертификата при STARTTLS. Проверка TLS обязательна, relay и его конфигурация
+этой интеграцией не изменяются.
+Отсутствующий `HH_API_TOKEN` оставляет HH verification явно недоступной.
+Production выключает OTP code exposure и FSP demo fixtures. Реального FSP registry
+контракта пока нет: 503 означает недоступную интеграцию, а не подтверждённую историю.
+
+## Порядок и данные
+
+Migration jobs сериализованы: PostgreSQL healthy → candidate-migrate → agents-migrate
+→ auth-migrate. Последний применяет все API migrations, включая expense triggers
+для уже существующих agents tables. HTTP runtime и workers ждут необходимых migrations;
+API дополнительно ждёт готовые engines/chat, web ждёт API readiness.
+Работают auth/notification mail worker, candidate profile и recommendation workers,
+candidate/vacancy/combine/rerank/feed-refill/preference workers и оба agents workers.
+
+Project name `comit`, volumes `pgdata`, `harrier_cache`, `chat-data` сохранены.
+`make down` сохраняет volumes. `down -v` запрещён без отдельного разрешения пользователя.
+
+## Явный dev-режим
+
+```bash
+make dev-up
+SMOKE_MODE=dev make smoke
+make dev-down
 ```
 
-- Стек живёт в Docker с `COMPOSE_PROJECT_NAME=comit` (имена `comit-web-1`, `comit-api-1`, ...), checkout раннера — временный, контейнеры от него не зависят.
-- Секреты: `/home/mgg/comit/.env` (создаётся один раз вручную по `.env.example`; `POSTGRES_PASSWORD` и `JWT_SECRET` обязательны — prod compose падает без них намеренно).
-- Порты на сервере (из `/home/mgg/comit/.env`, задеваем чужие): web `8088`, api `28080`, matching `28101`, testing `8102`, integration `8103` — 8080/8101 на хосте заняты другими контейнерами (kan-web и пр.). Deploy-workflow подхватывает эти порты в smoke автоматически. Наружу публикуется только web; api и engines в prod compose привязаны к `127.0.0.1`, postgres не публикуется.
+Это отдельный `infra/docker-compose.dev.yml` с `--profile dev`, project `comit-dev`
+и изолированными volumes. Не объединять dev/prod файлы: development настройки
+заданы только в явном dev entry point. Dev Makefile явно использует `--env-file /dev/null`, поэтому production `.env`
+не читается. Для собственной dev-конфигурации используйте отдельный `--env-file`. Передать другие host ports, если
+production уже работает. Здесь разрешены localhost HTTP cookies, synthetic
+non-secret service keys, локальная выдача OTP и FSP demo. Mail worker по умолчанию исключён из dev
+(профиль `prod` в dev-файле требует реального SMTP); OTP не создаёт mail outbox.
+Уведомления доступны в системном inbox, внешняя email доставка dev не включена. AI providers остаются
+реальными; без их конфигурации запросы явно недоступны. Harrier provision необходим
+и для dev (те же run/build команды с dev файлом, project `comit-dev`, `--profile dev`).
 
-## Операции
+## Сервер
 
-| Действие | Команда (на mgg-server) |
-|---|---|
-| Статус | `docker compose -f /home/mgg/comit/infra/docker-compose.prod.yml ps` — точнее: `docker ps --filter name=comit-` |
-| Логи | `docker logs -f comit-web-1` / `comit-api-1` / ... |
-| Рестарт сервиса | `docker compose -p comit -f /home/mgg/comit/infra/docker-compose.prod.yml restart api` |
-| Полная пересборка | push в `main` или `gh workflow run deploy.yml` |
-| Откат | `git checkout <prev-tag/commit>` на main + повторный deploy |
+Deploy target: `/home/mgg/comit`, пользователь `mgg`, существующий self-hosted workflow.
+Приватный `/home/mgg/comit/.env` перед deployment должен быть дополнен указанными
+обязательными настройками. Deploy workflow использует production compatibility file.
+Интерактивные операции на сервере требуют явной команды пользователя.
+Smoke проверяет bounded HTTP readiness, storage showcase, auth boundaries и отсутствие
+testing UI; curl не проверяет JS userflow, доставку SMTP или реальный AI вызов.
 
-## Правила
+## CD: exact SHA, backup и rollback
 
-- Интерактивные операции на сервере — только по явной команде пользователя (AGENTS §13).
-- `down -v` (снос volumes) на prod — запрещён без явной команды: там данные демо.
-- Деплой обязан заканчиваться зелёным smoke — красный деплой откатывается.
+`Deploy` запускается после успешного `CI` на `main`; ручной запуск также проверяет
+последний успешный CI именно для текущего SHA `main`. Устаревший результат не
+разворачивается. GitHub concurrency и host `flock` сериализуют переходы.
+`infra/deploy.py` извлекает `git archive` в `/home/mgg/comit/releases/<SHA>`.
+Приватный env читается только через `--env-file /home/mgg/comit/.env`, не копируется
+в checkout/release и не выводится в лог. Требуются Python 3, Docker Compose v2
+с `--wait`, существующие production volumes и доступные исходные Compose файлы
+текущего runtime. Первый bootstrap и исправление неполного предыдущего snapshot
+требуют отдельной подготовки: CD останавливается до изменения работающих сервисов.
+
+До перехода проверяются resolved Compose, HTTPS origins, secure cookies, production
+mode, отключённые dev flags и точные identities `comit_pgdata`, `comit_chat-data`,
+`comit_harrier_cache`. Образы собираются заранее с уникальными SHA tags и OCI
+`org.opencontainers.image.revision`; build label проверяется до запуска. Runtime
+получает `COMIT_RELEASE=<SHA>`. Новая попытка с уже существующим release directory
+останавливается: сначала нужно расследовать предыдущую попытку.
+
+Перед migration jobs создаётся PostgreSQL custom-format backup с правами 600 в
+`/home/mgg/comit/backups`; `pg_restore --list` проверяет читаемость архива.
+Это проверка структуры архива, не практическая проверка восстановления данных.
+Миграции должны быть additive и совместимыми с предыдущими app images: проверка
+миграций входит в code review перед `main`, скрипт не доказывает совместимость SQL.
+Во время успешного перехода выполняются local smoke и публичный HTTPS smoke с
+проверкой readiness, showcase, auth boundaries и отсутствия testing UI.
+
+При ошибке запуска/smoke CD пытается восстановить предыдущие immutable image IDs
+приложений через предыдущие Compose файлы с `--no-deps --no-build`. PostgreSQL,
+volumes и migration jobs rollback не запускает; downgrade/restore базы автоматически
+не выполняется. Rollback при несовместимой миграции не гарантируется; требуется
+ручной план восстановления. Служебный manifest содержит SHA, backup path и image
+IDs, но не environment. `/home/mgg/comit/current` переключается только после smoke.
+Не выполняются `down`, удаление volumes или image prune.
+
+Локальная регрессия preflight: `python3 tests/deploy-config.py`.
+
+
+### Первый переход с legacy stack
+
+Для проверенного старого runtime (ровно `web`, `api`, `matching-engine`, `postgres`,
+`testing-engine`, `integration-engine`) предусмотрен отдельный ручной input
+`adopt_legacy=true`. Workflow передаёт `--adopt-legacy` только при manual dispatch;
+автоматический CI-trigger никогда не включает adoption. SHA всё равно должен быть
+текущим `main` с успешным CI. Флаг отвергает любую другую комбинацию live services.
+
+Перед этим переходом оператор отдельно provision'ит `comit_chat-data` и
+`comit_harrier_cache`, включая exact Harrier snapshot; deploy их не создаёт.
+Фактический live mount `comit_pgdata` проверяется и сохраняется. Старому matching
+без `/models` не приписывается новый volume: mount добавляется только новой версии.
+При неудаче останавливаются только вновь введённые сервисы (включая workers и
+migration containers), без удаления containers/volumes; image rollback возвращает
+пять прежних приложений через старый Compose с `--no-deps --no-build`.
+База остаётся после additive migrations; прежние образы должны быть совместимы
+с ними. Последующие deployments используют строгий полный snapshot без adoption.
+
+Backend тестирования получает `TESTING_API_URL` и внутренний токен; данные сессий сохраняются в `testing-data`. UI testing-контура не публикуется.
+
+
+Rollback adoption читает только заранее подготовленный приватный snapshot
+`/home/mgg/comit/legacy/compose.json` (права 600): точный resolved старый Compose,
+ровно шесть legacy services, project `comit`, прежний `comit_pgdata`.
+Resolved snapshot содержит приватные environment значения; его нельзя печатать
+или сохранять в Git/artifacts. Его bind sources (nginx config, postgres init и другие)
+нужно предварительно скопировать внутрь `/home/mgg/comit/legacy/` и скорректировать
+пути snapshot: runner workspace меняется при checkout. Скрипт отвергает mutable bind
+sources. При обычном CD предыдущие Compose files и working directory должны быть
+в `/home/mgg/comit/releases/<SHA>/`; runner workspace источником rollback не служит.
+
+Домен `comit.droidje.com` обслуживает host nginx (образец: `infra/nginx/comit.droidje.com.conf`), проксируя gateway на `127.0.0.1:8088`. HTTP ACME challenge обслуживается из `/var/www/comit-acme`, остальные HTTP-запросы перенаправляются на HTTPS. Сертификат Let’s Encrypt находится в `/etc/letsencrypt/live/comit.droidje.com/`; host `certbot.timer` включён, scoped deploy hook проверяет nginx и перезагружает его после продления именно этого домена. Перед изменением vhost обязательны `nginx -t` и проверка внешнего ACME маршрута.
+
+SMTP использует существующий host relay Navix на порту 2525; STARTTLS проверяет имя `mail.droidje.com`. Учетные данные хранятся только в server `.env`, TLS-проверка не отключается. Сам SMTP/Navix сервис не модифицируется.
+
+При первом переходе автоматический CD main заранее отклоняет legacy-стек, не занимая каталог SHA; тот же проверенный SHA затем можно выкатить ручным dispatch с `adopt_legacy=true`. Повтор после ошибки сборки существующего release требует сначала осмотреть его состояние; deployment не перезаписывает release автоматически.

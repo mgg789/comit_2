@@ -1,3 +1,11 @@
+## Полный runtime и режимы
+
+Production запускается `make up`, dev явно `make dev-up`; конфигурация и обязательные
+секреты перечислены в [deploy.md](deploy.md). Legacy overlays больше не нужны для
+полного runtime. `make down` сохраняет БД/chat/model volumes. Перед первым запуском
+provision точную модель Harrier. При 503 `/ready` matching сначала проверить cache и
+успешное завершение migration jobs; не заменять модель fake embeddings.
+
 # Runbook — типовые операции
 
 Candidate-pipeline overlay теперь запускает `rerank-worker`. На ещё не активированной
@@ -31,9 +39,8 @@ challenge. После доставки/истечения/пяти неудач�
 удаляется. Повтор письма после crash между SMTP ACK и фиксацией ACK возможен;
 реальную доставку этим локальным запуском не считать проверенной.
 
-Опциональный compose overlay `infra/docker-compose.auth.yml` добавляет только
-auth-migration и mail-worker, использует существующий PostgreSQL и внешний SMTP;
-новый SMTP-сервис не создаётся. Не применять `down -v` для auth-проверки.
+Полный production Compose включает auth-migration и mail-worker (OTP и уведомления).
+Внешний SMTP остаётся существующим; новый SMTP-сервис не создаётся. Не применять `down -v` для auth-проверки.
 
 Тестовые БД auth должны быть раздельными и одноразовыми:
 
@@ -133,8 +140,9 @@ Runtime использует `local_files_only=True`, не требует вне
 кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
 
 Опциональный **локальный** compose-overlay включает миграции перед серверами и
-отдельные candidate-, vacancy- и combine-worker (rerank-worker в overlay нет — см.
-«Baseline R₀»); базовый `make up` сам по себе worker не запускает:
+отдельные candidate-, vacancy-, combine-, rerank-, feed-refill- и preference-worker
+(см. «Baseline R₀», [feed-refill.md](feed-refill.md), [preference-learning.md](preference-learning.md));
+базовый `make up` сам по себе worker не запускает:
 
 ```bash
 docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
@@ -156,8 +164,18 @@ PORT=38101 PYTHONPATH=services/matching-engine/src services/matching-engine/.ven
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine vacancy-worker
 PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine combine-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine rerank-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine feed-refill-worker
+PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m matching_engine preference-worker
 PORT=38080 pnpm --filter @comit/api start
 ```
+
+`preference-worker` выполняет автоматические operational fits vacancy-local
+моделей по реакциям ленты (30 уникальных реакций на первый fit, 16 свежих на
+повтор); он требует миграций 009/011 и training-v1 consent каждого участника.
+Без активной модели лента отдаёт baseline-порядок; rollback/reset — через
+employer preference routes. Research-показы гипотез включаются управлением
+vacancy (`/hypotheses/{pause|resume|reset}`).
 
 `/healthz` означает живой процесс; matching `/ready` проверяет token, миграции/БД
 и наличие pinned модели. Не считать healthz доказательством готового пула.
@@ -310,7 +328,7 @@ Retry сохраняет идемпотентность и не возвраща
 1. `python tests/rerank_pilot.py`:5 профилей/20 сравнений, без расхода grade-бюджета.
 2. `python -m matching_engine.rerank_experiment manifest`, затем `generate`.
    Последняя команда отказывает после проваленного пилота. Лимиты с учётом
-   повторов:60 семейств/600 профилей/3000 pair/600 grade; cache/usage сохраняются.
+   повторов:60 семейств/600 профилей/3000 pair/700 grade (grade поднят 600 → 700 07.10.2026); cache/usage сохраняются.
 3. `python -m matching_engine.rerank_experiment train`: только cached данные.
    Source/семейства фиксированы, нормализация train-only, C выбирается по validation.
    Dataset/code seals запрещают настройку по уже раскрытому golden; максимум2

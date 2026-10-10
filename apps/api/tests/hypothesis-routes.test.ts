@@ -65,7 +65,7 @@ test("hypothesis gateway scopes controls to the employer and preserves validatio
           return Response.json({ detail: "owner_record_not_found" }, { status: 404 });
         }
         return Response.json({ draft_id: returnedDraft, vacancy_id: vacancyId, owner_id: returnedOwner,
-          revision: 1, state: "created", fields: {}, publication: { status: publicationAccepted ? "accepted" : "queued", source_revision: 1 } });
+          revision: 1, state: "created", business_status: "open", archived: false, fields: {}, publication: { status: publicationAccepted ? "accepted" : "queued", source_revision: 1 } });
       }
       if (url.pathname.startsWith(`/internal/vacancies/${vacancyId}/hypotheses`)) {
         assert.equal(owner, employer.id);

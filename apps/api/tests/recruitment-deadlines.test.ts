@@ -9,7 +9,16 @@ import {ProfileStore} from '../src/profiles/store.js';
 import {RecruitmentStore,validateRejectionFeedback} from '../src/recruitment/store.js';
 import {SystemNotificationsStore} from '../src/notifications/system-store.js';
 const databaseUrl=process.env.RECRUITMENT_DEADLINES_TEST_DATABASE_URL;
-if(databaseUrl){const u=new URL(databaseUrl);if(u.hostname!=='127.0.0.1'||u.port!=='41033'||!/^\/hiring_test_[a-z0-9_]+$/.test(u.pathname))throw new Error('isolated_database_required');}
+if (databaseUrl) {
+  const isolated = new URL(databaseUrl);
+  // A disposable instance may use a random local port or the CI service hostname.
+  // Never infer isolation from port 41033: a live database can share that port.
+  if (process.env.COMIT_DISPOSABLE_DATABASE_TESTS !== '1'
+    || !['127.0.0.1', 'localhost', '[::1]', 'postgres'].includes(isolated.hostname)
+    || !/^\/hiring_test_[0-9]+_[a-f0-9]+$/.test(isolated.pathname)) {
+    throw new Error('isolated_database_required');
+  }
+}
 const feedback='The candidate needs more production experience designing distributed services and debugging API integrations before this technical role would be suitable.';
 type Fields<T=RecruitmentAction>=T extends RecruitmentAction?Omit<T,'expected_revision'|'idempotency_key'>:never;
 test('working clocks exclude Moscow weekends including weekend starts',()=>{

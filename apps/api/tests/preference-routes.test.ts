@@ -45,6 +45,7 @@ test("preference gateway enforces employer auth, draft ownership, forwarding and
       eligible_reactions: 12, fresh_reactions: 2, job_id: null, job_state: null, error_code: null,
       policy_hash: "preference-policy-test", selection_bias: "deterministic_feedback_unknown_propensity",
     };
+    let published = true;
     const transport: typeof fetch = async (input, init) => {
       const url = new URL(String(input));
       const owner = new Headers(init?.headers).get("x-owner-id");
@@ -52,7 +53,7 @@ test("preference gateway enforces employer auth, draft ownership, forwarding and
       if (url.pathname.startsWith("/internal/vacancy-drafts/")) {
         if (owner !== employer.id) return Response.json({ detail: "owner_record_not_found" }, { status: 404 });
         return Response.json({ draft_id: draftId, vacancy_id: vacancyId, owner_id: employer.id, revision: 1,
-          state: "created", fields: {}, publication: { status: "accepted", source_revision: 1 } });
+          state: "created", business_status: published ? "open" : "draft", archived: false, fields: {}, publication: { status: "accepted", source_revision: 1 } });
       }
       if (url.pathname.startsWith(`/internal/vacancies/${vacancyId}/preferences`)) return Response.json(status);
       return Response.json({ detail: "not_found" }, { status: 404 });
@@ -73,6 +74,14 @@ test("preference gateway enforces employer auth, draft ownership, forwarding and
     assert.deepEqual(read.json<PreferenceStatus>(), status);
     assert.equal(forwarded.at(-1)?.owner, employer.id);
     assert.equal(forwarded.at(-1)?.path, `/internal/vacancies/${vacancyId}/preferences`);
+
+    published = false;
+    const beforeUnpublished = forwarded.length;
+    const unavailable = await app.inject({ url: path, headers: employerHeaders });
+    assert.equal(unavailable.statusCode, 409, unavailable.body);
+    assert.equal(unavailable.json().detail, "vacancy_not_published");
+    assert.equal(forwarded.length, beforeUnpublished + 1, "unpublished source must not reach matching");
+    published = true;
 
     const command = { idempotency_key: randomUUID(), expected_revision: status.revision };
     for (const action of ["retry", "reset", "rollback"] as const) {

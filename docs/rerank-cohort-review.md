@@ -72,3 +72,22 @@ decisive_vs_insufficient и tie_vs_insufficient, причины и число н
 
 Модуль не вызывает API, не читает credentials и не обучает модель.
 Существующий v7 manifest/code hash не меняется: это отдельный операторский инструмент.
+
+## Выполненная user20 проверка repair-v4 (08.10.2026)
+
+Слепая пользовательская проверка по policy-corrected пакету
+`rerank-grounded-pair-repair-v4/reviews/user-packet.json`
+(packet_hash `0f8314c5…`, base — v9 user-packet `1da2247e…`) выполнена Mike
+и запечатана: `user-comparison-6d149ab0….json` (report_hash `9fc71db7…`).
+
+Результат: **17/20 согласий с учителем, 0 factual issues** —
+2 preference_reversal (mobile-07: user B / teacher A; data-02: user A / teacher B)
+и 1 decisive_vs_tie (qa-01: user B / teacher tie), каждая с reason проверяющего.
+Ассистентская проверка того же пакета — 20/20. Формальные метки датасета
+не менялись; disagreements остаются в отчёте как расхождение человека с учителем.
+
+Это закрывает человеческую leg валидации разметки repair-v4. Численные
+activation gates (ΔNDCG ≥ 0.02 и положительные bootstrap-границы) по-прежнему
+не выполнены — артефакт `c18f4bc1` продолжает sort-only rollout;
+[дополнительный сложный бенчмарк](rerank-hard-benchmark.md) показывает, что
+сама калибровка NDCG-порога требует решения оператора.

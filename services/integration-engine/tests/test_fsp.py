@@ -1,5 +1,13 @@
+import pytest
 from fastapi.testclient import TestClient
 from integration_engine.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def explicit_development_registry(monkeypatch):
+    """Registry fixtures are synthetic and must never be the production default."""
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("FSP_DEMO_ENABLED", "true")
 
 
 def test_healthz_reports_ok() -> None:
@@ -60,3 +68,16 @@ def test_demo_token_exchange_fails_closed_without_internal_token() -> None:
     client = TestClient(create_app())
     response = client.post("/fsp/demo/token", json={"code": "code", "state": "state"})
     assert response.status_code == 503
+
+
+@pytest.mark.parametrize("environment,flag", [("production","true"),("development","false"),("production","false")])
+def test_production_never_serves_synthetic_registry(monkeypatch, environment, flag):
+    monkeypatch.setenv("APP_ENV", environment)
+    monkeypatch.setenv("FSP_DEMO_ENABLED", flag)
+    client = TestClient(create_app(demo_internal_token="test-only-token"))
+    for path in ["/fsp/participants", "/fsp/participants/fsp-001", "/fsp/participants/fsp-001/achievements/a"]:
+        assert client.get(path).status_code == 503
+    assert client.post("/fsp/verify", json={"fsp_id":"fsp-001","claimed_rating":1}).status_code == 503
+    assert client.post("/fsp/demo/authorize", json={"state":"s","redirect_uri":"http://localhost:8080/candidate/profile/fsp/demo/callback","fixture_id":"fsp-001"}).status_code == 503
+    assert client.post("/fsp/demo/token", json={"code":"c","state":"s"}).status_code == 503
+    assert client.get("/healthz").status_code == 200

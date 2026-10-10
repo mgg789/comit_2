@@ -43,7 +43,10 @@ def test_cold_start_is_explicit_and_never_fits(monkeypatch: pytest.MonkeyPatch) 
         raise AssertionError("fit must not run for insufficient data")
 
     monkeypatch.setattr(evaluation, "fit_preference_model", unavailable)
-    report = evaluation.evaluate({"cold": context(train=23)}, BASELINE, "synthetic", "dataset", "split")
+    # One row below the live-policy train minimum (14 since the 30-reaction
+    # first-fit decision, issue #11): the evaluator must still refuse to fit.
+    report = evaluation.evaluate({"cold": context(train=evaluation.MINIMUMS["train"] - 1)},
+                                 BASELINE, "synthetic", "dataset", "split")
     assert report["status"] == "needs_more_data"
     assert report["contexts"]["cold"]["status"] == "needs_more_data"
     assert report["contexts"]["cold"]["fit"] is None
