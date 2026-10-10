@@ -1,6 +1,9 @@
 /** Participant-authenticated post-selection endpoints; chat routes share this domain's invitation grants. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard } from "@comit/shared";
+import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard, RecruitmentView, RecruitmentPage } from "@comit/shared";
+import type { EmployerProfileStore } from "../employers/store.js";
+import { enrichRecruitmentUnread } from "../chat/unread.js";
+import { chatConfiguration } from "./chat.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { correlatedFetch } from "../operations/index.js";
 import type { AccountGatewayOptions } from "./accounts.js";
@@ -11,7 +14,10 @@ import {
 } from "../recruitment/schemas.js";
 
 /** Reuse auth/profile dependencies and injectable private transports without exposing service credentials. */
-export interface RecruitmentOptions extends AccountGatewayOptions { recruitment: RecruitmentStore }
+export interface RecruitmentOptions extends AccountGatewayOptions {
+  employerProfiles?: EmployerProfileStore;
+  recruitment: RecruitmentStore; chatUrl?: string; chatToken?: string; chatTransport?: typeof fetch;
+}
 
 const uuid = { type: "string", format: "uuid" };
 const processParams = { type: "object", additionalProperties: false, required: ["id"], properties: { id: uuid } };
@@ -31,6 +37,20 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
   const matchingUrl = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
   const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
   const matchingToken = options.matchingToken ?? process.env.CANDIDATE_PIPELINE_TOKEN;
+  const configured = chatConfiguration();
+  const chatUrl = options.chatUrl ?? configured?.url, chatToken = options.chatToken ?? configured?.token;
+  const unreadConfig = chatUrl && chatToken ? { url: chatUrl, token: chatToken } : null;
+  const unreadTransport = correlatedFetch(options.chatTransport ?? fetch);
+  const unreadView = async (role: AccountRole, actorId: string, result: Promise<RecruitmentView>) => {
+    const view = await result;
+    await enrichRecruitmentUnread([view], role, actorId, unreadConfig, unreadTransport);
+    return view;
+  };
+  const unreadPage = async (role: AccountRole, actorId: string, result: Promise<RecruitmentPage>) => {
+    const page = await result;
+    await enrichRecruitmentUnread(page.items, role, actorId, unreadConfig, unreadTransport);
+    return page;
+  };
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
   const guard = (role: AccountRole) => async (request: FastifyRequest, reply: FastifyReply) => {
     reply.header("cache-control", "no-store");
@@ -56,7 +76,7 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     if (!response.ok) return invalid(response.status === 404 ? 404 : 503, "owned_vacancy_unavailable");
     const draft = await response.json() as AgentsDraftView;
     if (draft.owner_id !== ownerId || draft.draft_id !== draftId) return invalid(404, "owned_vacancy_unavailable");
-    if (draft.state !== "created" || draft.publication?.status !== "accepted") return invalid(409, "vacancy_not_published");
+    if (draft.archived || draft.business_status !== "open" || draft.state !== "created" || draft.publication?.status !== "accepted") return invalid(409, "vacancy_not_published");
     return draft;
   };
   const savedFor = async (ownerId: string, vacancyId: string, candidateId: string): Promise<SavedCard> => {
@@ -76,6 +96,10 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     const ownerId = actor(request), payload = request.body;
     const receipt = await options.recruitment.receipt(ownerId, payload.idempotency_key, recruitmentFingerprint(`invite:${request.params.draft_id}`, payload));
     if (receipt) return receipt;
+    if (!options.employerProfiles) return invalid(503, "employer_profile_unavailable");
+    const company = await options.employerProfiles.get(ownerId);
+    if (!company.company_name) return invalid(409, "employer_company_required");
+    if (payload.company_name !== undefined && payload.company_name.trim() !== company.company_name) return invalid(409, "employer_company_mismatch");
     const draft = await draftFor(ownerId, request.params.draft_id);
     const saved = await savedFor(ownerId, draft.vacancy_id, payload.candidate_id);
     if (!saved.card || !options.profiles || !matchingToken) return invalid(409, "saved_candidate_source_obsolete");
@@ -93,7 +117,7 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     if (!fields.city || !fields.daily || !fields.type) return invalid(409, "vacancy_terms_incomplete");
     return options.recruitment.invite(ownerId, payload, {
       draft_id: draft.draft_id, vacancy_id: draft.vacancy_id, candidate_id: payload.candidate_id, profile_revision: exposure.profile_revision,
-      terms: { company_name: payload.company_name, description: payload.description, salary, contact_method: "platform",
+      terms: { company_name: company.company_name, description: payload.description, salary, contact_method: "platform",
         vacancy_title: fields.title ?? null, city: fields.city, daily: fields.daily, work_type: fields.type },
     });
   }));
@@ -111,18 +135,18 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
 
   app.get<{ Params: { draft_id: string }; Querystring: { limit?: string; offset?: string; cursor?: string } }>("/employer/vacancy-drafts/:draft_id/recruitment", {
     schema: { tags: ["recruitment"], security: security("employer"), params: draftParams, querystring: querySchema, response: { 200: recruitmentPageSchema } }, onRequest: guard("employer"),
-  }, (request, reply) => safely(reply, () => options.recruitment.list("employer", actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), request.params.draft_id, request.query.cursor)));
+  }, (request, reply) => safely(reply, () => unreadPage("employer", actor(request), options.recruitment.list("employer", actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), request.params.draft_id, request.query.cursor))));
 
   for (const role of ["candidate", "employer"] as const) {
     app.get<{ Querystring: { limit?: string; offset?: string; cursor?: string } }>(`/${role}/recruitment`, {
       schema: { tags: ["recruitment"], security: security(role), querystring: querySchema, response: { 200: recruitmentPageSchema } }, onRequest: guard(role),
-    }, (request, reply) => safely(reply, () => options.recruitment.list(role, actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), undefined, request.query.cursor)));
+    }, (request, reply) => safely(reply, () => unreadPage(role, actor(request), options.recruitment.list(role, actor(request), Number(request.query.limit ?? 50), Number(request.query.offset ?? 0), undefined, request.query.cursor))));
   }
 
   for (const role of ["candidate", "employer"] as const) {
     app.get<{ Params: { id: string } }>(`/${role}/recruitment/:id`, {
       schema: { tags: ["recruitment"], security: security(role), params: processParams, response: { 200: recruitmentViewSchema } }, onRequest: guard(role),
-    }, (request, reply) => safely(reply, () => options.recruitment.get(role, actor(request), request.params.id)));
+    }, (request, reply) => safely(reply, () => unreadView(role, actor(request), options.recruitment.get(role, actor(request), request.params.id))));
     app.post<{ Params: { id: string }; Body: RecruitmentAction }>(`/${role}/recruitment/:id/actions`, {
       schema: { tags: ["recruitment"], security: security(role), params: processParams, body: recruitmentActionSchema, response: { 200: recruitmentViewSchema } }, onRequest: guard(role),
     }, (request, reply) => safely(reply, () => options.recruitment.act(role, actor(request), request.params.id, request.body)));

@@ -29,7 +29,7 @@ export interface ProjectionConsent {
   processing: boolean;
   pool: boolean;
   training?: boolean;
-  training_version?: "training-v1" | null;
+  training_version?: "training-v1" | "training-v2" | null;
   training_accepted_at?: Date | string | null;
   version: string;
   accepted_at: Date | string | null;

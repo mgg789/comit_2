@@ -142,8 +142,9 @@ export class AuthStore {
     if (this.consentVersion.length === 0) throw new Error("ACCOUNT_CONSENT_VERSION must not be empty");
   }
 
-  /** Issue one role-bound OTP, applying global email and IP limits atomically. */
-  public async issue(roleInput: AccountRole, emailInput: string, ip: string): Promise<ChallengeIssued> {
+  /** Issue a role-bound OTP with atomic limits; explicit development delivery skips SMTP and returns the generated code. */
+  public async issue(roleInput: AccountRole, emailInput: string, ip: string, developmentDelivery = false): Promise<ChallengeIssued> {
+    if (developmentDelivery && process.env.NODE_ENV !== "development") throw new Error("auth_dev_code_forbidden");
     let role: AccountRole;
     let email: string;
     let ipHash: Buffer;
@@ -206,20 +207,23 @@ export class AuthStore {
 
       const challengeId = randomUUID();
       const code = createOtp();
-      const encrypted = encryptOtpPayload(this.secret, { email, code, challengeId });
       await client.query(
         `INSERT INTO auth_challenges(id, email, role, code_hmac, ip_hmac, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [challengeId, email, role, hashOtp(this.secret, challengeId, code), ipHash, expiresAt],
       );
-      await client.query(
-        `INSERT INTO auth_mail_outbox(id, challenge_id, email, encrypted_payload, nonce, available_at)
-         VALUES ($1, $2, $3, $4, $5, now())`,
-        [randomUUID(), challengeId, email, encrypted.ciphertext, encrypted.nonce],
-      );
+      if (!developmentDelivery) {
+        const encrypted = encryptOtpPayload(this.secret, { email, code, challengeId });
+        await client.query(
+          `INSERT INTO auth_mail_outbox(id, challenge_id, email, encrypted_payload, nonce, available_at)
+           VALUES ($1, $2, $3, $4, $5, now())`,
+          [randomUUID(), challengeId, email, encrypted.ciphertext, encrypted.nonce],
+        );
+      }
       await client.query("COMMIT");
       committed = true;
-      return { challenge_id: challengeId, expires_at: expiresAt.toISOString(), resend_after: resendAfter.toISOString() };
+      return { challenge_id: challengeId, expires_at: expiresAt.toISOString(), resend_after: resendAfter.toISOString(),
+        ...(developmentDelivery ? { dev_code: code } : {}) };
     } catch (error) {
       if (!committed) await rollback(client);
       throw error;

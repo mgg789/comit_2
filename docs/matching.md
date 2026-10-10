@@ -550,6 +550,44 @@ fallback. Лайк для выбранной ready/open вакансии про�
 создаёт обычные saved/attractive/exclusions. Источник manual не включается
 в обучение learned-cohort и не меняет активный preference control.
 
+## Lifecycle вакансии
+
+`POST /internal/vacancies/{id}/deactivate` принимает owner, следующую `source_revision` и `draft`/`closed`; matching сохраняет монотонный lifecycle fence, снимает ready и инвалидирует vacancy preparation leases. Feed/refill не расширяется при inactive статусе, история и saved сохраняются. Вакансия `closed` не может вернуться в `open`; снятая `draft` принимает новую публикацию только с большей ревизией.
+
+`DELETE /internal/vacancies/{id}` физически очищает vacancy-owned graph под pipeline lock и сохраняет минимальный tombstone. Повтор с тем же owner и source revision идемпотентен. Intake удалённого UUID всегда отклоняется. Миграция `016_vacancy_lifecycle.sql` добавляет fences и каскады только в графе вакансии; кандидаты и общие артефакты остаются.
+
+## Автоматическое пополнение ленты
+
+Публикация ready/open вакансии через durable outbox запускает main selection,
+затем rerank. События изменения пула дополнительно проверяют живые сессии:
+пополнение ставится в очередь при изменении строгого пула на N1=10% или при
+остатке не более четырёх невыданных кандидатов. Та же проверка выполняется при
+чтении страницы; частично уникальный индекс допускает только одну pending job
+на сессию. Inactive, истёкшие и относящиеся к старой ревизии сессии не пополняются.
+
+`POST /internal/vacancies/{id}/feed/{session_id}/refill` принимает `{force: boolean}`
+(по умолчанию `false`) и возвращает `FeedRefillStatus | null`. Явное обновление
+с `force: true` повторяет terminal main/rerank failure и исчерпанный хвост;
+параллельные запросы используют одну job. После пустого результата без изменения
+пула повторных автоматических задач нет. После ошибки N1 сравнивается с пулом
+последней неуспешной попытки, поэтому чтение страницы не создаёт бесконечные retry.
+Ожидание main/rerank ограничено тем же числом попыток и backoff, что и прочие ошибки.
+Queue intents для ещё неготового источника сохраняются до deferred результата.
+
+`FeedPage.refill_state` различает `queued`/`running`, `active`, `exhausted` и
+`failed`; `has_more` учитывает pending refill. Интерфейс может показывать ожидание
+без дополнительной кнопки запуска. Для восстановления до появления сессии
+существуют `POST .../combine/retry` и `POST .../rerank/retry`.
+
+
+### Обезличенная встречающая витрина
+
+Matching предоставляет token-only read API для текущих consented кандидатских
+и open/ready вакансионных проекций без фиктивного владельца, моделей и inference.
+Общая витрина использует FTS/буквальный поиск, фильтры и keyset/date pagination;
+API повторно проверяет исходные согласия и editorial публикацию.
+[Поля, ограничения и проверки](public-showcase.md).
+
 ## Сложный бенчмарк R₀ (07.10.2026)
 
 Старый golden не способен показать требуемый прирост NDCG даже идеальному

@@ -4,7 +4,7 @@
  * Salary range is mandatory in vacancies AND invitations (TZ rule 2.2.1).
  */
 
-export type { EmployerStatisticsQuery, EmployerStatistics, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
+export type { EmployerStatisticsQuery, EmployerStatistics, EmployerExpenses, EmployerExpenseCategory, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
 
 export type {
   CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
@@ -24,7 +24,7 @@ export type {
   CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
   ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
   RerankCard, RerankPage, RerankRequest, RerankStatus,
-  FeedRequest, FeedCard, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
+  FeedRequest, FeedCard, FeedPage, FeedRefillStatus, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
   PreferenceStatus, PreferenceCommand,
   HypothesisId, HypothesisSummary, HypothesisStatus,
 } from "./matching.js";
@@ -35,6 +35,7 @@ export type * from "./auth.js";
 export type * from "./recruitment.js";
 export type * from "./chat.js";
 export type * from "./showcase.js";
+export type * from "./public-showcase.js";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;
 export type Grade = (typeof GRADES)[number];
@@ -114,3 +115,10 @@ export interface CandidateProfile {
   ratingPoints: number;
   fsp: FspProfile | null;
 }
+
+export * from "./business-time.js";
+export * from "./recommendations.js";
+export type * from "./notifications.js";
+export type * from "./employer-profile.js";
+
+export type * from "./testing-history.js";

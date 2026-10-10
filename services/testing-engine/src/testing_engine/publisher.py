@@ -44,7 +44,8 @@ class TrustedGradePublisher:
             "specialization": session.get("specialization", "backend"),
             "decided_grade": session.get("decided_grade"),
             "supervision_badge": (session.get("supervision") or {}).get("badge"),
-            "tasks_answered": session.get("tasks_answered", 0),
+            # submit_answer persists the adaptive scored answer count as tasks_given.
+            "tasks_answered": session.get("tasks_given", 0),
         }
         request = urllib.request.Request(
             self.base_url + "/internal/testing/session-result",

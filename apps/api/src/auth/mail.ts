@@ -1,5 +1,7 @@
 /** Secure, bounded SMTP delivery for email verification challenges. */
 import nodemailer from "nodemailer";
+import { notificationContent, type NotificationMail } from "../notifications/template.js";
+import { verificationHtml, type VerificationAttachment } from "./email-template.js";
 
 /** The two account roles that receive verification challenges. */
 export type MailRole = "candidate" | "employer";
@@ -20,6 +22,9 @@ export interface MailTransport {
     to: string;
     subject: string;
     text: string;
+    html: string;
+    attachments: VerificationAttachment[];
+    messageId?: string;
   }): Promise<unknown>;
   verify(): Promise<unknown>;
 }
@@ -29,6 +34,9 @@ export interface Mailer {
   send(message: VerificationMail): Promise<void>;
   verify(): Promise<boolean>;
 }
+
+/** Notification delivery uses the same TLS transport, without exposing provider details. */
+export interface NotificationMailer { sendNotification(message: NotificationMail): Promise<void>; }
 
 /** Safe error categories that the durable mail job may persist. */
 export type MailDeliveryCode = "smtp_unavailable" | "rejected";
@@ -157,7 +165,7 @@ function messageText(message: VerificationMail): string {
 }
 
 /** Nodemailer-backed mailer with mandatory TLS, bounded sockets, and safe failures. */
-export class SmtpMailer implements Mailer {
+export class SmtpMailer implements Mailer, NotificationMailer {
   private readonly transport: MailTransport;
   private readonly config: SmtpConfig;
 
@@ -184,15 +192,28 @@ export class SmtpMailer implements Mailer {
   async send(message: VerificationMail): Promise<void> {
     const text = messageText(message);
     try {
+      const { html, attachments } = verificationHtml(message, expiryText(message.expires_at));
       await this.transport.sendMail({
         from: this.config.from,
         to: message.email,
         subject: "Код подтверждения Comit",
         text,
+        html,
+        attachments,
       });
     } catch (error) {
       throw mapDeliveryError(error);
     }
+  }
+
+  /** Send a guarded event email with a stable message id across retry attempts. */
+  async sendNotification(message: NotificationMail): Promise<void> {
+    const rendered = notificationContent(message);
+    if (!/^[a-f0-9-]{36}$/i.test(message.job_id)) throw new TypeError("invalid_notification_job");
+    try {
+      await this.transport.sendMail({ from: this.config.from, to: message.email, ...rendered,
+        messageId: `<comit-notification-${message.job_id}@notifications.comit>` });
+    } catch (error) { throw mapDeliveryError(error); }
   }
 
   /** Check provider reachability; provider errors are deliberately reduced to false. */
@@ -206,7 +227,7 @@ export class SmtpMailer implements Mailer {
 }
 
 /** Create a configured SMTP mailer; partially configured environments fail closed. */
-export function createSmtpMailer(env: NodeJS.ProcessEnv = process.env, transport?: MailTransport): Mailer {
+export function createSmtpMailer(env: NodeJS.ProcessEnv = process.env, transport?: MailTransport): Mailer & NotificationMailer {
   return new SmtpMailer(readSmtpConfig(env), transport);
 }
 

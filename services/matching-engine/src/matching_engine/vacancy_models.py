@@ -10,6 +10,37 @@ from pydantic import Field, JsonValue, field_validator, model_validator
 from matching_engine.models import Contract, Direction
 
 BusinessStatus = Literal["draft", "open", "pending", "closed", "done"]
+
+
+class VacancyDeactivate(Contract):
+    """Owner-scoped monotonic lifecycle fence supplied by the employer API."""
+
+    owner_id: UUID
+    source_revision: int = Field(ge=1)
+    status: Literal["draft", "closed"]
+
+
+class VacancyDelete(Contract):
+    """Owner-scoped permanent deletion fence independent of publication availability."""
+
+    owner_id: UUID
+    source_revision: int = Field(ge=1)
+
+
+class VacancyDeleteReceipt(Contract):
+    """Minimal hard-deletion receipt without vacancy or candidate content."""
+
+    vacancy_id: UUID
+    source_revision: int
+    deleted: Literal[True] = True
+
+
+class VacancyLifecycleReceipt(Contract):
+    """Durable inactive fence, including vacancies with no matching snapshot yet."""
+
+    vacancy_id: UUID
+    source_revision: int
+    status: Literal["draft", "closed"]
 WorkType = Literal["onsite", "remote", "hybrid"]
 PipelineState = Literal["draft", "queued", "processing", "retrying", "failed", "ready"]
 BuildMode = Literal["class_only", "requirements_only", "mixed"]

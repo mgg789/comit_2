@@ -52,6 +52,7 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
     let malicious = false, changeDuringPdf = false, warn = false, writes = 0;
     const mismatchToken = "a".repeat(64);
     const calls: Array<{ path: string; owner: string | null }> = [];
+    let published = true;
     const transport: typeof fetch = async (input, init) => {
       const url = new URL(String(input));
       const account = new Headers(init?.headers).get("x-owner-id");
@@ -59,7 +60,7 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
       if (url.pathname === `/internal/vacancy-drafts/${draftId}`) {
         if (account !== owner.id) return Response.json({}, { status: 404 });
         return Response.json({ draft_id: draftId, vacancy_id: vacancyId, owner_id: owner.id, revision: 1,
-          state: "created", fields: {}, publication: { status: "accepted", source_revision: 1 } });
+          state: "created", business_status: published ? "open" : "draft", archived: false, fields: {}, publication: { status: "accepted", source_revision: 1 } });
       }
       if (url.pathname === "/internal/employer/candidates/search") {
         const { public_profile: _profile, ...card } = detail;
@@ -113,6 +114,14 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
     const likePath = `/employer/vacancy-drafts/${draftId}/showcase-likes`;
     const body = { candidate_id: id, profile_revision: 1, idempotency_key: randomUUID() };
     assert.equal((await app.inject({ method: "POST", url: likePath, headers: { authorization: foreign.authorization }, payload: body })).statusCode, 404);
+    published = false;
+    const beforeUnpublished = calls.length;
+    const unavailable = await app.inject({ method: "POST", url: likePath, headers, payload: body });
+    assert.equal(unavailable.statusCode, 409, unavailable.body);
+    assert.equal(unavailable.json().detail, "vacancy_not_published");
+    assert.equal(calls.length, beforeUnpublished + 1, "unpublished source must not reach matching");
+    assert.equal(writes, 0);
+    published = true;
     const liked = await app.inject({ method: "POST", url: likePath, headers, payload: body });
     assert.equal(liked.statusCode, 200, liked.body);
     sourceCurrent = false;

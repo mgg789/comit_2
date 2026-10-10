@@ -1,5 +1,7 @@
+import type { RejectionReasonCategory } from "./recommendations.js";
+
 /** State of one employer/candidate process, visible to both participants. */
-export type RecruitmentState = "sent" | "viewed" | "accepted" | "declined" | "rejected" | "offer_sent" | "hired" | "offer_declined" | "withdrawn";
+export type RecruitmentState = "sent" | "viewed" | "accepted" | "declined" | "rejected" | "offer_sent" | "hired" | "offer_declined" | "withdrawn" | "expired";
 
 /** Interview category; each process may contain both categories. */
 export type InterviewKind = "technical" | "general";
@@ -29,16 +31,17 @@ export interface InvitationTerms {
 export interface InviteRequest {
   candidate_id: string;
   idempotency_key: string;
-  company_name: string;
+  /** Compatibility only; server derives the saved account company and rejects mismatches. */
+  company_name?: string;
   description: string;
   salary?: RecruitmentSalary;
 }
 
 /** Employer-only shortlist rejection; it creates no candidate-visible invitation. */
-export interface RejectSavedRequest { candidate_id: string; idempotency_key: string; reason: string }
+export interface RejectSavedRequest { candidate_id: string; idempotency_key: string; reason: string; categories?: RejectionReasonCategory[] }
 
 /** Auditable reason and actor recorded for a process-closing decision. */
-export interface RecruitmentClosure { reason: string; actor: "candidate" | "employer"; at: string }
+export interface RecruitmentClosure { reason: string; actor: "candidate" | "employer" | "system"; at: string; categories?: RejectionReasonCategory[] }
 
 /** Interview schedule uses an absolute timestamp plus its IANA display time zone. */
 export interface InterviewView {
@@ -72,17 +75,28 @@ export interface RecruitmentActionIdentity { expected_revision: number; idempote
 /** Strict command union; each operation accepts only its own fields. */
 export type RecruitmentAction = RecruitmentActionIdentity & (
   | { action: "view" | "accept" }
-  | { action: "decline" | "withdraw" | "reject"; reason: string }
+  | { action: "decline" | "withdraw"; reason: string }
+  | { action: "reject"; reason: string; categories?: RejectionReasonCategory[] }
   | { action: "interview_propose"; kind: InterviewKind; starts_at: string; time_zone: string; duration_minutes: number; format: "remote" | "onsite"; location: string }
   | { action: "interview_accept"; interview_id: string }
   | { action: "interview_decline" | "interview_cancel"; interview_id: string; reason: string }
-  | { action: "interview_complete"; interview_id: string; outcome: InterviewOutcome; feedback: string }
+  | { action: "interview_complete"; interview_id: string; outcome: InterviewOutcome; feedback: string; categories?: RejectionReasonCategory[] }
   | { action: "offer_send"; salary_rub: number; description: string; expires_at: string }
   | { action: "offer_accept"; offer_id: string }
   | { action: "offer_decline"; offer_id: string; reason: string }
 );
 
-/** Contact-free process snapshot; chat remains unavailable in this lifecycle increment. */
+/** Server-owned hiring stage clock; all durations use 24-hour weekdays in Moscow. */
+export interface RecruitmentDeadline {
+  stage: "initial" | "conversation" | "after_interview" | "interview_wait";
+  due_at: string | null;
+  remind_at: string | null;
+  paused_until: string | null;
+  business_days: number;
+  time_zone: "Europe/Moscow";
+}
+
+/** Contact-free participant-scoped process snapshot with separately authorized chat access. */
 export interface RecruitmentView {
   id: string;
   owner_id: string;
@@ -101,6 +115,12 @@ export interface RecruitmentView {
   allowed_actions: RecruitmentAction["action"][];
   /** An invited, consented process has a configured chat backend; individual calls may still return 503. */
   chat_available: boolean;
+  /** Writing requires a live publication; historical chat remains readable when false. */
+  chat_writable: boolean;
+  /** Incoming unread messages for this caller; absent/null means unread status unavailable. */
+  chat_unread_count?: number | null;
+  /** Null before acceptance, while an offer awaits a reply, or after closure. */
+  deadline?: RecruitmentDeadline | null;
   created_at: string;
   updated_at: string;
 }

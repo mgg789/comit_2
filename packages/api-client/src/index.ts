@@ -3,16 +3,17 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
+  AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
   AgentsOrganizationContext, AgentsOrganizationMemory, AgentsOrganizationMemoryPatch,
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
   EmployerStatisticsQuery, EmployerStatistics,
-  CandidateProfileView, CandidateProfileMutation, CombineRequest, CombineStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
+  CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
-  ChatPage, ChatMessage, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
+  ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
   AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
@@ -32,12 +33,26 @@ export interface ApiClientOptions {
 }
 
 export interface ApiClient {
+  /** Read account-owned company settings, including initial revision zero. */
+  getEmployerProfile(): Promise<EmployerProfileView>;
+  /** Save company settings with revision CAS. */
+  updateEmployerProfile(body: EmployerProfileMutation): Promise<EmployerProfileView>;
+  /** Page the persistent read-only Comit system chat. */
+  getSystemChat(role: AccountRole, afterSequence?: number, limit?: number): Promise<SystemChatPage>;
+  /** Mark only delivered system notification sequences read. */
+  markSystemChatRead(role: AccountRole, body: SystemChatReadRequest): Promise<SystemChatReadStatus>;
+  /** Count unread items across every authorized hiring chat and the system inbox. */
+  getChatUnread(role: AccountRole): Promise<ChatUnreadStatus>;
+  /** Read the latest persisted candidate recommendation without starting provider work. */
+  getRecommendationsLatest(): Promise<CandidateRecommendationsResponse>;
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
   /** Resolve the sole global employer chat from the authenticated account. */
   getOrganizationChat(): Promise<AgentsOrganizationChat>;
   /** Page durable global messages after a server sequence, including background reports. */
   getOrganizationMessages(afterSequence?: number, limit?: number): Promise<AgentsOrganizationMessagePage>;
+  /** Clear idle history using owner-confirmed context CAS; memory, vault and billing stay intact. */
+  clearOrganizationMessages(body: AgentsOrganizationMessagesClearRequest): Promise<AgentsOrganizationContext>;
   /** Queue a model turn with a stable retry key; acceptance does not claim completion. */
   sendOrganizationMessage(body: AgentsOrganizationMessageRequest): Promise<AgentsOrganizationTurn>;
   /** Poll a queued turn under the employer session. */
@@ -72,7 +87,7 @@ export interface ApiClient {
   downloadOrganizationDocument(documentId: string): Promise<AgentsDocumentDownload>;
   /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
   getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
-  /** Queue a role-bound code; the receipt never contains the OTP. */
+  /** Request a role-bound code; explicit development delivery may return dev_code. */
   requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
   /** Verify a code, including account consent only for first registration. */
   verifyLoginCode(role: AccountRole, body: EmailCodeVerification): Promise<AuthenticatedSession>;
@@ -82,6 +97,10 @@ export interface ApiClient {
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
   getCandidateProfile(): Promise<CandidateProfileView>;
+  /** Read the last 30 Moscow calendar days of own confirmed test results. */
+  getCandidateTestingHistory(): Promise<CandidateTestingHistory>;
+  /** Read actual matching readiness for the authenticated candidate. */
+  getCandidatePipeline(): Promise<CandidatePipelineStatus>;
   /** CAS update; replace discards omitted editable fields, while PATCH preserves them. */
   saveCandidateProfile(body: CandidateProfileMutation, replace?: boolean): Promise<CandidateProfileView>;
   /** Retry the current failed matching handoff without changing profile revision. */
@@ -106,16 +125,31 @@ export interface ApiClient {
   publishVacancy(draftId: string, body: AgentsCreateRequest): Promise<AgentsDraftView>;
   /** Close and durably propagate a higher closed source revision. */
   closeVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
-  /** Archive a vacancy, retaining audit and closing any previous publication. */
+  /** Withdraw publication while preserving the historical shortlist and read-only chats. */
+  withdrawVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
+  /** Permanently delete a draft or closed vacancy and its scoped hiring/chat records. */
   archiveVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
   /** Discover public candidates without requiring any vacancy. */
   searchCandidates(body?: SearchRequest): Promise<SearchPage>;
+  /** Browse anonymous published vacancies without requiring a session. */
+  listPublicVacancies(query?: PublicShowcaseQuery): Promise<PublicShowcasePage<PublicShowcaseVacancy>>;
+  /** Browse consented anonymous candidates without detail or contact access. */
+  listPublicCandidates(query?: PublicShowcaseQuery): Promise<PublicShowcasePage<PublicShowcaseCandidate>>;
   /** Read the current anonymous public profile and authorized public PDF URL. */
   getPublicCandidate(candidateId: string): Promise<PublicCandidateDetail>;
   /** Save a displayed revision into an owned open vacancy using normal shortlist semantics. */
   likeShowcaseCandidate(draftId: string, body: ShowcaseLikeRequest): Promise<ShowcaseLikeReceipt>;
   /** Queue main top-k selection for an owned published vacancy draft. */
   requestSelection(draftId: string, body: CombineRequest): Promise<CombineStatus>;
+  /** Read publication preparation and the actual background selection state. */
+  getVacancyPipeline(draftId: string): Promise<AgentsMatchingStatus>;
+  retryVacancyPreparation(draftId: string): Promise<VacancyPipelineStatus>;
+  getSelectionStatus(draftId: string): Promise<CombineStatus>;
+  retrySelection(draftId: string): Promise<CombineStatus>;
+  getRerankStatus(draftId: string): Promise<RerankStatus>;
+  retryRerank(draftId: string): Promise<RerankStatus>;
+  /** Force one deduplicated retry of the current session's tail. */
+  refillFeed(draftId: string, sessionId: string): Promise<FeedRefillStatus | null>;
   /** Return the current contact-free selection page and public authorised PDF links. */
   getSelection(draftId: string, limit?: number, offset?: number): Promise<SelectionPage>;
   /** Open an owned vacancy portion from current rerank. */
@@ -166,6 +200,8 @@ export interface ApiClient {
   getRecruitmentEvents(role: AccountRole, afterSequence?: number, limit?: number): Promise<RecruitmentEventPage>;
   /** Poll ascending messages after the last processed cursor in a participant's invitation. */
   getChatMessages(role: AccountRole, processId: string, afterSequence?: number, limit?: number): Promise<ChatPage>;
+  /** Acknowledge only messages rendered while this conversation is visible. */
+  acknowledgeChatRead(role: AccountRole, processId: string, body: ChatReadRequest): Promise<ChatReadStatus>;
   /** Consume one bounded chat SSE connection; persist event cursors and reconnect with the returned cursor. */
   streamChatEvents(role: AccountRole, processId: string, onEvent: (event: ChatEvent) => void | Promise<void>, options?: EventStreamOptions): Promise<number>;
   /** Consume contact-free recruitment notifications using the same account session and durable cursor. */
@@ -232,7 +268,7 @@ export function createApiClient({
     } finally { await reader.cancel().catch(() => undefined); }
   }
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = body === undefined ? {} : { "content-type": "application/json" };
     const token = getAuthToken();
     if (token) headers.authorization = `Bearer ${token}`;
 
@@ -249,8 +285,15 @@ export function createApiClient({
   }
 
   return {
+    getEmployerProfile: () => request("GET", "/employer/profile"),
+    updateEmployerProfile: body => request("PATCH", "/employer/profile", body),
+    getSystemChat: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/system-chat?after_sequence=${afterSequence}&limit=${limit}`),
+    markSystemChatRead: (role, body) => request("POST", `/${role}/system-chat/read`, body),
+    getChatUnread: role => request("GET", `/${role}/chat-unread`),
+    getRecommendationsLatest: () => request("GET", "/candidate/recommendations/latest"),
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
     getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),
+    clearOrganizationMessages: body => request("DELETE", "/employer/organization-agent/messages", body),
     sendOrganizationMessage: body => request("POST", "/employer/organization-agent/messages", body),
     getOrganizationTurn: turnId => request("GET", `/employer/organization-agent/turns/${encodeURIComponent(turnId)}`),
     getOrganizationTasks: () => request("GET", "/employer/organization-agent/tasks"),
@@ -279,6 +322,8 @@ export function createApiClient({
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
+    getCandidateTestingHistory: () => request("GET", "/candidate/testing-history"),
+    getCandidatePipeline: () => request("GET", "/candidate/pipeline"),
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
     retryCandidateProjection: () => request("POST", "/candidate/profile/projection/retry", {}),
     getVacancyReady: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/ready`),
@@ -291,11 +336,29 @@ export function createApiClient({
     approveVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/approve`, { expected_revision: expectedRevision }),
     publishVacancy: (draftId, body) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/publish`, body),
     closeVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/close`, { expected_revision: expectedRevision }),
+    withdrawVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/withdraw`, { expected_revision: expectedRevision }),
     archiveVacancy: (draftId, expectedRevision) => request("DELETE", `/employer/vacancies/${encodeURIComponent(draftId)}`, { expected_revision: expectedRevision }),
     searchCandidates: (body = {}) => request("POST", "/employer/candidates/search", body),
+    listPublicVacancies: (query = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== null) params.set(key, String(value));
+      return request("GET", `/public/showcase/vacancies${params.size ? `?${params}` : ""}`);
+    },
+    listPublicCandidates: (query = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== null) params.set(key, String(value));
+      return request("GET", `/public/showcase/candidates${params.size ? `?${params}` : ""}`);
+    },
     getPublicCandidate: candidateId => request("GET", `/employer/candidates/${encodeURIComponent(candidateId)}`),
     likeShowcaseCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/showcase-likes`, body),
     requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),
+    getVacancyPipeline: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/pipeline`),
+    retryVacancyPreparation: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/retry`),
+    getSelectionStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`),
+    retrySelection: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine/retry`),
+    getRerankStatus: draftId => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/rerank`),
+    retryRerank: draftId => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/rerank/retry`),
+    refillFeed: (draftId, sessionId) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}/refill`, { force: true }),
     getSelection: (draftId, limit = 50, offset = 0) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/selections?limit=${limit}&offset=${offset}`),
     openFeed: (draftId, body = {}) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed`, body),
     getFeed: (draftId, sessionId, cursor, limit = 50) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/feed/${encodeURIComponent(sessionId)}?limit=${limit}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
@@ -320,6 +383,7 @@ export function createApiClient({
     actOnRecruitment: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/actions`, body),
     getRecruitmentContacts: processId => request("GET", `/employer/recruitment/${encodeURIComponent(processId)}/contacts`),
     getRecruitmentEvents: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment-events?after_sequence=${afterSequence}&limit=${limit}`),
+    acknowledgeChatRead: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/read`, body),
     getChatMessages: (role, processId, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/messages?after_sequence=${afterSequence}&limit=${limit}`),
     streamChatEvents: (role, processId, onEvent, options) => stream(`/${role}/recruitment/${encodeURIComponent(processId)}/chat/events`, onEvent, options),
     streamRecruitmentEvents: (role, onEvent, options) => stream(`/${role}/recruitment-events/stream`, onEvent, options),

@@ -18,5 +18,18 @@ export interface EmployerStatistics {
   previous: EmployerStatisticsCounts;
   unique_candidates: number;
   daily: Array<{ date: string; counts: EmployerStatisticsCounts }>;
+  expenses: EmployerExpenses;
   top_vacancies: Array<{ vacancy_id: string; draft_id: string; title: string; status: string; events: number; candidates: number }>;
+}
+
+/** Durable accounting categories; monetary values are integer RUB kopeks. */
+export type EmployerExpenseCategory = "publication" | "invitation" | "ai" | "penalty";
+
+/** Owner-scoped expense projection for the selected statistics period, without personal source payloads. */
+export interface EmployerExpenses {
+  currency: "RUB";
+  total_kopeks: number;
+  categories: Array<{ category: EmployerExpenseCategory; amount_kopeks: number; events: number }>;
+  daily: Array<{ date: string; amount_kopeks: number }>;
+  tariffs: { publication_kopeks: number; invitation_kopeks: number; deadline_penalty_kopeks: number; ai_daily_allowance_kopeks: number; ai_usd_rub: number };
 }

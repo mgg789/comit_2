@@ -32,7 +32,7 @@ class FeedRefillWorker:
             self.store.publish(job)
         except RefillNotReady:
             logger.info("feed refill source is not ready; retrying")
-            self.store.defer(job, "source_not_ready", self.retry_base_seconds)
+            self.store.defer(job, "source_not_ready", self.retry_base_seconds, self.max_attempts)
         except Exception:  # noqa: BLE001 - persist only a stable safe code.
             logger.warning("feed refill temporarily unavailable")
             self.store.fail(job, "feed_refill_failed", self.max_attempts, self.retry_base_seconds)

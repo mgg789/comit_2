@@ -1,5 +1,11 @@
 # Агенты работодателя и редакционный контур вакансии
 
+`DraftView` включает nullable ISO-8601 даты `created_at`, `published_at`, `closed_at`.
+Создание берётся из неизменяемого времени записи; публикация — из успешного
+подтверждения публикации worker; закрытие — из явного действия владельца.
+Миграция `009_vacancy_dates.sql` восстанавливает известные даты по durable jobs;
+неизвестные исторические даты остаются `null`. Обновление текста не меняет даты.
+
 Ручная форма и чат редактируют **один** черновик в `agents-service`.
 UI в этот проход не входит. `owner_id` — UUID для учёта владельца;
 он не подтверждает личность. Вызовы доступны доверенным сервисам с
@@ -14,11 +20,31 @@ UI в этот проход не входит. `owner_id` — UUID для учё
 
 ## Глобальный чат и фоновые поручения
 
+Проверка провайдера использует connect timeout 2 с и read timeout 5 с. Временный сбой
+кешируется 3 с, успешный ответ и отказ авторизации — 30 с. Manual mode/отсутствие ключа
+сохраняют `agent_disabled_manual_available`; временный отказ имеет retryable code
+`agent_temporarily_unavailable`, HTTP401/403 — non-retryable `agent_provider_rejected`.
+Проверка отправки не зависит от доступности enrichment. Локальная проверка 2026-10-08:
+отдельный synthetic DeepSeek turn принят HTTP202, завершился succeeded, сохранён один
+ответ. Это не проверка бизнес-инструментов или production.
+
 `GET /employer/organization-agent/chat` идемпотентно создаёт один чат;
 `POST /messages` ставит turn в очередь, `GET /turns/{id}` показывает результат.
 История читается по `after_sequence`, без замены транскрипта после сжатия.
 `organization-worker` запускается отдельно от редакционного worker и переживает
 перезапуск процесса: lease, provider receipt и эффекты инструментов сохраняются в БД.
+
+Каждый пользовательский turn принимает `reasoning_effort: off | medium | max`
+(по умолчанию `off`). Выбор сохраняется в очереди и входит в идентичность платного
+запроса; повтор одного `idempotency_key` с другим режимом возвращает 409.
+DeepSeek получает thinking disabled для `off`, enabled с `reasoning_effort=high`
+для `medium`, enabled с `reasoning_effort=max` для `max`.
+Допустимые параметры провайдера сверены с [официальным контрактом DeepSeek](https://api-docs.deepseek.com/api/create-chat-completion/).
+Приватный `reasoning_content` сохраняется для продолжения tool rounds текущего
+turn после перезапуска и не возвращается в публичном receipt или истории сообщений.
+Старые редакционные сессии и фоновые поручения используют `off`.
+Требуется миграция `008_organization_reasoning.sql`; реальный provider smoke
+для включённого thinking в этом проходе не выполнялся.
 
 Каталог инструментов доступен полностью. Модель сначала читает краткие названия,
 затем раскрывает выбранные JSON-схемы через `discover_tools` и вызывает `call_tool`.
@@ -76,6 +102,21 @@ Vault хранится в PostgreSQL внутри `agents_service.organization_d
 недоверенные данные и не может разрешить отправку сообщения кандидату.
 
 ## Выполнение бизнес-инструментов
+
+Встроенная справка доступна глобальному агенту без БД и внешних моделей:
+`knowledge_pages_list` возвращает отсортированные безопасные slug и заголовки,
+`knowledge_page_read` читает страницу по slug. `employer-ui` описывает реальные
+экраны, маршруты, действия, состояния и ограничения кабинета; `organization` —
+scope агента; `vacancy` — отдельный редакторский workflow. System prompt требует
+читать `employer-ui` перед ответом о UI. Справка и заголовки отмечены как
+недоверенные данные и не создают полномочия; пути вне каталога, включая symlink,
+не читаются. Неизвестный slug возвращает `knowledge_page_not_found`.
+
+Глобальный registry предоставляет list/get/create/edit/approve/publish вакансии.
+Снятие, закрытие и удаление доступны в UI/API через координированный lifecycle,
+но `vacancy_withdraw`, `vacancy_close`, `vacancy_delete` пока отсутствуют в registry.
+Агент объясняет ручной путь и не объявляет эти действия выполненными. Прямая
+архивация Store не заменяет lifecycle API с matching/recruitment последствиями.
 
 Доверенный bridge API-core — `POST /internal/organization-agent/tools/{tool}`,
 тело `{arguments, idempotency_key, task_id?}`, заголовки `X-Internal-Token`
@@ -199,3 +240,34 @@ unit-тестов; `/healthz` не доказывает корректность
 
 См. также: [API](api.md), [данные](data.md), [архитектура](architecture.md),
 [продуктовый контекст](../context/40-architecture.md).
+
+
+### Сверка 16 требований организации (2026-10-08)
+
+Это сверка исходников и доступных тестов, не подтверждение полного живого сценария.
+
+| № | Контур | Текущий статус |
+|---|---|---|
+| 1 | Создание/редактирование вакансии | Есть list/get/create/edit/approve/publish. Withdraw/close/delete отсутствуют в registry, хотя есть в UI/API. |
+| 2 | Статистика вакансии/организации | Есть owner-scoped tools. |
+| 3 | Переговоры об интервью | Есть availability-first task, несколько процессов, предложения, ожидание принятия кандидатом и отчёт/эскалация владельцу. PG integration не запущены. |
+| 4 | Офлайн-дублёр | Есть явный stand-in task, lease и свежий offline heartbeat; возвращение владельца прекращает отправку. |
+| 5 | Опрос кандидата и отчёт | Есть inquiry task, процессные отчёты и завершение/эскалация. Живые переговоры не проверены. |
+| 6 | Контекст кандидатов/вакансий | Есть scoped read/search/detail. |
+| 7 | Jev свайпы | Есть count 1..50 + comment, vacancy/cards context, guarded decisions и учёт usage. |
+| 8 | Общая витрина | Есть search/detail и работа с vacancy feed; scope и фильтры проверяет API. |
+| 9 | Документы | TXT/MD/PDF сохраняются приватно; create_md есть. Созданный MD не прикрепляется автоматически к видимому ответу: метаданные на tool message, UI скрывает tool rows. |
+| 10 | Context/memory | Есть compaction и отдельная revision-controlled memory; memory_write доступен, автоматического обновления memory при compaction нет. |
+| 11 | Справка по UI | Добавлена packaged employer-ui + безопасный knowledge_pages_list; runtime читает справку перед UI-ответами. Справка поддерживается вручную. |
+| 12 | Фон | Есть durable очередь, worker, tasks и leases; inquiry/schedule не зависят от открытой вкладки. |
+| 13 | $1 / rolling 7 days | Реализованы measured LLM/Jev usage, ledger/reservations и окно now()-7days; бесплатные локальные/cached actions сами по себе не создают расход LLM. Полное живое billing не проверено. |
+| 14 | Нет интернета у клиента | Нет отдельного navigator.onLine/online/offline UI gate; сетевой запрос завершается ошибкой. Provider unavailable обрабатывается отдельно. |
+| 15 | Постепенное раскрытие | Сначала discover_tools/call_tool, затем каталог/выбранные схемы; документы читаются порциями. |
+| 16 | Все tools доступны | Каталог содержит base+workflow tools. Выполнение сохраняет owner ACL, явную delegation, lease и candidate-owned acceptance. |
+
+Проверки: Python `pytest` tools/runtime/workflows/jev/billing/documents/availability с `-m 'not integration'`: 35 passed, 5 skipped, 9 deselected. API bridge `pnpm --filter @comit/api exec tsx --test tests/organization-agent-tools.test.ts`: 9 passed. PG integration, реальные кандидатские переговоры и production-контур не проверены.
+
+Для нетехнических вопросов system prompt просит отвечать простым русским языком. Внутренние имена инструментов и переменных, UUID, номера задач и ревизий не следует показывать, пока работодатель прямо не попросит технические подробности. В provider-контекст включается авторитетная ревизия context, в том числе после compaction: очистка истории меняет hash нового запроса и не позволяет воскресить старый кэшированный ответ.
+
+
+Локальная диагностика 2026-10-09: воркеры AI завершались при разрыве PostgreSQL-соединения в polling/claim. Оба долгоживущих режима теперь повторяют подключение с задержкой 1–30 секунд и прекращают ожидание при shutdown; режим `--once` сохраняет диагностическое завершение с ошибкой. Тесты проверяют восстановление, остановку и отсутствие retry для ошибок программирования. Matching worker отдельно был завершён OOM (exit137); это подтверждает нехватку памяти Docker VM, но исторический пик и конкретный потребитель не восстановлены. Локальный worker запущен повторно; настройки Docker и production не менялись.

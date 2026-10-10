@@ -446,7 +446,10 @@ def test_ready_snapshot_omits_private_preferences_narratives_contacts(store: Sto
 def test_routes_protected_not_ready_and_selection_state_handoff(store: Store) -> None:
     combines, vacancy_id, candidates = setup_pool(store)
     client = TestClient(create_app(store=store, combine_store=combines, internal_token="test", encoder_ready=lambda: True))
-    headers = {"X-Internal-Token": "test"}
+    with connect(store.database_url) as connection:
+        owner = connection.execute("SELECT owner_id FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s",
+                                   (vacancy_id,)).fetchone()["owner_id"]
+    headers = {"X-Internal-Token": "test", "X-Owner-ID": str(owner)}
     assert client.get("/internal/matching/events").status_code == 401
     assert client.post(f"/internal/vacancies/{vacancy_id}/combine", json={"top_k": True}, headers=headers).status_code == 422
     queued = client.post(f"/internal/vacancies/{vacancy_id}/combine", json={"top_k": 2}, headers=headers)
@@ -463,7 +466,7 @@ def test_routes_protected_not_ready_and_selection_state_handoff(store: Store) ->
     assert client.post("/internal/matching/events/retry", json={"source": "candidate", "event_id": 0}, headers=headers).status_code == 422
 
 
-def test_optional_owner_header_hides_foreign_vacancy(store: Store) -> None:
+def test_required_owner_header_hides_foreign_vacancy(store: Store) -> None:
     """Owner filtering returns the same 404 as a missing vacancy for foreign callers."""
     combines, vacancy_id, _ = setup_pool(store)
     client = TestClient(create_app(store=store, combine_store=combines, internal_token="test", encoder_ready=lambda: True))
@@ -474,6 +477,9 @@ def test_optional_owner_header_hides_foreign_vacancy(store: Store) -> None:
             (vacancy_id,),
         ).fetchone()["owner_id"]
 
+    assert client.get(f"/internal/vacancies/{vacancy_id}/combine", headers=headers).status_code == 422
+    assert client.get(f"/internal/vacancies/{vacancy_id}/combine",
+                      headers={**headers, "X-Owner-ID": "invalid"}).status_code == 422
     foreign = {**headers, "X-Owner-ID": str(uuid4())}
     assert client.post(
         f"/internal/vacancies/{vacancy_id}/combine",

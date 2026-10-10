@@ -1,0 +1,1182 @@
+/* Shared Figma primitives and shell; business page layouts stay in each app. */
+@font-face {
+  font-family: Inter;
+  src: url("./design-assets/fonts/Inter-Regular.woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: Inter;
+  src: url("./design-assets/fonts/Inter-Medium.woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: Inter;
+  src: url("./design-assets/fonts/Inter-SemiBold.woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: Inter;
+  src: url("./design-assets/fonts/Inter-Bold.woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Murs Gothic";
+  src: url("./design-assets/fonts/mursgothic-widedark.otf");
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Moon Walk";
+  src: url("./design-assets/fonts/moon-walk.ttf");
+  font-display: swap;
+}
+html {
+  font-size: min(0.0520833333vw, 1px);
+  background: var(--employer-paint-010101);
+}
+body {
+  margin: 0;
+}
+* {
+  box-sizing: border-box;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+a {
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--employer-blue);
+  outline-offset: 4px;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 1px solid var(--employer-blue);
+}
+:is(.employer-app, .candidate-app) {
+  position: relative;
+  min-height: 100vh;
+  color: var(--comit-text);
+  font-family: var(--employer-font);
+  font-size: 22rem;
+  line-height: 1.35;
+  background: var(--comit-bg);
+  overflow-x: clip;
+  isolation: isolate;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1,
+h2,
+.display {
+  font-family: var(--employer-display);
+  font-weight: 900;
+}
+h1 {
+  font-size: 40rem;
+  line-height: 1.15;
+}
+h2 {
+  font-size: 32rem;
+}
+h3 {
+  font-size: 28rem;
+  font-weight: 600;
+}
+small {
+  font-size: 18rem;
+  color: var(--comit-text-muted);
+}
+.ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: -1;
+}
+.ambient img {
+  position: absolute;
+  max-width: none;
+}
+/* Figma frame geometry (1920 artboard): image box before rotation, centred in its rotated bounds. */
+.ambient-upper {
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: 397.4rem;
+  top: -352.9rem;
+  transform: rotate(4.07deg);
+  filter: blur(15rem);
+  opacity: 0.28;
+}
+.ambient-lower {
+  width: 1802.6rem;
+  height: 1201.8rem;
+  left: -537.5rem;
+  top: 648.7rem;
+  transform: rotate(156deg);
+  filter: blur(15rem);
+  opacity: 0.35;
+}
+.ambient-glow {
+  width: 3183rem;
+  height: 293rem;
+  left: calc(50% - 1591rem);
+  top: 913rem;
+}
+.glass-filter {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.glass {
+  background: var(--employer-glass);
+  border: 1px solid transparent;
+  border-radius: 30rem;
+  background-clip: padding-box;
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 var(--employer-paint-ffffff38),
+    inset 1px 0 0 var(--employer-paint-ffffff14),
+    inset 0 -1px 0 var(--employer-paint-ffffff0f),
+    0 10rem 40rem var(--employer-paint-00000014);
+}
+/* Filter only the backdrop surface: transformed controls keep foreground sharp. */
+.glass.glass-surface {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.glass.glass-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--employer-glass);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 var(--employer-paint-ffffff38),
+    inset 1px 0 0 var(--employer-paint-ffffff14),
+    inset 0 -1px 0 var(--employer-paint-ffffff0f),
+    0 10rem 40rem var(--employer-paint-00000014);
+}
+.action.glass-surface:hover:not(:disabled) {
+  box-shadow: none;
+}
+.panel {
+  background: var(--employer-paint-191918);
+  border-radius: 30rem;
+  padding: 30rem;
+}
+.action {
+  display: inline-flex;
+  gap: 12rem;
+  align-items: center;
+  justify-content: center;
+  min-height: 60rem;
+  padding: 14rem 24rem;
+  border: 0;
+  color: var(--comit-text);
+  font-weight: 600;
+  font-size: 20rem;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    scale var(--employer-hover-duration) var(--employer-hover-ease),
+    background-color var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
+  border-radius: 27rem;
+}
+.action:hover:not(:disabled) {
+  transform: translateY(-2rem);
+  box-shadow:
+    inset 0 1px 0 var(--employer-paint-ffffff40),
+    0 6rem 24rem var(--employer-paint-bfe2ff1a);
+}
+.action:active:not(:disabled) {
+  scale: 0.98;
+}
+.primary {
+  background: var(--employer-gradient);
+}
+.light {
+  background: var(--comit-text);
+  color: var(--employer-ink);
+}
+.circle {
+  width: 66rem;
+  height: 66rem;
+  padding: 0;
+  border-radius: 97rem;
+  min-height: 0;
+  flex-shrink: 0;
+}
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26rem;
+  height: 26rem;
+  flex-shrink: 0;
+}
+.icon > svg,
+.icon-mask {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.icon-mask {
+  background-color: currentColor;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+/* Figma draws these glyphs in the muted grey; contexts below recolour them through `color`. */
+.icon-resumes,
+.icon-ai,
+.icon-candidates,
+.icon-statistics,
+.icon-settings,
+.icon-clock,
+.icon-at {
+  color: var(--comit-text-muted);
+}
+/* Primary action arrow: dark lucide arrow on a light disc. */
+.icon-disc {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--comit-text);
+  color: var(--comit-bg);
+}
+.icon-disc > svg {
+  width: 56%;
+  height: 56%;
+}
+.icon-logo {
+  width: 38rem;
+  height: 38rem;
+}
+.icon-back {
+  width: 30rem;
+  height: 31rem;
+}
+.icon-arrow {
+  width: 43rem;
+  height: 43rem;
+}
+.muted {
+  color: var(--comit-text-muted);
+}
+.topbar {
+  height: 66rem;
+  position: relative;
+  margin: 40rem 80rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30rem;
+  z-index: 5;
+}
+.brand {
+  height: 66rem;
+  padding: 16rem 32rem;
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 97rem;
+}
+.brand-word {
+  font-family: var(--employer-logo);
+  font-size: 32rem;
+  line-height: 1;
+  transform: translateY(5rem);
+}
+.nav {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20rem;
+}
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 66rem;
+  min-width: 66rem;
+  padding: 20rem;
+  border: 0;
+  border-radius: 97rem;
+  color: var(--comit-text);
+  gap: 0;
+  font-size: 24rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    padding var(--employer-hover-duration) var(--employer-hover-ease),
+    background-color var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.nav-item.selected {
+  background: var(--comit-text);
+  color: var(--comit-bg);
+  padding: 20rem 40rem;
+}
+.nav-item.selected .icon {
+  color: var(--comit-bg);
+}
+.nav-item:not(.selected) .icon {
+  color: var(--employer-nav-icon);
+}
+.icon-send {
+  transform: rotate(180deg);
+}
+.nav-item:hover {
+  transform: translateY(-1rem);
+}
+.nav-label {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tooltip {
+  position: absolute;
+  top: 80rem;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  background: var(--employer-paint-222225);
+  border: 1px solid var(--employer-border);
+  border-radius: 15rem;
+  padding: 18rem 24rem;
+  font-size: 20rem;
+  color: var(--comit-text);
+  transition: opacity var(--employer-hover-duration) var(--employer-hover-ease), transform var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.nav-item:hover .tooltip,
+.nav-item:focus-visible .tooltip {
+  opacity: 1;
+}
+.account-tools {
+  height: 66rem;
+  border-radius: 97rem;
+  padding: 8rem 28rem;
+  display: flex;
+  align-items: center;
+  gap: 24rem;
+}
+.plain-icon {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rem;
+}
+.account-tools .plain-icon > .icon {
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.account-avatar {
+  height: 46rem;
+  width: 46rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 22rem;
+  background: var(--employer-blue);
+  color: var(--employer-ink);
+}
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: 86rem;
+  width: 370rem;
+  padding: 26rem;
+  display: grid;
+  gap: 14rem;
+  font-size: 20rem;
+  z-index: 30;
+}
+.account-menu p {
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.account-confirmation {
+  width: min(560rem, 100%);
+  display: grid;
+  gap: 24rem;
+  font-size: 20rem;
+}
+.account-confirmation h2 {
+  font-size: 30rem;
+}
+.account-confirmation p {
+  line-height: 1.5;
+}
+.account-confirmation-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 14rem;
+}
+:is(.employer-app, .candidate-app).reduce-motion *,
+:is(.employer-app, .candidate-app).reduce-motion *::before,
+:is(.employer-app, .candidate-app).reduce-motion *::after {
+  transition-duration: var(--employer-feedback-transition, 0.01ms) !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+/* Bottom margin clears the floating AI button so the last line of a page stays readable. */
+.main-content {
+  margin: 90rem 80rem 160rem;
+  min-height: 700rem;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  gap: 20rem;
+  margin-bottom: 32rem;
+  min-height: 66rem;
+}
+.page-heading > .primary {
+  margin-left: 12rem;
+  min-height: 51rem;
+  padding: 4rem 4rem 4rem 20rem;
+}
+.page-heading > :not(h1):not(.circle) {
+  transform: translateY(7rem);
+}
+.page-heading > .primary:hover {
+  transform: translateY(5rem);
+}
+.custom-select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.custom-select > .custom-select-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.custom-select-trigger {
+  width: 100%;
+  min-height: 66rem;
+  border: 1px solid transparent;
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  color: var(--comit-text);
+  padding: 18rem 20rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rem;
+  font-size: 20rem;
+}
+.custom-select-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.custom-select-trigger .icon {
+  width: 18rem;
+  height: 18rem;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.custom-select-trigger[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+.custom-select-menu {
+  position: fixed;
+  z-index: 95;
+  border-radius: 27rem;
+  padding: 12rem 8rem;
+  background: var(--comit-text);
+  color: var(--employer-ink);
+  box-shadow: 0 12rem 48rem var(--employer-paint-0000006b);
+  overflow-y: auto;
+  outline: none;
+}
+.custom-select-caption {
+  padding: 8rem 12rem 12rem;
+  font-size: 18rem;
+  font-weight: 600;
+}
+.custom-select-menu > button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 10rem;
+  width: 100%;
+  padding: 12rem;
+  border-radius: 15rem;
+  text-align: left;
+  font-size: 20rem;
+}
+.custom-select-menu > button.is-active {
+  background: var(--employer-blue);
+}
+.custom-select-check {
+  display: grid;
+  place-items: center;
+  width: 20rem;
+  flex-shrink: 0;
+}
+.custom-select-check .icon {
+  width: 18rem;
+  height: 18rem;
+}
+.state {
+  padding: 50rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24rem;
+  flex-direction: column;
+  min-height: 210rem;
+  font-size: 24rem;
+}
+.spinner {
+  width: 30rem;
+  height: 30rem;
+  border: 2px solid var(--employer-border);
+  border-top-color: var(--employer-blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 760px) {
+  .custom-select-trigger {
+    min-height: 46rem;
+    font-size: 16rem;
+    padding: 12rem 16rem;
+  }
+  .custom-select-menu > button {
+    min-height: 44rem;
+    font-size: 16rem;
+  }
+  .custom-select-caption {
+    font-size: 14rem;
+  }
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8rem;
+  font-size: 20rem;
+}
+.field > span {
+  color: var(--comit-text-muted);
+}
+input,
+select,
+textarea {
+  background: var(--employer-paint-2e2e2d);
+  border: 1px solid transparent;
+  border-radius: 20rem;
+  color: var(--comit-text);
+  width: 100%;
+  padding: 22rem 20rem;
+  font-size: 20rem;
+  min-height: 66rem;
+}
+textarea {
+  resize: vertical;
+  min-height: 140rem;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--comit-text-muted);
+}
+.form-grid {
+  display: grid;
+  gap: 16rem;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14rem;
+}
+.form-error {
+  color: var(--employer-danger);
+  font-size: 18rem;
+  overflow-wrap: anywhere;
+}
+.form-actions {
+  display: flex;
+  gap: 12rem;
+  margin-top: 24rem;
+}
+.form-actions > .action {
+  flex: 1;
+}
+@media (max-width: 760px) {
+  html {
+    font-size: 1px;
+  }
+  :is(.employer-app, .candidate-app) {
+    font-size: 16rem;
+  }
+  h1 {
+    font-size: 26rem;
+  }
+  h2 {
+    font-size: 22rem;
+  }
+  h3 {
+    font-size: 20rem;
+  }
+  .topbar {
+    margin: 20rem;
+    height: 50rem;
+    gap: 12rem;
+  }
+  .brand {
+    height: 50rem;
+    padding: 12rem 18rem;
+  }
+  .brand-word {
+    font-size: 24rem;
+  }
+  .icon-logo {
+    width: 28rem;
+    height: 28rem;
+  }
+  .account-tools {
+    height: 50rem;
+    padding: 6rem 12rem;
+    gap: 12rem;
+  }
+  .account-avatar {
+    width: 30rem;
+    height: 30rem;
+    font-size: 16rem;
+  }
+  .nav {
+    position: fixed;
+    bottom: 18rem;
+    top: auto;
+    gap: 8rem;
+    z-index: 50;
+    border-radius: 97rem;
+    background: var(--employer-paint-17171ae8);
+    padding: 6rem;
+    backdrop-filter: blur(20rem);
+  }
+  .nav-item {
+    height: 46rem;
+    min-width: 46rem;
+    padding: 10rem;
+    font-size: 14rem;
+  }
+  .nav-item.selected {
+    padding: 12rem 16rem;
+  }
+  .nav-item .icon {
+    width: 20rem;
+    height: 20rem;
+  }
+  .tooltip {
+    display: none;
+  }
+  .main-content {
+    margin: 50rem 20rem 120rem;
+    min-height: 0;
+  }
+  .page-heading {
+    gap: 12rem;
+    margin-bottom: 24rem;
+    flex-wrap: wrap;
+    min-height: 46rem;
+  }
+  .page-heading > .primary {
+    font-size: 14rem;
+    min-height: 40rem;
+    margin-left: 0;
+  }
+  .icon {
+    width: 22rem;
+    height: 22rem;
+  }
+  .icon-arrow {
+    width: 32rem;
+    height: 32rem;
+  }
+  .action {
+    font-size: 16rem;
+    min-height: 44rem;
+    padding: 12rem 18rem;
+  }
+  .circle {
+    width: 46rem;
+    height: 46rem;
+  }
+  .state {
+    font-size: 18rem;
+    min-height: 180rem;
+    padding: 28rem;
+  }
+  .field,
+  input,
+  select,
+  textarea {
+    font-size: 16rem;
+  }
+  input,
+  select,
+  textarea {
+    padding: 16rem;
+    min-height: 48rem;
+    border-radius: 15rem;
+  }
+  .field > span,
+  small,
+  .form-error {
+    font-size: 14rem;
+  }
+  .panel {
+    padding: 24rem;
+    border-radius: 24rem;
+  }
+  .account-menu {
+    width: 300rem;
+    font-size: 16rem;
+    padding: 20rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: var(--employer-feedback-transition, 0.01ms) !important;
+    scroll-behavior: auto !important;
+  }
+}
+/* Keep bounded hover feedback even when larger motion is reduced. This variable
+   is inherited by button artwork; other transitions still use the near-zero fallback. */
+:is(.employer-app, .candidate-app) :is(button, .icon, .tooltip, .vacancy-card, .discovery-search, .discovery-row, .resume-vacancy-options label, .search-glyph, .copy-feedback) {
+  --employer-feedback-transition: var(--employer-hover-duration);
+}
+
+/* Shared existing employer modal shell; app-specific editors keep their own sizing. */
+.modal-shade {
+  position: fixed;
+  inset: 0;
+  background: var(--employer-paint-0000006b);
+  backdrop-filter: blur(10rem);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 70rem 24rem;
+  overflow-y: auto;
+  z-index: 40;
+}
+.modal {
+  position: relative;
+  width: 484rem;
+  background: var(--employer-paint-191918);
+  border-radius: 30rem;
+  padding: 28rem;
+  color: var(--comit-text);
+}
+
+.account-confirmation form { display: grid; gap: 24rem; }
+@media (max-width: 760px) {
+  .modal-shade {
+    padding: 50rem 20rem 100rem;
+  }
+  .modal {
+    width: 100%;
+    max-width: 484rem;
+    padding: 22rem;
+  }
+}
+
+/* Original employer skill tags, shared across both cabinets. */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rem;
+  margin-top: 20rem;
+}
+.tag {
+  padding: 10rem 20rem;
+  border-radius: 20rem;
+  background: var(--employer-paint-ededed);
+  color: var(--employer-ink);
+  font-size: 20rem;
+  line-height: 1.2;
+}
+.tag.blue {
+  background: var(--employer-blue);
+}
+.tag.pill { border-radius: 100rem; }
+.tag.muted { background: var(--employer-paint-2f2f2d); color: var(--comit-text); }
+.tag { overflow-wrap: anywhere; max-width: 100%; }
+@media (max-width: 760px) {
+  .tag {
+    font-size: 14rem;
+    padding: 8rem 14rem;
+  }
+}
+
+/* Dialogs rise in with their backdrop; the vacancy editor animates itself with framer-motion. */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14rem) scale(0.97);
+  }
+}
+.modal-shade > .modal:not(.vacancy-editor),
+.modal-shade > section.glass {
+  animation: modal-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-shade > .modal:not(.vacancy-editor),
+  .modal-shade > section.glass {
+    animation: none;
+  }
+}
+.reduce-motion .modal-shade > .modal:not(.vacancy-editor),
+.reduce-motion .modal-shade > section.glass {
+  animation: none;
+}
+
+/* Shared native checkbox from the established email consent control. */
+.comit-checkbox[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex: 0 0 max(24rem, var(--employer-checkbox-min));
+  width: max(24rem, var(--employer-checkbox-min));
+  height: max(24rem, var(--employer-checkbox-min));
+  margin: 0;
+  border: 1px solid var(--employer-border);
+  border-radius: max(7rem, 5px);
+  background: var(--employer-paint-ffffff08);
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    box-shadow 0.16s;
+}
+.comit-checkbox[type="checkbox"]:checked {
+  background: var(--employer-blue);
+  border-color: var(--employer-blue);
+}
+.comit-checkbox[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 50%;
+  left: 35%;
+  top: 12%;
+  border: solid var(--employer-ink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.comit-checkbox[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--employer-blue);
+  outline-offset: 4rem;
+}
+
+@media (max-width: 760px) {
+  .comit-checkbox[type="checkbox"] { width: 20rem; height: 20rem; flex-basis: 20rem; }
+  .comit-checkbox[type="checkbox"]:checked::after { left: 6rem; top: 2rem; width: 6rem; height: 10rem; }
+}
+
+.account-tools .plain-icon:hover > .icon-search,
+.account-tools .plain-icon:hover > .icon-bell,
+.account-tools .plain-icon:hover > .icon-message {
+  transform: scale(1.06);
+}
+.account-tools .plain-icon:hover > .icon-chevron {
+  transform: rotate(18deg);
+}
+.card-arrow {
+  height: 46rem;
+  width: 46rem;
+  border: 2rem solid var(--employer-paint-ffffff66);
+  border-radius: 16rem;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: inherit;
+  font-size: 30rem;
+}
+.card-arrow .icon {
+  width: 20rem;
+  height: 20rem;
+  translate: -2rem 0;
+  rotate: -90deg;
+}
+
+@media (max-width: 760px) {
+  .card-arrow {
+    width: 34rem;
+    height: 34rem;
+    border-radius: 12rem;
+    font-size: 24rem;
+  }
+}
+
+/* Vacancy card presentation reused by employer and public showcase. */
+.vacancy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40rem 20rem;
+}
+.vacancy-card {
+  height: 355rem;
+  padding: 16rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--employer-card);
+  border-radius: 30rem;
+  position: relative;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    border-color var(--employer-hover-duration) var(--employer-hover-ease);
+  text-align: left;
+}
+.vacancy-card:hover {
+  transform: translateY(-3rem);
+  border-color: var(--employer-border);
+}
+.status-pill {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+  padding: 18rem 12rem;
+  font-size: 18rem;
+  border-radius: 20rem;
+  line-height: 1;
+  background: var(--employer-glass);
+}
+.status-dot {
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  background: var(--employer-success);
+}
+.status-dot.closed {
+  background: var(--employer-warning);
+}
+.status-dot.draft {
+  background: var(--employer-violet);
+}
+.vacancy-card h3 {
+  font-size: 32rem;
+  margin-top: 22rem;
+  line-height: 1.12;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.salary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rem;
+  flex-wrap: wrap;
+  margin-top: 28rem;
+}
+.salary-row strong {
+  font-family: var(--employer-display);
+  font-size: 32rem;
+}
+.salary-row small {
+  font-size: 20rem;
+  color: var(--employer-paint-ffffff99);
+}
+.vacancy-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--employer-line);
+  padding-top: 18rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--comit-text-muted);
+  font-size: 24rem;
+}
+.vacancy-footer .date {
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+}
+
+@media (max-width: 760px) {
+  .vacancy-grid { grid-template-columns: 1fr; gap: 20rem; }
+  .vacancy-card {
+    height: 260rem;
+  }
+  .status-pill {
+    font-size: 14rem;
+    padding: 12rem;
+  }
+  .status-dot {
+    width: 12rem;
+    height: 12rem;
+  }
+  .vacancy-card h3 {
+    font-size: 24rem;
+  }
+  .salary-row strong {
+    font-size: 24rem;
+  }
+  .salary-row small {
+    font-size: 14rem;
+  }
+  .vacancy-footer {
+    font-size: 16rem;
+  }
+}
+
+/* The established employer list search also serves candidate offer filters. */
+.discovery-search {
+  display: flex;
+  align-items: center;
+  background: var(--employer-gradient);
+  border-radius: 27rem;
+  max-width: 310rem;
+  height: 51rem;
+  position: relative;
+}
+.discovery-search input {
+  background: transparent;
+  padding: 10rem 45rem 10rem 20rem;
+  min-height: 0;
+  height: 51rem;
+  border: 0;
+  font-size: 20rem;
+  border-radius: 27rem;
+}
+.discovery-search input::placeholder {
+  color: var(--comit-text);
+}
+.discovery-search button {
+  position: absolute;
+  right: 4rem;
+  background: var(--comit-text);
+  border: 0;
+  border-radius: 50%;
+  width: 43rem;
+  height: 43rem;
+  display: grid;
+  place-items: center;
+}
+.discovery-search .icon {
+  width: 25rem;
+  height: 25rem;
+}
+.discovery-search .icon {
+  color: var(--employer-search-icon);
+}
+.discovery-search {
+  transform-origin: left center;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.discovery-search:focus-within {
+  transform: translateY(7rem) scale(1.045);
+  box-shadow: 0 10rem 28rem var(--employer-paint-0000006b);
+}
+.discovery-search input:focus {
+  outline: none;
+}
+.discovery-search button,
+.discovery-search .search-glyph {
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.discovery-search:focus-within button,
+.discovery-search:focus-within .search-glyph {
+  scale: 1.1;
+}
+
+.discovery-search input { width: 100%; min-width: 0; }
+@media (max-width: 760px) {
+  .discovery-search {
+    height: 40rem;
+    max-width: 100%;
+    flex: 1;
+  }
+  .discovery-search input {
+    height: 40rem;
+    font-size: 14rem;
+    padding: 8rem 40rem 8rem 14rem;
+  }
+  .discovery-search button {
+    width: 32rem;
+    height: 32rem;
+  }
+}
+
+.chat-header-button { position: relative; }
+.chat-unread-badge { position: absolute; top: -5rem; right: -6rem; display: grid; place-items: center; min-width: 20rem; height: 20rem; padding: 0 4rem; border-radius: 20rem; background: var(--employer-blue); color: var(--employer-ink); font-size: 12rem; font-weight: 600; line-height: 1; pointer-events: none; }
+@media (max-width: 760px) { .chat-unread-badge { min-width: 16rem; height: 16rem; font-size: 10rem; top: -3rem; right: -4rem; } }
+
+.rejection-feedback { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 14rem; }
+.rejection-feedback legend { font-size: 20rem; margin-bottom: 14rem; }
+.rejection-categories { display: flex; flex-wrap: wrap; gap: 16rem 24rem; }
+.rejection-categories label { display: flex; gap: 10rem; align-items: center; font-size: 18rem; }
+.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-181816); color: var(--comit-text); margin: 20rem 0; }
+.recruitment-deadline p { margin: 8rem 0; font-size: 18rem; }
+.recruitment-deadline small { color: var(--comit-text-muted); }
+
+/* Loading is ongoing progress feedback even when decorative motion is reduced. */
+:is(.employer-app, .candidate-app) .spinner { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }

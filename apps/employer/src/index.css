@@ -1,1 +1,657 @@
 @import "tailwindcss";
+@import "@comit/ui-kit/design.css";
+@import "@comit/ui-kit/auth.css";
+.vacancy-card h3,
+.vacancy-card .tags,
+.vacancy-card .salary-row,
+.vacancy-card .status-pill {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .vacancy-card {
+    height: auto;
+    min-height: 260rem;
+    gap: 0;
+  }
+  .vacancy-card h3 {
+    white-space: normal;
+  }
+  .vacancy-card .salary-row {
+    margin-top: 20rem;
+  }
+  .vacancy-footer {
+    margin-top: 24rem;
+  }
+}
+.vacancy-card:first-child .tag {
+  background: var(--employer-blue);
+}
+.agent-launcher.glass-surface {
+  position: fixed;
+}
+.agent-close.glass-surface {
+  position: absolute;
+}
+.topbar.assistant-open {
+  z-index: auto;
+}
+.topbar.assistant-open .brand,
+.topbar.assistant-open .account-tools {
+  position: relative;
+  z-index: 70;
+}
+.topbar.assistant-open .account-menu {
+  z-index: 80;
+}
+.discovery-filters > .custom-select {
+  width: 210rem;
+}
+.discovery-filters > .custom-select:first-child {
+  width: 430rem;
+}
+.discovery-filters .custom-select-trigger {
+  background: var(--comit-text);
+  color: var(--employer-ink);
+}
+.discovery-filters .custom-select-trigger .icon {
+  color: var(--comit-bg);
+}
+.vacancy-search {
+  margin-left: auto;
+}
+.vacancy-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20rem;
+  margin-bottom: 30rem;
+}
+.filter-tab {
+  height: 66rem;
+  overflow: hidden;
+  border-radius: 15rem;
+  text-align: left;
+  padding: 20rem 32rem;
+  font-size: 22rem;
+  font-weight: 500;
+  background: linear-gradient(
+    180deg,
+    var(--employer-paint-463f7d1f),
+    var(--employer-paint-2a26626b),
+    var(--employer-paint-463f7d1f)
+  );
+  border: 1px solid var(--employer-border);
+  color: var(--comit-text);
+}
+.filter-tab[aria-selected="true"] {
+  box-shadow: inset 0 1px 0 var(--employer-paint-ffffff33);
+}
+.edit-badge .icon {
+  width: 18rem;
+  height: 18rem;
+  color: var(--comit-bg);
+}
+.card-link {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+}
+.card-link:focus-visible {
+  outline-offset: -4px;
+}
+.agent-launcher {
+  position: fixed;
+  right: 39rem;
+  bottom: 29rem;
+  width: 104rem;
+  height: 104rem;
+  border-radius: 97rem;
+  padding: 20rem;
+  z-index: 35;
+}
+.agent-launcher img {
+  width: 63rem;
+  height: 63rem;
+  object-fit: contain;
+}
+.modal.vacancy-editor {
+  width: 484rem;
+  max-width: calc(100vw - 144rem);
+  padding: 27rem 27rem 20rem;
+  border-radius: 32rem;
+}
+.modal.vacancy-editor.is-review {
+  width: 726rem;
+}
+@media (max-width: 760px) {
+  .modal.vacancy-editor {
+    width: 100%;
+    max-width: none;
+  }
+  .discovery-filters > .custom-select,
+  .discovery-filters > .custom-select:first-child {
+    width: 100%;
+  }
+}
+.modal-close {
+  position: absolute;
+  right: -72rem;
+  top: 0;
+}
+.modal-tabs {
+  display: flex;
+  background: var(--employer-paint-2e2e2d);
+  border-radius: 25rem;
+  padding: 6rem;
+  gap: 6rem;
+  margin-bottom: 28rem;
+}
+.modal-tabs button {
+  flex: 1;
+  border: 0;
+  border-radius: 20rem;
+  padding: 16rem 10rem;
+  font-size: 18rem;
+  background: transparent;
+  color: inherit;
+}
+.modal-tabs button.active {
+  background: var(--comit-text);
+  color: var(--comit-bg);
+  font-weight: 600;
+}
+.progress-line {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 14rem;
+  font-size: 20rem;
+}
+.progress-line strong {
+  font-family: var(--employer-display);
+  font-size: 28rem;
+}
+.progress-track {
+  height: 20rem;
+  background: var(--employer-paint-30302f);
+  border-radius: 10rem;
+  overflow: hidden;
+  margin-bottom: 30rem;
+}
+.progress-track span {
+  display: block;
+  height: 100%;
+  background: var(--employer-success);
+  border-radius: 10rem;
+  transition: width 0.3s;
+}
+.full-width {
+  width: 100%;
+}
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rem;
+  font-size: 18rem;
+  cursor: pointer;
+}
+.legal-document {
+  margin: 48rem auto;
+  width: min(1100rem, calc(100% - 48rem));
+  display: grid;
+  gap: 24rem;
+}
+.legal-document a {
+  color: var(--employer-blue);
+  text-decoration: underline;
+}
+.legal-document p {
+  white-space: pre-line;
+}
+.legal-table {
+  overflow-x: auto;
+}
+.legal-table th,
+.legal-table td {
+  padding: 12rem;
+  border: 1px solid var(--employer-border);
+  text-align: left;
+  vertical-align: top;
+}
+.detail-columns {
+  display: grid;
+  grid-template-columns: 950rem minmax(0, 1fr);
+  gap: 64rem;
+  margin-left: 86rem;
+}
+.detail-stack {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  gap: 32rem;
+}
+.detail-stack > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.detail-fields {
+  margin-top: 32rem;
+  display: grid;
+  gap: 26rem;
+}
+.skill-row {
+  display: grid;
+  gap: 12rem;
+  font-size: 24rem;
+}
+.skill-row header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20rem;
+}
+.skill-track {
+  height: 16rem;
+  border-radius: 20rem;
+  background: var(--employer-paint-30302f);
+  overflow: hidden;
+}
+.skill-track span {
+  height: 100%;
+  display: block;
+  background: var(--employer-success);
+  border-radius: 20rem;
+}
+.small-heading {
+  display: flex;
+  gap: 12rem;
+  align-items: center;
+  margin-bottom: 28rem;
+}
+.count {
+  font-family: var(--employer-font);
+  font-size: 18rem;
+  border-radius: 50%;
+  background: var(--comit-text);
+  color: var(--employer-ink);
+  width: 28rem;
+  height: 28rem;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
+}
+.count.count-overflow {
+  width: auto;
+  min-width: 38rem;
+  padding: 0 7rem;
+  border-radius: 97rem;
+}
+.saved-row {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  overflow-x: auto;
+  gap: 24rem;
+  scrollbar-width: thin;
+}
+.saved-card {
+  width: 306rem;
+  min-width: 306rem;
+  flex-shrink: 0;
+  border-radius: 20rem;
+  background: var(--employer-paint-272727);
+  border: 0;
+  color: inherit;
+  padding: 24rem;
+  text-align: left;
+  min-height: 230rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 6rem;
+  position: relative;
+}
+.saved-card .score {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 5rem 20rem;
+  border-radius: 20rem;
+  background: var(--employer-success);
+  font-family: var(--employer-display);
+  font-size: 24rem;
+  color: var(--comit-bg);
+}
+.saved-card h3 {
+  font-family: var(--employer-display);
+  font-size: 28rem;
+}
+.interview-row {
+  background: var(--comit-text);
+  border-radius: 30rem;
+  padding: 24rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rem;
+  color: var(--employer-ink);
+  margin-top: 24rem;
+}
+.interview-row h3 {
+  font-family: var(--employer-display);
+  font-size: 28rem;
+}
+.interview-row .action {
+  background: var(--employer-ink);
+  font-size: 20rem;
+}
+.selection-stack {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 65rem;
+}
+.candidate-deck {
+  position: relative;
+  width: 510rem;
+  max-width: 100%;
+  isolation: isolate;
+}
+.candidate-stack-card {
+  position: absolute;
+  inset: 0;
+  border-radius: 22rem;
+  pointer-events: none;
+}
+.stack-far { transform: rotate(9deg); z-index: 0; }
+.stack-near { transform: rotate(-12deg); z-index: 1; }
+.deck-tone-0 { background: linear-gradient(145deg, var(--employer-deck-neutral-start), var(--employer-deck-neutral-end)); }
+.deck-tone-1 { background: linear-gradient(150deg, var(--employer-paint-aaa0dd), var(--employer-paint-212938)); }
+.deck-tone-2 { background: linear-gradient(150deg, var(--employer-paint-73744b), var(--employer-paint-384851)); }
+.candidate-swipe {
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+  padding: 30rem;
+  border-radius: 22rem;
+  min-height: 600rem;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 12rem;
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  border: 1px solid var(--employer-border);
+}
+.candidate-swipe:active {
+  cursor: grabbing;
+}
+.candidate-swipe h2 {
+  font-size: 32rem;
+}
+.candidate-swipe .tags {
+  margin-top: 0;
+}
+.candidate-description {
+  background: var(--employer-paint-2e2e2d);
+  border-radius: 20rem;
+  padding: 20rem;
+  min-height: 70rem;
+  font-size: 20rem;
+}
+.candidate-description.main {
+  min-height: 160rem;
+  margin-top: 18rem;
+}
+.candidate-controls {
+  display: flex;
+  justify-content: center;
+  gap: 32rem;
+  margin-top: auto;
+  padding-top: 18rem;
+}
+.candidate-controls button {
+  width: 78rem;
+  height: 78rem;
+  border-radius: 20rem;
+  font-size: 36rem;
+  background: var(--employer-paint-252626);
+  min-height: 0;
+  padding: 0;
+}
+.deck-note {
+  text-align: center;
+  max-width: 510rem;
+  font-size: 18rem;
+  margin-top: 28rem;
+  color: var(--comit-text-muted);
+}
+.showcase-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 20rem;
+  margin-bottom: 32rem;
+}
+.showcase-toolbar input {
+  flex: 1;
+  border-radius: 97rem;
+}
+.showcase-toolbar select {
+  width: 280rem;
+  border-radius: 97rem;
+}
+.candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24rem;
+}
+.candidate-tile {
+  padding: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: 20rem;
+  min-height: 340rem;
+}
+.candidate-tile h2 {
+  font-size: 28rem;
+}
+.candidate-tile .action {
+  margin-top: auto;
+  align-self: flex-start;
+}
+.resume-grid {
+  display: grid;
+  grid-template-columns: 600rem 1fr;
+  gap: 32rem;
+}
+.resume-grid h2 {
+  margin-bottom: 24rem;
+}
+.resume-content {
+  display: grid;
+  gap: 32rem;
+}
+.resume-copy {
+  white-space: pre-wrap;
+  font-size: 24rem;
+  line-height: 1.5;
+}
+.resume-header {
+  display: flex;
+  align-items: center;
+  gap: 20rem;
+  margin-bottom: 30rem;
+}
+.anonymous-avatar {
+  width: 100rem;
+  height: 100rem;
+  background: var(--employer-blue);
+  color: var(--employer-ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 40rem;
+}
+.resume-section {
+  margin-top: 30rem;
+}
+.resume-section h3 {
+  margin-bottom: 12rem;
+}
+.resume-section .tags {
+  margin-top: 12rem;
+}
+.inline-notice {
+  padding: 18rem 24rem;
+  background: var(--employer-glass);
+  border-radius: 20rem;
+  font-size: 20rem;
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 30rem;
+}
+.empty-note {
+  font-size: 20rem;
+  color: var(--comit-text-muted);
+  padding: 28rem 0;
+}
+@media (max-width: 760px) {
+  .vacancy-filters {
+    gap: 8rem;
+    margin-bottom: 20rem;
+  }
+  .filter-tab {
+    height: 46rem;
+    padding: 12rem;
+    font-size: 14rem;
+  }
+  .vacancy-grid,
+  .candidate-grid {
+    grid-template-columns: 1fr;
+    gap: 20rem;
+  }
+  .agent-launcher {
+    width: 64rem;
+    height: 64rem;
+    right: 16rem;
+    bottom: 88rem;
+    padding: 12rem;
+  }
+  .agent-launcher img {
+    width: 40rem;
+    height: 40rem;
+  }
+  .modal-close {
+    right: 0;
+    top: -48rem;
+  }
+  .modal-tabs button {
+    font-size: 14rem;
+    padding: 12rem;
+  }
+  .progress-line {
+    font-size: 16rem;
+  }
+  .progress-line strong {
+    font-size: 22rem;
+  }
+  .progress-track {
+    height: 12rem;
+    margin-bottom: 22rem;
+  }
+  .checkbox {
+    font-size: 14rem;
+    gap: 12rem;
+  }
+  .detail-columns,
+  .resume-grid {
+    grid-template-columns: 1fr;
+    margin: 0;
+    gap: 30rem;
+  }
+  .skill-row {
+    font-size: 16rem;
+  }
+  .skill-track {
+    height: 10rem;
+  }
+  .saved-card {
+    min-width: 210rem;
+    width: 210rem;
+    min-height: 150rem;
+  }
+  .saved-card h3 {
+    font-size: 20rem;
+  }
+  .saved-card .score {
+    font-size: 16rem;
+  }
+  .interview-row {
+    padding: 18rem;
+    flex-wrap: wrap;
+  }
+  .interview-row h3 {
+    font-size: 20rem;
+  }
+  .selection-stack {
+    padding: 25rem;
+  }
+  .candidate-deck {
+    width: 100%;
+  }
+  .candidate-swipe {
+    min-height: 440rem;
+    padding: 24rem;
+  }
+  .candidate-swipe h2 {
+    font-size: 24rem;
+  }
+  .candidate-description {
+    font-size: 16rem;
+  }
+  .candidate-controls button {
+    width: 58rem;
+    height: 58rem;
+    font-size: 28rem;
+  }
+  .deck-note {
+    font-size: 14rem;
+  }
+  .showcase-toolbar {
+    gap: 12rem;
+    flex-wrap: wrap;
+  }
+  .showcase-toolbar input {
+    flex-basis: 100%;
+  }
+  .showcase-toolbar select {
+    width: calc(50% - 6rem);
+  }
+  .candidate-tile {
+    min-height: 260rem;
+  }
+  .candidate-tile h2 {
+    font-size: 22rem;
+  }
+  .resume-copy {
+    font-size: 16rem;
+  }
+  .anonymous-avatar {
+    width: 70rem;
+    height: 70rem;
+    font-size: 30rem;
+  }
+  .inline-notice,
+  .empty-note {
+    font-size: 16rem;
+  }
+}
+
+@supports (backdrop-filter: url("#glass-refraction")) {
+  .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
+}
+.deck-icon { width: 34rem; height: 34rem; color: var(--comit-text); }

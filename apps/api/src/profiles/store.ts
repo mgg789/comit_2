@@ -10,6 +10,7 @@ import type {
   CandidateProjectionDelivery,
   CandidateVerificationDocument,
   CandidateVerificationDocumentUpload,
+  InvitationTerms,
   JsonValue,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
@@ -60,7 +61,7 @@ interface ProfileRow extends QueryResultRow {
   processing_consent: boolean;
   pool_consent: boolean;
   training_consent: boolean;
-  training_consent_version: "training-v1" | null;
+  training_consent_version: "training-v1" | "training-v2" | null;
   training_consent_accepted_at: Date | string | null;
   consent_version: string;
   consent_accepted_at: Date | string | null;
@@ -254,7 +255,7 @@ function validateConsent(value: unknown): asserts value is NonNullable<Candidate
     || "accepted_at" in value) throw invalid("invalid_profile_consent");
   if (value.pool && !value.processing) throw invalid("processing_consent_required");
   if (value.training !== undefined && typeof value.training !== "boolean") throw invalid("invalid_training_consent");
-  if (value.training ? (!value.processing || !value.pool || value.training_version !== "training-v1") : value.training_version !== undefined) throw invalid("invalid_training_consent");
+  if (value.training ? (!value.processing || !value.pool || !["training-v1", "training-v2"].includes(String(value.training_version))) : value.training_version !== undefined) throw invalid("invalid_training_consent");
 }
 
 function evidenceValueRows(fields: CandidateProfileFields): Array<{ key: string; value: unknown }> {
@@ -422,6 +423,34 @@ async function enqueue(client: PoolClient, account: AccountRow, profile: Profile
   );
 }
 
+/** Atomically append an idempotent hiring claim and withdraw publication with an exact projection snapshot.
+ * Caller holds the hiring aggregate and takes the account before the profile lock, like ordinary profile writes.
+ * The new experience remains a declaration; accepting an offer does not fabricate external verification.
+ */
+export async function applyRecruitmentHire(client: PoolClient, processId: string, candidateId: string, terms: InvitationTerms): Promise<boolean> {
+  const account = await accountFor(client, candidateId);
+  const current = await profileRow(client, candidateId, true);
+  if (!current?.processing_consent) throw new ProfileError(409, "processing_consent_required");
+  const marker = await client.query("INSERT INTO recruitment_hire_applications(process_id,candidate_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING process_id", [processId, candidateId]);
+  if (!marker.rowCount) return false;
+  const claimId = processId;
+  const experience = [...(current.fields.experience ?? [])];
+  if (!experience.some(item => item.id === claimId)) experience.push({ id: claimId, title: terms.vacancy_title ?? "Работа",
+    organization: terms.company_name, description: "Оффер принят на платформе Comit.", link: null });
+  const fields: CandidateProfileFields = { ...current.fields, experience };
+  validateFields(fields);
+  const profile = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET fields=$2,revision=revision+1,pool_consent=false,training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL,updated_at=now()
+    WHERE candidate_id=$1 RETURNING *`, [candidateId, fields])).rows[0]!;
+  const previous = new Map((await evidenceFor(client, candidateId)).map(row => [row.evidence_key, row]));
+  await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id=$1", [candidateId]);
+  for (const row of [...evidenceRows(fields, previous), ...externalEvidenceRows(fields, previous)]) await client.query(`INSERT INTO candidate_profile_evidence
+    (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at) VALUES($1,$2,$3,$4,$5,$6,$7)`,
+    [candidateId, row.key, row.inputHash, row.status, row.verifiedValue === null ? null : JSON.stringify(row.verifiedValue), JSON.stringify(row.provenance), row.checkedAt]);
+  await client.query("UPDATE candidate_profile_outbox SET state='obsolete',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE candidate_id=$1 AND state IN ('queued','processing','retrying','failed')", [candidateId]);
+  await enqueue(client, account, profile, await evidenceFor(client, candidateId));
+  return true;
+}
+
 /**
  * PostgreSQL-backed source profile store. CAS writes and outbox insertion are
  * one transaction, so matching never observes a profile without its snapshot.
@@ -479,7 +508,7 @@ export class CandidateProfileStore {
            consent_version=EXCLUDED.consent_version, consent_accepted_at=EXCLUDED.consent_accepted_at, updated_at=now()
          RETURNING candidate_id, revision, fields, processing_consent, pool_consent, training_consent, training_consent_version, training_consent_accepted_at, consent_version,
                    consent_accepted_at, updated_at`,
-        [accountId, revision, JSON.stringify(fields), consent.processing, consent.pool, consent.version, acceptedAt, training, training ? "training-v1" : null, trainingAt],
+        [accountId, revision, JSON.stringify(fields), consent.processing, consent.pool, consent.version, acceptedAt, training, training ? consent.training_version : null, trainingAt],
       );
       const profile = inserted.rows[0];
       if (!profile) throw new Error("profile insert returned no row");
@@ -883,66 +912,54 @@ export class CandidateProfileStore {
     );
     if (result.rowCount !== 1) throw new Error("projection lease is no longer valid");
   }
-
-  /**
-   * Trusted-producer entry (testing contour): persist the approved grade
-   * result, refresh the source profile's declared grade with a CAS revision
-   * bump, stamp `grade:trusted` evidence and enqueue the exact snapshot.
-   * Cooldowns: retake >= 7 days, upgrade >= 30 days after the last result.
+  /** Accept a trusted finished session atomically with evidence and matching projection.
+   * Identical publisher retries never add another activity; cross-owner/session reuse fails closed.
    */
   public async recordTrustedGrade(candidateId: string, input: {
-    sessionId: string; grade: string; specialization: string;
+    sessionId: string; grade: "intern" | "junior" | "middle" | "senior"; specialization: string;
     supervisionBadge: string | null; tasksAnswered: number;
-  }): Promise<{ recorded: boolean; grade: string; decided_at: string }> {
+  }): Promise<{ recorded: true; grade: string; decided_at: string }> {
     return transaction(this.pool, async client => {
       const account = await accountFor(client, candidateId, true);
       const profile = await profileRow(client, candidateId, true);
       if (!profile) throw new ProfileError(404, "profile_not_found");
-      const history = await client.query<{ grade: string; decided_at: string }>(
-        `SELECT grade, decided_at FROM candidate_grade_results
-          WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1`, [candidateId]);
-      const last = history.rows[0];
+      const previous = (await client.query<{ candidate_id: string; grade: string; specialization: string;
+        supervision_badge: string | null; tasks_answered: number; decided_at: Date }>(
+        "SELECT * FROM candidate_grade_results WHERE session_id=$1", [input.sessionId])).rows[0];
+      if (previous) {
+        if (previous.candidate_id !== candidateId || previous.grade !== input.grade
+          || previous.specialization !== input.specialization || previous.supervision_badge !== input.supervisionBadge
+          || previous.tasks_answered !== input.tasksAnswered) throw new ProfileError(409, "testing_result_conflict");
+        return { recorded: true, grade: previous.grade, decided_at: previous.decided_at.toISOString() };
+      }
+      const last = (await client.query<{ grade: string; decided_at: Date }>(
+        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1", [candidateId])).rows[0];
       if (last) {
-        const days = (Date.now() - new Date(last.decided_at).getTime()) / 86400000;
+        const days = (Date.now() - last.decided_at.getTime()) / 86400000;
         if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
-        if ((GRADE_RANK[input.grade] ?? 0) <= (GRADE_RANK[last.grade] ?? 0)
-            && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
+        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
       }
       const decidedAt = new Date();
-      await client.query(
-        `INSERT INTO candidate_grade_results
-           (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [randomUUID(), candidateId, input.sessionId, input.specialization,
-         input.grade, input.supervisionBadge, input.tasksAnswered, decidedAt]);
-      const fields = { ...(profile.fields as Record<string, unknown>),
-        declared_grade: input.grade } as CandidateProfileFields;
-      const revision = Number(profile.revision) + 1;
-      const updated = await client.query<ProfileRow>(
-        `UPDATE candidate_profiles SET revision=$2, fields=$3::jsonb, updated_at=now()
-          WHERE candidate_id=$1 RETURNING candidate_id, revision, fields, processing_consent, pool_consent,
-                training_consent, training_consent_version, training_consent_accepted_at, consent_version,
-                consent_accepted_at, updated_at`,
-        [candidateId, revision, JSON.stringify(fields)]);
-      const refreshed = updated.rows[0];
-      const evidenceKey = "grade:trusted";
-      const inputHash = createHash("sha256")
-        .update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
-      await client.query(
-        `INSERT INTO candidate_profile_evidence
-           (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
-         VALUES ($1,$2,$3,'confirmed',$4::jsonb,$5::jsonb,$6)
-         ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET
-           input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
-           verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
-        [candidateId, evidenceKey, inputHash,
-         JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
-         JSON.stringify(["testing-engine: adaptive session"]), decidedAt]);
-      const currentEvidence = await evidenceFor(client, candidateId);
-      await enqueue(client, account, refreshed as ProfileRow, currentEvidence);
+      await client.query(`INSERT INTO candidate_grade_results
+        (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(),candidateId,input.sessionId,input.specialization,
+        input.grade,input.supervisionBadge,input.tasksAnswered,decidedAt]);
+      const fields: CandidateProfileFields = { ...profile.fields, declared_grade: input.grade };
+      const refreshed = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET revision=revision+1,fields=$2::jsonb,updated_at=now()
+        WHERE candidate_id=$1 RETURNING *`, [candidateId,JSON.stringify(fields)])).rows[0]!;
+      const inputHash = createHash("sha256").update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
+      await client.query(`INSERT INTO candidate_profile_evidence
+        (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+        VALUES ($1,'grade:trusted',$2,'confirmed',$3::jsonb,$4::jsonb,$5)
+        ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
+          verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
+          JSON.stringify(["testing-engine: adaptive session"]),decidedAt]);
+      await enqueue(client,account,refreshed,await evidenceFor(client,candidateId));
       return { recorded: true, grade: input.grade, decided_at: decidedAt.toISOString() };
     });
   }
+
 }
 
 /** Short alias retained for route consumers that use the domain name. */

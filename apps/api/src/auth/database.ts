@@ -22,6 +22,8 @@ export interface ChallengeIssued {
   challenge_id: string;
   expires_at: string;
   resend_after: string;
+  /** Random challenge code returned only by explicitly enabled development delivery. */
+  dev_code?: string;
 }
 
 /** Result of consuming a valid challenge and creating a revocable session. */

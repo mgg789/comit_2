@@ -4,6 +4,7 @@ import { test } from "node:test";
 import Fastify from "fastify";
 import { Pool } from "pg";
 import { correlatedFetch, installOperations, validatedRequestId } from "../src/operations/index.js";
+import { proxyTrustConfig } from "../src/server.js";
 import { migrate } from "../src/auth/migrate.js";
 
 test("global quotas bound fallback keys, reset windows, expose private-free metrics and correlate concurrent calls", async () => {
@@ -22,7 +23,8 @@ test("global quotas bound fallback keys, reset windows, expose private-free metr
     const requests = await Promise.all(["safe-a", "safe-b"].map(id => app.inject({ url: "/anything/private-candidate-id", headers: { "x-request-id": id } })));
     assert.deepEqual(requests.map(result => result.statusCode), [200, 200]);
     assert.deepEqual(downstream.sort(), ["safe-a", "safe-b"]);
-    const exhausted = await app.inject({ url: "/anything/another" });
+    const exhausted = await app.inject({ url: "/anything/another",
+      headers: { "x-forwarded-for": "198.51.100.99" } });
     assert.equal(exhausted.statusCode, 429); assert.equal(exhausted.headers["retry-after"], "60");
     assert.equal((await app.inject({ url: "/healthz" })).statusCode, 200);
     assert.equal((await app.inject({ url: "/anything/second-address", remoteAddress: "192.0.2.2" })).statusCode, 200);
@@ -55,4 +57,37 @@ test("two API instances share an atomic PostgreSQL quota and database failure fa
     await pool.end();
     assert.equal((await first.inject({ url: "/ordinary" })).statusCode, 503);
   } finally { await first.close(); await second.close(); if (!pool.ended) await pool.end(); }
+});
+
+
+test("proxy trust accepts only explicit addresses and non-universal CIDRs", () => {
+  assert.equal(proxyTrustConfig(undefined), false);
+  assert.equal(proxyTrustConfig(" "), false);
+  assert.deepEqual(proxyTrustConfig(" 192.0.2.2/32, 2001:db8::2/128 "), ["192.0.2.2/32", "2001:db8::2/128"]);
+  for (const unsafe of ["true", "*", "loopback", "nginx", "0.0.0.0/0", "::/0", "192.0.2.2/33", "::/129", "192.0.2.2,", "192.0.2.2/24/1"]) {
+    assert.throws(() => proxyTrustConfig(unsafe), /TRUST_PROXY/);
+  }
+});
+
+test("trusted nginx separates client quotas; untrusted sockets cannot spoof quotas with XFF", async () => {
+  const app = Fastify({ trustProxy: proxyTrustConfig("192.0.2.2/32") });
+  installOperations(app, { limit: 1, now: () => 60000 });
+  app.get("/ordinary", request => ({ ip: request.ip }));
+  try {
+    for (const client of ["198.51.100.1", "198.51.100.2"]) {
+      const request = { url: "/ordinary", remoteAddress: "192.0.2.2", headers: { "x-forwarded-for": client } };
+      const response = await app.inject(request);
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.json().ip, client);
+      assert.equal((await app.inject(request)).statusCode, 429);
+    }
+    for (const [index, spoofed] of ["198.51.100.3", "198.51.100.4"].entries()) {
+      const response = await app.inject({ url: "/ordinary", remoteAddress: "192.0.2.3", headers: { "x-forwarded-for": spoofed } });
+      assert.equal(response.statusCode, index === 0 ? 200 : 429);
+      if (index === 0) assert.equal(response.json().ip, "192.0.2.3");
+    }
+    // Only the closest untrusted hop is used, even if a client prepends forged addresses.
+    assert.equal((await app.inject({ url: "/ordinary", remoteAddress: "192.0.2.2",
+      headers: { "x-forwarded-for": "198.51.100.99, 198.51.100.1" } })).statusCode, 429);
+  } finally { await app.close(); }
 });

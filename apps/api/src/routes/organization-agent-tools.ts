@@ -7,6 +7,7 @@ import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore, StatisticsError } from "../statistics/store.js";
 import { RecruitmentError, type RecruitmentStore } from "../recruitment/store.js";
 import type { ProfileStore } from "../profiles/store.js";
+import type { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const tools = [
@@ -39,6 +40,7 @@ export interface OrganizationAgentToolsOptions {
   statistics: EmployerStatisticsStore;
   profiles?: ProfileStore;
   delegation?: OrganizationAgentDelegationVerifier;
+  vacancyLifecycle?: VacancyLifecycle;
 }
 
 /** Public bridge errors deliberately contain only stable machine-readable details. */
@@ -208,6 +210,7 @@ export async function organizationAgentToolsRoutes(app: FastifyInstance, options
     if (!isRecord(result) || result.owner_id !== ownerId || result.vacancy_id !== vacancyId) fail(404, "vacancy_not_found");
     if (result.state !== "created" || !isRecord(result.publication) || result.publication.status !== "accepted") fail(409, "vacancy_not_published");
     if (open && (result.business_status !== "open" || result.archived === true)) fail(409, "vacancy_not_open");
+    if (open && options.vacancyLifecycle && await options.vacancyLifecycle.pending(vacancyId)) fail(409, "vacancy_lifecycle_pending");
   };
 
   const matchingRequest = async (ownerId: string, path: string, method: "GET" | "POST", body?: unknown): Promise<JsonValue> => {

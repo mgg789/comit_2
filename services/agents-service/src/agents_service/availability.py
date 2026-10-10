@@ -8,7 +8,7 @@ import httpx
 from agents_service.providers import ProviderError
 
 _lock = threading.Lock()
-_cache: dict[str, tuple[float, bool]] = {}
+_cache: dict[str, tuple[float, bool, bool]] = {}
 
 
 def _reachable(feature: str) -> bool:
@@ -26,13 +26,16 @@ def _reachable(feature: str) -> bool:
         cached = _cache.get(feature)
         if cached and time.monotonic() < cached[0]:
             return cached[1]
+    rejected = False
     try:
-        response = httpx.get(url, headers=headers, timeout=2, follow_redirects=False)
+        response = httpx.get(url, headers=headers, timeout=httpx.Timeout(5, connect=2), follow_redirects=False)
         available = response.is_success
+        rejected = response.status_code in (401, 403)
     except httpx.HTTPError:
         available = False
     with _lock:
-        _cache[feature] = (time.monotonic() + 30, available)
+        # A brief network failure must not disable a configured provider for 30 seconds.
+        _cache[feature] = (time.monotonic() + (30 if available or rejected else 3), available, rejected)
     return available
 
 
@@ -48,5 +51,12 @@ def require_capability(feature: str) -> None:
     """Reject disabled work before enqueue; callers keep the draft editable."""
     if feature not in ("agent", "enrichment"):
         raise ValueError("unknown capability")
-    if not capability_view()[feature]:
+    if os.getenv("AGENTS_MODE", "auto") == "manual" or (feature == "agent" and not os.getenv("DEEPSEEK_API_KEY")):
         raise ProviderError("agent_disabled_manual_available", False)
+    if not _reachable(feature):
+        with _lock:
+            cached = _cache.get(feature)
+            rejected = bool(cached and cached[2])
+        if rejected:
+            raise ProviderError(f"{feature}_provider_rejected", False)
+        raise ProviderError(f"{feature}_temporarily_unavailable", True)

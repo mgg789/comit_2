@@ -118,7 +118,7 @@ test("combine gateway validates controls and both exclusion IDs before forwardin
     assert.equal(new Headers(options?.headers).get("x-internal-token"), "synthetic-test-token");
     return Response.json({ detail: "synthetic conflict" }, { status: 409 });
   } });
-  const headers = { "x-internal-token": "synthetic-test-token" };
+  const headers = { "x-internal-token": "synthetic-test-token", "x-owner-id": "00000000-0000-4000-8000-000000000003" };
   const url = "/internal/vacancies/00000000-0000-4000-8000-000000000001/combine";
   assert.equal((await app.inject({ method: "POST", url, payload: {} })).statusCode, 401);
   for (const payload of [{ top_k: 0 }, { top_k: 501 }, { top_k: true }, { top_k: "50" }, { unknown: 1 }]) {
@@ -178,5 +178,33 @@ test("rerank gateway validates caller identity and preserves reserve pagination"
   assert.equal((await app.inject({ method: "POST", url, headers, payload: {} })).statusCode, 409);
   assert.equal((await app.inject({ method: "GET", url: `${url}/selections?kind=reserve&limit=2&offset=1`, headers })).statusCode, 409);
   assert.equal(calls, 2);
+  await app.close();
+});
+
+
+test("owner-scoped matching gateway requires a UUID after token authentication and preserves it", async () => {
+  const app = gateway();
+  const owner = "00000000-0000-4000-8000-000000000003";
+  let calls = 0;
+  await app.register(candidatePipelineRoutes, { token: "synthetic-test-token", transport: async (_url, options) => {
+    calls++;
+    assert.equal(new Headers(options?.headers).get("x-owner-id"), owner);
+    return Response.json({ detail: "owner_record_not_found" }, { status: 404 });
+  } });
+  const root = "/internal/vacancies/00000000-0000-4000-8000-000000000001";
+  for (const [method, suffix, payload] of [
+    ["POST", "/combine", {}], ["GET", "/combine", undefined], ["POST", "/combine/retry", undefined],
+    ["GET", "/selections", undefined],
+    ["PUT", "/selection-state/00000000-0000-4000-8000-000000000002", { state: "visited" }],
+  ] as const) {
+    for (const invalid of [undefined, "", "invalid", `${owner},${owner}`]) {
+      const headers = { "x-internal-token": "synthetic-test-token", ...(invalid === undefined ? {} : { "x-owner-id": invalid }) };
+      assert.equal((await app.inject({ method, url: root + suffix, headers, payload })).statusCode, 400);
+    }
+    assert.equal((await app.inject({ method, url: root + suffix, headers: { "x-owner-id": owner }, payload })).statusCode, 401);
+    assert.equal((await app.inject({ method, url: root + suffix,
+      headers: { "x-internal-token": "synthetic-test-token", "x-owner-id": owner }, payload })).statusCode, 404);
+  }
+  assert.equal(calls, 5);
   await app.close();
 });

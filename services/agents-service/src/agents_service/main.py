@@ -3,7 +3,7 @@
 import hmac
 import os
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 import psycopg
@@ -21,6 +21,7 @@ from agents_service.models import (
     MatchingStatus,
     RevisionRequest,
     SchemaSnapshot,
+    VacancyDeletionReceipt,
 )
 from agents_service.providers import MatchingClient, ProviderError, fingerprint
 from agents_service.store import ConflictError, NotFoundError, Store
@@ -147,6 +148,11 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
         """Human publication confirms the approved summary using the existing durable job."""
         return db.submit(owner_id, draft_id, request, engine.schema())
 
+    @app.post("/internal/vacancies/{draft_id}/withdraw", response_model=DraftView)
+    def withdraw_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
+        """Withdraw to draft without removing saved candidates or previous feed history."""
+        return db.withdraw(owner_id, draft_id, request)
+
     @app.post("/internal/vacancies/{draft_id}/close", response_model=DraftView)
     def close_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
         """Durably close a vacancy without deleting selection or recruitment audit."""
@@ -154,8 +160,19 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
 
     @app.delete("/internal/vacancies/{draft_id}", response_model=DraftView)
     def archive_vacancy(draft_id: UUID, request: RevisionRequest, owner_id: Owner, db: Database):
-        """Archive and, when published, enqueue a closed snapshot before removal from lists."""
-        return db.close(owner_id, draft_id, request, archive=True)
+        """Hard-delete only draft/closed vacancy state and return its final removal snapshot."""
+        return db.delete(owner_id, draft_id, request)
+
+    @app.get("/internal/vacancies/{draft_id}/deletion", response_model=VacancyDeletionReceipt)
+    def vacancy_deletion(draft_id: UUID, owner_id: Owner, db: Database):
+        """Read an owned deletion receipt for durable API retries."""
+        return db.deletion(owner_id, draft_id)
+
+    @app.get("/internal/vacancies/{draft_id}/lifecycle/{expected_revision}/{action}", response_model=DraftView)
+    def vacancy_lifecycle_receipt(draft_id: UUID, expected_revision: int,
+                                 action: Literal["withdraw", "close"], owner_id: Owner, db: Database):
+        """Read the exact owner-scoped lifecycle acknowledgement after an unknown HTTP outcome."""
+        return db.lifecycle_receipt(owner_id, draft_id, expected_revision, action)
 
     @app.patch("/internal/vacancy-drafts/{draft_id}", response_model=DraftView)
     def patch(draft_id: UUID, request: DraftPatch, owner_id: Owner, db: Database):
@@ -213,6 +230,8 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     # Separate session module shares this app's owner dependency and database store.
     from agents_service.session_routes import register_session_routes
     register_session_routes(app, owner, database, engine, capability_check=require_optional)
+    from agents_service.recommendations import register_recommendation_routes
+    register_recommendation_routes(app, owner, database)
     from agents_service.organization_routes import register_organization_routes
     register_organization_routes(app, owner, database, capability_check=require_optional)
     from agents_service.organization_documents import register_document_routes

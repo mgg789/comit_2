@@ -17,3 +17,121 @@
   --comit-radius: 12px;
   --comit-space-unit: 4px;
 }
+
+/* Shared Figma surface: employer/candidate only; the other apps retain their palette. */
+.employer-app,
+.candidate-app,
+.comit-design {
+  --employer-paint-2f2f2d: #2f2f2d;
+  --employer-paint-f8fcfe: #f8fcfe;
+  --employer-control-min: 44px;
+  --employer-input-text-min: 16px;
+  --employer-caption-text-min: 14px;
+  --employer-checkbox-min: 20px;
+  --comit-bg: #010101;
+  --comit-text: #f0f0f0;
+  --comit-text-muted: #c0c0c0;
+  --employer-ink: #272930;
+  /* Icon tints that used to be image filters on exported artwork. */
+  --employer-nav-icon: #adadad;
+  --employer-search-icon: #787878;
+  --employer-assistant-mark: #606060;
+  --employer-blue: #bfe2ff;
+  --employer-violet: #a49bf7;
+  --employer-glass: linear-gradient(145deg, rgb(52 53 54 / 82%), rgb(34 35 36 / 94%));
+  --employer-composer-glass: linear-gradient(145deg, rgb(49 50 51 / 98%), rgb(37 38 39 / 98%));
+  --employer-glass-blur: 48rem;
+  --employer-deck-neutral-start: rgb(198 190 214 / 82%);
+  --employer-deck-neutral-end: rgb(183 153 100 / 70%);
+  --employer-card: rgb(255 255 255 / 5%);
+  --employer-border: rgb(255 255 255 / 18%);
+  --employer-line: rgb(255 255 255 / 14%);
+  --employer-gradient: linear-gradient(173.6267465362488deg, #397ee4 4.5062%, #9663c3 112.06%);
+  --employer-success: #69cd55;
+  --employer-warning: #ffc655;
+  --employer-danger: #ff7789;
+  --employer-font: "Inter", sans-serif;
+  --employer-display: "Murs Gothic", sans-serif;
+  --employer-logo: "Moon Walk", sans-serif;
+  --employer-radius: 30px;
+  --employer-gap: 20px;
+  --employer-interaction: 160ms;
+  --employer-hover-duration: 300ms;
+  --employer-hover-ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Additional employer surface paints, shared by all employer modules. */
+:root {
+  --employer-paint-000: #000;
+  --employer-paint-00000014: #00000014;
+  --employer-paint-0000006b: #0000006b;
+  --employer-paint-0006: #0006;
+  --employer-paint-0008: #0008;
+  --employer-paint-0009: #0009;
+  --employer-paint-007cd3: #007cd3;
+  --employer-paint-008ed4: #008ed4;
+  --employer-paint-010101: #010101;
+  --employer-paint-0564a5: #0564a5;
+  --employer-paint-0a7347: #0a7347;
+  --employer-paint-102e51: #102e51;
+  --employer-paint-15131d00: #15131d00;
+  --employer-paint-17171ae8: #17171ae8;
+  --employer-paint-181816: #181816;
+  --employer-paint-191918: #191918;
+  --employer-paint-191921: #191921;
+  --employer-paint-212938: #212938;
+  --employer-paint-222225: #222225;
+  --employer-paint-252626: #252626;
+  --employer-paint-26262b: #26262b;
+  --employer-paint-272727: #272727;
+  --employer-paint-272930: #272930;
+  --employer-paint-27293099: #27293099;
+  --employer-paint-282020: #282020;
+  --employer-paint-28262f: #28262f;
+  --employer-paint-282b34: #282b34;
+  --employer-paint-2a26626b: #2a26626b;
+  --employer-paint-2cacfd: #2cacfd;
+  --employer-paint-2e2e2d: #2e2e2d;
+  --employer-paint-30302f: #30302f;
+  --employer-paint-333: #333;
+  --employer-paint-384851: #384851;
+  --employer-paint-3f485c: #3f485c;
+  --employer-paint-40364a: #40364a;
+  --employer-paint-463f7d1f: #463f7d1f;
+  --employer-paint-5da6ed: #5da6ed;
+  --employer-paint-6773ac88: #6773ac88;
+  --employer-paint-727478: #727478;
+  --employer-paint-73744b: #73744b;
+  --employer-paint-99c7e2: #99c7e2;
+  --employer-paint-9c9da5: #9c9da5;
+  --employer-paint-a5a5af: #a5a5af;
+  --employer-paint-aaa0dd: #aaa0dd;
+  --employer-paint-b2b6c2: #b2b6c2;
+  --employer-paint-b4e9ff50: #b4e9ff50;
+  --employer-paint-b7996440: #b7996440;
+  --employer-paint-bfe2ff1a: #bfe2ff1a;
+  --employer-paint-c2c5d1: #c2c5d1;
+  --employer-paint-c6bed673: #c6bed673;
+  --employer-paint-d5d5d5: #d5d5d5;
+  --employer-paint-d9ffff: #d9ffff;
+  --employer-paint-daffe6: #daffe6;
+  --employer-paint-dedee3: #dedee3;
+  --employer-paint-e0e0e0: #e0e0e0;
+  --employer-paint-ededed: #ededed;
+  --employer-paint-eee: #eee;
+  --employer-paint-f43: #f43;
+  --employer-paint-f5f4fb: #f5f4fb;
+  --employer-paint-ff443e: #ff443e;
+  --employer-paint-fff: #fff;
+  --employer-paint-fff4: #fff4;
+  --employer-paint-ffffff08: #ffffff08;
+  --employer-paint-ffffff0f: #ffffff0f;
+  --employer-paint-ffffff14: #ffffff14;
+  --employer-paint-ffffff24: #ffffff24;
+  --employer-paint-ffffff30: #ffffff30;
+  --employer-paint-ffffff33: #ffffff33;
+  --employer-paint-ffffff38: #ffffff38;
+  --employer-paint-ffffff40: #ffffff40;
+  --employer-paint-ffffff66: #ffffff66;
+  --employer-paint-ffffff99: #ffffff99;
+}

@@ -385,6 +385,8 @@ class RerankStore:
             from matching_engine.learning_store import LearningStore
             main = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (row["main_run_id"],)).fetchone()
             LearningStore.capture_main(connection, main)
+            from matching_engine.recommendations import capture_rerank
+            capture_rerank(connection, job, outcome)
             return True
 
     def fail(self, job: RerankJob, error_code: str, max_attempts: int, retry_base_seconds: int) -> None:

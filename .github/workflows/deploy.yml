@@ -1,9 +1,21 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      adopt_legacy:
+        description: 'Adopt the verified legacy six-service stack (first upgrade only)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  actions: read
 
 concurrency:
   group: deploy-prod
@@ -11,30 +23,57 @@ concurrency:
 
 jobs:
   deploy:
-    name: Build & run prod stack on mgg-server
+    name: Deploy CI-verified exact main revision
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: [self-hosted, ci]
     steps:
-      # Container jobs (ci js/python) leave root-owned files in the shared
-      # workspace; a root container chowns them back to the runner user.
-      - name: Fix workspace ownership
-        run: >
-          docker run --rm -v "/home/mgg/actions-runners/${RUNNER_NAME}:/work" alpine:3.20
-          chown -R "$(id -u):$(id -g)" /work/_work/comit_2
-      - uses: actions/checkout@v5
-      - name: Load server env
+      - name: Verify current main has successful CI
+        id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const candidate = context.eventName === 'workflow_run'
+              ? context.payload.workflow_run.head_sha : context.sha;
+            const main = await github.rest.repos.getBranch({ owner, repo, branch: 'main' });
+            if (candidate !== main.data.commit.sha) {
+              core.setFailed('Only current main can deploy; stale CI results are rejected.');
+              return;
+            }
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner, repo, workflow_id: 'ci.yml', branch: 'main', head_sha: candidate,
+              event: 'push', status: 'completed', per_page: 100
+            });
+            const latest = runs.data.workflow_runs
+              .filter(run => run.head_sha === candidate)
+              .sort((a, b) => b.id - a.id)[0];
+            if (!latest || latest.conclusion !== 'success') {
+              core.setFailed('Current exact main SHA requires a successful latest CI run.');
+              return;
+            }
+            core.setOutput('sha', candidate);
+      - name: Restore this repository workspace ownership
         run: |
-          if [ -f /home/mgg/comit/.env ]; then
-            cp /home/mgg/comit/.env .env
-            # smoke must probe the ports the server actually uses
-            grep -E '^(WEB|API|MATCHING|TESTING|INTEGRATION)_PORT=' /home/mgg/comit/.env >> "$GITHUB_ENV"
-          else
-            echo "::error::/home/mgg/comit/.env is missing — create it on the server from .env.example"
-            exit 1
-          fi
-      - name: Build and start prod stack
-        run: docker compose -p comit --env-file .env -f infra/docker-compose.prod.yml up -d --build
-      - name: Smoke gate (prod ports)
-        run: ./tests/smoke.sh
-      - name: Prune dangling images
-        if: always()
-        run: docker image prune -f
+          case "$RUNNER_NAME" in
+            mgg-ci-[123]) ;;
+            *) echo "Unsupported deployment runner for workspace ownership repair" >&2; exit 1 ;;
+          esac
+          docker run --rm \
+            --mount "type=bind,source=/home/mgg/actions-runners/${RUNNER_NAME}/_work/comit_2,target=/work" \
+            alpine:3.20 chown -R "$(id -u):$(id -g)" /work
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.release.outputs.sha }}
+          fetch-depth: 1
+      - name: Build, backup, migrate and verify production
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          ADOPT_LEGACY: ${{ github.event_name == 'workflow_dispatch' && inputs.adopt_legacy || false }}
+        run: |
+          args=()
+          if [[ "$ADOPT_LEGACY" == true ]]; then args+=(--adopt-legacy); fi
+          python3 infra/deploy.py "$RELEASE_SHA" --repo "$GITHUB_WORKSPACE" "${args[@]}"

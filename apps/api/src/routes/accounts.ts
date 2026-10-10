@@ -7,7 +7,10 @@ import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { typ
 import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { showcaseRoutes } from "./showcase.js";
+import { publicShowcaseRoutes } from "./public-showcase.js";
 import { correlatedFetch } from "../operations/index.js";
+import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
+import { RecruitmentError } from "../recruitment/store.js";
 
 type Schema = string | number | boolean | null | undefined | Schema[] | { [key: string]: Schema };
 
@@ -34,6 +37,7 @@ export interface AccountGatewayOptions extends AuthOptions {
   matchingToken?: string;
   transport?: typeof fetch;
   profiles?: ProfileStore;
+  vacancyLifecycle?: VacancyLifecycle;
 }
 
 /** Expose employer editorial endpoints and candidate private reads with server-derived UUIDs. */
@@ -92,14 +96,27 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
           const identity = identities.get(request);
           if (!identity || !agentsToken) return reply.code(503).send({ detail: "agents_unavailable" });
           try {
+            const lifecycle = /^\/internal\/vacancies\/\{draft_id\}(?:\/(withdraw|close))?$/.exec(path);
+            if (options.vacancyLifecycle && lifecycle && (method === "delete" || lifecycle[1] && method === "post")) {
+              const params = request.params as { draft_id: string };
+              const body = request.body as { expected_revision: number };
+              return reply.header("cache-control", "no-store").send(await options.vacancyLifecycle.execute(identity.accountId,
+                params.draft_id, body.expected_revision, method === "delete" ? "delete" : lifecycle[1] as "withdraw" | "close"));
+            }
             const incoming = new URL(request.url, "http://gateway.invalid");
             const url = new URL(agentsUrl);
             url.pathname = incoming.pathname.replace("/employer/", "/internal/"); url.search = incoming.search;
-            const result = await transport(url, { method: request.method, headers: {
+            const forward = () => transport(url, { method: request.method, headers: {
               "x-internal-token": agentsToken, "x-owner-id": identity.accountId, "content-type": "application/json" },
               ...(method !== "get" ? { body: JSON.stringify(request.body) } : {}), signal: AbortSignal.timeout(10000), redirect: "error" });
+            const draftId = (request.params as { draft_id?: string }).draft_id;
+            const result = method !== "get" && draftId && options.vacancyLifecycle
+              ? await options.vacancyLifecycle.withEditorial(draftId, forward) : await forward();
             return reply.code(result.status).header("cache-control", "no-store").send(await result.json());
-          } catch { return reply.code(503).send({ detail: "agents_unavailable" }); }
+          } catch (error) {
+            if (error instanceof RecruitmentError) return reply.code(error.status).send({ detail: error.code });
+            return reply.code(503).send({ detail: "agents_unavailable" });
+          }
         } });
     }
   }
@@ -192,7 +209,8 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
             if (!draftResult.ok) return reply.code(draftResult.status).send({ detail: "owner_record_not_found" });
             const draft = await draftResult.json() as AgentsDraftView;
             if (draft.owner_id !== identity.accountId || draft.draft_id !== request.params.draft_id) return reply.code(404).send({ detail: "owner_record_not_found" });
-            if (draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
+            if ((method !== "get" || !["/saved", "/visited"].some(prefix => suffix.startsWith(prefix))) && (draft.archived || draft.business_status !== "open" || draft.state !== "created" || draft.publication?.status !== "accepted"
+              || options.vacancyLifecycle && await options.vacancyLifecycle.pending(draft.draft_id))) return reply.code(409).send({ detail: "vacancy_not_published" });
             const resolved = suffix.replace(/\{([^}]+)\}/g, (_full, key: string) => encodeURIComponent(request.params[key]!));
             const upstream = new URL(`/internal/vacancies/${draft.vacancy_id}${resolved}`, matchingUrl);
             upstream.search = new URL(request.url, "http://gateway.invalid").search;
@@ -267,7 +285,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
       if (!draftResult.ok) return reply.code(draftResult.status).send({ detail: "owner_record_not_found" });
       const draft = await draftResult.json() as AgentsDraftView;
       if (draft.owner_id !== identity.accountId || draft.draft_id !== request.params.draft_id) return reply.code(404).send({ detail: "owner_record_not_found" });
-      if (draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
+      if (draft.archived || draft.business_status !== "open" || draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
       const exposureUrl = new URL(`/internal/vacancies/${draft.vacancy_id}/feed/exposures/${request.params.exposure_id}`, matchingUrl);
       const exposure = await transport(exposureUrl, { headers, signal: AbortSignal.timeout(10000), redirect: "error" });
       if (!exposure.ok) return reply.code(exposure.status).send(await exposure.json());
@@ -288,9 +306,12 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   });
   const publicRoutes = [
     { method: "GET", suffix: "/ready", upstream: "/ready", response: "VacancyReady" },
+    { method: "POST", suffix: "/retry", upstream: "/retry", response: "VacancyPipelineStatus" },
     { method: "POST", suffix: "/combine", upstream: "/combine", body: "CombineRequest", response: "CombineStatus" },
     { method: "GET", suffix: "/combine", upstream: "/combine", response: "CombineStatus" },
     { method: "POST", suffix: "/combine/retry", upstream: "/combine/retry", response: "CombineStatus" },
+    { method: "GET", suffix: "/rerank", upstream: "/rerank", response: "RerankStatus" },
+    { method: "POST", suffix: "/rerank/retry", upstream: "/rerank/retry", response: "RerankStatus" },
     { method: "GET", suffix: "/selections", upstream: "/selections", response: "SelectionPage" },
     { method: "GET", suffix: "/candidates/:candidate_id/resume.pdf", upstream: "/selections" },
   ] as const;
@@ -315,7 +336,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
           if (!draftResult.ok) return reply.code(draftResult.status).send({ detail: "owner_record_not_found" });
           const draft = await draftResult.json() as AgentsDraftView;
           if (draft.owner_id !== identity.accountId || draft.draft_id !== request.params.draft_id) return reply.code(404).send({ detail: "owner_record_not_found" });
-          if (draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
+          if (draft.archived || draft.business_status !== "open" || draft.state !== "created" || draft.publication?.status !== "accepted") return reply.code(409).send({ detail: "vacancy_not_published" });
           const pdf = request.params.candidate_id !== undefined;
           const url = new URL(`/internal/vacancies/${draft.vacancy_id}${route.upstream}`, matchingUrl);
           if (pdf) url.search = "limit=500&offset=0";
@@ -346,4 +367,5 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     });
   }
   await app.register(showcaseRoutes, options);
+  await app.register(publicShowcaseRoutes, options);
 }

@@ -23,6 +23,8 @@ export interface EmailCodeReceipt {
   challenge_id: string;
   expires_at: string;
   resend_after: string;
+  /** Random challenge code returned only by explicitly enabled development delivery. */
+  dev_code?: string;
 }
 
 /** Registration and login share verification; consent is required for the first account. */

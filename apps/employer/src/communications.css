@@ -1,0 +1,787 @@
+@import "@comit/ui-kit/conversation.css";
+.process-menu {
+  margin-left: auto;
+  position: relative;
+}
+.process-menu summary {
+  font-size: 26rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0 16rem;
+}
+.process-menu > div {
+  position: absolute;
+  right: 0;
+  top: 40rem;
+  z-index: 5;
+  width: 350rem;
+  display: grid;
+  gap: 12rem;
+  padding: 24rem;
+  color: var(--employer-paint-fff);
+}
+.process-menu p {
+  font-size: 18rem;
+}
+.chat-picker {
+  position: absolute;
+  left: 0;
+  top: 92rem;
+  width: 320rem;
+  padding: 12rem 18rem;
+  border-radius: 20rem;
+  font-size: 18rem;
+  z-index: 2;
+}
+.chat-more {
+  position: absolute;
+  left: 0;
+  top: 160rem;
+  font-size: 16rem;
+}
+.communication-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--employer-paint-0009);
+  backdrop-filter: blur(12rem);
+  display: grid;
+  place-items: center;
+  z-index: 70;
+}
+.communication-modal > form {
+  width: 560rem;
+  padding: 32rem;
+  max-height: 85vh;
+  overflow: auto;
+}
+.communication-modal h2 {
+  font-size: 28rem;
+  margin-bottom: 24rem;
+}
+.communication-modal .field {
+  margin-bottom: 18rem;
+}
+.communication-modal .action {
+  margin-right: 12rem;
+}
+.organization-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--employer-paint-0008);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.organization-history {
+  position: absolute;
+  inset: 0;
+  top: 82rem;
+  padding: 8rem 48rem 220rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+}
+.organization-history-content {
+  width: 100%;
+  max-width: 1036rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28rem;
+}
+.organization-message {
+  position: relative;
+  display: flex;
+  gap: 18rem;
+  flex-shrink: 0;
+  font-size: 20rem;
+  line-height: 24rem;
+}
+.organization-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.organization-message.assistant {
+  align-self: flex-start;
+  margin-left: 40rem;
+  width: 956rem;
+}
+.organization-message.assistant .organization-message-body {
+  width: 100%;
+  padding-right: 18rem;
+}
+.organization-message.user {
+  align-self: flex-end;
+  max-width: min(720rem, 90%);
+  font-size: 18rem;
+  line-height: 1.25;
+}
+.organization-message.user p {
+  background: var(--employer-paint-fff);
+  color: var(--employer-paint-000);
+  border-radius: 30rem;
+  padding: 18rem 24rem;
+}
+.organization-message.user .copy-message {
+  margin-left: auto;
+}
+.assistant-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 60rem;
+  height: 60rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: -78rem;
+  background: linear-gradient(
+    135deg,
+    var(--employer-paint-d9ffff),
+    var(--employer-paint-2cacfd)
+  );
+  color: var(--employer-paint-102e51);
+  position: relative;
+}
+.assistant-avatar .icon {
+  width: 38rem;
+  height: 38rem;
+  color: var(--employer-assistant-mark);
+}
+.copy-message {
+  display: block;
+  width: 26rem;
+  height: 26rem;
+  margin-top: 16rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--employer-paint-fff);
+  cursor: pointer;
+  opacity: 0.8;
+}
+.copy-message svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  fill: none;
+}
+.organization-composer {
+  bottom: 40rem;
+  translate: -50% 0;
+  transform: none;
+}
+.agent-attached-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rem;
+  margin-bottom: 12rem;
+}
+.agent-attached-document {
+  display: flex;
+  align-items: center;
+  gap: 5rem;
+  width: 178rem;
+  height: 48rem;
+  padding: 12rem;
+  border-radius: 14rem;
+  background: var(--employer-paint-ffffff0f);
+  backdrop-filter: blur(100rem);
+  -webkit-backdrop-filter: blur(100rem);
+  font-size: 18rem;
+}
+.agent-attached-document-icon {
+  width: 24rem;
+  height: 24rem;
+  flex-shrink: 0;
+}
+.agent-attached-document > span {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-attached-document button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  width: 18rem;
+  height: 18rem;
+  background: transparent;
+  cursor: pointer;
+}
+.agent-attached-document button .icon {
+  width: 100%;
+  height: 100%;
+}
+.communication-attribution .droidje-ai-logo {
+  width: 19.13rem;
+  height: 19.7rem;
+  object-fit: contain;
+}
+.organization-composer .communication-attribution span {
+  color: inherit;
+}
+.recruitment-empty > .state {
+  margin-top: 8rem;
+}
+.organization-history .agent-turn-state {
+  margin-left: 42rem;
+  font-size: 16rem;
+  color: var(--employer-paint-c2c5d1);
+}
+.assistant-welcome {
+  position: absolute;
+  left: 50%;
+  top: clamp(180rem, 50dvh, calc(100dvh - 240rem));
+  transform: translate(-50%, -50%);
+  width: min(956rem, calc(100% - 240rem));
+  max-height: calc(100dvh - 300rem);
+  overflow: auto;
+  scrollbar-width: thin;
+  margin: 0;
+  text-align: center;
+  color: var(--employer-paint-eee);
+}
+.assistant-welcome > .assistant-avatar {
+  margin: 0 auto 30rem;
+  width: 90rem;
+  height: 90rem;
+}
+.assistant-welcome h2 {
+  font-size: 38rem;
+  margin-bottom: 15rem;
+}
+.assistant-welcome p {
+  font-size: 20rem;
+}
+.agent-close {
+  position: absolute;
+  right: 38rem;
+  bottom: 30rem;
+  width: 104rem;
+  height: 104rem !important;
+  min-height: 0;
+  font-size: 54rem;
+  font-weight: 400;
+  padding: 0 !important;
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+}
+.agent-close .icon {
+  width: 28rem;
+  height: 28rem;
+  transform: rotate(45deg);
+}
+.agent-close:hover:not(:disabled) {
+  filter: none;
+}
+.agent-tools {
+  position: absolute;
+  right: 61rem;
+  bottom: 151rem;
+  width: 58rem;
+  height: 159rem;
+  border-radius: 40rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  padding: 12rem 0;
+  gap: 9rem;
+  transform-origin: center bottom;
+}
+.agent-tools > button,
+.agent-reasoning-control > button {
+  background: none;
+  border: 0;
+  width: 36rem;
+  height: 36rem;
+  position: relative;
+  padding: 0;
+  color: var(--employer-paint-fff);
+  cursor: pointer;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
+  display: grid;
+  place-items: center;
+}
+.agent-tools > button:hover,
+.agent-reasoning-control > button:hover {
+  transform: scale(1.06);
+}
+.agent-tools > button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.agent-tools button > .icon {
+  display: block;
+  width: 28rem;
+  height: 28rem;
+  object-fit: contain;
+}
+.agent-reasoning-control {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36rem;
+  height: 36rem;
+  flex-shrink: 0;
+}
+.agent-reasoning {
+  position: absolute;
+  right: calc(100% + 21rem);
+  top: calc(50% + 4rem);
+  translate: 0 -50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 249rem;
+  height: 50rem;
+  padding: 13rem 18rem;
+  gap: 8rem;
+  border-radius: 97rem;
+  box-sizing: border-box;
+  color: var(--employer-paint-fff);
+  font-size: 20rem;
+  line-height: 24rem;
+  font-weight: 500;
+}
+.agent-reasoning::after {
+  content: "";
+  position: absolute;
+  inset: 0 -24rem 0 auto;
+  width: 24rem;
+}
+.agent-reasoning-slider {
+  position: relative;
+  width: 123rem;
+  height: 20rem;
+  flex-shrink: 0;
+}
+.agent-reasoning-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.agent-reasoning-track {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 97rem;
+  background: var(--employer-paint-2f2f2d, var(--employer-paint-333));
+  pointer-events: none;
+}
+.agent-reasoning-thumb {
+  display: block;
+  width: 20rem;
+  height: 20rem;
+  border-radius: 50%;
+  background: var(--employer-paint-f8fcfe, var(--employer-paint-fff));
+}
+.agent-reasoning-slider input:focus-visible + .agent-reasoning-track {
+  box-shadow: 0 0 0 1rem var(--employer-paint-ffffff38);
+}
+.agent-reasoning-slider input:disabled {
+  cursor: default;
+}
+.agent-reasoning-slider:has(input:disabled) .agent-reasoning-track {
+  opacity: 0.45;
+}
+.agent-tools svg {
+  width: 28rem;
+  height: 28rem;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.agent-tools .icon {
+  width: 30rem;
+  height: 30rem;
+}
+.agent-question-count {
+  position: absolute;
+  right: -4rem;
+  top: -5rem;
+  background: var(--employer-paint-007cd3);
+  color: var(--employer-paint-fff);
+  width: 16rem;
+  height: 16rem;
+  border-radius: 50%;
+  font-size: 11rem;
+}
+.agent-budget {
+  position: absolute;
+  right: 135rem;
+  bottom: 198rem;
+  min-width: 230rem;
+  height: 50rem;
+  border-radius: 50rem;
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+  padding: 12rem 20rem;
+  font-size: 20rem;
+}
+.agent-budget-track {
+  display: block;
+  width: 130rem;
+  height: 14rem;
+  border-radius: 20rem;
+  overflow: hidden;
+  background: var(--employer-paint-ffffff38);
+}
+.agent-budget-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--employer-paint-fff);
+  transition: width 0.2s ease;
+}
+.agent-questions {
+  position: absolute;
+  right: 145rem;
+  bottom: 152rem;
+  width: 470rem;
+  padding: 24rem;
+  max-height: 65vh;
+  overflow: auto;
+}
+.agent-questions h2 {
+  font-size: 26rem;
+}
+.agent-questions p {
+  font-size: 20rem;
+}
+.agent-questions form {
+  margin-top: 20rem;
+}
+.agent-questions .action {
+  margin-top: 12rem;
+}
+.agent-pending-questions {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  flex-shrink: 0;
+  max-height: none;
+  overflow: visible;
+}
+@media (max-width: 760px) {
+  .recruitment-screen {
+    min-height: calc(100dvh - 170rem);
+  }
+  .chat-back {
+    position: relative;
+    gap: 12rem;
+    margin-bottom: 18rem;
+  }
+  .chat-back h1 {
+    font-size: 24rem;
+    letter-spacing: 0;
+  }
+  .chat-back .circle {
+    width: 42rem;
+    height: 42rem;
+  }
+  .recruitment-thread {
+    width: 100%;
+  }
+  .participant-header {
+    height: 58rem;
+    padding: 5rem 10rem;
+  }
+  .anonymous-avatar {
+    width: 44rem;
+    height: 44rem;
+  }
+  .participant-name strong {
+    font-size: 16rem;
+  }
+  .participant-name small {
+    font-size: 12rem;
+  }
+  .chat-picker {
+    position: relative;
+    top: auto;
+    width: 100%;
+    margin-bottom: 12rem;
+    font-size: 14rem;
+  }
+  .chat-more {
+    position: relative;
+    top: auto;
+    font-size: 14rem;
+    margin-bottom: 12rem;
+  }
+  .recruitment-messages {
+    height: calc(100dvh - 390rem);
+    min-height: 180rem;
+    gap: 18rem;
+    padding-top: 24rem;
+  }
+  .message-bubble {
+    max-width: 90%;
+    padding: 12rem 15rem;
+    font-size: 15rem;
+    line-height: 20rem;
+    border-radius: 16rem;
+  }
+  .communication-composer-wrap {
+    width: calc(100% - 36rem);
+    bottom: 20rem;
+  }
+  .communication-composer {
+    height: auto;
+    min-height: 58rem;
+    gap: 10rem;
+    padding: 6rem;
+  }
+  .attach-button,
+  .communication-composer .send-button {
+    width: 44rem;
+    height: 44rem;
+    font-size: 28rem;
+  }
+  .communication-composer > input:not([type="file"]) {
+    font-size: 14rem;
+  }
+  .communication-attribution {
+    font-size: 10rem;
+    margin-top: 8rem;
+  }
+  .communication-attribution .icon {
+    width: 16rem;
+    height: 16rem;
+  }
+  .organization-history {
+    top: 80rem;
+    padding: 0 16rem 200rem;
+  }
+  .organization-history-content {
+    gap: 20rem;
+  }
+  .organization-message {
+    font-size: 15rem;
+    line-height: 20rem;
+  }
+  .organization-message.assistant {
+    width: calc(100% - 36rem);
+    margin-left: 36rem;
+  }
+  .assistant-avatar {
+    width: 30rem;
+    height: 30rem;
+    margin-left: -36rem;
+  }
+  .assistant-avatar .icon {
+    width: 22rem;
+    height: 22rem;
+  }
+  .organization-message.user p {
+    padding: 10rem 15rem;
+  }
+  .organization-composer {
+    bottom: 30rem;
+    width: calc(100% - 100rem);
+    left: 16rem;
+    transform: none;
+    translate: none;
+  }
+  .agent-close {
+    width: 54rem !important;
+    height: 54rem !important;
+    right: 12rem;
+    bottom: 24rem;
+    font-size: 32rem;
+  }
+  .agent-tools {
+    width: 42rem;
+    height: 120rem;
+    right: 18rem;
+    bottom: 94rem;
+    padding: 10rem 0;
+  }
+  .agent-tools svg {
+    width: 22rem;
+    height: 22rem;
+  }
+  .agent-tools .icon {
+    width: 22rem;
+    height: 22rem;
+  }
+  .agent-tools button > .icon {
+    width: 22rem;
+    height: 22rem;
+  }
+  .agent-reasoning {
+    width: 225rem;
+    right: calc(100% + 12rem);
+    font-size: 16rem;
+    padding: 13rem 12rem;
+  }
+  .agent-budget {
+    right: 70rem;
+    bottom: 135rem;
+    min-width: 180rem;
+    height: 44rem;
+    font-size: 16rem;
+    padding: 10rem 14rem;
+  }
+  .agent-budget-track {
+    width: 95rem;
+  }
+  .agent-questions {
+    right: 70rem;
+    bottom: 100rem;
+    width: calc(100% - 90rem);
+    padding: 20rem;
+  }
+  .agent-questions h2 {
+    font-size: 22rem;
+  }
+  .agent-questions p {
+    font-size: 14rem;
+  }
+  .agent-pending-questions {
+    right: auto;
+    bottom: auto;
+    width: 100%;
+  }
+  .assistant-welcome h2 {
+    font-size: 26rem;
+  }
+  .assistant-welcome {
+    top: clamp(145rem, 43dvh, calc(100dvh - 220rem));
+    width: calc(100% - 48rem);
+    max-height: calc(100dvh - 280rem);
+  }
+  .assistant-welcome p {
+    font-size: 15rem;
+  }
+  .communication-modal > form {
+    width: calc(100% - 32rem);
+    padding: 24rem;
+  }
+  .communication-error {
+    font-size: 13rem;
+  }
+  .process-menu > div {
+    width: 260rem;
+    padding: 18rem;
+  }
+  .process-menu p {
+    font-size: 14rem;
+  }
+  .pending-files button {
+    font-size: 12rem;
+  }
+  .organization-history .agent-turn-state {
+    font-size: 13rem;
+    margin-left: 36rem;
+  }
+}
+
+.assistant-avatar > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: none;
+}
+.assistant-avatar {
+  background: none;
+}
+.agent-tools > button > .icon {
+  width: 28rem;
+  height: 28rem;
+  object-fit: contain;
+}
+.organization-message.assistant {
+  margin-left: 0;
+  width: 100%;
+  gap: 20rem;
+}
+.agent-avatar-wrap {
+  width: 60rem;
+  flex-shrink: 0;
+}
+.agent-avatar-wrap > .assistant-avatar {
+  margin-left: 0;
+}
+.organization-message.assistant > .organization-message-body {
+  min-width: 0;
+  flex: 1;
+  width: calc(100% - 80rem);
+  padding-right: 0;
+}
+@media (max-width: 760px) {
+  .agent-tools > button > .icon {
+    width: 22rem;
+    height: 22rem;
+  }
+}
+
+.agent-markdown { overflow-wrap: anywhere; line-height: 1.5; }
+.organization-message .agent-markdown p { white-space: normal; margin: 0 0 12rem; }
+.agent-markdown > :last-child { margin-bottom: 0; }
+.agent-markdown h1, .agent-markdown h2, .agent-markdown h3 { font-size: 1.15em; margin: 18rem 0 10rem; line-height: 1.3; }
+.agent-markdown ul, .agent-markdown ol { padding-left: 26rem; margin: 12rem 0; }
+.agent-markdown ul { list-style: disc; }
+.agent-markdown ol { list-style: decimal; }
+.agent-markdown li { margin: 4rem 0; }
+.agent-markdown pre { overflow-x: auto; padding: 16rem; border-radius: 12rem; background: var(--employer-card); white-space: pre; }
+.agent-markdown code { font-family: monospace; font-size: .9em; }
+.agent-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 14rem 0; }
+.agent-markdown td, .agent-markdown th { padding: 8rem 12rem; border: 1px solid var(--employer-border); }
+.agent-markdown a { color: var(--employer-blue); text-decoration: underline; }
+.agent-markdown blockquote { border-left: 2px solid var(--employer-border); margin: 12rem 0; padding-left: 16rem; color: var(--comit-text-muted); }
+.agent-reply-header { min-height: 60rem; display: flex; align-items: center; }
+.organization-message .agent-thought-label { width: fit-content; border-radius: 40rem; background: var(--employer-paint-fff); color: var(--employer-paint-000); padding: 16rem 24rem; font-size: 16rem; line-height: 1; font-weight: 500; }
+.agent-final-answer { margin-top: 16rem; }
+.agent-thinking { display: flex; width: 182rem; height: 44rem; gap: 6rem; align-items: center; justify-content: center; border-radius: 40rem; background: var(--employer-paint-fff); }
+.agent-think-dot { width: 6rem; height: 6rem; border-radius: 50%; background: var(--employer-paint-000); animation: agent-think 1.1s infinite ease-in-out; }
+.agent-think-dot:nth-child(2) { animation-delay: .15s; }
+.agent-think-dot:nth-child(3) { animation-delay: .3s; }
+@keyframes agent-think { 0%, 70%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-4rem); } }
+.reduce-motion .agent-think-dot { animation: none; opacity: .7; }
+@media (max-width: 760px) {
+  .agent-avatar-wrap { width: 30rem; }
+  .organization-message.assistant { gap: 12rem; }
+  .agent-reply-header { min-height: 30rem; }
+  .agent-thinking { width: 140rem; height: 34rem; }
+  .organization-message .agent-thought-label { font-size: 13rem; padding: 12rem 16rem; }
+  .organization-message.user { font-size: 15rem; }
+}
+.copy-message { position: relative; display: grid; place-items: center; line-height: 1; transition: opacity var(--employer-hover-duration) var(--employer-hover-ease); }
+.copy-message:hover { opacity: 1; }
+.copy-message .icon { display: block; width: 24rem; height: 24rem; }
+.agent-answer-actions { display: flex; gap: 12rem; align-items: center; margin-top: 16rem; }
+.agent-answer-actions .copy-message { margin-top: 0; width: 40rem; height: 40rem; border-radius: 10rem; }
+.copy-message > span:first-child:not(.copy-feedback) { font-size: 22rem; }
+.copy-feedback { position: absolute; left: calc(100% + 8rem); top: 50%; transform: translateY(-50%); width: max-content; font-size: 14rem; line-height: 1; color: var(--comit-text-muted); }
+.organization-message.user .copy-feedback { left: auto; right: calc(100% + 8rem); }
+@media (prefers-reduced-motion: reduce) { .agent-think-dot { animation: none; opacity: .7; } }
+
+.agent-clear-dialog {
+  width: min(560rem, calc(100vw - 40rem));
+  padding: 32rem;
+  display: grid;
+  gap: 18rem;
+}
+.agent-clear-dialog .actions { display: flex; justify-content: flex-end; gap: 12rem; }

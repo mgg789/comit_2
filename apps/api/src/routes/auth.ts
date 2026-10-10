@@ -45,12 +45,15 @@ export async function authRoutes(app: FastifyInstance, options: AuthOptions): Pr
       schema: { tags: ["auth"], body: { type: "object", additionalProperties: false, required: ["email"],
         properties: { email: { type: "string", minLength: 3, maxLength: 254 } } },
         response: { 202: { type: "object", required: ["challenge_id", "expires_at", "resend_after"],
-          properties: { challenge_id: { type: "string", format: "uuid" }, expires_at: { type: "string" }, resend_after: { type: "string" } } } } },
+          properties: { challenge_id: { type: "string", format: "uuid" }, expires_at: { type: "string" }, resend_after: { type: "string" }, dev_code: { type: "string", pattern: "^[0-9]{6}$" } } } } },
     }, async (request, reply) => {
       if (!originAllowed(request, config)) return reply.code(403).send({ detail: "origin_forbidden" });
-      if (!options.mailConfigured) return reply.code(503).send({ detail: "mail_not_configured" });
-      const receipt = await store.issue(role, normalizeEmail(request.body.email), request.ip);
-      return reply.code(202).header("cache-control", "no-store").send(receipt);
+      if (config.developmentCodeDelivery && process.env.NODE_ENV !== "development") return reply.code(503).send({ detail: "auth_not_configured" });
+      if (!options.mailConfigured && !config.developmentCodeDelivery) return reply.code(503).send({ detail: "mail_not_configured" });
+      const receipt = await store.issue(role, normalizeEmail(request.body.email), request.ip, config.developmentCodeDelivery);
+      const { dev_code, ...publicReceipt } = receipt;
+      return reply.code(202).header("cache-control", "no-store").send({ ...publicReceipt,
+        ...(config.developmentCodeDelivery && dev_code ? { dev_code } : {}) });
     });
     app.post<{ Body: EmailCodeVerification }>(`${root}/verify`, {
       schema: { tags: ["auth"], body: { type: "object", additionalProperties: false,

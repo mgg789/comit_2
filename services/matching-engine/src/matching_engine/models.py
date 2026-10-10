@@ -48,7 +48,7 @@ class Consent(Contract):
     processing: bool = False
     pool: bool = False
     training: bool = False
-    training_version: Literal["training-v1"] | None = None
+    training_version: Literal["training-v1", "training-v2"] | None = None
     training_accepted_at: AwareDatetime | None = None
     accepted_at: AwareDatetime | None = None
     version: str | None = Field(default=None, min_length=1, max_length=100)
@@ -56,7 +56,7 @@ class Consent(Contract):
     @model_validator(mode="after")
     def training_requires_separate_acceptance(self) -> "Consent":
         """Training opt-in needs its own version/time; permission gates check all purposes."""
-        if self.training and (self.training_version != "training-v1" or self.training_accepted_at is None):
+        if self.training and (self.training_version not in ("training-v1", "training-v2") or self.training_accepted_at is None):
             raise ValueError("training requires explicit versioned consent")
         if not self.training and (self.training_version is not None or self.training_accepted_at is not None):
             raise ValueError("withdrawn training consent cannot retain acceptance fields")

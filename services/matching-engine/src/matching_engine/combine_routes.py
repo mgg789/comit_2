@@ -29,11 +29,10 @@ def combine_router(repository: CombineStore | None, require_internal: Callable) 
         return repository
 
     def owned_storage(vacancy_id: UUID, _authenticated: Annotated[object, Depends(require_internal)],
-                      x_owner_id: Annotated[UUID | None, Header()] = None) -> CombineStore:
+                      x_owner_id: Annotated[UUID, Header()]) -> CombineStore:
         if repository is None:
             raise HTTPException(status_code=503, detail="matching database is not configured")
-        if x_owner_id is not None:
-            assert_vacancy_owner(repository.database_url, vacancy_id, x_owner_id)
+        assert_vacancy_owner(repository.database_url, vacancy_id, x_owner_id)
         return repository
 
     @router.post("/internal/vacancies/{vacancy_id}/combine", response_model=CombineStatus)

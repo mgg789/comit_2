@@ -133,6 +133,8 @@ class LearningStore:
         PreferenceStore.withdraw(connection, candidate_id)
         from matching_engine.hypothesis_store import HypothesisStore
         HypothesisStore.withdraw(connection, candidate_id)
+        from matching_engine.recommendations import withdraw
+        withdraw(connection, candidate_id)
         return result.rowcount
 
     def export(self, directory: Path, key: bytes, *, source: str = "operational", limit: int = 10000) -> dict:

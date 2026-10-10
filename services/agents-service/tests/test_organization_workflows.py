@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+
 from agents_service.database import connect
 from agents_service.organization_models import OrganizationTaskRequest
 from agents_service.organization_store import (
@@ -270,7 +271,8 @@ def test_pg_multi_inquiry_scheduled_report_is_durable():
         assert current.status == "succeeded"
         messages = store.list_messages(owner_id, limit=20).items
         report = [message.content for message in messages if message.role == "assistant" and "Собеседования подтверждены" in message.content]
-        assert report and all(str(value) in report[-1] for value in process_ids)
+        assert report and report[-1] == "Собеседования подтверждены кандидатами. Всего: 2"
+        assert all(str(value) not in report[-1] for value in process_ids)
     finally:
         _cleanup_owner(database_url, owner_id)
 

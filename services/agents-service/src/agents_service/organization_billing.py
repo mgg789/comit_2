@@ -101,7 +101,7 @@ class OrganizationBilling:
         return len(body) + framing
 
     def begin(self, owner_id: UUID, turn_id: UUID, request_hash: str, *, input_bound: Decimal,
-              output_bound: Decimal) -> BillingReservation:
+              output_bound: Decimal, legacy_request_hash: str | None = None) -> BillingReservation:
         """Lookup completed cache before creating any reservation; fence in-flight calls forever."""
         amount = input_bound + output_bound
         if (not all(isinstance(value, Decimal) and value.is_finite() for value in (input_bound, output_bound))
@@ -111,6 +111,11 @@ class OrganizationBilling:
             db.execute("SELECT owner_id FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE", (owner_id,))
             prior = db.execute("SELECT status,response FROM agents_service.organization_provider_calls WHERE owner_id=%s AND request_hash=%s FOR UPDATE",
                                (owner_id, request_hash)).fetchone()
+            if prior is None and legacy_request_hash is not None:
+                # Default-off requests from before mode selection must retain their
+                # paid receipt and ambiguous-call fence after a worker upgrade.
+                prior = db.execute("SELECT status,response FROM agents_service.organization_provider_calls WHERE owner_id=%s AND request_hash=%s FOR UPDATE",
+                                   (owner_id, legacy_request_hash)).fetchone()
             if prior is not None:
                 if prior["status"] == "completed" and prior["response"] is not None:
                     return BillingReservation(request_hash, None, dict(prior["response"]))

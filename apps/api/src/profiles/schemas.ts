@@ -37,7 +37,7 @@ export const candidateProfileFieldsSchema = object({
 export const candidateProfileMutationSchema = object({
   expected_revision: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER }, fields: candidateProfileFieldsSchema,
   consent: object({ processing: { type: "boolean" }, pool: { type: "boolean" },
-    training: { type: "boolean" }, training_version: { type: "string", const: "training-v1" },
+    training: { type: "boolean" }, training_version: { type: "string", enum: ["training-v1", "training-v2"] },
     version: { type: "string", minLength: 1, maxLength: 100 } }, ["processing", "pool", "version"]),
 }, ["expected_revision", "fields"]);
 
@@ -50,7 +50,7 @@ export const candidateProfileViewSchema = object({
     verified_value: {}, provenance: array(text(1000), 30), checked_at: nullable({ type: "string", format: "date-time" }),
   }, ["input_hash", "status", "verified_value", "provenance", "checked_at"]) },
   consents: object({ processing: { type: "boolean" }, pool: { type: "boolean" }, version: text(100),
-    training: { type: "boolean" }, training_version: nullable({ type: "string", const: "training-v1" }),
+    training: { type: "boolean" }, training_version: nullable({ type: "string", enum: ["training-v1", "training-v2"] }),
     training_accepted_at: nullable({ type: "string", format: "date-time" }),
     accepted_at: nullable({ type: "string", format: "date-time" }) }, ["processing", "pool", "version", "accepted_at", "training", "training_version", "training_accepted_at"]),
   projection: object({ state: { type: "string", enum: ["queued", "processing", "retrying", "failed", "delivered"] },

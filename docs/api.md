@@ -1,5 +1,10 @@
 # API — Comit
 
+`GET /api/employer/vacancy-drafts` и `GET /api/employer/vacancy-drafts/{draft_id}`
+возвращают в `AgentsDraftView` nullable ISO-8601 `created_at`, `published_at`,
+`closed_at`. Даты отражают реальные события жизненного цикла; отсутствующая
+историческая дата возвращается как `null`, а не подменяется временем редактирования.
+
 Статистика работодателя: `GET /api/employer/statistics?from=YYYY-MM-DD&to=YYYY-MM-DD&vacancy_id=UUID` — текущий инвентарь, этапы подбора, дневные события и предыдущий период; [контракт и определения](employer-statistics.md).
 
 Feed поддерживает `POST /api/employer/vacancy-drafts/{draft_id}/feed/impressions`
@@ -12,6 +17,27 @@ activation_revision, approval_receipt_hash и activation_kind; `manual_override`
 [Сбор карточек](real-card-learning.md), [активация](rerank-activation.md).
 
 > Правило (ТЗ §3.5): все методы описаны через OpenAPI; эндпоинты документированы — запросы, ответы, коды ошибок.
+
+## Письмо входа
+
+Письмо OTP передаётся SMTP как multipart text/html: текстовый fallback сохраняет
+роль и абсолютный срок действия UTC; HTML повторяет макет Figma `325:15652` с
+динамическим шестизначным кодом, включая ведущие нули. Логотип и фон встроены как
+PNG MIME parts с CID; внешние адреса изображений и tracking links отсутствуют.
+Табличная разметка, inline CSS и сплошные фоновые цвета обеспечивают fallback для
+клиентов без градиентов, фоновых картинок и пользовательских шрифтов. `pnpm
+--filter @comit/api build` копирует bundled assets в `dist/auth/email-assets`.
+Обязательные TLS, timeouts и безопасные категории SMTP failures не изменены.
+
+## Подготовка ленты
+
+Работодатель читает подготовку опубликованной вакансии по
+`GET /api/employer/vacancy-drafts/{id}/pipeline` (существующий `AgentsMatchingStatus`,
+upstream `GET /internal/vacancy-drafts/{id}/pipeline`) и повторяет её через
+`POST .../retry` (`VacancyPipelineStatus` matching-engine). Статус
+rerank доступен через `GET .../rerank` (`RerankStatus`), явное восстановление —
+`POST .../rerank/retry`. Gateway проверяет сессию и принадлежность вакансии;
+подробности автоматического пополнения приведены в [matching](matching.md).
 
 ## Живые спецификации
 
@@ -349,6 +375,12 @@ gateway routes and CRUD опубликованной вакансии остаю
 источников.
 Подробности: [agents.md](agents.md).
 
+Проверка доступности AI различает HTTP503 с `detail`: `agent_disabled_manual_available`
+означает manual mode или отсутствие ключа; `agent_temporarily_unavailable` — временный
+сбой проверки провайдера; `agent_provider_rejected` — HTTP401/403 провайдера и необходимость
+проверки конфигурации. Временный отрицательный probe кешируется 3 секунды, успешный и
+отказ авторизации — 30 секунд. Проверка одной функции не опрашивает другую optional-зависимость.
+
 
 ## Лента работодателя и история решений
 
@@ -420,7 +452,10 @@ OpenAPI; DTO живут в packages/shared/recruitment.ts и использую�
 
 Симметричные role-auth маршруты `/{role}/recruitment/{id}/chat/messages`
 (GET history, POST SendChatMessage), `/files` (POST UploadChatFile) и
-`/files/{file_id}` (GET DownloadChatFile) описаны в Fastify OpenAPI.
+`/files/{file_id}` (GET DownloadChatFile), `/read` (POST ChatReadRequest →
+ChatReadStatus) описаны в Fastify OpenAPI. GET recruitment одного процесса и
+списков дополняется текущим participant-scoped `chat_unread_count`: число
+входящих сообщений или `null`, если метадата недоступна.
 DTO в `packages/shared/chat.ts`, типизированные методы в api-client.
 Участники и комната определяются API из приглашения, не из body/header клиента.
 Чат доступен до accept, контакты — по прежнему правилу после accept.
@@ -478,6 +513,12 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 
 ## Глобальный агент работодателя
 
+`POST /employer/organization-agent/messages` принимает `message`, `idempotency_key`
+и необязательный `reasoning_effort` (`off`, `medium`, `max`; default `off`).
+Возвращаемый turn содержит сохранённый режим. Повтор ключа с другим режимом,
+сообщением или task возвращает 409. Приватный `reasoning_content` исключён из
+сериализованного provider receipt; история сообщений его не содержит.
+
 Публичные account-scoped маршруты находятся под `/employer/organization-agent`;
 gateway получает владельца из employer session. Внутренние маршруты имеют
 префикс `/internal/organization-agent` и требуют `AGENTS_SERVICE_TOKEN`.
@@ -489,3 +530,116 @@ shared и OpenAPI, которые использует gateway. [Операци�
 публичными файлами кандидатов. Business bridge
 `POST /internal/organization-agent/tools/{tool}` принимает только доверенный
 сервисный вызов с owner scope и не выдаёт права принять интервью за кандидата.
+
+## Отзыв, закрытие и удаление вакансии
+
+`POST /employer/vacancies/{draft_id}/withdraw`, `POST .../close` и `DELETE
+/employer/vacancies/{draft_id}` принимают `{expected_revision}` и возвращают
+`DraftView`. Удалять можно только черновики и закрытые вакансии; закрытие
+необратимо. Отзыв переводит вакансию в черновик, сохраняя лайки и процессы.
+API проверяет актуальную публикацию при изменении процесса, отправке сообщения
+и загрузке файла с обеих сторон, включая вызовы агента. Неактивные процессы
+читаются, но их `allowed_actions` пуст и `chat_writable=false`;
+`chat_available=true` продолжает разрешать чтение истории. Предложенные и назначенные интервью
+отменяются; повторная публикация разрешает новые действия, не восстанавливая
+отменённые интервью.
+
+Миграция API `011_vacancy_lifecycle.sql` хранит durable-команды координации.
+`012_chat_writable_receipts.sql` добавляет безопасный read-only флаг в ранее
+сохранённые ответы команд; актуальный флаг клиент получает при чтении процесса.
+Запись фиксируется до удалённого CAS; reconciliation каждые 5 секунд повторяет
+неподтверждённые шаги по точным service receipts. Пока команда не завершена,
+новая выдача, изменения и повторная публикация заблокированы. Ошибка
+`vacancy_lifecycle_pending` означает незавершённую координацию и допускает
+повтор того же действия; `vacancy_lifecycle_conflict` означает отклонённый CAS.
+Gateway не меняет таблицы других сервисов напрямую.
+
+Удаление очищает matching/editorial-записи, API recruitment graph и receipts,
+а для приглашённых процессов вызывает приватный `POST /internal/chat/purge`:
+QGramm удаляет зашифрованные сообщения, файлы, устройства и операции процесса.
+Остаются только минимальные ID/revision tombstones против запоздалых запросов.
+При недоступном chat provider удаление с приглашёнными процессами остаётся
+pending; успешный ответ не выдаётся до подтверждения всех шагов.
+
+
+### Очистка общей истории AI
+
+`DELETE /employer/organization-agent/messages` принимает JSON
+`{expected_context_revision: number}` из предварительного
+`GET /employer/organization-agent/context`; успешный HTTP200 возвращает
+`AgentsOrganizationContext` с пустым `current_summary` и новой ревизией.
+Owner определяется сессией; чужой `X-Owner-ID` не даёт доступа. Cookie-запрос
+требует разрешённый Origin. Очистка не требует доступного LLM и не вызывает его.
+
+В одной транзакции удаляются сообщения, вопросы владельцу и завершённые turns
+с их tool journal, сбрасывается текущий summary. Общая память, документы, задания,
+вакансии, переписка с кандидатами и финансовые записи сохраняются. Терминальные
+leases заданий инвалидируются; запоздалые ответы по удалённым turns и заданиям
+отклоняются. Сохранённые provider receipts остаются финансовым/повторным fence;
+авторитетная ревизия контекста включена в новый provider request, поэтому старый
+ответ не используется для нового диалога после очистки. Это очистка рабочей
+истории, а не полное удаление аккаунта или всех аудитных сведений.
+
+HTTP409 `context_revision_conflict` означает, что после подтверждения контекст
+изменился: требуется перечитать его и подтвердить заново. HTTP409
+`organization_chat_busy` запрещает очистку при queued/processing/retrying turn,
+незавершённом задании (включая waiting/stand-in/waiting_employer), reserved usage,
+in-flight provider call или started tool journal. Активная работа автоматически
+не отменяется; неразрешённый исход операции требует восстановления/разбора.
+После HTTP200 frontend сбрасывает сообщения, выбранные turn и курсор опроса;
+при ошибке локальная история сохраняется. Подтверждение выполняется модалкой
+пользователя; в tool registry очистка не предлагается модели.
+
+Клиент `getCandidatePipeline()` читает существующий `GET /api/candidate/pipeline` как `CandidatePipelineStatus`. Готовность относится к `profile_revision`; подтверждение доставки исходного профиля не равнозначно состоянию `ready`.
+
+
+### Внутренний combine: обязательный контекст владельца
+
+`/internal/vacancies/{vacancy_id}/combine` (POST/GET), `/combine/retry`,
+`/selections` и `/selection-state/{candidate_id}` требуют UUID `X-Owner-ID`
+вместе с `X-Internal-Token`. Matching всегда проверяет владельца вакансии,
+отсутствующий или неверный UUID отклоняется до обращения к подбору.
+Internal gateway сохраняет проверенный заголовок, browser API берёт владельца
+из сессии. На внешнем nginx `/api/internal` и `/api/internal/*` закрыты (404);
+сервисные клиенты используют прямой внутренний URL. Схема OpenAPI генерируется
+из matching routes командой `python tests/generate_candidate_contract.py`.
+
+
+### Общая публичная витрина
+
+`GET /api/public/showcase/vacancies` и `GET /api/public/showcase/candidates` —
+read-only списки без сессии и без detail/PDF/contact-доступа. Краткие карточки,
+фильтры, opaque cursor и fences описаны в [контракте витрины](public-showcase.md).
+
+
+## Профиль компании, сроки и уведомления
+
+`GET/PATCH /api/employer/profile`, `GET /api/{candidate|employer}/system-chat`, `POST /api/{role}/system-chat/read` и `GET /api/{role}/chat-unread` используют владельца из сессии. DTO, CAS, пагинация, read receipts и fallback счётчика описаны в [system-inbox.md](system-inbox.md). API client использует те же контракты.
+
+`RecruitmentView` дополнен `deadline` и terminal состоянием `expired`; closure допускает `actor=system`, категории feedback. `company_name` в InviteRequest стал необязательным совместимым полем: авторитетное название берётся из employer profile; несовпадение отклоняется. Причины отказа требуют содержательного текста и категорий. Полная таблица переходов — [recruitment.md](recruitment.md).
+
+`GET /api/candidate/recommendations/latest` возвращает только собственную недельную рекомендацию либо `item=null`, включая честные insufficient_data/provider_unavailable. Источники, внутренние endpoint и leased worker описаны в [recommendations.md](recommendations.md). API автоматически возобновляет недельную очередь каждую минуту; уникальность кандидат/неделя предотвращает повторную генерацию. CLI `pnpm --filter @comit/api recommendations:worker` использует тот же durable store и атомарное уведомление.
+
+Недельные рекомендации требуют нового явного согласия `training-v2`. Версия
+`training-v1` совместима с прежним ранжированием, но не включает рекомендации.
+Миграция API `017_recommendation_consent_version.sql` расширяет допустимые версии
+и очищает результаты без нового согласия. Обновления резюме сохраняют выбранную версию.
+
+### Расходы в статистике работодателя
+
+`GET /employer/statistics` возвращает `expenses`: `currency: RUB`, `total_kopeks`, четыре `categories` с `amount_kopeks` и количеством ненулевых начислений `events`, заполненные UTC-дни `daily`, тарифы `tariffs`. Суммы — целые копейки. Период и владение совпадают с остальной статистикой; при `vacancy_id` расходы ИИ не включаются, потому что provider usage не имеет достоверной привязки к конкретной вакансии. Чтение не создаёт начислений. Ответ не содержит личности кандидата, содержимого ОС или provider payload.
+
+Начальные ставки `expense-v1`: первая публикация вакансии 199 ₽; отправленное приглашение 49 ₽; просроченный дедлайн работодателя 199 ₽; ИИ — фактическая стоимость провайдера сверх 10 ₽ за московский календарный день, перевод по зафиксированному курсу 100 ₽/USD. Дневная сумма округляется вверх до копейки один раз на накопленном превышении, а не для каждого вызова. Изменение тарифов требует новой версии политики, исторические начисления не пересчитываются.
+
+Некачественная ОС не определяется автоматически. Начисление 199 ₽ появляется исключительно после ручного решения поддержки через закрытую DB-функцию `record_support_feedback_expense(owner,vacancy,decision,explanation)`: идентификатор решения обязателен, повтор идемпотентен, функция отозвана у PUBLIC. Endpoint работодателя для этого не существует.
+
+
+### История подтверждённых тестов кандидата
+
+`GET /candidate/testing-history` доступен только с сессией кандидата. Владелец определяется сервером; чужой идентификатор не принимается. Ответ `CandidateTestingHistory`: `timezone: Europe/Moscow`, `kind: confirmed_results`, включительный `period: {from,to}`, 30 элементов `daily: [{date,count}]` и сумма `total`. Период включает сегодняшний московский день и 29 предыдущих. Будущие записи исключены. Отсутствие результатов даёт нулевой календарь; ошибка хранилища — 503 `testing_history_unavailable`, а не пустую успешную историю.
+
+Доверенный producer `POST /internal/testing/session-result` принимает `X-Internal-Token`, сверяемый с `TESTING_ENGINE_TOKEN`, и поля `candidate_id`, `session_id`, `specialization`, `decided_grade`, `tasks_answered`, необязательный `supervision_badge`. Browser JWT не даёт права отправлять результаты. Запись результата, подтверждённое свидетельство `grade:trusted`, revision профиля и outbox проекции изменяются одной транзакцией. Повтор идентичного результата возвращает прежний результат без повторного начисления активности; повтор session_id с другим владельцем или содержимым — 409. Повторный тест разрешён через 7 дней, повышение оценки — через 30 дней.
+
+Этот контракт совместим с адаптивным publisher основного checkout. В данной ветке testing-engine предоставляет только blueprints и не содержит адаптивного publisher: автоматическая публикация требует подключения настоящего доверенного testing contour с `TESTING_API_URL` и `TESTING_ENGINE_TOKEN`. Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
+
+`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.

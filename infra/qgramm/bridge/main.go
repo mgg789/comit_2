@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -173,6 +174,10 @@ func New(configPath string) (*Bridge, error) {
 	if err != nil {
 		return nil, err
 	}
+	if _, err = c.DB.Exec(`CREATE TABLE IF NOT EXISTS comit_purged_chats(chat_id TEXT PRIMARY KEY)`); err != nil {
+		_ = c.Close()
+		return nil, err
+	}
 	return &Bridge{core: c, serviceToken: token, deviceSecret: device, signing: key, management: management, issuer: cfg.Security.Issuer, audience: cfg.Security.Audience, provisioned: make(map[string]bool)}, nil
 }
 
@@ -213,6 +218,10 @@ func (b *Bridge) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	switch r.URL.Path {
+	case "/internal/chat/read":
+		b.handleRead(w, r)
+	case "/internal/chat/unread":
+		b.handleUnread(w, r)
 	case "/internal/chat/history":
 		b.handleHistory(w, r)
 	case "/internal/chat/events":
@@ -223,9 +232,94 @@ func (b *Bridge) serveHTTP(w http.ResponseWriter, r *http.Request) {
 		b.handleUpload(w, r)
 	case "/internal/chat/download":
 		b.handleDownload(w, r)
+	case "/internal/chat/purge":
+		b.handlePurge(w, r)
 	default:
 		writeError(w, 404, "not found")
 	}
+}
+
+// handlePurge erases one process's encrypted records and files, retaining only a
+// non-content tombstone so a delayed request can never recreate the chat.
+func (b *Bridge) handlePurge(w http.ResponseWriter, r *http.Request) {
+	var in contextInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if !validContext(in) || in.ActorID != in.OwnerID {
+		writeError(w, 400, "invalid purge context")
+		return
+	}
+	chat := stableID("chat", in.ProcessID, in.OwnerID, in.CandidateID)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	tx, err := b.core.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, 503, "storage unavailable")
+		return
+	}
+	defer tx.Rollback()
+	rows, err := tx.QueryContext(r.Context(), `SELECT id FROM uploads WHERE chat_id=?`, chat)
+	if err != nil {
+		writeError(w, 503, "storage unavailable")
+		return
+	}
+	var uploads []string
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			writeError(w, 503, "storage unavailable")
+			return
+		}
+		if _, err = uuid.Parse(id); err != nil {
+			rows.Close()
+			writeError(w, 503, "invalid file identifier")
+			return
+		}
+		uploads = append(uploads, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		writeError(w, 503, "storage unavailable")
+		return
+	}
+	for _, id := range uploads {
+		if err = os.RemoveAll(filepath.Join(b.core.Config.Storage.Files, id)); err != nil {
+			writeError(w, 503, "file purge unavailable")
+			return
+		}
+	}
+	for _, query := range []string{
+		`DELETE FROM uploads WHERE chat_id=?`, `DELETE FROM events WHERE chat_id=?`,
+		`DELETE FROM cursors WHERE chat_id=?`, `DELETE FROM messages WHERE chat_id=?`,
+		`DELETE FROM members WHERE chat_id=?`, `DELETE FROM chats WHERE id=?`,
+		`INSERT OR IGNORE INTO comit_purged_chats(chat_id) VALUES(?)`,
+	} {
+		if _, err = tx.ExecContext(r.Context(), query, chat); err != nil {
+			writeError(w, 503, "storage unavailable")
+			return
+		}
+	}
+	for _, a := range []actor{b.actor(in.ProcessID, "owner", in.OwnerID), b.actor(in.ProcessID, "candidate", in.CandidateID)} {
+		for _, query := range []string{`DELETE FROM operations WHERE device_id=?`, `DELETE FROM tickets WHERE device_id=?`, `DELETE FROM devices WHERE id=?`} {
+			if _, err = tx.ExecContext(r.Context(), query, a.DeviceID); err != nil {
+				writeError(w, 503, "storage unavailable")
+				return
+			}
+		}
+		if _, err = tx.ExecContext(r.Context(), `DELETE FROM users WHERE id=?`, a.UserID); err != nil {
+			writeError(w, 503, "storage unavailable")
+			return
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		writeError(w, 503, "storage unavailable")
+		return
+	}
+	delete(b.provisioned, chat)
+	writeJSON(w, 200, map[string]bool{"deleted": true})
 }
 
 // handleEvents reads one bounded durable journal page, never a held-open stream.
@@ -621,6 +715,13 @@ func (b *Bridge) context(ctx context.Context, in contextInput) (actor, string, e
 	chat := stableID("chat", in.ProcessID, in.OwnerID, in.CandidateID)
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	var purged bool
+	if err := b.core.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM comit_purged_chats WHERE chat_id=?)`, chat).Scan(&purged); err != nil {
+		return actor{}, "", err
+	}
+	if purged {
+		return actor{}, "", apiErr{404, "chat not found"}
+	}
 	if !b.provisioned[chat] {
 		if err := b.provision(ctx, in, chat); err != nil {
 			return actor{}, "", err

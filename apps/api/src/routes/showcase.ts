@@ -78,6 +78,7 @@ export async function showcaseRoutes(app: FastifyInstance, options: AccountGatew
         const draft = await source.json() as AgentsDraftView;
         if (draft.owner_id !== identity.accountId || draft.vacancy_id !== vacancyId) return reply.code(404).send({ detail: "owner_record_not_found" });
         if (draft.state !== "created" || draft.publication?.status !== "accepted" || draft.business_status !== "open" || draft.archived) return reply.code(409).send({ detail: "vacancy_not_open" });
+        if (options.vacancyLifecycle && await options.vacancyLifecycle.pending(vacancyId)) return reply.code(409).send({ detail: "vacancy_lifecycle_pending" });
         const vacancy = await json(request, identity.accountId, `/internal/vacancies/${vacancyId}/ready`, ref("VacancyReady")) as VacancyReady;
         if (vacancy.vacancy_id !== vacancyId || vacancy.owner_id !== identity.accountId) return reply.code(404).send({ detail: "owner_record_not_found" });
         if (vacancy.status !== "open") return reply.code(409).send({ detail: "vacancy_not_open" });

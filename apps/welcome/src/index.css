@@ -1,1 +1,102 @@
 @import "tailwindcss";
+
+@font-face {
+  font-family: Inter;
+  src: url("../public/design/fonts/Inter-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Murs Gothic";
+  src: url("../public/design/fonts/mursgothic-widedark.otf") format("opentype");
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Moon Walk";
+  src: url("../public/design/fonts/moon-walk.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.welcome-page {
+  /* Scale the 1920px Figma composition while retaining readable mobile text. */
+  --welcome-unit: min(0.0520833333vw, 1px);
+  position: relative;
+  min-height: max(100svh, calc(1080 * var(--welcome-unit)));
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--comit-bg);
+  color: var(--comit-text);
+  font-family: var(--employer-font);
+  font-weight: 600;
+}
+.welcome-background { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.welcome-sweep {
+  position: absolute;
+}
+.welcome-sweep img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(1802.65 * var(--welcome-unit));
+  height: calc(1201.767 * var(--welcome-unit));
+  max-width: none;
+  object-fit: cover;
+  filter: blur(calc(15 * var(--welcome-unit)));
+}
+.welcome-sweep-right { left: calc(50% - 1664 * var(--welcome-unit)); top: calc(334 * var(--welcome-unit)); width: calc(2135.618 * var(--welcome-unit)); height: calc(1831.112 * var(--welcome-unit)); opacity: .5; }
+.welcome-sweep-right img { transform: translate(-50%, -50%) rotate(156deg); opacity: .8; }
+.welcome-sweep-left { left: calc(16.666667% + 37 * var(--welcome-unit)); top: calc(-435 * var(--welcome-unit)); width: calc(1883.378 * var(--welcome-unit)); height: calc(1326.645 * var(--welcome-unit)); opacity: .4; }
+.welcome-sweep-left img { transform: translate(-50%, -50%) rotate(4.07deg); }
+.welcome-glow { position: absolute; }
+.welcome-glow img { position: absolute; max-width: none; }
+.welcome-glow-one img { left: -91.46%; top: -167.6%; width: 282.92%; height: 435.2%; }
+.welcome-glow-two img { left: -31.71%; top: -375.65%; width: 163.42%; height: 851.3%; }
+.welcome-glow-one { left: calc(25% + 152 * var(--welcome-unit)); top: calc(848 * var(--welcome-unit)); width: calc(328 * var(--welcome-unit)); height: calc(179 * var(--welcome-unit)); }
+.welcome-glow-two { left: calc(33.333333% + 50 * var(--welcome-unit)); top: calc(822 * var(--welcome-unit)); width: calc(545 * var(--welcome-unit)); height: calc(46 * var(--welcome-unit)); }
+.welcome-content { position: relative; width: calc(1045 * var(--welcome-unit)); margin: 0 auto; padding-top: calc(156 * var(--welcome-unit)); padding-bottom: calc(102 * var(--welcome-unit)); }
+.welcome-logo { display: flex; align-items: center; gap: calc(70 * var(--welcome-unit)); margin: 0; height: calc(297 * var(--welcome-unit)); }
+.welcome-logo-tile { display: grid; place-items: center; flex: 0 0 calc(300 * var(--welcome-unit)); height: 100%; border-radius: calc(100 * var(--welcome-unit)); background: var(--comit-text); }
+.welcome-logo-tile img { width: calc(197.834 * var(--welcome-unit)); height: calc(197.472 * var(--welcome-unit)); }
+.welcome-wordmark { font-family: var(--employer-logo); font-size: calc(200 * var(--welcome-unit)); font-weight: 400; line-height: .715; white-space: nowrap; }
+.welcome-entries { display: grid; gap: calc(34 * var(--welcome-unit)); width: calc(888 * var(--welcome-unit)); margin: calc(97 * var(--welcome-unit)) auto 0; }
+.welcome-card { position: relative; overflow: hidden; display: flex; align-items: center; gap: calc(24 * var(--welcome-unit)); min-height: calc(120 * var(--welcome-unit)); padding: calc(24 * var(--welcome-unit)); padding-left: calc(28 * var(--welcome-unit)); border-radius: calc(32 * var(--welcome-unit)); background: var(--comit-text); color: var(--employer-ink); }
+.welcome-card-line { position: absolute; left: calc(975 * var(--welcome-unit)); top: calc(59 * var(--welcome-unit)); width: calc(25 * var(--welcome-unit)); height: calc(4 * var(--welcome-unit)); }
+.welcome-card-icon { flex: 0 0 calc(68 * var(--welcome-unit)); width: calc(68 * var(--welcome-unit)); height: calc(68 * var(--welcome-unit)); }
+.welcome-card-copy { flex: 1; min-width: 0; }
+.welcome-card h2 { margin: 0; font-family: var(--employer-display); font-weight: 900; font-size: calc(28 * var(--welcome-unit)); line-height: 1.2; }
+.welcome-card p { margin: calc(6 * var(--welcome-unit)) 0 0; font-size: calc(20 * var(--welcome-unit)); line-height: 1.2; }
+.welcome-card-action { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: calc(12 * var(--welcome-unit)); min-height: calc(72 * var(--welcome-unit)); padding: 0 calc(64 * var(--welcome-unit)); border-radius: calc(20 * var(--welcome-unit)); background: var(--employer-ink); color: var(--employer-paint-fff); font-size: calc(20 * var(--welcome-unit)); line-height: 1.2; text-decoration: none; transition: opacity var(--employer-interaction), transform var(--employer-interaction); }
+.welcome-card-action:hover { opacity: .85; }
+.welcome-card-action:active { transform: translateY(1px); }
+.welcome-card-action:focus-visible { outline: 3px solid var(--employer-paint-007cd3); outline-offset: 4px; }
+
+@media (max-width: 1100px) {
+  .welcome-page { --welcome-unit: .75px; }
+  .welcome-content { max-width: calc(100% - 40px); padding-top: 64px; }
+  .welcome-logo { justify-content: center; }
+  .welcome-entries { width: 100%; margin-top: 64px; }
+  .welcome-card h2 { font-size: 22px; }
+  .welcome-card p, .welcome-card-action { font-size: 16px; }
+}
+@media (max-width: 760px) {
+  .welcome-page { min-height: 100svh; }
+  .welcome-content { width: 100%; padding-top: 40px; padding-bottom: 40px; }
+  .welcome-logo { gap: 20px; height: auto; }
+  .welcome-logo-tile { flex-basis: clamp(72px, 20vw, 130px); height: clamp(72px, 20vw, 130px); border-radius: 30px; }
+  .welcome-logo-tile img { width: 66%; height: 66%; }
+  .welcome-wordmark { font-size: clamp(48px, 14vw, 90px); }
+  .welcome-entries { gap: 20px; margin-top: 48px; }
+  .welcome-card { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; padding: 20px; border-radius: 24px; }
+  .welcome-card-icon { width: 48px; height: 48px; }
+  .welcome-card h2 { font-size: 21px; overflow-wrap: anywhere; }
+  .welcome-card p { font-size: 16px; line-height: 1.4; margin-top: 8px; }
+  .welcome-card-action { grid-column: 1 / -1; min-height: 52px; padding: 16px; border-radius: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-card-action { transition: none; }
+}

@@ -381,3 +381,41 @@ API миграции `009_organization_agent_tool_receipts.sql` и
 `010_organization_agent_read_receipts.sql` сохраняют immutable hash
 запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
 сохраняют checksum. [Потоки и ограничения](agents.md).
+
+## Очередь событий email (API013)
+
+`notification_mail_outbox` хранит тип, UUID адресата и авторитетного источника,
+срок, attempts, fenced lease и состояния `pending/processing/delivered/failed/dropped`.
+Email и приватные имена разрешаются из текущего источника только перед delivery.
+`notification_mail_cutover` исключает исторические matching likes после обновления
+worker. Вставка `recruitment_interviews` и обе записи outbox транзакционны.
+[Типы, согласия, retry и отсутствующий producer ежемесячных заданий](email-notifications.md).
+
+
+## Компания, inbox и процессы найма (API014–016)
+
+Миграция 014 добавляет `employer_profiles`, `system_inboxes`, `system_notifications` и cutover источников. Номер сообщения локален для аккаунта; idempotency key уникален в его inbox. Read cursor монотонен и не превышает реально выданные сообщения. Схема и producer API: [system-inbox.md](system-inbox.md).
+
+Миграция 015 хранит уникальные недельные recommendation jobs, lease, попытки и результаты; отзыв обязательных согласий немедленно удаляет записи. Matching017 отдельно хранит реальные candidate-scoped причины, срок хранения 90 дней и порог четырёх разных вакансий. Детали: [recommendations.md](recommendations.md).
+
+Миграция 016 добавляет `deadline`, `deadline_suspended`, `employer_contacted_at`, `reminder_sent_at`, interview reason_categories, terminal expired и idempotent `recruitment_hire_applications`. Принятие оффера обновляет profile/source revision, опыт, pool consent и projection outbox внутри hiring-транзакции. Миграции уже применённого файла не редактируются. Таблица переходов: [recruitment.md](recruitment.md).
+
+Недельные рекомендации требуют нового явного согласия `training-v2`. Версия
+`training-v1` совместима с прежним ранжированием, но не включает рекомендации.
+Миграция API `017_recommendation_consent_version.sql` расширяет допустимые версии
+и очищает результаты без нового согласия. Обновления резюме сохраняют выбранную версию.
+
+### Реестр расходов работодателя
+
+API-миграция `018_employer_expenses.sql` добавляет `employer_expenses` (source key, owner, optional vacancy, category, integer kopeks, source time, frozen policy, reason) и `employer_expense_ai_days` (owner/Moscow date, cumulative provider micro-USD and billed kopeks). Категории: publication, invitation, ai, penalty. Данные не содержат контактов кандидатов и текста ОС. Владение в HTTP всегда берётся из сессии.
+
+Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
+
+Миграция backfill использует только известные даты публикаций и durable события/settlements, сохраняет исходные timestamps и маркирует исторические записи; неизвестные даты не синтезируются. API/agents migrations допускают оба порядка через deployment-only `install_employer_expense_sources()`; agents migration 011 устанавливает hooks, когда API-схема уже существует. Миграции выполняет владелец общих схем; функции не доступны PUBLIC. Функция поддержки сохраняет ссылку на ручное решение, не публикуя пояснение в статистике. Ни HTTP GET, ни агрегирование рекомендаций не создают расходов.
+
+
+### Подтверждённые результаты тестирования
+
+Миграция `019_testing_grades.sql` добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
+
+Миграция `020_training_consent_not_null.sql` закрывает SQL NULL-обход CHECK: включённое согласие требует явную версию v1/v2 и дату. Недопустимые старые строки не получают выдуманное согласие: миграция отклоняется до ручного исправления.

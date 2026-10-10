@@ -97,7 +97,8 @@ def test_null_bio_preserves_raw_input_and_publishes_without_inference(vacancies:
 
 
 @pytest.mark.parametrize("status", ["draft", "pending", "closed", "done"])
-def test_business_status_withdraws_artifacts_and_reopen_generates_fresh_revision(vacancies, status) -> None:
+def test_business_status_withdraws_artifacts_and_only_nonclosed_reopens(vacancies, status) -> None:
+    """Closure is terminal; other inactive snapshots may publish a later source revision."""
     vacancy_id, profile = uuid4(), eligible_vacancy()
     vacancies.intake(vacancy_id, profile)
     run(vacancies).process_once()
@@ -108,6 +109,13 @@ def test_business_status_withdraws_artifacts_and_reopen_generates_fresh_revision
     with connect(vacancies.database_url) as connection:
         assert connection.execute("SELECT event_type FROM vacancy_pipeline.outbox ORDER BY id DESC LIMIT 1").fetchone()["event_type"] == "vacancy.withdrawn"
     profile.status, profile.source_revision = "open", 3
+    if status == "closed":
+        with pytest.raises(ConflictError, match="vacancy_closed"):
+            vacancies.intake(vacancy_id, profile)
+        assert vacancies.status(vacancy_id).revision == 2
+        with pytest.raises(NotFoundError):
+            vacancies.ready_entry(vacancy_id)
+        return
     vacancies.intake(vacancy_id, profile)
     run(vacancies).process_once()
     assert vacancies.ready_entry(vacancy_id).revision == 3

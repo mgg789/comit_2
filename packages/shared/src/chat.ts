@@ -39,3 +39,9 @@ export interface UploadChatFile { idempotency_key: string; name: string; media_t
 
 /** Download only a published attachment in an authorized process; browsers should save it as a file. */
 export interface DownloadChatFile extends ChatFile { data_base64: string }
+
+/** Last rendered live message; the server rejects future/control-journal cursors. */
+export interface ChatReadRequest { through_sequence: number }
+
+/** Durable actor-scoped read receipt; own messages never contribute to unread_count. */
+export interface ChatReadStatus { read_sequence: number; unread_count: number }

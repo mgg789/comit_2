@@ -86,7 +86,7 @@ export class EmployerStatisticsStore {
     const now = this.clock(), period = statisticsPeriod(query, now);
     const client = await this.pool.connect();
     try {
-      await client.query("BEGIN READ ONLY");
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
       await client.query("SET LOCAL statement_timeout='5000ms'");
       const result = await client.query<{
         has_vacancy: boolean; inventory: EmployerStatistics["inventory"]; unique_candidates: number;
@@ -96,6 +96,16 @@ export class EmployerStatisticsStore {
       }>(sql, [ownerId, query.vacancy_id ?? null, `${period.previous_from}T00:00:00.000Z`, period.start, period.end]);
       const row = result.rows[0]!;
       if (query.vacancy_id && !row.has_vacancy) throw new StatisticsError(404, "statistics_vacancy_not_found");
+      const expenses = await client.query<{ category: EmployerStatistics["expenses"]["categories"][number]["category"]; amount: string; events: string }>(
+        `SELECT category,sum(amount_kopeks)::text AS amount,count(*) FILTER(WHERE amount_kopeks>0)::text AS events
+         FROM employer_expenses WHERE owner_id=$1 AND ($2::uuid IS NULL OR vacancy_id=$2)
+         AND occurred_at >= $3::timestamptz AND occurred_at < $4::timestamptz GROUP BY category`,
+        [ownerId,query.vacancy_id ?? null,period.start,period.end]);
+      const expenseDaily = await client.query<{ date: string; amount: string }>(
+        `SELECT to_char(occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD') AS date,sum(amount_kopeks)::text AS amount
+         FROM employer_expenses WHERE owner_id=$1 AND ($2::uuid IS NULL OR vacancy_id=$2)
+         AND occurred_at >= $3::timestamptz AND occurred_at < $4::timestamptz GROUP BY 1`,
+        [ownerId,query.vacancy_id ?? null,period.start,period.end]);
       await client.query("COMMIT");
       const empty = (): EmployerStatisticsCounts => ({ delivered: 0, viewed: 0, liked: 0, disliked: 0, invited: 0, accepted: 0, interviewed: 0, offered: 0, hired: 0 });
       const current = empty(), previous = empty();
@@ -104,7 +114,14 @@ export class EmployerStatisticsStore {
       for (const item of row.daily) daily.find(bucket => bucket.date === item.date)!.counts[item.stage] = item.count;
       return { version: "employer-statistics-v1", generated_at: now.toISOString(), timezone: "UTC",
         period: { from: period.from, to: period.to, previous_from: period.previous_from, previous_to: period.previous_to, vacancy_id: query.vacancy_id ?? null },
-        inventory: row.inventory, current, previous, unique_candidates: row.unique_candidates, daily, top_vacancies: row.top };
+        inventory: row.inventory, current, previous, unique_candidates: row.unique_candidates, daily, top_vacancies: row.top,
+        expenses: { currency: "RUB", total_kopeks: expenses.rows.reduce((sum,item) => sum+Number(item.amount),0),
+          categories: (["publication","invitation","ai","penalty"] as const).map(category => {
+            const item=expenses.rows.find(value => value.category===category);
+            return {category,amount_kopeks:Number(item?.amount ?? 0),events:Number(item?.events ?? 0)};
+          }),
+          daily: daily.map(item => ({date:item.date,amount_kopeks:Number(expenseDaily.rows.find(value => value.date===item.date)?.amount ?? 0)})),
+          tariffs: {publication_kopeks:19900,invitation_kopeks:4900,deadline_penalty_kopeks:19900,ai_daily_allowance_kopeks:1000,ai_usd_rub:100} } };
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   }

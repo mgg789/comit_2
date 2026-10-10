@@ -1,5 +1,15 @@
 # Архитектура — Comit
 
+Интерфейс работодателя реализован в `apps/employer`: hash-навигация, вакансии,
+подбор, анонимные резюме, переписка, статистика и постоянный AI overlay.
+[Страницы, запуск и границы интеграции](employer-ui.md). UI использует общий SDK
+и существующие серверные проверки; формулы подбора на клиент не переносятся.
+
+Кабинет кандидата (`apps/candidate`) использует тот же `@comit/ui-kit`: вход по почте,
+собственное резюме, приглашения работодателей и переписку после принятия.
+[Экраны и границы интеграции](candidate-ui.md), [общие компоненты](ui-kit.md).
+Показатели без публичного API отображаются как недоступные, без примерных цифр.
+
 > Статус: backend первого цикла; email auth, account-owned candidate profile и
 > employer owner gateway реализованы, frontend и testing provider подключаются
 > отдельными этапами.
@@ -41,10 +51,9 @@ services/matching-engine     services/testing-engine     services/integration-en
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
 
-Чаты на движке-протоколе Mike (QGramm) интегрированы в пост-отбор отдельным
-opt-in overlay: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию,
-доступ по приглашению и текущее согласие под DB-locks. Frontend и public hiring
-chat остаются отдельными этапами; matching selection gateway уже даёт owner boundary.
+Публичная стартовая страница `apps/welcome` и её переходы описаны в [welcome-ui.md](welcome-ui.md); кабинеты — в [employer-ui.md](employer-ui.md) и [candidate-ui.md](candidate-ui.md).
+
+Чаты на QGramm интегрированы в кабинеты обеих ролей: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию, доступ по приглашению и текущее согласие под DB-locks. Системный чат Comit доставляет уведомления платформы.
 
 ## Auth и ownership
 
@@ -130,3 +139,5 @@ QGramm, а решения найма — PostgreSQL API. [Контракт и к
 проверяет source consent/revision и закрывает частный PDF. Ручной лайк
 транзакционно использует FeedStore и существующий recruitment; отдельный
 сервис или ML-запуск для него не создаётся. [Контракт](candidate-showcase.md).
+
+`@comit/shared` собирается в JavaScript `dist/` перед API: production Node не выполняет TypeScript из `node_modules`. Package exports сохраняет source typings; Docker API и coverage gate явно собирают shared перед запуском.

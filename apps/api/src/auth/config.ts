@@ -1,6 +1,7 @@
 /** Passwordless configuration: explicit origins, a strong secret and secure production cookies. */
 export interface AuthConfig {
   secret: string;
+  developmentCodeDelivery: boolean;
   origins: Set<string>;
   secureCookies: boolean;
   issuer: string;
@@ -11,6 +12,8 @@ export interface AuthConfig {
 
 /** Load process configuration without exposing secret values or silently enabling insecure production. */
 export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
+  const developmentCodeDelivery = env.DEV_AUTH_EXPOSE_CODE === "true";
+  if (developmentCodeDelivery && env.NODE_ENV !== "development") throw new Error("auth_dev_code_forbidden");
   const secret = (env.AUTH_SECRET?.trim() || env.JWT_SECRET?.trim() || "");
   if (Buffer.byteLength(secret) < 32 || /changeme|replace.me/i.test(secret)) throw new Error("auth_secret_missing");
   const secureCookies = env.AUTH_COOKIE_SECURE !== "false";
@@ -27,7 +30,7 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     return url.origin;
   }));
   if (!origins.size) throw new Error("auth_origins_missing");
-  return { secret, origins, secureCookies, issuer: env.AUTH_ISSUER ?? "comit",
+  return { secret, developmentCodeDelivery, origins, secureCookies, issuer: env.AUTH_ISSUER ?? "comit",
     audience: env.AUTH_AUDIENCE ?? "comit-api", keyId: env.AUTH_KEY_ID ?? "v1",
     consentVersion: env.ACCOUNT_CONSENT_VERSION ?? "account-v1" };
 }

@@ -8,6 +8,12 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "install:clean": "pnpm install --frozen-lockfile"
+    "install:clean": "pnpm install --frozen-lockfile",
+    "coverage:api": "pnpm --filter @comit/shared build && node tests/coverage-gates/api.mjs",
+    "coverage:check": "python3 tests/coverage-gates/check.py",
+    "coverage:test": "python3 -m unittest discover -s tests/coverage-gates -p \"test_*.py\""
+  },
+  "devDependencies": {
+    "c8": "^10.1.3"
   }
 }

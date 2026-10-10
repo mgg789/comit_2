@@ -1,61 +1,53 @@
-/** Trusted-producer contour: the testing engine publishes approved grade results.
- *
- * POST /internal/testing/session-result (X-Internal-Token = TESTING_ENGINE_TOKEN):
- *   {candidate_id, session_id, specialization, decided_grade, supervision_badge, tasks_answered}
- * Writes candidate_grade_results, updates the source profile's declared grade
- * (CAS revision bump), stamps `grade:trusted` evidence as confirmed and
- * enqueues the exact snapshot into the outbox. Cooldowns: retake >= 7 days,
- * grade upgrade >= 30 days after the previous confirmation.
- */
-
-import { randomUUID } from "node:crypto";
-import type { FastifyInstance } from "fastify";
+/** Token-authenticated accepted-result producer, compatible with the adaptive engine publisher. */
 import { timingSafeEqual } from "node:crypto";
-import { CandidateProfileStore, ProfileError } from "../profiles/store.js";
-
-const RETAKE_COOLDOWN_DAYS = 7;
-const UPGRADE_COOLDOWN_DAYS = 30;
-const GRADE_RANK: Record<string, number> = { intern: 0, junior: 1, middle: 2, senior: 3 };
-
-export interface TestingIntegrationOptions {
-  profiles: CandidateProfileStore;
-  token?: string;
+import type { FastifyInstance } from "fastify";
+import { ProfileError, type ProfileStore } from "../profiles/store.js";
+interface TrustedResult {
+  candidate_id: string; session_id: string; specialization: string;
+  decided_grade: "intern" | "junior" | "middle" | "senior";
+  supervision_badge?: string | null; tasks_answered: number;
 }
 
-/** Register the internal testing result endpoint (service token, never browser JWTs). */
-export function registerTestingIntegration(
-  app: FastifyInstance,
-  options: TestingIntegrationOptions,
-): void {
+/** Browser sessions cannot publish grades; missing service configuration fails closed. */
+export async function testingIntegrationRoutes(app: FastifyInstance,
+  options: { profiles: ProfileStore; token?: string }): Promise<void> {
   const token = options.token ?? process.env.TESTING_ENGINE_TOKEN ?? "";
-  app.post("/internal/testing/session-result", async (request, reply) => {
-    if (!token) return reply.code(503).send({ detail: "testing integration is not configured" });
-    const supplied = request.headers["x-internal-token"];
-    if (typeof supplied !== "string"
-        || Buffer.byteLength(supplied) !== Buffer.byteLength(token)
-        || !timingSafeEqual(Buffer.from(supplied), Buffer.from(token))) {
-      return reply.code(401).send({ detail: "invalid_internal_token" });
+  app.post<{ Body: TrustedResult; Reply: unknown }>("/internal/testing/session-result", {
+    schema: { tags: ["internal-testing"], security: [{ internalToken: [] }],
+      body: { type: "object", additionalProperties: false,
+        required: ["candidate_id", "session_id", "specialization", "decided_grade", "tasks_answered"], properties: {
+          candidate_id: { type: "string", format: "uuid" }, session_id: { type: "string", minLength: 1, maxLength: 120 },
+          specialization: { type: "string", minLength: 1, maxLength: 100 },
+          decided_grade: { type: "string", enum: ["intern", "junior", "middle", "senior"] },
+          supervision_badge: { anyOf: [{ type: "string", maxLength: 100 }, { type: "null" }] },
+          tasks_answered: { type: "integer", minimum: 1, maximum: 1000 }
+        } }, response: {
+          200: { type: "object", required: ["recorded", "grade", "decided_at"], properties: {
+            recorded: { const: true }, grade: { type: "string" }, decided_at: { type: "string", format: "date-time" } } },
+          400: { type: "object", properties: { detail: { type: "string" } } },
+          401: { type: "object", properties: { detail: { type: "string" } } },
+          403: { type: "object", properties: { detail: { type: "string" } } },
+          404: { type: "object", properties: { detail: { type: "string" } } },
+          409: { type: "object", properties: { detail: { type: "string" } } },
+          503: { type: "object", properties: { detail: { type: "string" } } }
+        } }, onRequest: async (request, reply) => {
+      if (!token) return reply.code(503).send({ detail: "testing_not_configured" });
+      const supplied = request.headers["x-internal-token"];
+      if (typeof supplied !== "string" || Buffer.byteLength(supplied) !== Buffer.byteLength(token)
+        || !timingSafeEqual(Buffer.from(supplied), Buffer.from(token))) return reply.code(401).send({ detail: "invalid_internal_token" });
     }
-    const body = request.body as Record<string, unknown>;
-    const candidateId = String(body.candidate_id ?? "");
-    const sessionId = String(body.session_id ?? "");
-    const grade = String(body.decided_grade ?? "");
-    const specialization = String(body.specialization ?? "backend");
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId)
-        || !sessionId || sessionId.length > 120
-        || !(grade in GRADE_RANK)) {
-      return reply.code(400).send({ detail: "invalid_session_result" });
-    }
+  }, async (request, reply) => {
     try {
-      const outcome = await options.profiles.recordTrustedGrade(candidateId, {
-        sessionId, grade, specialization,
-        supervisionBadge: typeof body.supervision_badge === "string" ? body.supervision_badge : null,
-        tasksAnswered: Number(body.tasks_answered ?? 0),
-      });
-      return reply.code(outcome.recorded ? 200 : 409).send(outcome);
+      const body = request.body;
+      return reply.header("cache-control", "no-store").send(await options.profiles.recordTrustedGrade(body.candidate_id, {
+        sessionId: body.session_id, grade: body.decided_grade, specialization: body.specialization,
+        supervisionBadge: body.supervision_badge ?? null, tasksAnswered: body.tasks_answered }));
     } catch (error) {
       if (error instanceof ProfileError) return reply.code(error.status).send({ detail: error.code });
-      throw error;
+      return reply.code(503).send({ detail: "testing_result_unavailable" });
     }
   });
 }
+
+/** Compatibility entry point retained for the testing contour; same authenticated HTTP contract. */
+export const registerTestingIntegration = testingIntegrationRoutes;

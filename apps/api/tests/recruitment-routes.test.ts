@@ -13,6 +13,7 @@ import { signSession } from "../src/auth/session.js";
 import { migrate } from "../src/auth/migrate.js";
 import { ProfileStore } from "../src/profiles/store.js";
 import { RecruitmentStore } from "../src/recruitment/store.js";
+import { EmployerProfileStore } from "../src/employers/store.js";
 import { recruitmentRoutes } from "../src/routes/recruitment.js";
 
 const databaseUrl = process.env.RECRUITMENT_ROUTE_TEST_DATABASE_URL;
@@ -46,6 +47,9 @@ test("recruitment HTTP contracts enforce auth, ownership, source freshness, priv
     }
     await pool.query("UPDATE candidate_profile_outbox SET state='delivered',projected_revision=11,delivered_at=now() WHERE candidate_id=ANY($1::uuid[])", [[candidate.id, revoked.id]]);
     await profiles.save(revoked.id, { expected_revision: 1, fields: {}, consent: { processing: true, pool: false, version: "profile-v1" } });
+    const employerProfiles = new EmployerProfileStore(pool);
+    await employerProfiles.update(employer.id, { expected_revision: 0, company_name: "Synthetic company" });
+    await employerProfiles.update(foreign.id, { expected_revision: 0, company_name: "Synthetic company" });
     const draftId = randomUUID(), rejectDraftId = randomUUID(), vacancyId = randomUUID(), rejectVacancyId = randomUUID();
     const exposures = new Map([candidate, pending, revoked].map(person => [person.id, randomUUID()]));
     const forwarded: Array<{ path: string; owner: string | null }> = [];
@@ -60,7 +64,7 @@ test("recruitment HTTP contracts enforce auth, ownership, source freshness, priv
         const id = url.pathname.split("/").at(-1);
         if (id !== draftId && id !== rejectDraftId) return Response.json({ detail: "not_found" }, { status: 404 });
         const draft: AgentsDraftView = { draft_id: id, vacancy_id: id === draftId ? vacancyId : rejectVacancyId,
-          owner_id: employer.id, revision: 1, state: "created", publication: { status: "accepted", source_revision: 1 },
+          owner_id: employer.id, revision: 1, state: "created", business_status: "open", publication: { status: "accepted", source_revision: 1 },
           fields: { title: "Backend engineer", zp_min: 100000, zp_max: 200000, city: "Москва", daily: "Backend development", type: "remote" } };
         return Response.json(draft);
       }
@@ -84,7 +88,7 @@ test("recruitment HTTP contracts enforce auth, ownership, source freshness, priv
       bearerAuth: { type: "http", scheme: "bearer" }, employerSession: { type: "apiKey", in: "cookie", name: "comit_employer_session" },
       candidateSession: { type: "apiKey", in: "cookie", name: "comit_candidate_session" },
     } } } });
-    await app.register(recruitmentRoutes, { store, config, recruitment, profiles, mailConfigured: false,
+    await app.register(recruitmentRoutes, { store, config, recruitment, profiles, employerProfiles, mailConfigured: false,
       agentsToken: "synthetic-agents", matchingToken: "synthetic-matching", transport });
     await app.ready();
     const inviteUrl = `/employer/vacancy-drafts/${draftId}/invitations`;
@@ -143,7 +147,7 @@ test("recruitment HTTP contracts enforce auth, ownership, source freshness, priv
     offline = false;
 
     const rejected = await app.inject({ method: "POST", url: `/employer/vacancy-drafts/${rejectDraftId}/recruitment/reject`,
-      headers: employer.headers, payload: { candidate_id: pending.id, idempotency_key: randomUUID(), reason: "Missing skill" } });
+      headers: employer.headers, payload: { candidate_id: pending.id, idempotency_key: randomUUID(), reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable.", categories: ["technical_skills"] } });
     assert.equal(rejected.statusCode, 200, rejected.body);
     const rejection = rejected.json<RecruitmentView>();
     assert.equal(rejection.invited_at, null);

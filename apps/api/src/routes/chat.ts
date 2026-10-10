@@ -1,10 +1,10 @@
 /** Authenticate every chat call in Comit; private QGramm identities and credentials never reach clients. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AccountRole, ChatEventPage, SendChatMessage, UploadChatFile } from "@comit/shared";
+import type { AccountRole, ChatEventPage, SendChatMessage, UploadChatFile, ChatReadRequest } from "@comit/shared";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { RecruitmentError } from "../recruitment/store.js";
 import type { RecruitmentOptions } from "./recruitment.js";
-import { chatPageSchema, chatMessageSchema, chatFileSchema, chatSendSchema, chatUploadSchema, chatDownloadSchema } from "../chat/schemas.js";
+import { chatPageSchema, chatMessageSchema, chatFileSchema, chatSendSchema, chatUploadSchema, chatDownloadSchema, chatReadSchema, chatReadStatusSchema } from "../chat/schemas.js";
 import { correlatedFetch } from "../operations/index.js";
 import { serveStream, streamCursor } from "../chat/sse.js";
 
@@ -96,7 +96,7 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
         const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         if (!request.compileValidationSchema(schema)(parsed)) throw new RecruitmentError(503, "chat_invalid_response");
         return parsed;
-      });
+      }, operation === "send");
       return reply.send(result);
     } catch (error) {
       if (error instanceof RecruitmentError) return reply.code(error.status).send({ detail: error.code });
@@ -210,6 +210,9 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
         limit: { type: "string", pattern: "^(?:[1-9]|[1-9][0-9]|100)$" },
       } }, response: { 200: chatPageSchema } }, onRequest: guard(role),
     }, (request, reply) => invoke(request, reply, role, "history", { after_sequence: Number(request.query.after_sequence ?? 0), limit: Number(request.query.limit ?? 50) }, chatPageSchema, false));
+    app.post<{ Params: { id: string }; Body: ChatReadRequest }>(`${base}/read`, {
+      schema: { tags: ["chat"], security, params, body: chatReadSchema, response: { 200: chatReadStatusSchema } }, onRequest: guard(role),
+    }, (request, reply) => invoke(request, reply, role, "read", request.body, chatReadStatusSchema, false));
     app.post<{ Params: { id: string }; Body: SendChatMessage }>(`${base}/messages`, {
       schema: { tags: ["chat"], security, params, body: chatSendSchema, response: { 200: chatMessageSchema } }, onRequest: guard(role),
     }, (request, reply) => invoke(request, reply, role, "send", request.body, chatMessageSchema, true));

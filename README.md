@@ -19,29 +19,39 @@
 
 ## Быстрый старт
 
-Требования: Docker, Make.
+Требования: Docker Compose v2, Make; для production — HTTPS gateway, приватные SMTP/provider настройки и реальный Harrier cache. Подготовка описана в [deploy.md](docs/deploy.md).
 
 ```sh
-cp .env.example .env      # при желании поменяйте порты/пароль
-make up                   # соберёт и поднимет весь стек
-make smoke                # smoke-гейт: все сервисы и маршруты
-make logs                 # логи стека
-make down                 # остановить и снести volumes
+cp .env.example .env      # заполните приватные production значения
+make up                   # production по умолчанию
+make smoke                # health/readiness и публичные маршруты
+make logs
+make down                 # остановить стек, сохранить volumes
 ```
+
+Для локальной разработки профиль включается явно:
+
+```sh
+make dev-up               # отдельный compose/profile и volumes comit-dev
+SMOKE_MODE=dev make smoke
+make dev-down             # сохранить данные dev volumes
+```
+
+В dev одноразовый код автоматически заполняется при каждом входе. В production код доставляется через SMTP и не возвращается API. Mock ФСП доступен только в dev. Конфигурации запускаются отдельно; при одновременном запуске задайте разные порты.
 
 | URL | Что |
 |---|---|
-| http://localhost:8088/ | Витрина/welcome |
+| http://localhost:8088/ | Общая начальная страница и витрина |
 | http://localhost:8088/candidate/ | Кабинет кандидата |
 | http://localhost:8088/employer/ | Кабинет работодателя |
-| http://localhost:8088/testing/ | Сервис тестирования |
 | http://localhost:8088/api/docs | OpenAPI (Swagger UI) api-core |
-| http://localhost:8101..8103 | matching / testing / integration engines (dev-порты) |
+
+Testing UI в общем приложении не публикуется (`/testing/` возвращает 404). Backend тестирования остаётся отдельным внутренним сервисом. API и остальные service ports доступны через loopback; [deploy.md](docs/deploy.md) описывает HTTPS домен и CD, [ci.md](docs/ci.md) — реальные тесты, измерения покрытия и пороги.
 
 ## Архитектура
 
 ```
-web (nginx: welcome | candidate | employer | testing)
+web (nginx: welcome | candidate | employer)
         │ /api/*
         ▼
 api-core (Fastify) ──────── PostgreSQL 16 + pgvector
@@ -100,6 +110,14 @@ GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, л
 - **Deploy** — на push в `main`: сборка и подъём prod-стека на сервере в `/home/mgg/comit` + health-проверки.
 
 Ветки: работа в `dev`, стабильные состояния — PR в `main` (подробности и правила — `AGENTS.md`).
+
+## GitHub Issues
+
+При начале работы с репозиторием и на смысловых контрольных точках проверяйте открытые
+GitHub Issues. Подтверждённые и актуальные проблемы исправляйте в рамках разрешённой
+области репозитория, даже если пользователь отдельно не назвал issue. Сверяйте описание
+issue с текущим кодом: уже исправленные и неподтверждённые пункты не меняйте вслепую;
+за пределами разрешённой области зафиксируйте проблему и сообщите о ней ответственному.
 
 ## Документация
 

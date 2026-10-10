@@ -1,0 +1,462 @@
+/* The complete established employer auth surface is shared by both roles. */
+.login {
+  min-height: 100vh;
+  padding: 36rem 40rem;
+}
+.yandex {
+  display: grid;
+  place-items: center;
+  height: var(--login-control-height);
+  border-radius: 97rem;
+  background: var(--comit-text);
+  color: var(--comit-bg);
+  border: 0;
+  font-size: 48rem;
+  font-weight: 700;
+  letter-spacing: -2rem;
+}
+.login-card .checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rem;
+  font-size: 18rem;
+  cursor: pointer;
+}
+/* Shared email sign-in and six-digit OTP layout; API roles stay in each app. */
+.login {
+  min-height: 100vh;
+  padding: 36rem 40rem;
+}
+@media (max-width: 760px) {
+  .login {
+    padding: 20rem;
+  }
+}
+@media (max-width: 760px) {
+  .login-logo-asset {
+    width: 66rem !important;
+    height: 66rem !important;
+  }
+  .login-input-wrap > img {
+    width: 20rem;
+    height: 20rem;
+  }
+  .auth-check {
+    padding: 80rem 20rem;
+  }
+  .yandex > img {
+    width: 120rem;
+    height: 34rem;
+  }
+}
+.yandex:disabled {
+  opacity: 1;
+}
+.login-submit-asset {
+  transform: rotate(180deg) scaleY(-1);
+}
+/* Auth artwork uses the login-specific exported logo and neutral blue background. */
+.login-logo-asset {
+  width: 198rem;
+  height: 198rem;
+  object-fit: contain;
+}
+.login-mini-word {
+  font-family: var(--employer-logo);
+}
+.login-input-wrap {
+  position: relative;
+  flex: 1;
+}
+.login-input-wrap > img {
+  position: absolute;
+  left: max(16rem, 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max(24rem, 20px);
+  height: max(24rem, 20px);
+}
+.login-input-wrap > input {
+  padding-left: max(48rem, 40px);
+}
+.login-submit-asset {
+  max-width: 100%;
+  max-height: 100%;
+}
+.yandex > img {
+  width: 158rem;
+  height: 45rem;
+}
+.auth-check {
+  padding: 250rem 300rem;
+}
+.auth-warning {
+  position: fixed;
+  top: 20rem;
+  right: 20rem;
+  z-index: 20;
+  font-size: 18rem;
+  padding: 16rem 24rem;
+  border-radius: 20rem;
+  background: var(--employer-paint-2e2e2d);
+  color: var(--employer-danger);
+}
+.auth-warning button {
+  background: transparent;
+  color: var(--employer-blue);
+  border: 0;
+}
+.is-login .ambient-upper {
+  content: url("./design-assets/2912dfd1b1af75565d6fd5f86cbe23776dc7799f.png");
+  opacity: 0.4;
+}
+.is-login .ambient-lower {
+  content: url("./design-assets/6f0a38215d44082a8500e6aa08c4a16a70316dc5.png");
+  opacity: 0.4;
+}
+.is-login .ambient-glow {
+  display: none;
+}
+.checkbox input {
+  width: 24rem;
+  height: 24rem;
+  min-height: 0;
+  padding: 0;
+  margin: 2rem 0;
+  accent-color: var(--employer-blue);
+}
+.login-back {
+  display: flex;
+  align-items: center;
+  gap: 20rem;
+  font-family: var(--employer-display);
+  font-size: 38rem;
+  color: inherit;
+  text-decoration: none;
+  width: fit-content;
+}
+.login-brand {
+  color: inherit;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 75rem;
+  width: 1048rem;
+  margin: 53rem auto 58rem;
+}
+.login-mark {
+  width: 300rem;
+  height: 300rem;
+  border-radius: 96rem;
+  background: var(--comit-text);
+  display: grid;
+  place-items: center;
+}
+.login-mark .icon {
+  width: 200rem;
+  height: 200rem;
+}
+.login-mark .icon {
+  color: var(--comit-bg);
+}
+.login-word {
+  font-family: var(--employer-logo);
+  font-size: 190rem;
+  line-height: 1.05;
+}
+.login-business {
+  font-size: 46rem;
+  font-weight: 600;
+  margin-left: 12rem;
+  margin-top: -14rem;
+}
+.login-card {
+  --login-control-height: max(66rem, var(--employer-control-min));
+  width: 688rem;
+  min-height: 460rem;
+  margin: auto;
+  padding: 28rem 68rem;
+  border-radius: 30rem;
+  display: flex;
+  flex-direction: column;
+  gap: 24rem;
+}
+.login-card h1 {
+  font-family: var(--employer-font);
+  font-size: 32rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.2;
+  margin-bottom: 40rem;
+}
+.login-card.otp-card {
+  position: relative;
+  width: 690rem;
+  min-height: 460rem;
+  padding: 35rem 24rem;
+  gap: 0;
+  align-items: center;
+  backdrop-filter: blur(100rem);
+  -webkit-backdrop-filter: blur(100rem);
+}
+.otp-card h1 {
+  width: 543rem;
+  max-width: 100%;
+  line-height: 31rem;
+  font-size: 32rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+  margin-bottom: 0;
+}
+.otp-digits {
+  position: relative;
+  display: flex;
+  width: 455rem;
+  max-width: 100%;
+  height: 63rem;
+  gap: 15.4rem;
+  margin-top: 87rem;
+}
+.otp-digits .otp-native {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  padding: 0;
+  border: 0;
+  z-index: 1;
+}
+.otp-digit {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 200rem;
+  font-size: 30rem;
+  font-weight: 500;
+  color: var(--comit-text-muted);
+  cursor: text;
+  transition: color 180ms;
+}
+.otp-digit.focused,
+.otp-digit.filled {
+  color: var(--comit-text);
+}
+.otp-digit.glass,
+.otp-submit.glass {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: transparent;
+  backdrop-filter: blur(100rem);
+  -webkit-backdrop-filter: blur(100rem);
+}
+.otp-digit::before,
+.otp-submit::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -2;
+  width: 1031rem;
+  height: 66rem;
+  left: -193rem;
+  top: 0;
+  background: url("./design-assets/otp-glass-effect-2.svg") 0 0 / 100% 100%
+    no-repeat;
+}
+.otp-digit::after,
+.otp-submit::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  width: 687rem;
+  height: 44rem;
+  left: -34rem;
+  top: 5rem;
+  mix-blend-mode: plus-lighter;
+  background: url("./design-assets/otp-extra-vector.svg") 0 0 / 100% 100%
+    no-repeat;
+}
+.otp-digit.focused {
+  box-shadow: inset 0 0 0 1px var(--employer-blue);
+}
+.otp-submit {
+  width: 455rem;
+  max-width: 100%;
+  min-height: 63rem;
+  margin-top: 52rem;
+  border-radius: 200rem;
+  font-size: 24rem;
+  font-weight: 500;
+}
+.otp-submit:disabled {
+  opacity: 1;
+  color: var(--comit-text-muted);
+}
+.otp-card .otp-note {
+  width: 464rem;
+  max-width: 100%;
+  margin-top: 19rem;
+  text-align: center;
+  font-size: 18rem;
+  line-height: 22rem;
+  letter-spacing: -0.54rem;
+}
+.otp-resend {
+  position: absolute;
+  top: calc(100% + 14rem);
+  font-size: 16rem;
+}
+.otp-resend button {
+  background: transparent;
+  color: var(--comit-text-muted);
+  border: 0;
+}
+@media (max-width: 760px) {
+  .login-card.otp-card {
+    width: 100%;
+    padding: 28rem 20rem;
+    min-height: 0;
+  }
+  .otp-card h1 {
+    font-size: 24rem;
+    line-height: 28rem;
+  }
+  .otp-digits {
+    margin-top: 44rem;
+    gap: 8rem;
+    height: auto;
+  }
+  .otp-digit {
+    aspect-ratio: 1;
+    font-size: 24rem;
+  }
+  .otp-submit {
+    margin-top: 32rem;
+    min-height: 52rem;
+  }
+  .otp-card .otp-note {
+    font-size: 15rem;
+    line-height: 20rem;
+  }
+}
+.login-email {
+  display: flex;
+  gap: 14rem;
+  align-items: center;
+}
+.login-email input {
+  height: var(--login-control-height);
+  min-height: 0;
+  border-radius: 97rem;
+  background: linear-gradient(
+    180deg,
+    var(--employer-paint-ffffff08),
+    var(--employer-paint-ffffff24)
+  );
+  box-shadow: inset 0 0 1px var(--employer-border);
+  font-size: max(20rem, var(--employer-input-text-min));
+}
+.login-email .circle {
+  height: var(--login-control-height);
+  width: var(--login-control-height);
+}
+.yandex:first-letter {
+  color: var(--employer-paint-f43);
+}
+.login-card .checkbox {
+  margin-top: 34rem;
+  padding: 0 40rem;
+}
+.login-card .login-consent {
+  align-items: center;
+  font-size: max(18rem, var(--employer-caption-text-min));
+  padding: 0 12rem;
+}
+.login-consent a {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: transparent;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4rem;
+  transition: text-decoration-color 280ms ease;
+}
+.login-consent a:hover,
+.login-consent a:focus-visible {
+  text-decoration-color: currentColor;
+}
+.login-consent.has-error input {
+  border-color: var(--employer-danger);
+  box-shadow: 0 0 0 4rem var(--employer-paint-ffffff08);
+}
+.login-consent.has-error a {
+  color: var(--employer-danger);
+}
+.login-card small {
+  text-align: center;
+  font-size: max(18rem, var(--employer-caption-text-min));
+}
+.login-card .form-error {
+  font-size: max(18rem, var(--employer-caption-text-min));
+}
+@media (max-width: 760px) {
+  .checkbox input {
+    width: 20rem;
+    height: 20rem;
+  }
+  .login-back {
+    font-size: 24rem;
+  }
+  .login-brand {
+    width: 100%;
+    gap: 22rem;
+    margin: 50rem auto 40rem;
+    justify-content: center;
+  }
+  .login-mark {
+    width: 100rem;
+    height: 100rem;
+    border-radius: 32rem;
+  }
+  .login-mark .icon {
+    width: 66rem;
+    height: 66rem;
+  }
+  .login-word {
+    font-size: 58rem;
+  }
+  .login-business {
+    font-size: 20rem;
+  }
+  .login-card {
+    --login-control-height: 48rem;
+    width: 100%;
+    max-width: 460rem;
+    min-height: 0;
+    padding: 24rem;
+    gap: 16rem;
+  }
+  .login-card h1 {
+    font-size: 22rem;
+    margin-bottom: 12rem;
+  }
+  .login-email input {
+    font-size: 16rem;
+    height: 48rem;
+  }
+  .login-card .checkbox {
+    margin-top: 18rem;
+    padding: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .login { padding: 20rem; }
+  .yandex { font-size: 32rem; height: 48rem; }
+  .login-card .checkbox { gap: 12rem; }
+}

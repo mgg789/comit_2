@@ -60,7 +60,7 @@ export interface CandidateIntake {
     approved_at?: string | null;
   } | null;
   consents?: { processing?: boolean; pool?: boolean; accepted_at?: string | null; version?: string | null;
-    training?: boolean; training_version?: "training-v1" | null; training_accepted_at?: string | null };
+    training?: boolean; training_version?: "training-v1" | "training-v2" | null; training_accepted_at?: string | null };
   domains?: PipelineSkill[];
   stacks?: PipelineSkill[];
   soft_skills?: PipelineSkill[];

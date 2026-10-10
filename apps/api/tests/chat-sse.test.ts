@@ -26,6 +26,7 @@ test("SSE cursor rejects ambiguity and unsafe integers", () => {
 const databaseUrl = process.env.CHAT_SSE_TEST_DATABASE_URL;
 test("chat SSE bounds streams, resumes durable events and stops after consent/session revocation", { skip: !databaseUrl }, async () => {
   const pool = new Pool({ connectionString: databaseUrl });
+  const revocationApp = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } } });
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } } });
   try {
     await migrate(pool);
@@ -87,17 +88,45 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
     await new Promise(resolve => setTimeout(resolve, 10));
     assert.equal((await app.inject({ url: path, headers })).statusCode, 429);
     await Promise.all([first, second]);
-    const duringWithdrawal = app.inject({ url: path, headers });
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // Real response headers confirm the stream is open before changing durable
+    // authorization. The separate bounded lifetime must not race a PG commit.
+    await revocationApp.register(cookie);
+    await revocationApp.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false,
+      chatUrl: "http://synthetic-chat", chatToken: "synthetic-private-token", chatTransport: transport,
+      streamLifetimeMs: 5000, streamPollMs: 10 });
+    const address = await revocationApp.listen({ host: "127.0.0.1", port: 0 });
+    const openStream = async () => {
+      const response = await fetch(`${address}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
+      assert.equal(response.status, 200, response.status === 200 ? undefined : await response.text());
+      const reader = response.body?.getReader();
+      assert.ok(reader);
+      const firstFrame = await reader.read();
+      assert.equal(firstFrame.done, false);
+      const prefix = new TextDecoder().decode(firstFrame.value);
+      assert.match(prefix, /retry: 1000/);
+      return { reader, prefix };
+    };
+    const finishStream = async (stream: Awaited<ReturnType<typeof openStream>>) => {
+      const decoder = new TextDecoder();
+      let body = stream.prefix;
+      while (true) {
+        const frame = await stream.reader.read();
+        if (frame.done) return body + decoder.decode();
+        body += decoder.decode(frame.value, { stream: true });
+      }
+    };
+    const duringWithdrawal = await openStream();
+    // Exercise a mutation after the old 80ms fixture lifetime, rather than
+    // relying on a scheduling sleep to assume that Fastify started the request.
+    await new Promise(resolve => setTimeout(resolve, 120));
     await profiles.save(candidate.id, { expected_revision: 1, fields: {}, consent: { processing: false, pool: false, version: "profile-v1" } });
-    const closed = await duringWithdrawal;
-    assert.match(closed.body, /event: error/); assert.ok(!closed.body.includes("synthetic-private-error"));
+    const closed = await finishStream(duringWithdrawal);
+    assert.match(closed, /event: error/); assert.ok(!closed.includes("synthetic-private-error"));
     assert.equal((await app.inject({ url: path, headers })).statusCode, 409);
     await profiles.save(candidate.id, { expected_revision: 2, fields: {}, consent: { processing: true, pool: false, version: "profile-v1" } });
-    const duringLogout = app.inject({ url: path, headers });
-    await new Promise(resolve => setTimeout(resolve, 10));
+    const duringLogout = await openStream();
     await store.revokeAll("candidate", candidate.id);
-    assert.match((await duringLogout).body, /chat_session_revoked/);
+    assert.match(await finishStream(duringLogout), /chat_session_revoked/);
     assert.equal((await app.inject({ url: path, headers })).statusCode, 401);
-  } finally { await app.close(); await pool.end(); }
+  } finally { await revocationApp.close(); await app.close(); await pool.end(); }
 });

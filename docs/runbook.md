@@ -1,3 +1,11 @@
+## Полный runtime и режимы
+
+Production запускается `make up`, dev явно `make dev-up`; конфигурация и обязательные
+секреты перечислены в [deploy.md](deploy.md). Legacy overlays больше не нужны для
+полного runtime. `make down` сохраняет БД/chat/model volumes. Перед первым запуском
+provision точную модель Harrier. При 503 `/ready` matching сначала проверить cache и
+успешное завершение migration jobs; не заменять модель fake embeddings.
+
 # Runbook — типовые операции
 
 Candidate-pipeline overlay теперь запускает `rerank-worker`. На ещё не активированной
@@ -31,9 +39,8 @@ challenge. После доставки/истечения/пяти неудач�
 удаляется. Повтор письма после crash между SMTP ACK и фиксацией ACK возможен;
 реальную доставку этим локальным запуском не считать проверенной.
 
-Опциональный compose overlay `infra/docker-compose.auth.yml` добавляет только
-auth-migration и mail-worker, использует существующий PostgreSQL и внешний SMTP;
-новый SMTP-сервис не создаётся. Не применять `down -v` для auth-проверки.
+Полный production Compose включает auth-migration и mail-worker (OTP и уведомления).
+Внешний SMTP остаётся существующим; новый SMTP-сервис не создаётся. Не применять `down -v` для auth-проверки.
 
 Тестовые БД auth должны быть раздельными и одноразовыми:
 
@@ -485,3 +492,18 @@ Lexical fallback при недоступном Harrier — штатный явн
 генерировать тестовые векторы. Миграция011 применяется обычным matching
 migrate и backfill; команды/отдельные тестовые БД и HTTP acceptance описаны
 в [candidate-showcase.md](candidate-showcase.md).
+
+## Email событий (API013)
+
+Перед обновлением почтового worker применить `013_notification_mail.sql` обычной
+командой `auth:migrate`. Доверенный `PUBLIC_SITE_URL` включает обработку событий
+в существующем `auth:mail-worker`; без него доставляются только OTP. Значения
+SMTP и публичного origin меняются через существующее секретное окружение,
+без печати credentials. Не запускать worker для UI-проверок: это реальная отправка.
+
+Оператор проверяет агрегаты `notification_mail_outbox` по `status/kind/error_code`,
+без выгрузки адресов аккаунтов. `dropped/source_unavailable` означает закрытый или
+неактуальный источник/согласие; `failed/rejected` — постоянный SMTP reject;
+`failed/smtp_unavailable` — исчерпанные попытки. Сбой matching-источника не должен
+остановить OTP. При отсутствии feed schema новые лайки не импортируются.
+[Контракты, cutover и проверяемые ограничения](email-notifications.md).

@@ -3,16 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "files": ["dist", "migrations"],
+  "files": [
+    "dist",
+    "migrations"
+  ],
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node -e \"require('node:fs').cpSync('src/auth/email-assets','dist/auth/email-assets',{recursive:true})\"",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "start": "node dist/server.js",
     "auth:migrate": "tsx src/auth/migrate.ts",
     "auth:mail-worker": "tsx src/auth/mail-worker.ts",
-    "profile:worker": "tsx src/profiles/worker.ts"
+    "profile:worker": "tsx src/profiles/worker.ts",
+    "recommendations:worker": "tsx src/recommendations/worker.ts"
   },
   "dependencies": {
     "@comit/shared": "workspace:*",

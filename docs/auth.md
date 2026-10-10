@@ -56,7 +56,22 @@ Code/verify требуют Origin из `AUTH_ALLOWED_ORIGINS`. Любые cookie
 требуют этот Origin; Bearer-клиент может опустить Origin, но чужой Origin отклоняется.
 CORS для сторонних origins не включён: UI и API предполагаются на одном origin.
 `TRUST_PROXY` принимает только явно заданные IP/CIDR; без него X-Forwarded-For не
-влияет на лимиты. За nginx задать конкретную доверенную прокси-сеть.
+влияет на лимиты. Auth compose требует непустой `TRUST_PROXY`: указать точный IP
+nginx или выделенную сеть прокси, например `172.30.10.2/32` (пример, не значение
+по умолчанию). Не доверять всей Docker-сети, если в ней есть другие сервисы;
+порты API не публиковать для произвольных клиентов. `true`, hostnames и универсальные
+CIDR `/0` запрещены. При прямом локальном запуске API переменная может отсутствовать:
+используется адрес сокета, клиентский X-Forwarded-For игнорируется. За доверенным
+nginx разные IP клиентов имеют раздельные лимиты, у недоверенного соединения
+смена X-Forwarded-For не меняет квоту.
+
+nginx возвращает 404 для `/api/internal` и `/api/internal/*`, включая вложенные
+пути. Внутренние клиенты обращаются напрямую к сервисам. Combine, его состояние,
+retry, selections и selection-state требуют одновременно сервисный токен и UUID
+`X-Owner-ID`; matching проверяет владельца вакансии даже для сервисного клиента.
+Внутренний API gateway сохраняет проверенный UUID, а browser API выставляет его
+из аутентифицированного аккаунта. Отсутствующий/невалидный UUID отклоняется, чужая
+и неизвестная вакансия дают одинаковый 404.
 
 Работодатель получает `/employer/vacancy-drafts`, `/employer/agents/*` — тот же
 editorial API, но `X-Owner-ID` сервер устанавливает из account.id. Заголовок клиента
@@ -130,3 +145,24 @@ pnpm -r build
 
 См. также: [API](api.md), [данные](data.md), [agents](agents.md),
 [контекст](../context/40-architecture.md).
+
+
+Регрессии границ: `bash tests/nginx-internal-boundary.sh` запускает только одноразовый
+nginx с существующим локальным image, без публикации портов. Проверяются exact,
+prefix, URL-encoded и нормализованные internal пути (404), health и разрешённый
+public API proxy. API проверки: `pnpm --filter @comit/api exec tsx --test
+tests/candidate-pipeline.test.ts tests/operations.test.ts`. Matching ownership:
+`PYTHONPATH=services/matching-engine/src python -m pytest
+services/matching-engine/tests/test_combine_routes.py -q`. Database integration
+отдельно требует выделенного `PIPELINE_TEST_DATABASE_URL` и не выполняется на live БД.
+
+## Локальная доставка кода в dev
+
+По умолчанию используется SMTP. Только при одновременных `NODE_ENV=development`
+и `DEV_AUTH_EXPOSE_CODE=true` API возвращает дополнительное поле `dev_code`
+в receipt обоих role endpoints. Это настоящий случайный OTP текущего challenge:
+HMAC, срок действия, лимиты, consent и одноразовая проверка остаются прежними.
+В этом режиме SMTP не нужен и запись в mail outbox не создаётся. Общий EmailLogin
+автоматически подставляет код при каждом запросе; подтверждение остаётся ручным.
+Код не пишется в логи. При включённом флаге вне development auth отказывает
+в конфигурации; production receipt никогда не содержит `dev_code`.

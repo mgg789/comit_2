@@ -823,7 +823,7 @@
       },
       "delete": {
         "summary": "Archive Vacancy",
-        "description": "Archive and, when published, enqueue a closed snapshot before removal from lists.",
+        "description": "Hard-delete only draft/closed vacancy state and return its final removal snapshot.",
         "operationId": "archive_vacancy_internal_vacancies__draft_id__delete",
         "parameters": [
           {
@@ -1069,6 +1069,89 @@
         }
       }
     },
+    "/internal/vacancies/{draft_id}/withdraw": {
+      "post": {
+        "summary": "Withdraw Vacancy",
+        "description": "Withdraw to draft without removing saved candidates or previous feed history.",
+        "operationId": "withdraw_vacancy_internal_vacancies__draft_id__withdraw_post",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/vacancies/{draft_id}/close": {
       "post": {
         "summary": "Close Vacancy",
@@ -1128,6 +1211,174 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{draft_id}/deletion": {
+      "get": {
+        "summary": "Vacancy Deletion",
+        "description": "Read an owned deletion receipt for durable API retries.",
+        "operationId": "vacancy_deletion_internal_vacancies__draft_id__deletion_get",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VacancyDeletionReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/vacancies/{draft_id}/lifecycle/{expected_revision}/{action}": {
+      "get": {
+        "summary": "Vacancy Lifecycle Receipt",
+        "description": "Read the exact owner-scoped lifecycle acknowledgement after an unknown HTTP outcome.",
+        "operationId": "vacancy_lifecycle_receipt_internal_vacancies__draft_id__lifecycle__expected_revision___action__get",
+        "parameters": [
+          {
+            "name": "draft_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Draft Id"
+            }
+          },
+          {
+            "name": "expected_revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Expected Revision"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "withdraw",
+                "close"
+              ],
+              "type": "string",
+              "title": "Action"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2080,6 +2331,87 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OrganizationMessagePage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Clear Messages",
+        "description": "Clear only an idle owner's conversation; provider availability is irrelevant.",
+        "operationId": "clear_messages_internal_organization_agent_messages_delete",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationMessagesClearRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationContext"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Active work or context revision conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationClearConflict"
                 }
               }
             }
@@ -4763,6 +5095,42 @@
             "type": "boolean",
             "title": "Archived",
             "default": false
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "published_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Published At"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
           }
         },
         "additionalProperties": false,
@@ -5261,6 +5629,25 @@
         "title": "OrganizationChat",
         "description": "Owner-scoped global employer conversation and its presence projection."
       },
+      "OrganizationClearConflict": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "enum": [
+              "organization_chat_busy",
+              "context_revision_conflict"
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "OrganizationClearConflict",
+        "description": "Public reasons why the confirmed conversation cannot currently be cleared."
+      },
       "OrganizationContext": {
         "properties": {
           "owner_id": {
@@ -5533,6 +5920,16 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Idempotency Key"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "off",
+              "medium",
+              "max"
+            ],
+            "title": "Reasoning Effort",
+            "default": "off"
           }
         },
         "additionalProperties": false,
@@ -5543,6 +5940,23 @@
         ],
         "title": "OrganizationMessageRequest",
         "description": "Request to queue a user message in the sole owner chat."
+      },
+      "OrganizationMessagesClearRequest": {
+        "properties": {
+          "expected_context_revision": {
+            "type": "integer",
+            "maximum": 9007199254740991.0,
+            "minimum": 1.0,
+            "title": "Expected Context Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_context_revision"
+        ],
+        "title": "OrganizationMessagesClearRequest",
+        "description": "Clear idle conversation history using the context revision shown to its owner."
       },
       "OrganizationTask": {
         "properties": {
@@ -5817,6 +6231,16 @@
             "maxLength": 8000,
             "minLength": 1,
             "title": "User Message"
+          },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": [
+              "off",
+              "medium",
+              "max"
+            ],
+            "title": "Reasoning Effort",
+            "default": "off"
           },
           "status": {
             "type": "string",
@@ -6351,6 +6775,33 @@
         ],
         "title": "UserTurnRequest",
         "description": "Request for appending a user turn with both optimistic and idempotency guards."
+      },
+      "VacancyDeletionReceipt": {
+        "properties": {
+          "vacancy_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Vacancy Id"
+          },
+          "source_revision": {
+            "type": "integer",
+            "title": "Source Revision"
+          },
+          "deleted": {
+            "type": "boolean",
+            "const": true,
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "vacancy_id",
+          "source_revision"
+        ],
+        "title": "VacancyDeletionReceipt",
+        "description": "Minimal owner-scoped deletion receipt for durable lifecycle reconciliation."
       },
       "ValidationError": {
         "properties": {

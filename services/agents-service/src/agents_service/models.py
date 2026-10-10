@@ -8,6 +8,7 @@ and is checked before every write that changes coordinate fields.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -168,6 +169,14 @@ class RevisionRequest(Contract):
     expected_revision: int = Field(strict=True, ge=1, le=SAFE_JSON_INTEGER)
 
 
+class VacancyDeletionReceipt(Contract):
+    """Minimal owner-scoped deletion receipt for durable lifecycle reconciliation."""
+
+    vacancy_id: UUID
+    source_revision: int
+    deleted: Literal[True] = True
+
+
 class CreateRequest(Contract):
     """Human publication confirmation for one exact approved summary."""
 
@@ -218,6 +227,9 @@ class DraftView(Contract):
     publication: PublicationView | None = None
     business_status: Literal["draft", "open", "closed"] = "draft"
     archived: bool = False
+    created_at: datetime | None = None
+    published_at: datetime | None = None
+    closed_at: datetime | None = None
 
 
 class DraftPage(Contract):

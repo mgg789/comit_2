@@ -102,16 +102,27 @@ test("training consent is optional, versioned, preserved on field edits and inde
       (error: unknown) => error instanceof ProfileError && error.code === "invalid_training_consent");
     view = await store.save(candidateId, { expected_revision: 1, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: true, training_version: "training-v1" } });
     assert.equal(view.consents.training, true);
+    assert.equal(view.consents.training_version, "training-v1");
+    // Recommendation consent requires a new explicit v2 choice; field edits retain v1.
     const stamp = view.consents.training_accepted_at;
     assert.ok(stamp);
     view = await store.save(candidateId, { expected_revision: 2, fields: { city: "Москва" } });
     assert.equal(view.consents.training_accepted_at, stamp);
-    view = await store.save(candidateId, { expected_revision: 3, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: false } });
+    assert.equal(view.consents.training_version, "training-v1");
+    view = await store.save(candidateId, { expected_revision: 3, fields: {},
+      consent: { processing: true, pool: true, version: "profile-v1", training: true, training_version: "training-v2" } });
+    assert.equal(view.consents.training_version, "training-v2");
+    assert.ok(view.consents.training_accepted_at);
+    const v2stamp = view.consents.training_accepted_at;
+    view = await store.save(candidateId, { expected_revision: 4, fields: { city: "Тула" } });
+    assert.equal(view.consents.training_version, "training-v2");
+    assert.equal(view.consents.training_accepted_at, v2stamp);
+    view = await store.save(candidateId, { expected_revision: 5, fields: {}, consent: { processing: true, pool: true, version: "profile-v1", training: false } });
     assert.equal(view.consents.training, false);
     assert.equal(view.consents.processing, true);
     assert.equal(view.consents.pool, true);
     assert.equal(view.consents.training_version, null);
-    const payload = (await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=4", [candidateId])).rows[0]?.payload;
+    const payload = (await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=6", [candidateId])).rows[0]?.payload;
     assert.equal(payload.consents.training, false);
     assert.equal(payload.consents.training_accepted_at, null);
   } finally {

@@ -62,7 +62,10 @@ test("transactional recruitment ownership, contacts, interviews, offers and dura
       await assert.rejects(() => store.contacts(f.owner, view.id), rejection(409, "candidate_processing_consent_required"));
       assert.equal((await store.get("candidate", f.candidate, view.id)).allowed_actions.includes("withdraw"), true);
       const events = await store.events("candidate", f.candidate);
-      assert.equal(events.items.length, 2);
+      assert.deepEqual(events.items.map(event => event.type), ["invitation.sent", "accept", "deadline.suspended"]);
+      assert.equal(events.items[2].state, "accepted");
+      assert.equal(events.items[2].revision, 3);
+      assert.equal((await store.events("candidate", f.candidate)).items.length, 3, "repeated reads must not suspend twice");
       for (const event of events.items) {
         assert.deepEqual(Object.keys(event).sort(), ["created_at", "event_id", "process_id", "revision", "sequence", "state", "type"]);
         assert.ok(!Number.isNaN(Date.parse(event.created_at)));
@@ -179,7 +182,7 @@ test("transactional recruitment ownership, contacts, interviews, offers and dura
 
     await t.test("silent shortlist rejection is employer-only and cannot become an invitation", async () => {
       const f = await fixture();
-      const request = { candidate_id: f.candidate, idempotency_key: randomUUID(), reason: "Required skills missing" };
+      const request = { candidate_id: f.candidate, idempotency_key: randomUUID(), reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable.", categories: ["technical_skills" as const] };
       const view = await store.rejectSaved(f.owner, f.grant.draft_id, f.grant.vacancy_id, 11, request);
       assert.equal(view.state, "rejected");
       assert.equal(view.terms, null);

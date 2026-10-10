@@ -55,7 +55,7 @@ export interface CandidateProfileConsentInput {
   /** Optional, never inferred from processing/pool; omitted in a consent write means false. */
   training?: boolean;
   /** Required only for an explicit training opt-in. */
-  training_version?: "training-v1";
+  training_version?: "training-v1" | "training-v2";
 }
 
 /** Compare-and-swap profile mutation; revision zero creates the first profile. */
@@ -133,7 +133,7 @@ export interface CandidateProfileView {
   consents: Omit<CandidateProfileConsentInput, "training_version"> & {
     accepted_at: string | null;
     training: boolean;
-    training_version: "training-v1" | null;
+    training_version: "training-v1" | "training-v2" | null;
     training_accepted_at: string | null;
   };
   projection: CandidateProjectionDelivery;

@@ -64,6 +64,7 @@ export async function candidatePipelineRoutes(app: FastifyInstance, options: Can
     { method: "POST", path: "/internal/matching/events/retry", body: "DeliveryRetryRequest", response: "DeliveryStatus" },
   ] as const;
   for (const route of routes) {
+    const ownerScoped = /^\/internal\/vacancies\/:vacancy_id\/(?:combine(?:\/retry)?|selections|selection-state\/:candidate_id)$/.test(route.path);
     const paramNames = ["vacancy_id", "candidate_id"].filter(name => route.path.includes(`:${name}`));
     app.route({
       method: route.method,
@@ -71,6 +72,8 @@ export async function candidatePipelineRoutes(app: FastifyInstance, options: Can
       schema: {
         tags: [route.path.startsWith("/internal/vacancies") ? "vacancy-pipeline" : "candidate-pipeline"],
         security: [{ internalToken: [] }],
+        ...(ownerScoped ? { headers: { type: "object", required: ["x-owner-id"],
+          properties: { "x-owner-id": { type: "string", format: "uuid" } } } } : {}),
         ...(paramNames.length ? { params: {
           type: "object", required: paramNames,
           properties: Object.fromEntries(paramNames.map(name => [name, { type: "string", format: "uuid" }])),
@@ -94,7 +97,8 @@ export async function candidatePipelineRoutes(app: FastifyInstance, options: Can
           upstream.search = incoming.search;
           const response = await transport(upstream, {
             method: route.method,
-            headers: { "x-internal-token": token ?? "", "content-type": "application/json" },
+            headers: { "x-internal-token": token ?? "", "content-type": "application/json",
+              ...(ownerScoped ? { "x-owner-id": String(request.headers["x-owner-id"]) } : {}) },
             body: route.method === "PUT" || (route.method === "POST" && "body" in route)
               ? JSON.stringify(request.body) : undefined,
             signal: AbortSignal.timeout(10000),

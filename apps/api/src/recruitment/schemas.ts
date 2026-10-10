@@ -1,3 +1,5 @@
+import { rejectionReasonCategories } from "@comit/shared";
+
 /** Strict recruitment contracts; all state transitions and salary ordering are validated by the store. */
 const uuid = { type: "string", format: "uuid" };
 const timestamp = { type: "string", format: "date-time" };
@@ -9,7 +11,7 @@ const object = (properties: Record<string, object>, required = Object.keys(prope
   type: "object", additionalProperties: false, properties, required,
 });
 const enumeration = (values: readonly string[]) => ({ type: "string", enum: values });
-const states = ["sent", "viewed", "accepted", "declined", "rejected", "offer_sent", "hired", "offer_declined", "withdrawn"];
+const states = ["sent", "viewed", "accepted", "declined", "rejected", "offer_sent", "hired", "offer_declined", "withdrawn", "expired"];
 const actions = ["view", "accept", "decline", "withdraw", "reject", "interview_propose", "interview_accept", "interview_decline", "interview_cancel", "interview_complete", "offer_send", "offer_accept", "offer_decline"];
 const salary = object({ from_rub: integer(0), to_rub: integer(0) });
 const interviewFields = {
@@ -26,19 +28,23 @@ const command = (action: string | readonly string[], fields: Record<string, obje
 /** Invitation creation never accepts owner IDs, state, profile revision, or contact information. */
 export const invitationBodySchema = object({
   candidate_id: uuid, idempotency_key: uuid, company_name: nonempty(300), description: nonempty(10000), salary,
-}, ["candidate_id", "idempotency_key", "company_name", "description"]);
+}, ["candidate_id", "idempotency_key", "description"]);
+
+const categories = { type: "array", minItems: 1, maxItems: 7, uniqueItems: true, items: enumeration(rejectionReasonCategories) };
+const detailedReason = { ...text(10000, 80), pattern: "\\S" };
 
 /** Rejecting a saved candidate accepts no invitation terms or participant identities. */
-export const rejectSavedBodySchema = object({ candidate_id: uuid, idempotency_key: uuid, reason: nonempty(10000) });
+export const rejectSavedBodySchema = object({ candidate_id: uuid, idempotency_key: uuid, reason: detailedReason, categories });
 
 /** Each action branch closes additional properties and requires CAS plus a UUID retry key. */
 export const recruitmentActionSchema = { anyOf: [
   command(["view", "accept"]),
-  command(["decline", "withdraw", "reject"], { reason: nonempty(10000) }),
+  command(["decline", "withdraw"], { reason: nonempty(10000) }),
+  command("reject", { reason: detailedReason, categories }),
   command("interview_propose", interviewFields),
   command("interview_accept", { interview_id: uuid }),
   command(["interview_decline", "interview_cancel"], { interview_id: uuid, reason: nonempty(10000) }),
-  command("interview_complete", { interview_id: uuid, outcome, feedback: nonempty(10000) }),
+  object({ ...identity, action: enumeration(["interview_complete"]), interview_id: uuid, outcome, feedback: nonempty(10000), categories }, ["expected_revision", "idempotency_key", "action", "interview_id", "outcome", "feedback"]),
   command("offer_send", { salary_rub: integer(1), description: nonempty(10000), expires_at: timestamp }),
   command("offer_accept", { offer_id: uuid }),
   command("offer_decline", { offer_id: uuid, reason: nonempty(10000) }),
@@ -60,11 +66,13 @@ export const recruitmentViewSchema = object({
     contact_method: enumeration(["platform"]), vacancy_title: nullable(text(300)), city: text(300), daily: text(10000), work_type: text(300),
   })),
   invited_at: nullable(timestamp),
-  closure: nullable(object({ reason: nonempty(10000), actor: enumeration(["candidate", "employer"]), at: timestamp })),
+  closure: nullable(object({ reason: nonempty(10000), actor: enumeration(["candidate", "employer", "system"]), at: timestamp, categories }, ["reason", "actor", "at"])),
   interviews: { type: "array", items: interview }, offers: { type: "array", items: offer },
   allowed_actions: { type: "array", items: enumeration(actions), uniqueItems: true },
-  chat_available: { type: "boolean" }, created_at: timestamp, updated_at: timestamp,
-});
+  deadline: nullable(object({ stage: enumeration(["initial", "conversation", "after_interview", "interview_wait"]),
+    due_at: nullable(timestamp), remind_at: nullable(timestamp), paused_until: nullable(timestamp), business_days: integer(0, 7), time_zone: enumeration(["Europe/Moscow"]) })),
+  chat_available: { type: "boolean" }, chat_writable: { type: "boolean" }, chat_unread_count: nullable(integer(0)), created_at: timestamp, updated_at: timestamp,
+}, ["id", "owner_id", "candidate_id", "vacancy_id", "draft_id", "profile_revision", "revision", "state", "terms", "invited_at", "closure", "interviews", "offers", "allowed_actions", "chat_available", "chat_writable", "created_at", "updated_at"]);
 
 /** Participant-scoped list response with explicit pagination bounds. */
 export const recruitmentPageSchema = object({ items: { type: "array", items: recruitmentViewSchema },
