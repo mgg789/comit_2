@@ -728,7 +728,7 @@ try {
   );
   await page.mouse.up();
   await page
-    .getByText("Вы просмотрели текущую подборку", { exact: true })
+    .getByText("Не можем найти подходящих кандидатов", { exact: true })
     .waitFor();
   assert.equal(feedDecisions.length, 1);
   assert.equal(feedDecisions[0].action, "dislike");
@@ -865,6 +865,10 @@ try {
   for (const width of [1920, 1024, 390]) await capture("statistics", width);
   await page.getByRole("button", { name: "Открыть меню аккаунта" }).click();
   await page.getByRole("button", { name: "Выйти", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Выйти из аккаунта?", exact: true })
+    .getByRole("button", { name: "Выйти", exact: true })
+    .click();
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   assert.equal(authenticated, false);
   }
@@ -897,7 +901,8 @@ try {
     ),
   );
 } catch (error) {
-  await page.screenshot({ path: `${output}/failure.png`, fullPage: true });
+  // A hung capture must not hide the original failure.
+  await page.screenshot({ path: `${output}/failure.png`, fullPage: true, timeout: 5000 }).catch(() => {});
   console.error(
     JSON.stringify(
       {

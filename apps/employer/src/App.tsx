@@ -347,18 +347,16 @@ export default function App() {
               )}
             </AnimatePresence>
             <main className="main-content">
-              <AnimatePresence mode="wait">
-                {/* Plain crossfade: each screen brings its own Reveal, so a second slide would double the motion. */}
-                <motion.div
-                  key={`${route}:${checkpoint}`}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  {screen}
-                </motion.div>
-              </AnimatePresence>
+              {/* Fade-in only: a "wait" exit could stay stuck when the route changed while the
+                  previous screen was still entering, leaving the old page on screen. */}
+              <motion.div
+                key={`${route}:${checkpoint}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.18 }}
+              >
+                {screen}
+              </motion.div>
             </main>
             <Action
               className="agent-launcher glass glass-surface"
