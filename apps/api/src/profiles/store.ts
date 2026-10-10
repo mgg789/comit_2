@@ -436,7 +436,7 @@ export async function applyRecruitmentHire(client: PoolClient, processId: string
     organization: terms.company_name, description: "Оффер принят на платформе Comit.", link: null });
   const fields: CandidateProfileFields = { ...current.fields, experience };
   validateFields(fields);
-  const profile = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET fields=$2,revision=revision+1,pool_consent=false,updated_at=now()
+  const profile = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET fields=$2,revision=revision+1,pool_consent=false,training_consent=false,training_consent_version=NULL,training_consent_accepted_at=NULL,updated_at=now()
     WHERE candidate_id=$1 RETURNING *`, [candidateId, fields])).rows[0]!;
   const previous = new Map((await evidenceFor(client, candidateId)).map(row => [row.evidence_key, row]));
   await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id=$1", [candidateId]);

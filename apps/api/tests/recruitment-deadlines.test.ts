@@ -85,11 +85,11 @@ test('durable clock transitions, raced expiry, messages and accepted-offer proje
    assert.equal(view.deadline?.paused_until,pause);assert.equal(view.deadline?.stage,'interview_wait');
   });
   await t.test('offer acceptance once appends work and queues exact withdrawal',async()=>{
-   const f=await fixture();const sent=await f.act('employer',{action:'offer_send',salary_rub:150000,description:'Synthetic offer',expires_at:new Date(Date.now()+86400000).toISOString()});
+   const f=await fixture();const optIn=await profiles.get(f.candidate);await profiles.save(f.candidate,{expected_revision:optIn!.revision,fields:{},consent:{processing:true,pool:true,version:'profile-v1',training:true,training_version:'training-v2'}});const sent=await f.act('employer',{action:'offer_send',salary_rub:150000,description:'Synthetic offer',expires_at:new Date(Date.now()+86400000).toISOString()});
    assert.equal((await profiles.get(f.candidate))?.consents.pool,true);
    const command:RecruitmentAction={action:'offer_accept',offer_id:sent.offers[0]!.id,expected_revision:sent.revision,idempotency_key:randomUUID()};
    const [one,two]=await Promise.all([store.act('candidate',f.candidate,sent.id,command),store.act('candidate',f.candidate,sent.id,command)]);assert.deepEqual(one,two);assert.equal(one.state,'hired');
-   const profile=await profiles.get(f.candidate);assert.equal(profile?.consents.pool,false);assert.equal(profile?.consents.processing,true);assert.equal(profile?.fields.experience?.length,2);assert.equal(profile?.fields.experience?.[1]?.id,sent.id);assert.equal(profile?.projection.source_revision,profile?.revision);
+   const profile=await profiles.get(f.candidate);assert.equal(profile?.consents.pool,false);assert.equal(profile?.consents.processing,true);assert.equal(profile?.consents.training,false);assert.equal(profile?.consents.training_version,null);assert.equal(profile?.fields.experience?.length,2);assert.equal(profile?.fields.experience?.[1]?.id,sent.id);assert.equal(profile?.projection.source_revision,profile?.revision);
    const payload=(await pool.query<{payload:Record<string,unknown>}>('SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=$2',[f.candidate,profile!.revision])).rows[0]!.payload;
    assert.equal((payload.consents as {pool:boolean}).pool,false);
    assert.equal((await notifications.page('candidate',f.candidate)).items.filter(e=>e.type==='candidate.hired').length,1);

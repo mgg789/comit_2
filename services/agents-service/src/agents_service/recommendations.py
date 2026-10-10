@@ -60,10 +60,31 @@ class RecommendationOutput(BaseModel):
 
 def generate(request: RecommendationInput, provider: DeepSeekClient) -> RecommendationOutput:
     """Call the existing official provider without sending any subject identity."""
-    instruction = """Составь краткие рекомендации кандидату по агрегатам за неделю на русском языке.
+    instruction = """Составь рекомендации кандидату за неделю: один или два коротких абзаца на простом русском языке.
+На Comit работодатель сам находит кандидата и приглашает его. Кандидат не отправляет отклики.
+Не советуй отправлять резюме, откликаться, выбирать объявления или искать вакансии.
+Давай действия в собственном профиле и советы по подготовке к разговору.
+Упоминай только темы из входных категорий: если есть только experience, говори только об опыте,
+вкладе в проекты, задачах и результатах — не о зарплате, городе или специализации.
+Говори о порядке показа только при main_top_k_omission, unranked_by_reranker или reranker_reserve во входе.
+Если такая категория есть, объясни: порядок показа не доказывает слабые навыки.
+Нельзя превращать технический сбой или уже просмотренный профиль в совет улучшать квалификацию.
+Обращайся на «вы». Пиши короткими предложениями, без сложных слов и терминов системы.
+В text нельзя писать top-k, reranker, rerank, реранкер, комбайн, pipeline, строгий фильтр,
+схема, агрегат или имена категорий с подчёркиваниями. Названия ниже нужны только для понимания входа.
+Объясняй причины через работу и резюме: ожидания по зарплате, город, формат, опыт.
+Не советуй снижать зарплату автоматически: сначала предложи проверить ожидания и подходящие вакансии.
 Данные содержат только категории и число независимых наблюдений. Не выдумывай конкретные отзывы,
 компании, вакансии, навыки, оценки, вероятность найма или причинность. Отзывы отражают мнения работодателей,
 а не доказанные недостатки. Предлагай проверить профиль, уточнить предпочтения или подготовиться.
+Это исторические наблюдения, а не состояние текущих полей. Не утверждай, что у кандидата
+не указаны данные или не хватает сведений. Советуй проверить и при необходимости уточнить.
+work_type_mismatch означает несовпадение формата, а не отсутствие формата в профиле.
+relocation_destination_mismatch означает другой город переезда, а не неизвестный город.
+unranked_by_reranker означает, что повторной оценки кандидата НЕ было. Не говори, что он её не прошёл.
+Не перечисляй числа наблюдений, отметки или статистические категории. Напиши только понятные действия.
+relocation_unknown означает, что не указана готовность к переезду; это НЕ неизвестный город или местоположение.
+location_unknown означает неизвестный город. Не смешивай эти причины.
 class_mismatch означает несовпадение специализации; salary_disjoint — диапазонов зарплаты;
 work_type/relocation/location — формата работы и местоположения, не квалификации.
 main_top_k_omission: кандидат прошёл строгий фильтр, но не вошёл в top-k основного отбора;
@@ -85,7 +106,17 @@ strict_schema_mismatch и system_fallback — системные огранич�
         allowed = {item.category for item in request.evidence}
         if not set(output.referenced_categories) <= allowed or len(set(output.referenced_categories)) != len(output.referenced_categories):
             raise ValueError()
-        if re.search(r"https?://|www\.|\S+@\S+|[0-9a-f]{8}-[0-9a-f]{4}-", output.text, re.IGNORECASE):
+        if re.search(r"https?://|www\.|\S+@\S+|[0-9a-f]{8}-[0-9a-f]{4}-|top[- ]?k|rerank(?:er)?|реранк|комбайн|pipeline|агрегат|строг(?:ий|ого) фильтр|не указан[аоы]?|не хватает данных|отсутствуют сведения|отклик|отправ[а-я ]{0,30}резюме|[a-z]+_[a-z]+", output.text, re.IGNORECASE):
+            raise ValueError()
+        # A readable sentence can still introduce a cause absent from the evidence.
+        topic_categories = (
+            (r"зарплат|доход", {"salary", "salary_disjoint"}),
+            (r"переезд|переезж|город|местополож", {"location", "location_unknown", "relocation_unknown", "relocation_not_ready", "relocation_destination_mismatch"}),
+            (r"формат.{0,10}работ|удал[её]н|офис", {"work_format", "work_type_unknown", "work_type_mismatch"}),
+            (r"специализац", {"class_mismatch"}),
+        )
+        if any(re.search(pattern, output.text, re.IGNORECASE) and not allowed.intersection(categories)
+               for pattern, categories in topic_categories):
             raise ValueError()
         return output
     except (ValueError, KeyError, IndexError, TypeError):

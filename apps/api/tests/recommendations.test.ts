@@ -72,3 +72,10 @@ test("terminal recovery publication race discards invalid source snapshot immedi
   await new WeeklyRecommendationWorker(store, { ...options, transport: async () => { throw new Error("must not call"); } }).processOnce();
   assert.equal(store.discarded, 1);
 });
+
+
+test("offline matching guidance uses plain language without internal selection terms", () => {
+  for (const category of ["main_top_k_omission", "unranked_by_reranker", "reranker_reserve", "system_fallback", "strict_schema_mismatch"]) {
+    assert.doesNotMatch(fallbackText([{source:"matching",category,count:4}],true), /top[- ]?k|rerank|реранк|комбайн|pipeline|агрегат|строгий фильтр|[a-z]+_[a-z]+/i);
+  }
+});

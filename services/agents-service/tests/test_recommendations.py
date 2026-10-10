@@ -75,3 +75,44 @@ def test_internal_endpoint_authentication_and_consent_recheck(monkeypatch):
         raise HTTPException(409, "recommendation_consent_required")
     monkeypatch.setattr("agents_service.recommendations._consent", withdrawn)
     assert TestClient(app).post("/internal/candidate-recommendations/generate", json=payload()).status_code == 409
+
+
+@pytest.mark.parametrize("text", [
+    "Профиль не вошёл в top-k, поэтому нужно улучшить описание опыта и проектов.",
+    "Reranker оставил вас в резерве; проверьте свой профиль и зарплатные ожидания.",
+    "Причина salary_disjoint указывает на несовпадение зарплатных ожиданий.",
+])
+def test_internal_selection_terms_never_reach_candidate(text):
+    with pytest.raises(ProviderError):
+        generate(RecommendationInput.model_validate(payload()), Provider(text=text))
+
+
+@pytest.mark.parametrize("text", [
+    "Перед отправкой резюме перечитайте его и опишите свои проекты понятнее.",
+    "Если откликов мало, проверьте описание своего опыта и результаты проектов.",
+    "Причина связана с опытом. Также проверьте ожидания по зарплате и выбранный город.",
+])
+def test_inverse_hiring_and_supported_topics_are_preserved(text):
+    with pytest.raises(ProviderError):
+        generate(RecommendationInput.model_validate(payload()), Provider(text=text))
+
+
+def test_route_accepts_a_supported_salary_topic(monkeypatch):
+    monkeypatch.setattr("agents_service.recommendations._consent", lambda *_args: None)
+    app = FastAPI()
+    def owner():
+        return UUID("00000000-0000-4000-8000-000000000001")
+    class Database:
+        database_url = "synthetic-only"
+    provider = Provider(text="Проверьте ожидания по зарплате в профиле. Они не совпали с предложениями работодателей.", categories=["salary_disjoint"])
+    register_recommendation_routes(app, owner, Database, provider)
+    result = TestClient(app).post("/internal/candidate-recommendations/generate", json={"evidence": [{"source": "matching", "category": "salary_disjoint", "count": 4}]})
+    assert result.status_code == 200
+    assert result.json()["referenced_categories"] == ["salary_disjoint"]
+
+
+def test_historical_counts_do_not_claim_current_fields_are_missing():
+    request = RecommendationInput.model_validate({"evidence": [{"source": "matching", "category": "work_type_mismatch", "count": 4}]})
+    provider = Provider(text="В вашем профиле не указан формат работы. Добавьте сведения, чтобы работодатель мог найти вас.", categories=["work_type_mismatch"])
+    with pytest.raises(ProviderError):
+        generate(request, provider)
