@@ -26,6 +26,9 @@ const PROFILE_CONSENT_VERSION = "profile-v1";
 const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY = /^[a-z][a-z0-9_-]*$/;
+const RETAKE_COOLDOWN_DAYS = 7;
+const UPGRADE_COOLDOWN_DAYS = 30;
+const GRADE_RANK: Record<string, number> = { intern: 0, junior: 1, middle: 2, senior: 3 };
 const FIELD_NAMES = new Set([
   "display_name", "phone", "city", "work_types", "relocation_ready", "relocation_cities", "salary",
   "primary_direction", "declared_grade", "domains", "stacks", "soft_skills", "description", "projects",
@@ -879,6 +882,66 @@ export class CandidateProfileStore {
       [jobId, leaseToken],
     );
     if (result.rowCount !== 1) throw new Error("projection lease is no longer valid");
+  }
+
+  /**
+   * Trusted-producer entry (testing contour): persist the approved grade
+   * result, refresh the source profile's declared grade with a CAS revision
+   * bump, stamp `grade:trusted` evidence and enqueue the exact snapshot.
+   * Cooldowns: retake >= 7 days, upgrade >= 30 days after the last result.
+   */
+  public async recordTrustedGrade(candidateId: string, input: {
+    sessionId: string; grade: string; specialization: string;
+    supervisionBadge: string | null; tasksAnswered: number;
+  }): Promise<{ recorded: boolean; grade: string; decided_at: string }> {
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, candidateId, true);
+      const profile = await profileRow(client, candidateId, true);
+      if (!profile) throw new ProfileError(404, "profile_not_found");
+      const history = await client.query<{ grade: string; decided_at: string }>(
+        `SELECT grade, decided_at FROM candidate_grade_results
+          WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1`, [candidateId]);
+      const last = history.rows[0];
+      if (last) {
+        const days = (Date.now() - new Date(last.decided_at).getTime()) / 86400000;
+        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
+        if ((GRADE_RANK[input.grade] ?? 0) <= (GRADE_RANK[last.grade] ?? 0)
+            && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
+      }
+      const decidedAt = new Date();
+      await client.query(
+        `INSERT INTO candidate_grade_results
+           (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [randomUUID(), candidateId, input.sessionId, input.specialization,
+         input.grade, input.supervisionBadge, input.tasksAnswered, decidedAt]);
+      const fields = { ...(profile.fields as Record<string, unknown>),
+        declared_grade: input.grade } as CandidateProfileFields;
+      const revision = Number(profile.revision) + 1;
+      const updated = await client.query<ProfileRow>(
+        `UPDATE candidate_profiles SET revision=$2, fields=$3::jsonb, updated_at=now()
+          WHERE candidate_id=$1 RETURNING candidate_id, revision, fields, processing_consent, pool_consent,
+                training_consent, training_consent_version, training_consent_accepted_at, consent_version,
+                consent_accepted_at, updated_at`,
+        [candidateId, revision, JSON.stringify(fields)]);
+      const refreshed = updated.rows[0];
+      const evidenceKey = "grade:trusted";
+      const inputHash = createHash("sha256")
+        .update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
+      await client.query(
+        `INSERT INTO candidate_profile_evidence
+           (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+         VALUES ($1,$2,$3,'confirmed',$4::jsonb,$5::jsonb,$6)
+         ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET
+           input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
+           verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+        [candidateId, evidenceKey, inputHash,
+         JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
+         JSON.stringify(["testing-engine: adaptive session"]), decidedAt]);
+      const currentEvidence = await evidenceFor(client, candidateId);
+      await enqueue(client, account, refreshed as ProfileRow, currentEvidence);
+      return { recorded: true, grade: input.grade, decided_at: decidedAt.toISOString() };
+    });
   }
 }
 

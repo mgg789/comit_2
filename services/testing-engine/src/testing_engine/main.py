@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 
 from testing_engine.blueprints import DEFAULT_BLUEPRINT_DIR, load_blueprints
 from testing_engine.judge import judge_answer
+from testing_engine.publisher import TrustedGradePublisher
 from testing_engine.supervision import (
     CAMERA_GRANTED,
     MEDIA_RETENTION_DAYS,
@@ -190,6 +191,10 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
         session.update(state=state.to_dict(), tasks_given=state.answered,
                        status="finished" if done else "active", decided_grade=grade)
         store.write_session(session)
+        if done and grade:
+            published, publish_status = TrustedGradePublisher().publish(session)
+            session["grade_publication"] = {"published": published, "status": publish_status}
+            store.write_session(session)
         return {"session_id": session_id, "correct": correct, "judge_status": judge_status,
                 "answered": state.answered, "decided_grade": grade,
                 "status": "finished" if done else "active"}

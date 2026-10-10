@@ -11,6 +11,7 @@ import { ProfileStore } from "../profiles/store.js";
 import { RecruitmentStore } from "../recruitment/store.js";
 import { recruitmentRoutes } from "../routes/recruitment.js";
 import { chatConfiguration, chatRoutes } from "../routes/chat.js";
+import { registerTestingIntegration } from "../routes/testing-integration.js";
 import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore } from "../statistics/store.js";
 import { statisticsRoutes } from "../routes/statistics.js";
@@ -50,4 +51,6 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   const statistics = new EmployerStatisticsStore(pool);
   await app.register(statisticsRoutes, { ...options, statistics });
   await app.register(organizationAgentToolsRoutes, { ...options, pool, recruitment, statistics });
+  await app.register(registerTestingIntegration, { profiles: options.profiles,
+    token: process.env.TESTING_ENGINE_TOKEN ?? "" });
 }

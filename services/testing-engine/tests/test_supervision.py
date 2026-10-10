@@ -80,3 +80,19 @@ def test_maintenance_cleanup_reports_removed_media(tmp_path: Path) -> None:
     """The retention pass runs on a data dir without media and reports zero."""
     report = maintenance(tmp_path / "data")
     assert report == {"removed": 0, "retention_days": 90}
+
+
+def test_publisher_degrades_without_config(tmp_path: Path) -> None:
+    """Without TESTING_API_URL the publication degrades to not_configured."""
+    import os
+
+    from testing_engine.publisher import TrustedGradePublisher
+
+    saved_url = os.environ.get("TESTING_API_URL")
+    os.environ.pop("TESTING_API_URL", None)
+    try:
+        published, status = TrustedGradePublisher().publish({"candidate_key": "x", "session_id": "s"})
+        assert published is False and status == "not_configured"
+    finally:
+        if saved_url:
+            os.environ["TESTING_API_URL"] = saved_url
