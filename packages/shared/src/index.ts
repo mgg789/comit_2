@@ -34,6 +34,7 @@ export type * from "./auth.js";
 export type * from "./recruitment.js";
 export type * from "./chat.js";
 export type * from "./showcase.js";
+export type * from "./public-showcase.js";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;
 export type Grade = (typeof GRADES)[number];

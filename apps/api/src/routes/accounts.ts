@@ -7,6 +7,7 @@ import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { typ
 import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { showcaseRoutes } from "./showcase.js";
+import { publicShowcaseRoutes } from "./public-showcase.js";
 import { correlatedFetch } from "../operations/index.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 import { RecruitmentError } from "../recruitment/store.js";
@@ -366,4 +367,5 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     });
   }
   await app.register(showcaseRoutes, options);
+  await app.register(publicShowcaseRoutes, options);
 }

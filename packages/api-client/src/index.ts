@@ -3,7 +3,7 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
@@ -117,6 +117,10 @@ export interface ApiClient {
   archiveVacancy(draftId: string, expectedRevision: number): Promise<AgentsDraftView>;
   /** Discover public candidates without requiring any vacancy. */
   searchCandidates(body?: SearchRequest): Promise<SearchPage>;
+  /** Browse anonymous published vacancies without requiring a session. */
+  listPublicVacancies(query?: PublicShowcaseQuery): Promise<PublicShowcasePage<PublicShowcaseVacancy>>;
+  /** Browse consented anonymous candidates without detail or contact access. */
+  listPublicCandidates(query?: PublicShowcaseQuery): Promise<PublicShowcasePage<PublicShowcaseCandidate>>;
   /** Read the current anonymous public profile and authorized public PDF URL. */
   getPublicCandidate(candidateId: string): Promise<PublicCandidateDetail>;
   /** Save a displayed revision into an owned open vacancy using normal shortlist semantics. */
@@ -314,6 +318,16 @@ export function createApiClient({
     withdrawVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/withdraw`, { expected_revision: expectedRevision }),
     archiveVacancy: (draftId, expectedRevision) => request("DELETE", `/employer/vacancies/${encodeURIComponent(draftId)}`, { expected_revision: expectedRevision }),
     searchCandidates: (body = {}) => request("POST", "/employer/candidates/search", body),
+    listPublicVacancies: (query = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== null) params.set(key, String(value));
+      return request("GET", `/public/showcase/vacancies${params.size ? `?${params}` : ""}`);
+    },
+    listPublicCandidates: (query = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== null) params.set(key, String(value));
+      return request("GET", `/public/showcase/candidates${params.size ? `?${params}` : ""}`);
+    },
     getPublicCandidate: candidateId => request("GET", `/employer/candidates/${encodeURIComponent(candidateId)}`),
     likeShowcaseCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/showcase-likes`, body),
     requestSelection: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/combine`, body),

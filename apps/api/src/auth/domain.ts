@@ -24,6 +24,11 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
     config = loadAuthConfig();
     if (!process.env.DATABASE_URL) throw new Error("auth_database_missing");
   } catch {
+    for (const kind of ["vacancies", "candidates"]) {
+      app.get(`/public/showcase/${kind}`, { schema: { tags: ["public-showcase"], security: [],
+        response: { 503: { type: "object", required: ["detail"], properties: { detail: { type: "string" } } } } } },
+      async (_request, reply) => reply.header("cache-control", "no-store").code(503).send({ detail: "showcase_unavailable" }));
+    }
     for (const role of ["candidate", "employer"]) {
       for (const path of ["code", "verify", "logout", "logout-all"]) {
         app.post(`/auth/${role}/${path}`, { schema: { tags: ["auth"] } }, async (_request, reply) =>

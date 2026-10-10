@@ -596,3 +596,10 @@ Internal gateway сохраняет проверенный заголовок, b
 из сессии. На внешнем nginx `/api/internal` и `/api/internal/*` закрыты (404);
 сервисные клиенты используют прямой внутренний URL. Схема OpenAPI генерируется
 из matching routes командой `python tests/generate_candidate_contract.py`.
+
+
+### Общая публичная витрина
+
+`GET /api/public/showcase/vacancies` и `GET /api/public/showcase/candidates` —
+read-only списки без сессии и без detail/PDF/contact-доступа. Краткие карточки,
+фильтры, opaque cursor и fences описаны в [контракте витрины](public-showcase.md).

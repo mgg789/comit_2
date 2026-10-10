@@ -28,6 +28,7 @@ from matching_engine.preference_store import PreferenceStore
 from matching_engine.rerank_routes import rerank_router
 from matching_engine.rerank_store import RerankStore
 from matching_engine.showcase_routes import showcase_router
+from matching_engine.public_showcase import PublicShowcaseStore, public_showcase_router
 from matching_engine.showcase_store import ShowcaseStore
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.vacancy_routes import vacancy_router
@@ -81,6 +82,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
                                          require_internal))
 
     app.include_router(showcase_router(showcase_repository, require_internal))
+    app.include_router(public_showcase_router(PublicShowcaseStore(pipeline_store.database_url) if pipeline_store else None, require_internal))
 
     @app.exception_handler(ConflictError)
     async def conflict_handler(_request: Request, exception: ConflictError) -> JSONResponse:
