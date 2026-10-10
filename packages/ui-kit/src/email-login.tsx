@@ -32,6 +32,7 @@ export function EmailLogin<Account>({
   onLogin,
   errorText,
   brandSubtitle,
+  homeHref = "/",
   consentHref = "#/legal/processing-consent",
 }: {
   requestCode: (email: string) => Promise<EmailLoginReceipt>;
@@ -39,6 +40,7 @@ export function EmailLogin<Account>({
   onLogin: (account: Account) => void;
   errorText: (reason: unknown) => string;
   brandSubtitle?: string;
+  homeHref?: string;
   consentHref?: string;
 }) {
   const [email, setEmail] = useState("");
@@ -92,13 +94,15 @@ export function EmailLogin<Account>({
   const canResend = receipt && now >= Date.parse(receipt.resend_after);
   return (
     <main className="login">
-      <a className="login-back" href="/">
+      <a className="login-back" href={homeHref}>
         <span className="action glass circle">
           <Icon name="back" />
         </span>
         Назад
       </a>
-      <motion.div
+      <motion.a
+        href={homeHref}
+        aria-label="Comit — главная"
         className="login-brand"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
@@ -115,7 +119,7 @@ export function EmailLogin<Account>({
           <p className="login-word">comit</p>
           {brandSubtitle && <p className="login-business">{brandSubtitle}</p>}
         </div>
-      </motion.div>
+      </motion.a>
       <motion.form
         className={`login-card glass ${receipt ? "otp-card" : ""}`}
         onSubmit={submit}

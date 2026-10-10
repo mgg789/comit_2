@@ -2,7 +2,7 @@ import { PersistentStateScope } from "@comit/ui-kit/ui-state";
 import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
+import { AppShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
@@ -305,7 +305,7 @@ export default function App() {
           </>
         ) : (
           <>
-            <AppShellHeader brandHref="#/vacancies" brandLabel="Comit — вакансии" navigationLabel="Навигация работодателя"
+            <AppShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} brandLabel="Comit — главная" navigationLabel="Навигация работодателя"
               items={[
                 { id: "vacancies", label: "Вакансии", path: "/vacancies", icon: "vacancies" },
                 { id: "resumes", label: "Резюме", path: "/resumes", icon: "resumes" },

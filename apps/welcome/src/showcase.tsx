@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createApiClient, ApiError } from "@comit/api-client";
 import { GRADES, SPECIALIZATIONS, type PublicShowcaseCandidate, type PublicShowcaseVacancy, type PublicShowcasePage, type PublicShowcaseQuery } from "@comit/shared";
-import { PublicShellHeader, Dialog } from "@comit/ui-kit/app-shell";
+import { PublicShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { Action, Backdrop, Icon, Select, State, Tags } from "@comit/ui-kit/design";
 import { usePersistentState } from "@comit/ui-kit/ui-state";
 import { WelcomeBackground, candidateUrl, employerUrl } from "./entry";
@@ -51,7 +51,7 @@ export function PublicShowcase({ kind }: { kind: Kind }) {
   }
   return <div className="employer-app comit-design public-showcase">
     <Backdrop imagery={false} /><WelcomeBackground />
-    <PublicShellHeader brandHref="#/" loginHref="#/" navigationLabel="Разделы витрины" items={tabs} selected={kind} navigate={path => { window.location.hash = path; }} />
+    <PublicShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} loginHref="#/" navigationLabel="Разделы витрины" items={tabs} selected={kind} navigate={path => { window.location.hash = path; }} />
     <main className="main-content public-content">
       <div className="public-filters">
         <Select aria-label="Специализация" value={specialization} onChange={event => setSpecialization(event.target.value)}><option value="">Специализация</option>{SPECIALIZATIONS.map(value => <option key={value} value={value}>{roleLabels[value]}</option>)}</Select>

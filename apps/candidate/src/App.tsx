@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state";
-import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
+import { AppShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
 import { Action, Backdrop, PageTitle, State } from "@comit/ui-kit/design";
@@ -89,9 +89,9 @@ export default function App() {
         : authError ? <main className="main-content">
         <State error={authError} retry={() => void checkAccount()}/>
         </main>
-          : !account ? <EmailLogin requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
+          : !account ? <EmailLogin homeHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
             : <PersistentStateScope scope={`candidate:${account.id}`}>
-    <AppShellHeader brandHref="#/resume" brandLabel="Comit — резюме" navigationLabel="Навигация кандидата"
+    <AppShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} brandLabel="Comit — главная" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
       searchLabel="Поиск предложений" onSearch={() => { setMenu(false); setSearch(true); }} secondaryLabel="Чаты" secondaryIcon="message" onSecondary={() => navigate("/chat")}

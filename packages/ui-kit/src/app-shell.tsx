@@ -2,6 +2,21 @@ import { useEffect, useId, useRef, type ComponentProps, type ReactNode, type Ref
 import { AnimatePresence, motion } from "framer-motion";
 import { Icon } from "./design";
 
+/**
+ * Resolve the shared three-choice landing without keeping a role-specific route.
+ * @param origin Current page origin; the same host and protocol are used in development.
+ * @param development Whether to use the sibling welcome Vite server on port 5176.
+ * @param override Optional trusted welcome mount from the application configuration.
+ * @returns Configured mount, production root, or the absolute development landing URL.
+ */
+export function homePageHref(origin: string, development: boolean, override?: string): string {
+  if (override?.trim()) return override.trim();
+  if (!development) return "/";
+  const home = new URL("/", origin);
+  home.port = "5176";
+  return home.href;
+}
+
 /** Existing employer header; role-specific navigation, API actions and assistant lifecycle stay in the application. */
 export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, selected, navigate, email, menu, toggleMenu, menuContent, toolsRef, menuRef, searchLabel, onSearch, secondaryLabel, onSecondary, secondaryIcon = "message", assistantOpen = false, toolsContent, overlayContent }: {
   brandHref: string; brandLabel: string; navigationLabel: string;
