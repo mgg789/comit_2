@@ -160,10 +160,15 @@ export function Select({
     if (props.disabled || !anchor.current) return;
     const rect = anchor.current.getBoundingClientRect();
     const available = window.innerHeight - rect.bottom - 12;
+    const unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 1;
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (context) context.font = getComputedStyle(anchor.current).font;
+    const longest = Math.max(0, ...Array.from(native.current?.options || []).map(option => context?.measureText(option.text).width || 0));
+    const width = Math.min(window.innerWidth - 16, 560 * unit, Math.max(rect.width, longest + 76 * unit));
     const height = Math.min(320, options.length * 44 + 56);
     const above = available < Math.min(height, 180) && rect.top > available;
     if (placement === "right") {
-      const width = Math.min(280, window.innerWidth - 16);
       const left = rect.right + 8 + width <= window.innerWidth - 8
         ? rect.right + 8 : Math.max(8, rect.left - width - 8);
       const top = Math.max(8, Math.min(rect.top, window.innerHeight - height - 8));
@@ -175,10 +180,10 @@ export function Select({
     setGeometry({
       left: Math.max(
         8,
-        Math.min(rect.left, window.innerWidth - rect.width - 8),
+        Math.min(rect.left, window.innerWidth - width - 8),
       ),
       top: above ? Math.max(8, rect.top - height - 8) : rect.bottom + 8,
-      width: rect.width,
+      width,
       maxHeight: above
         ? Math.min(height, rect.top - 16)
         : Math.max(80, available),

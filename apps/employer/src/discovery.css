@@ -1110,3 +1110,40 @@
 .discovery-targets .action { min-height: 56rem; }
 
 .statistics-vacancy-row b { transition: color var(--employer-hover-duration) var(--employer-hover-ease); }
+
+/* Accepted profiles expose their body while explicit actions remain independent. */
+.discovery-profile-link { position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.discovery-profile-link:focus-visible { outline: 3rem solid var(--employer-blue); outline-offset: 3rem; }
+.discovery-tile-actions { display: flex; align-items: center; gap: 12rem; margin-left: auto; position: relative; z-index: 2; flex-shrink: 0; }
+.light-row .discovery-tile-actions .action { margin-left: 0; }
+.light-row .discovery-tile-actions .discovery-reject { width: 72rem; min-width: 72rem; padding: 0; }
+.statistics-inventory .statistics-summary-grid { margin-top: 34rem; }
+.statistics-inventory .statistics-summary-grid > div { gap: 2rem; }
+.statistics-summary-grid > div > div { display: flex; align-items: center; gap: 10rem; }
+@media (max-width: 760px) {
+  .discovery-tile-actions { width: 100%; }
+  .light-row .discovery-tile-actions .discovery-reject { width: 48rem; min-width: 48rem; }
+  .light-row .discovery-tile-actions .discovery-dark { flex: 1; }
+}
+
+.statistics-expenses { grid-column: 1 / -1; }
+.statistics-expense-total { display: flex; align-items: baseline; gap: 18rem; margin: 24rem 0 28rem; }
+.statistics-expense-total strong { font-size: 48rem; font-weight: 500; }
+.statistics-expense-total > span, .statistics-expense-categories small { color: var(--comit-text-muted); font-size: 15rem; }
+.statistics-expense-categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24rem; }
+.statistics-expense-categories > div { padding: 22rem; border-radius: 20rem; background: var(--employer-paint-272930); display: flex; flex-direction: column; gap: 10rem; }
+.statistics-expense-categories > div > div { display: flex; gap: 10rem; align-items: center; font-size: 18rem; }
+.statistics-expense-categories .icon { width: 24rem; height: 24rem; color: var(--employer-blue); }
+.statistics-expense-categories strong { font-size: 28rem; font-weight: 500; }
+.statistics-expense-daily { display: flex; align-items: stretch; gap: 6rem; height: 100rem; margin-top: 32rem; }
+.statistics-expense-daily > div { flex: 1; display: flex; align-items: end; background: var(--employer-paint-272930); border-radius: 5rem; }
+.statistics-expense-daily span { width: 100%; background: var(--employer-gradient); border-radius: inherit; min-height: 2rem; }
+@media (max-width: 760px) {
+  .statistics-expense-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12rem; }
+  .statistics-expense-categories > div { padding: 14rem; }
+  .statistics-expense-categories > div > div { font-size: 14rem; }
+  .statistics-expense-categories strong { font-size: 20rem; }
+  .statistics-expense-categories small { font-size: 12rem; }
+  .statistics-expense-total { flex-direction: column; gap: 4rem; }
+  .statistics-expense-total strong { font-size: 36rem; }
+}

@@ -4,7 +4,7 @@
  * Salary range is mandatory in vacancies AND invitations (TZ rule 2.2.1).
  */
 
-export type { EmployerStatisticsQuery, EmployerStatistics, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
+export type { EmployerStatisticsQuery, EmployerStatistics, EmployerExpenses, EmployerExpenseCategory, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
 
 export type {
   CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
@@ -119,3 +119,5 @@ export * from "./business-time.js";
 export * from "./recommendations.js";
 export type * from "./notifications.js";
 export type * from "./employer-profile.js";
+
+export type * from "./testing-history.js";

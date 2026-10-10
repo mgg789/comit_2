@@ -909,6 +909,55 @@ export class CandidateProfileStore {
     );
     if (result.rowCount !== 1) throw new Error("projection lease is no longer valid");
   }
+  /** Accept a trusted finished session atomically with evidence and matching projection.
+   * Identical publisher retries never add another activity; cross-owner/session reuse fails closed.
+   */
+  public async recordTrustedGrade(candidateId: string, input: {
+    sessionId: string; grade: "intern" | "junior" | "middle" | "senior"; specialization: string;
+    supervisionBadge: string | null; tasksAnswered: number;
+  }): Promise<{ recorded: true; grade: string; decided_at: string }> {
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, candidateId, true);
+      const profile = await profileRow(client, candidateId, true);
+      if (!profile) throw new ProfileError(404, "profile_not_found");
+      const previous = (await client.query<{ candidate_id: string; grade: string; specialization: string;
+        supervision_badge: string | null; tasks_answered: number; decided_at: Date }>(
+        "SELECT * FROM candidate_grade_results WHERE session_id=$1", [input.sessionId])).rows[0];
+      if (previous) {
+        if (previous.candidate_id !== candidateId || previous.grade !== input.grade
+          || previous.specialization !== input.specialization || previous.supervision_badge !== input.supervisionBadge
+          || previous.tasks_answered !== input.tasksAnswered) throw new ProfileError(409, "testing_result_conflict");
+        return { recorded: true, grade: previous.grade, decided_at: previous.decided_at.toISOString() };
+      }
+      const last = (await client.query<{ grade: string; decided_at: Date }>(
+        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1", [candidateId])).rows[0];
+      if (last) {
+        const days = (Date.now() - last.decided_at.getTime()) / 86400000;
+        if (days < 7) throw new ProfileError(409, "retake_cooldown");
+        const ranks: Record<string, number> = { intern: 0, junior: 1, middle: 2, senior: 3 };
+        if (ranks[input.grade]! > ranks[last.grade]! && days < 30) throw new ProfileError(409, "grade_upgrade_cooldown");
+      }
+      const decidedAt = new Date();
+      await client.query(`INSERT INTO candidate_grade_results
+        (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(),candidateId,input.sessionId,input.specialization,
+        input.grade,input.supervisionBadge,input.tasksAnswered,decidedAt]);
+      const fields: CandidateProfileFields = { ...profile.fields, declared_grade: input.grade };
+      const refreshed = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET revision=revision+1,fields=$2::jsonb,updated_at=now()
+        WHERE candidate_id=$1 RETURNING *`, [candidateId,JSON.stringify(fields)])).rows[0]!;
+      const inputHash = createHash("sha256").update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
+      await client.query(`INSERT INTO candidate_profile_evidence
+        (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+        VALUES ($1,'grade:trusted',$2,'confirmed',$3::jsonb,$4::jsonb,$5)
+        ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
+          verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
+          JSON.stringify(["testing-engine: adaptive session"]),decidedAt]);
+      await enqueue(client,account,refreshed,await evidenceFor(client,candidateId));
+      return { recorded: true, grade: input.grade, decided_at: decidedAt.toISOString() };
+    });
+  }
+
 }
 
 /** Short alias retained for route consumers that use the domain name. */

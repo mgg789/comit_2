@@ -13,13 +13,21 @@ const uuid = { type: "string", format: "uuid" };
 const failure = { type: "object", additionalProperties: false, required: ["detail"], properties: { detail: { type: "string" } } } as const;
 const response = {
   type: "object", additionalProperties: false,
-  required: ["version", "generated_at", "timezone", "period", "inventory", "current", "previous", "unique_candidates", "daily", "top_vacancies"],
+  required: ["version", "generated_at", "timezone", "period", "inventory", "current", "previous", "unique_candidates", "daily", "top_vacancies", "expenses"],
   properties: {
     version: { const: "employer-statistics-v1", type: "string" }, generated_at: { type: "string", format: "date-time" }, timezone: { type: "string", const: "UTC" },
     period: { type: "object", additionalProperties: false, required: ["from", "to", "previous_from", "previous_to", "vacancy_id"],
       properties: { from: date, to: date, previous_from: date, previous_to: date, vacancy_id: { anyOf: [uuid, { type: "null" }] } } },
     inventory: { type: "object", additionalProperties: false, required: ["draft", "open", "closed", "archived", "saved_pairs", "active_processes"],
       properties: { draft: count, open: count, closed: count, archived: count, saved_pairs: count, active_processes: count } },
+    expenses: { type: "object", additionalProperties: false, required: ["currency","total_kopeks","categories","daily","tariffs"], properties: {
+      currency: {type:"string",const:"RUB"}, total_kopeks: count,
+      categories: {type:"array",maxItems:4,items:{type:"object",additionalProperties:false,required:["category","amount_kopeks","events"],properties:{
+        category:{type:"string",enum:["publication","invitation","ai","penalty"]},amount_kopeks:count,events:count}}},
+      daily:{type:"array",maxItems:90,items:{type:"object",additionalProperties:false,required:["date","amount_kopeks"],properties:{date,amount_kopeks:count}}},
+      tariffs:{type:"object",additionalProperties:false,required:["publication_kopeks","invitation_kopeks","deadline_penalty_kopeks","ai_daily_allowance_kopeks","ai_usd_rub"],properties:{
+        publication_kopeks:count,invitation_kopeks:count,deadline_penalty_kopeks:count,ai_daily_allowance_kopeks:count,ai_usd_rub:count}}
+    }},
     current: counts, previous: counts, unique_candidates: count,
     daily: { type: "array", maxItems: 90, items: { type: "object", additionalProperties: false, required: ["date", "counts"], properties: { date, counts } } },
     top_vacancies: { type: "array", maxItems: 10, items: { type: "object", additionalProperties: false,

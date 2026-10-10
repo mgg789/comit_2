@@ -220,6 +220,7 @@ const captures = [];
 
 const errors = [], writes = [], searches = [];
 let forceFailure = false;
+let savedTest = false;
 let openDrafts = [draft];
 const browser = await playwright.chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || "chrome", headless: true });
 const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
@@ -240,7 +241,8 @@ await context.route("**/api/**", async route => {
     return reply({ candidate_id: candidate.candidate_id, profile_revision: candidate.profile_revision, vacancy_revision: 1, added: true });
   }
   if (path === "/employer/candidates/" + candidate.candidate_id) return reply(candidate);
-  if (path.endsWith("/recruitment") || path === "/employer/recruitment") return reply({ items: [], limit: 100, offset: 0, has_more: false, next_cursor: null });
+  if (path.endsWith("/saved")) return reply({ items: [{ candidate_id: ids.candidate, profile_revision: 1, card: feedCard, saved_at: now, vacancy_id: ids.vacancy, exposure_id: feedCard.exposure_id }], limit: 50, offset: 0, has_more: false, next_cursor: null });
+  if (path.endsWith("/recruitment") || path === "/employer/recruitment") return reply({ items: savedTest ? [{ ...recruitment, state: "accepted", allowed_actions: ["reject", "interview_propose"] }, { ...recruitment, candidate_id: "10000000-0000-4000-8000-000000000099" }] : [], limit: 100, offset: 0, has_more: false, next_cursor: null });
   if (path.endsWith("/capabilities")) return reply({ manual_editing: true, agent: false });
   if (path === "/employer/statistics") return reply(stats);
   return reply({ detail: "synthetic_not_found" }, 404);
@@ -263,7 +265,8 @@ try {
   const search = page.getByRole("textbox", { name: "Поиск по имени, роли или стеку" });
   await search.fill("persistent backend");
   await page.getByRole("button", { name: "Найти", exact: true }).click();
-  await page.getByRole("textbox", { name: "Стек", exact: true }).fill("python");
+  await page.getByRole("button", { name: "Стек", exact: true }).click();
+  await page.getByRole("option", { name: "Python", exact: true }).click();
   await page.getByRole("button", { name: "Грейд", exact: true }).click();
   await page.getByRole("option", { name: "Middle", exact: true }).click();
   await page.evaluate(() => location.hash = "/vacancies");
@@ -273,7 +276,7 @@ try {
   await page.evaluate(() => location.hash = "/showcase");
   await plus.waitFor();
   assert.equal(await search.inputValue(), "persistent backend");
-  assert.equal(await page.getByRole("textbox", { name: "Стек", exact: true }).inputValue(), "python");
+  assert.equal(await page.getByRole("button", { name: "Стек", exact: true }).innerText(), "Python");
   await page.reload();
   await plus.waitFor();
   assert.equal(await search.inputValue(), "persistent backend");
@@ -318,6 +321,25 @@ try {
   await page.reload();
   await page.getByRole("button", { name: "Добавить вакансию", exact: true }).first().click();
   assert.equal(await title.inputValue(), "Restored draft title");
+  await page.keyboard.press("Escape");
+  savedTest = true; openDrafts = [draft];
+  await page.goto(base + "#/resumes");
+  const savedRow = page.locator(".vacancy-resume-list .discovery-row");
+  await savedRow.first().waitFor();
+  assert.equal(await savedRow.count(), 1, "process without a like must not create a saved row");
+  await savedRow.getByRole("button", { name: "Отклонить кандидата", exact: true }).click();
+  await page.getByRole("dialog").getByText("Отказ кандидату", { exact: true }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.reload(); await savedRow.first().waitFor();
+  await savedRow.getByRole("link", { name: /Открыть резюме/ }).click();
+  assert.match(page.url(), /#\/resume\//);
+  await page.goto(base + "#/showcase");
+  const trigger = page.getByRole("button", { name: "Вакансия", exact: true });
+  await trigger.click();
+  await page.getByRole("listbox").waitFor();
+  const menu = await page.getByRole("listbox").boundingBox(), anchor = await trigger.boundingBox();
+  assert.ok(menu.width > anchor.width, "long options may grow beyond the trigger");
+  assert.ok(menu.width <= 560 && menu.x + menu.width <= 1920 - 7, "dropdown remains bounded");
   assert.deepEqual(errors, []);
   console.log("PASS: independent single-vacancy target modal, signed force-add retry, errors/empty state, persistent filters and unsaved title, animated row hover");
 } catch (error) { console.error("Browser errors", errors); console.error((await page.locator("body").innerText()).slice(0, 1800)); throw error; } finally { await browser.close(); }

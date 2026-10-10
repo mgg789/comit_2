@@ -3,7 +3,7 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
@@ -97,6 +97,8 @@ export interface ApiClient {
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
   getCandidateProfile(): Promise<CandidateProfileView>;
+  /** Read the last 30 Moscow calendar days of own confirmed test results. */
+  getCandidateTestingHistory(): Promise<CandidateTestingHistory>;
   /** Read actual matching readiness for the authenticated candidate. */
   getCandidatePipeline(): Promise<CandidatePipelineStatus>;
   /** CAS update; replace discards omitted editable fields, while PATCH preserves them. */
@@ -320,6 +322,7 @@ export function createApiClient({
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
+    getCandidateTestingHistory: () => request("GET", "/candidate/testing-history"),
     getCandidatePipeline: () => request("GET", "/candidate/pipeline"),
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
     retryCandidateProjection: () => request("POST", "/candidate/profile/projection/retry", {}),

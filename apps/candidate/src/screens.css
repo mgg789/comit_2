@@ -1,4 +1,4 @@
-.candidate-profile-page { padding-top: 32rem; }
+.candidate-profile-page { padding-top: 0; }
 .candidate-profile-hero { display: flex; flex-direction: column; align-items: center; gap: 36rem; text-align: center; }
 .candidate-profile-hero h1 { font-size: 64rem; max-width: 100%; overflow-wrap: anywhere; }
 .candidate-profile-avatar { width: 300rem; height: 300rem; display: grid; place-items: center; font-family: var(--employer-display); font-size: 88rem; border-radius: 50%; background: var(--employer-gradient); color: var(--comit-text); box-shadow: 0 20rem 80rem var(--employer-paint-0000006b); }
@@ -51,8 +51,9 @@
 .candidate-offer-detail { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32rem; }
 .candidate-offer-chat-link { display: flex; justify-content: center; }
 .candidate-offer-chat-link .action { min-height: 60rem; padding: 16rem 32rem; }
-.candidate-publication-actions { display: flex; flex-wrap: wrap; gap: 16rem; }
-.candidate-publication-actions .action { width: auto; justify-self: start; }
+.candidate-publication-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16rem; }
+.candidate-publication-actions .action { width: 100%; min-width: 0; }
+.candidate-app .action.action-danger { background: var(--employer-danger); color: var(--comit-bg); }
 .candidate-offer-terms { display: grid; gap: 30rem; }
 .candidate-offer-terms .candidate-offer-status { justify-self: start; }
 .candidate-offer-terms .candidate-chips { justify-content: flex-start; }
@@ -102,8 +103,8 @@
 }
 
 /* Preserve the Figma panel hierarchy even when an API metric is unavailable. */
-.candidate-profile-page { padding-top: 32rem; }
-.candidate-profile-hero { position: relative; gap: 24rem; min-height: 587rem; }
+.candidate-profile-page { padding-top: 0; }
+.candidate-profile-hero { position: relative; gap: 24rem; padding-bottom: 48rem; }
 .candidate-profile-hero > .action { position: absolute; right: 0; top: -80rem; }
 .candidate-profile-hero > .candidate-chips { max-width: 1000rem; }
 .candidate-profile-body { margin-top: 0; gap: 23rem; }
@@ -137,7 +138,7 @@
 .candidate-stat-offers > .action { justify-self: start; }
 @media (max-width: 760px) {
   .candidate-profile-page { padding-top: 24rem; }
-  .candidate-profile-hero { min-height: 0; padding-bottom: 40rem; }
+  .candidate-profile-hero { padding-bottom: 28rem; }
   .candidate-profile-hero > .action { position: static; }
   .candidate-weekly-task, .candidate-grade-test { flex-direction: column; align-items: stretch; }
   .candidate-weekly-task .action, .candidate-grade-test .action { padding: 14rem 24rem; }
@@ -162,3 +163,30 @@
 .candidate-recommendations-info .icon { width: 28rem; height: 28rem; }
 .candidate-recommendations-info .tooltip { display: block; top: calc(100% + 12rem); left: auto; right: 0; transform: none; width: min(440rem, calc(100vw - 64rem)); white-space: normal; font-weight: 400; line-height: 1.4; z-index: 10; }
 .candidate-recommendations-info:hover .tooltip, .candidate-recommendations-info:focus-within .tooltip { opacity: 1; }
+
+/* Resume starts closer to the capsule navigation; other screens retain their spacing. */
+.candidate-app .main-content:has(.candidate-profile-page) { margin-top: 48rem; }
+@media (max-width: 760px) {
+  .candidate-app .main-content:has(.candidate-profile-page) { margin-top: 24rem; }
+  .candidate-publication-actions { gap: 10rem; }
+  .candidate-publication-actions .action { padding-inline: 12rem; font-size: 14rem; }
+}
+
+.candidate-testing-activity { display: grid; gap: 18rem; }
+.candidate-testing-summary { display: flex; align-items: center; justify-content: space-between; gap: 16rem; color: var(--comit-text-muted); }
+.candidate-testing-summary strong { font-size: 32rem; color: var(--comit-text); }
+.candidate-testing-calendar { display: flex; gap: 14rem; }
+.candidate-testing-weekdays { display: grid; grid-template-rows: repeat(7, 22rem); gap: 7rem; align-items: center; font-size: 13rem; color: var(--comit-text-muted); }
+.candidate-testing-days { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 22rem); grid-auto-columns: 22rem; gap: 7rem; }
+.candidate-testing-cell { display: block; position: relative; width: 22rem; height: 22rem; border-radius: 4rem; background: var(--employer-paint-2f2f2d); }
+.candidate-testing-cell.intensity-1 { background: color-mix(in srgb, var(--employer-success) 30%, var(--employer-card)); }
+.candidate-testing-cell.intensity-2 { background: color-mix(in srgb, var(--employer-success) 50%, var(--employer-card)); }
+.candidate-testing-cell.intensity-3 { background: color-mix(in srgb, var(--employer-success) 75%, var(--employer-card)); }
+.candidate-testing-cell.intensity-4 { background: var(--employer-success); }
+.candidate-testing-cell.is-outside { visibility: hidden; }
+.candidate-testing-cell:focus-visible { outline: 2rem solid var(--employer-blue); outline-offset: 3rem; }
+.candidate-testing-tooltip { display: none; position: absolute; bottom: calc(100% + 8rem); left: 50%; transform: translateX(-50%); z-index: 5; width: max-content; padding: 8rem 12rem; border-radius: 8rem; background: var(--employer-glass); color: var(--comit-text); font-size: 14rem; pointer-events: none; backdrop-filter: blur(var(--employer-glass-blur)); }
+.candidate-testing-cell:hover .candidate-testing-tooltip, .candidate-testing-cell:focus .candidate-testing-tooltip { display: block; }
+.candidate-testing-calendar-range { display: flex; justify-content: space-between; max-width: 225rem; font-size: 14rem; color: var(--comit-text-muted); }
+.candidate-testing-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7rem; font-size: 14rem; color: var(--comit-text-muted); }
+.candidate-testing-legend .candidate-testing-cell { width: 16rem; height: 16rem; }

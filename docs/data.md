@@ -397,3 +397,16 @@ worker. Вставка `recruitment_interviews` и обе записи outbox т
 `training-v1` совместима с прежним ранжированием, но не включает рекомендации.
 Миграция API `017_recommendation_consent_version.sql` расширяет допустимые версии
 и очищает результаты без нового согласия. Обновления резюме сохраняют выбранную версию.
+
+### Реестр расходов работодателя
+
+API-миграция `018_employer_expenses.sql` добавляет `employer_expenses` (source key, owner, optional vacancy, category, integer kopeks, source time, frozen policy, reason) и `employer_expense_ai_days` (owner/Moscow date, cumulative provider micro-USD and billed kopeks). Категории: publication, invitation, ai, penalty. Данные не содержат контактов кандидатов и текста ОС. Владение в HTTP всегда берётся из сессии.
+
+Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
+
+Миграция backfill использует только известные даты публикаций и durable события/settlements, сохраняет исходные timestamps и маркирует исторические записи; неизвестные даты не синтезируются. API/agents migrations допускают оба порядка через deployment-only `install_employer_expense_sources()`; agents migration 011 устанавливает hooks, когда API-схема уже существует. Миграции выполняет владелец общих схем; функции не доступны PUBLIC. Функция поддержки сохраняет ссылку на ручное решение, не публикуя пояснение в статистике. Ни HTTP GET, ни агрегирование рекомендаций не создают расходов.
+
+
+### Подтверждённые результаты тестирования
+
+Миграция `019_testing_grades.sql` добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.

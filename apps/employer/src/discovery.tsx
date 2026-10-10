@@ -20,6 +20,7 @@ import {
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
+import { stackChoices } from "./labels";
 import { candidateName } from "./candidate-name";
 import { SHOWCASE_SORTS, candidateCode, isShowcaseSort, orderCandidates } from "./showcase-order";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
@@ -191,7 +192,7 @@ export function Showcase({
     (value): value is string => typeof value === "string" && (value === "" || SPECIALIZATIONS.some(item => item === value)));
   const [grade, setGrade] = usePersistentState("showcase.grade", "",
     (value): value is string => typeof value === "string" && (value === "" || GRADES.some(item => item === value)));
-  const [stack, setStack] = usePersistentState("showcase.stack", "");
+  const [stack, setStack] = usePersistentState("showcase.stack", "", (value): value is string => typeof value === "string" && (value === "" || stackChoices.some(([key]) => key === value)));
   const [draftId, setDraftId] = usePersistentState("showcase.draftId", "");
   const [sort, setSort] = usePersistentState("showcase.sort", "relevance", isShowcaseSort);
   // An anonymous code ("0A40") is matched by id prefix; the server's text search cannot see it.
@@ -375,12 +376,10 @@ export function Showcase({
             </option>
           ))}
         </Select>
-        <input
-          aria-label="Стек"
-          placeholder="Стек"
-          value={stack}
-          onChange={(event) => setStack(event.target.value)}
-        />
+        <Select aria-label="Стек" value={stack} onChange={event => setStack(event.target.value)}>
+          <option value="">Любой стек</option>
+          {stackChoices.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </Select>
         <Select
           aria-label="Вакансия"
           value={draftId}
@@ -1040,10 +1039,6 @@ export function Resumes({ navigate }: Navigation) {
         score: item.card?.explanation.score,
       }),
     );
-    page.processes.items.forEach((process) => {
-      if (!byCandidate.has(process.candidate_id))
-        byCandidate.set(process.candidate_id, { candidate: null, process });
-    });
     return [...byCandidate].map(([id, row]) => ({
       ...row,
       id,
@@ -1133,6 +1128,7 @@ export function Resumes({ navigate }: Navigation) {
               className="discovery-row light-row"
               key={`${row.vacancy.draft_id}:${row.id}`}
             >
+              {row.candidate && row.process && ["accepted", "offer_sent", "hired"].includes(row.process.state) && <a className="discovery-profile-link" href={`#/resume/${row.id}?draft=${row.vacancy.draft_id}`} aria-label={`Открыть резюме ${candidateName(row.candidate.display_name)}`} onClick={event => { event.preventDefault(); navigate(`/resume/${row.id}?draft=${row.vacancy.draft_id}`); }} />}
               {row.score != null && (
                 <span
                   className="discovery-score"
@@ -1145,9 +1141,9 @@ export function Resumes({ navigate }: Navigation) {
                 <CandidateIdentity candidate={row.candidate} />
               ) : (
                 <>
-                  <AnonymousAvatar name="Анонимный профиль" />
+                  <AnonymousAvatar name="Резюме недоступно" />
                   <div className="discovery-identity">
-                    <h3>Анонимный профиль</h3>
+                    <h3>Резюме недоступно</h3>
                     <p>
                       {row.process
                         ? statusLabels[row.process.state]
@@ -1257,21 +1253,13 @@ export function VacancyResumes({
   data.data?.saved.items.forEach((item) =>
     rows.set(item.candidate_id, {
       candidate: item.card,
-      name: candidateName(item.card?.display_name, "Анонимный профиль"),
+      name: candidateName(item.card?.display_name, "Резюме недоступно"),
       process: data.data?.processes.items.find(
         (process) => process.candidate_id === item.candidate_id,
       ),
       score: item.card?.explanation.score,
     }),
   );
-  data.data?.processes.items.forEach((process) => {
-    if (!rows.has(process.candidate_id))
-      rows.set(process.candidate_id, {
-        candidate: null,
-        name: "Анонимный профиль",
-        process,
-      });
-  });
   return (
     <Reveal>
       <PageTitle
@@ -1296,6 +1284,7 @@ export function VacancyResumes({
         <div className="discovery-list vacancy-resume-list">
           {[...rows].map(([id, row]) => (
             <article className="discovery-row light-row" key={id}>
+              {row.candidate && row.process && ["accepted", "offer_sent", "hired"].includes(row.process.state) && <a className="discovery-profile-link" href={`#/resume/${id}?draft=${draftId}`} aria-label={`Открыть резюме ${candidateName(row.candidate.display_name)}`} onClick={event => { event.preventDefault(); navigate(`/resume/${id}?draft=${draftId}`); }} />}
               {row.score != null && (
                 <span
                   className="discovery-score"
@@ -1526,6 +1515,20 @@ export function Statistics({ navigate }: Navigation) {
               ))}
             </div>
           </div>
+          <div className="statistics-summary-grid">
+            <div>
+              <div><strong>{stats.unique_candidates}</strong><Icon name="candidates" /></div>
+              <span>кандидатов за период</span>
+            </div>
+            <div>
+              <div><strong>{stats.inventory.saved_pairs}</strong><Icon name="resumes" /></div>
+              <span>сохранено сейчас</span>
+            </div>
+            <div>
+              <div><strong>{stats.inventory.active_processes}</strong><Icon name="clock" /></div>
+              <span>активных процессов</span>
+            </div>
+          </div>
           {!total && (
             <p className="statistics-empty">
               Создайте первую вакансию, чтобы начать подбор
@@ -1570,26 +1573,6 @@ export function Statistics({ navigate }: Navigation) {
             Уникальные пары «вакансия — кандидат» на каждом этапе
           </p>
         </section>
-        <section className="panel statistics-summary">
-          <h3>В работе</h3>
-          <div className="statistics-summary-grid">
-            <div>
-              <Icon name="candidates" />
-              <strong>{stats.unique_candidates}</strong>
-              <span>кандидатов за период</span>
-            </div>
-            <div>
-              <Icon name="resumes" />
-              <strong>{stats.inventory.saved_pairs}</strong>
-              <span>сохранено сейчас</span>
-            </div>
-            <div>
-              <Icon name="clock" />
-              <strong>{stats.inventory.active_processes}</strong>
-              <span>активных процессов</span>
-            </div>
-          </div>
-        </section>
         <section className="panel statistics-vacancies">
           <div className="statistics-card-heading">
             <h3>Активность вакансий</h3>
@@ -1624,6 +1607,19 @@ export function Statistics({ navigate }: Navigation) {
             </div>
           )}
         </section>
+        <section className="panel statistics-expenses">
+          <div className="statistics-card-heading"><h3>Расходы</h3><span className="statistics-caption">{stats.period.from} — {stats.period.to}</span></div>
+          {stats.expenses ? <>
+            <div className="statistics-expense-total"><strong>{formatExpense(stats.expenses.total_kopeks)}</strong><span>за выбранный период</span></div>
+            <div className="statistics-expense-categories">{stats.expenses.categories.map(item => {
+              const meta = { publication: { label: "Размещение вакансий", icon: "vacancies" as const }, invitation: { label: "Приглашения", icon: "candidates" as const }, ai: { label: "ИИ-агент", icon: "ai" as const }, penalty: { label: "Неустойки", icon: "clock" as const } }[item.category];
+              return <div key={item.category}><div><Icon name={meta.icon} /><span>{meta.label}</span></div><strong>{formatExpense(item.amount_kopeks)}</strong><small>{item.category === "ai" ? `Сверх ${formatExpense(stats.expenses.tariffs.ai_daily_allowance_kopeks)} в день` : item.category === "publication" ? `${formatExpense(stats.expenses.tariffs.publication_kopeks)} за размещение` : item.category === "invitation" ? `${formatExpense(stats.expenses.tariffs.invitation_kopeks)} за приглашение` : "Просрочки и решения поддержки"}</small></div>;
+            })}</div>
+            <div className="statistics-expense-daily" role="img" aria-label="Расходы по дням">{stats.expenses.daily.map(day => <div key={day.date} title={`${day.date}: ${formatExpense(day.amount_kopeks)}`}><span style={{ height: `${Math.max(day.amount_kopeks ? 4 : 0, day.amount_kopeks / Math.max(1, ...stats.expenses.daily.map(item => item.amount_kopeks)) * 100)}%` }} /></div>)}</div>
+            <div className="statistics-axis"><span>{stats.period.from}</span><span>{stats.period.to}</span></div>
+            {!stats.expenses.total_kopeks && <p className="statistics-empty">За этот период расходов пока нет</p>}
+          </> : <State error="Расходы пока не удалось загрузить" retry={data.refresh} />}
+        </section>
       </div>
       <p className="statistics-period">
         {stats.period.from} — {stats.period.to} · UTC{" "}
@@ -1639,9 +1635,36 @@ export function Statistics({ navigate }: Navigation) {
 function RecruitmentTileButton({ candidateId, draftId, process: initial, navigate }: Navigation & { candidateId: string; draftId: string; process?: RecruitmentView }) {
   const [updated, setUpdated] = useState<RecruitmentView | undefined>();
   const process = updated && (!initial || Number(updated.revision) >= Number(initial.revision)) ? updated : initial;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false), [reject, setReject] = useState(false);
   const action = recruitmentTileAction(process);
-  return <><Milestones process={process} /><Action className="discovery-dark" disabled={action.disabled} title={action.disabled && ["sent", "viewed"].includes(process?.state || "") ? "Собеседование можно назначить после принятия приглашения кандидатом" : undefined} onClick={() => action.command === "chat" && process ? navigate(`/chat/${process.id}`) : setOpen(true)}>{action.label}</Action>{createPortal(<AnimatePresence>{open && (action.command === "invite" ? <SavedCandidateInvitation candidateId={candidateId} draftId={draftId} onClose={() => setOpen(false)} onDone={value => { setUpdated(value); setOpen(false); }} navigate={navigate} /> : process && (action.command === "interview_propose" || action.command === "offer_send") ? <ProcessCommand process={process} command={action.command} onClose={() => setOpen(false)} onDone={value => { setUpdated(value); setOpen(false); }} /> : null)}</AnimatePresence>, document.querySelector(".employer-app") || document.body)}</>;
+  const done = (value: RecruitmentView) => { setUpdated(value); setOpen(false); setReject(false); };
+  return <><Milestones process={process} /><div className="discovery-tile-actions">
+    <Action className="discovery-reject" aria-label="Отклонить кандидата" title="Отклонить кандидата" disabled={!!process && !process.allowed_actions.includes("reject")} onClick={() => setReject(true)}><Icon name="close" /></Action>
+    <Action className="discovery-dark" disabled={action.disabled} title={action.disabled && ["sent", "viewed"].includes(process?.state || "") ? "Собеседование можно назначить после принятия приглашения кандидатом" : undefined} onClick={() => action.command === "chat" && process ? navigate(`/chat/${process.id}`) : setOpen(true)}>{action.label}</Action>
+  </div>{createPortal(<AnimatePresence>
+    {reject && (process ? <ProcessCommand process={process} command="reject" onClose={() => setReject(false)} onDone={done} /> : <SavedCandidateRejection candidateId={candidateId} draftId={draftId} onClose={() => setReject(false)} onDone={done} />)}
+    {open && (action.command === "invite" ? <SavedCandidateInvitation candidateId={candidateId} draftId={draftId} onClose={() => setOpen(false)} onDone={done} navigate={navigate} /> : process && (action.command === "interview_propose" || action.command === "offer_send") ? <ProcessCommand process={process} command={action.command} onClose={() => setOpen(false)} onDone={done} /> : null)}
+  </AnimatePresence>, document.querySelector(".employer-app") || document.body)}</>;
+}
+
+/** A saved like can be rejected before an invitation, with the same required feedback. */
+function SavedCandidateRejection({ candidateId, draftId, onClose, onDone }: { candidateId: string; draftId: string; onClose: () => void; onDone: (value: RecruitmentView) => void }) {
+  const prefix = `resume.${candidateId}.${draftId}`;
+  const [reason, setReason] = usePersistentState(`${prefix}.reason`, "");
+  const [categories, setCategories] = usePersistentState<RejectionReasonCategory[]>(`${prefix}.categories`, [], (value): value is RejectionReasonCategory[] => Array.isArray(value) && value.every(item => rejectionReasonCategories.includes(item)));
+  const clear = useClearPersistentState();
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const key = useRef({ identity: "", value: crypto.randomUUID() });
+  async function submit(event: FormEvent) {
+    event.preventDefault(); if (busy) return;
+    const problem = rejectionFeedbackError(reason, categories); if (problem) { setError(problem); return; }
+    const identity = JSON.stringify([reason.trim(), categories]);
+    if (key.current.identity !== identity) key.current = { identity, value: crypto.randomUUID() };
+    setBusy(true); setError("");
+    try { const result = await api.rejectSavedCandidate(draftId, { candidate_id: candidateId, reason: reason.trim(), categories, idempotency_key: key.current.value }); clear(`${prefix}.reason`); clear(`${prefix}.categories`); onDone(result); }
+    catch (cause) { setError(errorText(cause)); } finally { setBusy(false); }
+  }
+  return <Dialog title="Отказ кандидату" close={() => { if (!busy) onClose(); }}><form className="form-grid" onSubmit={event => void submit(event)}><RejectionFeedback reason={reason} setReason={setReason} categories={categories} setCategories={setCategories} disabled={busy} />{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><Action type="button" disabled={busy} onClick={onClose}>Отмена</Action><Action type="submit" className="discovery-reject" disabled={busy}>{busy ? "Сохраняем…" : "Отклонить кандидата"}</Action></div></form></Dialog>;
 }
 
 /** Invitation from an already saved candidate uses the existing dialog, fields and invitation API. */
@@ -1660,3 +1683,6 @@ function SavedCandidateInvitation({ candidateId, draftId, onClose, onDone, navig
   const company = organization.data?.company_name;
   return <Dialog title="Пригласить кандидата" close={() => { if (!busy) onClose(); }}><form className="form-grid" onSubmit={event => void submit(event)}><fieldset disabled={busy}><Field label="Вакансия"><p>{vacancy.data?.fields.title}</p></Field><Field label="Зарплата"><p>{salary(vacancy.data?.fields.zp_min, vacancy.data?.fields.zp_max)}</p></Field><Field label="Компания"><p>{company || "Название компании пока не указано"}</p></Field>{!company && <Action type="button" onClick={() => navigate("/settings")}>Указать компанию в настройках</Action>}<Field label="Сообщение кандидату"><textarea required maxLength={10000} value={description} onChange={event => { setDescription(event.target.value); key.current = crypto.randomUUID(); }} /></Field></fieldset>{(organization.loading || organization.error || vacancy.loading || vacancy.error) && <State loading={organization.loading || vacancy.loading} error={organization.error || vacancy.error} retry={() => { organization.refresh(); vacancy.refresh(); }} />}{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><Action type="button" disabled={busy} onClick={onClose}>Отмена</Action><Action type="submit" variant="light" disabled={busy || !company || vacancy.loading || !!vacancy.error}>{busy ? "Отправляем…" : "Отправить приглашение"}</Action></div></form></Dialog>;
 }
+
+/** Format integer RUB kopeks without mixing provider USD units into the UI. */
+function formatExpense(kopeks: number): string { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 }).format(kopeks / 100); }

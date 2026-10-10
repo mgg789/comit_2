@@ -1132,7 +1132,7 @@ textarea::placeholder {
     transform var(--employer-hover-duration) var(--employer-hover-ease),
     box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
 }
-.page-heading > .discovery-search:focus-within {
+.discovery-search:focus-within {
   transform: translateY(7rem) scale(1.045);
   box-shadow: 0 10rem 28rem var(--employer-paint-0000006b);
 }

@@ -22,6 +22,9 @@ import { notificationRoutes } from "../routes/notifications.js";
 import { CandidateRecommendationsStore } from "../recommendations/store.js";
 import { recommendationsRoutes } from "../recommendations/routes.js";
 import { WeeklyRecommendationWorker } from "../recommendations/worker.js";
+import { CandidateTestingHistoryStore } from "../profiles/testing-history.js";
+import { candidateTestingHistoryRoutes } from "../routes/candidate-testing-history.js";
+import { testingIntegrationRoutes } from "../routes/testing-integration.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
@@ -69,6 +72,8 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   app.addHook("onClose", async () => { clearInterval(interval); });
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
+  await app.register(candidateTestingHistoryRoutes, { ...options, testingHistory: new CandidateTestingHistoryStore(pool) });
+  await app.register(testingIntegrationRoutes, { profiles: options.profiles });
   await app.register(accountRoutes, options);
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
     (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client),
