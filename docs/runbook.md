@@ -164,7 +164,7 @@ PORT=38080 pnpm --filter @comit/api start
 ```
 
 `preference-worker` выполняет автоматические operational fits vacancy-local
-моделей по реакциям ленты (40 уникальных реакций на первый fit, 16 свежих на
+моделей по реакциям ленты (30 уникальных реакций на первый fit, 16 свежих на
 повтор); он требует миграций 009/011 и training-v1 consent каждого участника.
 Без активной модели лента отдаёт baseline-порядок; rollback/reset — через
 employer preference routes. Research-показы гипотез включаются управлением
@@ -321,7 +321,7 @@ Retry сохраняет идемпотентность и не возвраща
 1. `python tests/rerank_pilot.py`:5 профилей/20 сравнений, без расхода grade-бюджета.
 2. `python -m matching_engine.rerank_experiment manifest`, затем `generate`.
    Последняя команда отказывает после проваленного пилота. Лимиты с учётом
-   повторов:60 семейств/600 профилей/3000 pair/600 grade; cache/usage сохраняются.
+   повторов:60 семейств/600 профилей/3000 pair/700 grade (grade поднят 600 → 700 07.10.2026); cache/usage сохраняются.
 3. `python -m matching_engine.rerank_experiment train`: только cached данные.
    Source/семейства фиксированы, нормализация train-only, C выбирается по validation.
    Dataset/code seals запрещают настройку по уже раскрытому golden; максимум2

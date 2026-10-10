@@ -57,11 +57,12 @@ JWT и отзываемая DB-сессия. Нормализованный emai
 ревизии. Нулевая ревизия создаёт профиль. Поля proof, grade result, candidate ID,
 email и серверное время согласия запрещены в mutation.
 
-Кандидат может указать ID ФСП (`fsp_id`): сервер сам проверяет его в
-реестре (integration-engine) и пишет верифицированный блок как evidence;
-подтверждённые достижения ФСП поднимают статус домена `algorithms` в
-`confirmed` и печатаются в PDF блоком «Спортивный профиль». Отсутствие
-истории ФСП — штатный `pending`, ничего не блокируется. [Контур](integration.md).
+`fsp_id`/`fsp_claim_id` — server-managed поля: mutation профиля их отклоняет
+(`server_managed_field`). ФСП ID привязывается только демо-контуром
+`POST /candidate/profile/fsp/demo/authorize` → `/candidate/profile/fsp/demo/callback`;
+импортированные достижения реестра получают `confirmed`, сама привязка — evidence
+`partial` (демо-реестр). Отсутствие истории ФСП ничего не блокирует. Контур и
+коды ошибок — [verification.md](verification.md), [integration.md](integration.md).
 
 Editable narrative claims получают стабильный UUID на сервере. `facts` (домены,
 стеки, длительность, роль, production support) — структурированная декларация,
