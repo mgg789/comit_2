@@ -73,3 +73,14 @@ def test_publication_does_not_accept_empty_ack():
     provider = MatchingClient(token="synthetic", client=client(lambda _: httpx.Response(200, json={})))
     with pytest.raises(ProviderError, match="invalid_matching_ack"):
         provider.publish("00000000-0000-4000-8000-000000000001", {"source_revision": 1})
+
+
+def test_laya_unconfigured_does_not_block_other_worker_jobs(monkeypatch):
+    """An optional empty endpoint disables inference without preventing worker startup."""
+    monkeypatch.setenv("JEV_LOCAL_URL", "")
+    calls = []
+    provider = LayaClient(client=client(lambda request: calls.append(request)))
+    with pytest.raises(ProviderError, match="laya_not_configured") as error:
+        provider.derive({}, {"schema_hash": "a", "coordinates": []})
+    assert error.value.retryable is False
+    assert calls == []

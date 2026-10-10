@@ -65,6 +65,8 @@ if [[ -n "${VERIFICATION_PORT:-}" ]]; then
   check "verification" "http://localhost:${VERIFICATION_PORT}/healthz" '"service":"verification-engine"' || failures=$((failures + 1))
 fi
 check "web root"      "http://localhost:${WEB_PORT}/"                 "работа настигает сама" || failures=$((failures + 1))
+check "welcome logo asset" "http://localhost:${WEB_PORT}/design/comit-mark.svg" "<svg" || failures=$((failures + 1))
+check "welcome showcase asset" "http://localhost:${WEB_PORT}/design/showcase-icon.svg" "<svg" || failures=$((failures + 1))
 check "web candidate" "http://localhost:${WEB_PORT}/candidate/"       "кабинет кандидата" || failures=$((failures + 1))
 check "web employer"  "http://localhost:${WEB_PORT}/employer/"        "кабинет работодателя" || failures=$((failures + 1))
 check_status "testing UI excluded" "http://localhost:${WEB_PORT}/testing/" 404 || failures=$((failures + 1))

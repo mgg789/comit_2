@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import urlparse
 
 ROOT = Path('/home/mgg/comit')
@@ -181,6 +182,21 @@ def main():
         deploy(args.sha, Path(args.repo), args.adopt_legacy)
 
 
+def check_running_release(running, app_services, built_images, sha):
+    """Reject missing, unhealthy or restarting apps, including workers without healthchecks."""
+    actual = {c['Config']['Labels']['com.docker.compose.service']: c for c in running}
+    for name in app_services:
+        container = actual.get(name)
+        if not container or container['State'].get('Status') != 'running' or container.get('RestartCount', 0):
+            raise ValueError(f'Release service is not stable: {name}')
+        if container['State'].get('Health', {}).get('Status', 'healthy') != 'healthy':
+            raise ValueError(f'Release service is not healthy: {name}')
+        if container['Image'] != built_images[name]['id'] or container['Config']['Labels'].get('com.docker.compose.project') != 'comit':
+            raise ValueError('Running release image identity mismatch')
+        if f'COMIT_RELEASE={sha}' not in container['Config'].get('Env', []):
+            raise ValueError('Running release stamp mismatch')
+
+
 def deploy(sha, repo, adopt_legacy=False):
     """Execute a release; database restore and migration downgrade are never automatic."""
     resolved = run(['git', '-C', str(repo), 'rev-parse', f'{sha}^{{commit}}'], capture=True).decode().strip()
@@ -248,12 +264,12 @@ def deploy(sha, repo, adopt_legacy=False):
         run(command + ['up', '-d', '--no-build', '--wait', '--wait-timeout', '240'])
         running_ids = run(command + ['ps', '-q'], capture=True).decode().split()
         running = json.loads(run(['docker', 'inspect', *running_ids], capture=True))
-        actual = {c['Config']['Labels']['com.docker.compose.service']: c for c in running}
-        for name in app_services:
-            if actual[name]['Image'] != built_images[name]['id'] or actual[name]['Config']['Labels'].get('com.docker.compose.project') != 'comit':
-                raise ValueError('Running release image identity mismatch')
-            if f'COMIT_RELEASE={sha}' not in actual[name]['Config'].get('Env', []):
-                raise ValueError('Running release stamp mismatch')
+        check_running_release(running, app_services, built_images, sha)
+        # Compose --wait cannot detect a worker crash after its process initially starts.
+        time.sleep(20)
+        running_ids = run(command + ['ps', '-q'], capture=True).decode().split()
+        running = json.loads(run(['docker', 'inspect', *running_ids], capture=True))
+        check_running_release(running, app_services, built_images, sha)
         smoke_env = os.environ.copy()
         for key, value in config['services']['api']['environment'].items():
             if key == 'PUBLIC_SITE_URL':
