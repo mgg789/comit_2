@@ -1,3 +1,4 @@
+import { withChatOrigin } from "@comit/ui-kit/chat-navigation";
 import { ApiError, createApiClient } from "@comit/api-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -117,7 +118,7 @@ export function salary(from?: number | null, to?: number | null): string {
 /** Read SPA state from a hash so deep links work under the existing nginx base. */
 export function useRoute() {
   const read = () =>
-    decodeURIComponent(window.location.hash.slice(1) || "/vacancies");
+    window.location.hash.slice(1) || "/vacancies";
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const update = () => setRoute(read());
@@ -125,7 +126,7 @@ export function useRoute() {
     return () => window.removeEventListener("hashchange", update);
   }, []);
   const navigate = useCallback((path: string) => {
-    window.location.hash = path;
+    window.location.hash = withChatOrigin(path, window.location.hash.slice(1), "/vacancies");
   }, []);
   return { route, navigate };
 }

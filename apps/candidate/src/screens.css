@@ -57,7 +57,6 @@
 .candidate-offer-progress { display: grid; align-content: start; gap: 30rem; }
 .candidate-offer-progress article { display: grid; gap: 14rem; padding-top: 24rem; border-top: 1px solid var(--employer-line); }
 .candidate-decline { display: grid; gap: 20rem; }
-.candidate-process-chat { grid-column: 1 / -1; display: grid; gap: 24rem; }
 .candidate-statistics { display: grid; grid-template-columns: minmax(0, 655fr) minmax(0, 1073fr); gap: 32rem; align-items: stretch; }
 .candidate-statistics > section { min-width: 0; }
 .candidate-stat-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32rem; border-radius: 16rem; align-content: start; }

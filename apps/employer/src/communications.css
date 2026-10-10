@@ -1,72 +1,4 @@
 @import "@comit/ui-kit/conversation.css";
-.recruitment-screen {
-  position: relative;
-  min-height: 820rem;
-}
-.chat-back {
-  position: absolute;
-  left: 0;
-  top: 0;
-  display: flex;
-  align-items: center;
-  gap: 20rem;
-}
-.chat-back h1 {
-  font-size: 42rem;
-  font-weight: 700;
-  letter-spacing: -1rem;
-}
-.chat-back .circle {
-  width: 66rem;
-  height: 66rem;
-}
-.recruitment-thread {
-  width: 964rem;
-  margin: 0 auto;
-  position: relative;
-}
-.participant-header {
-  height: 66rem;
-  border-radius: 40rem;
-  background: var(--employer-paint-fff);
-  color: var(--employer-paint-282b34);
-  display: flex;
-  align-items: center;
-  padding: 6rem 12rem;
-  gap: 14rem;
-}
-.anonymous-avatar {
-  width: 54rem;
-  height: 54rem;
-  border-radius: 50%;
-  background: var(--employer-paint-dedee3);
-  display: grid;
-  place-items: center;
-  border: 0;
-  color: var(--employer-paint-282b34);
-}
-.anonymous-avatar .icon {
-  width: 30rem;
-  height: 30rem;
-  color: var(--comit-bg);
-}
-.participant-name {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  background: none;
-  border: 0;
-  color: inherit;
-  gap: 3rem;
-}
-.participant-name strong {
-  font-size: 22rem;
-  font-weight: 700;
-}
-.participant-name small {
-  font-size: 18rem;
-}
 .process-menu {
   margin-left: auto;
   position: relative;
@@ -298,47 +230,6 @@
 .recruitment-empty > .state {
   margin-top: 8rem;
 }
-.organization-composer .communication-composer {
-  background: var(--employer-composer-glass);
-  height: auto;
-  min-height: 80rem;
-  border-radius: 40rem;
-  align-items: center;
-}
-.organization-composer .communication-composer.multiline {
-  align-items: flex-end;
-}
-.organization-composer textarea {
-  align-self: center;
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  max-height: 192rem;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  outline: none;
-  box-shadow: none;
-  resize: none;
-  background: transparent;
-  color: var(--employer-paint-fff);
-  font: inherit;
-  font-size: 20rem;
-  line-height: 24rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--employer-paint-333) transparent;
-}
-.organization-composer textarea::placeholder {
-  color: var(--employer-paint-f5f4fb);
-}
-.organization-composer .send-button:hover:not(:disabled) {
-  transform: none;
-  box-shadow: none;
-}
-.organization-composer .send-button {
-  transition: scale var(--employer-hover-duration) var(--employer-hover-ease), opacity var(--employer-hover-duration) var(--employer-hover-ease);
-}
 .organization-history .agent-turn-state {
   margin-left: 42rem;
   font-size: 16rem;
@@ -389,10 +280,6 @@
 }
 .agent-close:hover:not(:disabled) {
   filter: none;
-}
-.organization-composer .attach-button .icon {
-  width: 28rem;
-  height: 28rem;
 }
 .agent-tools {
   position: absolute;
@@ -661,20 +548,10 @@
     bottom: 20rem;
   }
   .communication-composer {
-    height: 58rem;
-    gap: 10rem;
-    padding: 6rem;
-  }
-  .organization-composer .communication-composer {
-  background: var(--employer-composer-glass);
     height: auto;
     min-height: 58rem;
-    border-radius: 29rem;
-  }
-  .organization-composer textarea {
-    font-size: 14rem;
-    line-height: 20rem;
-    max-height: 160rem;
+    gap: 10rem;
+    padding: 6rem;
   }
   .attach-button,
   .communication-composer .send-button {
@@ -852,14 +729,6 @@
   flex: 1;
   width: calc(100% - 80rem);
   padding-right: 0;
-}
-@media (max-width: 760px) {
-  .communication-composer-wrap:not(.organization-composer) {
-    bottom: 100rem;
-  }
-  .recruitment-messages {
-    height: calc(100dvh - 470rem);
-  }
 }
 @media (max-width: 760px) {
   .agent-tools > button > .icon {

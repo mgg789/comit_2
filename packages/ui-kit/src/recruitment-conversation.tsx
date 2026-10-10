@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLayoutEffect, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ChatFile, ChatMessage, ChatPage, DownloadChatFile, RecruitmentView, SendChatMessage, UploadChatFile } from "@comit/shared";
 import { Action, Icon, State } from "./design";
 import "./conversation.css";
+import { ChatComposer } from "./chat-composer";
+const qgrammMark = new URL("./qgramm-mark.svg", import.meta.url).href;
 
 /** Callbacks bind the caller's authenticated role; this component never selects authority. */
 export interface ConversationTransport {
@@ -59,6 +61,20 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
   const transportRef = useRef(transport); transportRef.current = transport;
   useEffect(() => { setMessages([]); setText(""); setFiles([]); retry.current = null; setError(null); setSending(false); setUploading(false); setHistoryLoading(process.chat_available); }, [id]);
   const input = useRef<HTMLInputElement>(null);
+  const history = useRef<HTMLDivElement>(null);
+  const composer = useRef<HTMLDivElement>(null);
+  const [historyHeight, setHistoryHeight] = useState<number | undefined>();
+  useLayoutEffect(() => {
+    const wrap = composer.current, list = history.current;
+    if (!wrap || !list) return;
+    const fit = () => {
+      const unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 1;
+      setHistoryHeight(Math.max(120 * unit, Math.floor(wrap.getBoundingClientRect().top - list.getBoundingClientRect().top - 16 * unit)));
+    };
+    const observer = new ResizeObserver(fit); observer.observe(wrap); fit();
+    window.addEventListener("resize", fit);
+    return () => { observer.disconnect(); window.removeEventListener("resize", fit); };
+  }, [id]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!process.chat_available) {
@@ -154,7 +170,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
     }
   }
   return <div className="recruitment-conversation">{header}
-      <div className="recruitment-messages" aria-live="polite">
+      <div ref={history} className="recruitment-messages" style={{ height: historyHeight }} aria-live="polite">
         {historyLoading && <State loading />}
         {!process.chat_available && (
           <State empty="Чат недоступен для этого приглашения" />
@@ -163,7 +179,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
           <p className="conversation-empty">{emptyText}</p>
         )}
         <AnimatePresence initial={false}>
-          {messages.map((message) => (
+          {process.chat_available && messages.map((message) => (
             <motion.article
               key={message.id}
               className={`message-bubble ${message.sender_id === accountId ? "outgoing" : "incoming"}`}
@@ -202,7 +218,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
         </AnimatePresence>
         <div ref={end} />
       </div>
-      <div className="communication-composer-wrap">
+      <div ref={composer} className="communication-composer-wrap">
         {error && (
           <p className="communication-error" role="alert">
             {error}
@@ -228,51 +244,35 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
           </div>
         )}
         {process.chat_available && !process.chat_writable && <p className="empty-note" role="status">Чат доступен только для чтения. Отправка сообщений и файлов сейчас недоступна.</p>}
-        <form className="communication-composer glass" onSubmit={send}>
-          <input
-            ref={input}
-            type="file"
-            hidden
-            onChange={(event) => void upload(event.target.files?.[0])}
-          />
-          <button
-            className="attach-button"
-            type="button"
-            aria-label="Прикрепить файл до 8 МБ"
-            disabled={!process.chat_writable || uploading || sending || !!retry.current}
-            onClick={() => input.current?.click()}
-          >
-            {uploading ? <span className="spinner" /> : <Icon name="plus" />}
-          </button>
-          <input
-            aria-label={messageLabel}
-            placeholder={process.chat_writable ? "Отправьте сообщение" : "Чат доступен только для чтения"}
-            value={text}
-            maxLength={16000}
-            disabled={!process.chat_writable || sending || !!retry.current}
-            onChange={(event) => {
-              setText(event.target.value);
-              retry.current = null;
-            }}
-          />
-          <Action
-            className="circle send-button"
-            type="submit"
-            disabled={
-              !process.chat_writable ||
-              sending ||
-              uploading ||
-              (!text.trim() && !files.length)
-            }
-            aria-label="Отправить сообщение"
-          >
-            {sending ? <span className="spinner" /> : <Icon name="arrow" />}
-          </Action>
-        </form>
+        <ChatComposer text={text} onTextChange={value => { setText(value); retry.current = null; }} onSubmit={send}
+          messageLabel={messageLabel} maxLength={16000} disabled={!process.chat_writable || sending || !!retry.current}
+          placeholder={process.chat_writable ? "Отправьте сообщение" : "Чат доступен только для чтения"}
+          canSubmit={process.chat_writable && !sending && !uploading && (!!text.trim() || !!files.length)}
+          attachLabel="Прикрепить файл до 8 МБ" attachDisabled={!process.chat_writable || uploading || sending || !!retry.current}
+          onAttach={() => input.current?.click()} uploading={uploading} sending={sending}>
+          <input ref={input} type="file" hidden onChange={event => void upload(event.target.files?.[0])} />
+        </ChatComposer>
         <p className="communication-attribution">
-          <Icon name="logo" />
-          Защищено с <span>QGramm</span>
+          <img className="qgramm-mark" src={qgrammMark} alt="" />
+          Защищено с <a href="https://github.com/mgg789/QGramm" target="_blank" rel="noopener noreferrer">QGramm</a>
         </p>
       </div>
+  </div>;
+}
+
+/** The same list tiles for both roles; listing chats never mounts a conversation or fetches its messages. */
+export function RecruitmentChatList({ items, loading, error, emptyText, retry, onOpen, hasMore, loadMore, loadingMore }: {
+  items: readonly { id: string; title: string; subtitle: string; state: string }[];
+  loading: boolean; error: string | null; emptyText: string; retry: () => void;
+  onOpen: (id: string) => void; hasMore?: boolean; loadMore?: () => void; loadingMore?: boolean;
+}) {
+  return <div className="recruitment-chat-list">
+    {(loading || error || !items.length) && <State loading={loading} error={error} empty={!items.length ? emptyText : undefined} retry={retry} />}
+    {items.map(item => <button key={item.id} className="recruitment-chat-tile panel" onClick={() => onOpen(item.id)}>
+      <span className="anonymous-avatar"><Icon name="candidates" /></span>
+      <span className="chat-tile-label"><strong>{item.title}</strong><small>{item.subtitle}</small></span>
+      <span className="chat-tile-state">{item.state}</span><Icon name="arrow" />
+    </button>)}
+    {hasMore && loadMore && <Action disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Загружаем…" : "Другие разговоры"}</Action>}
   </div>;
 }

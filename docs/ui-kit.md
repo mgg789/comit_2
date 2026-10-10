@@ -53,3 +53,5 @@
 - `PLAYWRIGHT_MODULE=/absolute/path/playwright/index.mjs node tests/conversation-browser.mjs` — история, файлы, повтор отправки, запрет записи и мобильный экран.
 
 Общий `AppShellHeader` принимает `toolsContent` и `overlayContent`: приложения вставляют дополнительные действия и выпадающие панели, сохраняя единые разметку и анимации хедера. Уведомления работодателя используют эти слоты, а состояние и запросы остаются в приложении работодателя. Анимация появления общих модальных окон находится в `design.css` и действует в обоих кабинетах.
+
+Панель `ChatComposer` из `@comit/ui-kit/chat-composer` извлечена из AI-чата и используется без копии разметки и стилей в переписке работодателя и соискателя: авторазмер textarea, Enter/Shift+Enter и IME, плюс, send, multiline, стекло и hover. Приложения сохраняют свои пределы вложений, транспорт, consent/allowed-actions и retry ключи. `RecruitmentChatList` отображает только метаданные плашек. `withChatOrigin` / `chatReturnRoute` сохраняют внутренний путь с фильтрами в `from` и исключают внешние/рекурсивные возвраты. SVG QGramm — точный экспорт Figma 544:1754; подпись ведёт на https://github.com/mgg789/QGramm.

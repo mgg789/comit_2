@@ -83,6 +83,7 @@ const recruitment = {
   offers: [],
   allowed_actions: ["withdraw"],
   chat_available: true,
+  chat_writable: true,
   created_at: now,
   updated_at: now,
 };
@@ -221,9 +222,11 @@ const feedDecisions = [];
 const chatSends = [];
 const agentSends = [];
 const runtimeErrors = [];
-let authenticated = false;
+const chatOnly = process.env.EMPLOYER_CHAT_ONLY === "1";
+let authenticated = chatOnly;
 let codeUnavailable = true;
 let chatFailOnce = true;
+let chatReads = 0;
 let contactsReads = 0;
 let organizationReads = 0;
 let processState = structuredClone(recruitment);
@@ -342,6 +345,7 @@ await context.route("**/api/**", async (route) => {
     });
   }
   if (path.endsWith("/chat/messages") && method === "GET") {
+    chatReads++;
     const cursor = Number(url.searchParams.get("after_sequence") || 0);
     return reply({
       messages: durableMessages.filter((item) => item.sequence > cursor),
@@ -590,6 +594,7 @@ async function capture(name, width = 1920) {
 
 try {
   await page.goto(base);
+  if (!chatOnly) {
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   await page
     .getByRole("textbox", { name: "Email", exact: true })
@@ -665,9 +670,9 @@ try {
   codeUnavailable = false;
   await page.getByRole("button", { name: "Получить код", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "Код из письма", exact: true })
+    .getByRole("textbox", { name: "Код подтверждения из письма, 6 цифр", exact: true })
     .fill("123456");
-  await page.getByRole("button", { name: "Войти", exact: true }).click();
+  await page.getByRole("button", { name: "Продолжить", exact: true }).click();
   await page
     .getByRole("navigation", { name: "Навигация работодателя" })
     .waitFor();
@@ -735,9 +740,28 @@ try {
     .waitFor();
   for (const width of [1920, 1024, 390])
     await capture("vacancy-resumes", width);
-  await page.evaluate((id) => {
-    location.hash = `/chat/${id}`;
-  }, ids.process);
+  }
+  await page.getByRole("button", { name: "Переписка и приглашения", exact: true }).click();
+  await page.getByRole("heading", { name: "Чаты", exact: true }).waitFor();
+  assert.equal(await page.locator(".recruitment-conversation").count(), 0);
+  assert.equal(chatReads, 0, "chat directory must not fetch private history");
+  await page.locator(".recruitment-chat-tile").first().click();
+  await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
+  assert.equal(await page.locator(".chat-picker").count(), 0);
+  assert.ok(page.url().includes("from=%2Fchat"));
+  await page.reload();
+  await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();
+  await page.getByRole("heading", { name: "Чаты", exact: true }).waitFor();
+  await page.evaluate(id => { location.hash = `/vacancy/${id}?filter=liked&search=react`; }, ids.draft);
+  await page.getByRole("button", { name: "Открыть чат", exact: true }).first().waitFor();
+  await page.getByRole("button", { name: "Открыть чат", exact: true }).first().click();
+  await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
+  await page.reload();
+  await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
+  await page.getByRole("button", { name: "Вернуться", exact: true }).click();
+  assert.ok(page.url().endsWith(`/vacancy/${ids.draft}?filter=liked&search=react`));
+  await page.getByRole("button", { name: "Открыть чат", exact: true }).first().click();
   await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
   assert.equal(
     contactsReads,
@@ -770,7 +794,14 @@ try {
     chatSends[0].idempotency_key,
     /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i,
   );
-  for (const width of [1920, 1024, 390]) await capture("chat", width);
+  for (const width of [1920, 1024, 390]) {
+    await capture("chat", width);
+    assert.equal(await page.evaluate(() => {
+      const send = document.querySelector(".recruitment-thread .send-button")?.getBoundingClientRect();
+      const launcher = document.querySelector(".agent-launcher")?.getBoundingClientRect();
+      return !!send && !!launcher && send.left < launcher.right && send.right > launcher.left && send.top < launcher.bottom && send.bottom > launcher.top;
+    }), false, "floating AI launcher must not cover the chat send button");
+  }
   processState = {
     ...processState,
     state: "accepted",
@@ -784,6 +815,7 @@ try {
     contactsReads > 0,
     "accepted process should resolve authorized contact details",
   );
+  if (!chatOnly) {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page
     .getByRole("button", { name: "Открыть AI-агента", exact: true })
@@ -835,13 +867,14 @@ try {
   await page.getByRole("button", { name: "Выйти", exact: true }).click();
   await page.getByRole("textbox", { name: "Email", exact: true }).waitFor();
   assert.equal(authenticated, false);
+  }
   assert.deepEqual(runtimeErrors, [], "unhandled browser exceptions");
   console.log(
     JSON.stringify(
       {
         result: "passed",
         screenshots: output,
-        checks: [
+        checks: chatOnly ? ["separate tiles without history", "chat return to list and vacancy with filters after reload", "no conversation picker", "identical UUID retry", "contacts acceptance gate", "source artwork decodes", "1920/1024/390 no overflow"] : [
           "OTP explicit consent and provider503",
           "keyboard navigation",
           "vacancy creation modal",

@@ -32,7 +32,7 @@ await context.route("**/api/**", async route => {
 });
 const page = await context.newPage(), errors = []; page.on("pageerror", reason => errors.push(reason.message));
 try {
-  await page.goto(base + `#/offer/${id}`);
+  await page.goto(base + `#/chat/${id}?from=%2Foffers`);
   await page.getByText("Входящее сообщение", { exact: true }).waitFor();
   assert.equal(await page.locator(".recruitment-conversation .message-bubble.incoming").count(), 101);
   const download = page.waitForEvent("download"); await page.locator(".message-file").click(); await download;
@@ -45,18 +45,19 @@ try {
   assert.equal(await page.getByLabel("Сообщение работодателю", { exact: true }).isDisabled(), true);
   assert.equal(await page.getByRole("button", { name: "Прикрепить файл до 8 МБ" }).isDisabled(), true);
   await page.getByRole("button", { name: "Отправить сообщение", exact: true }).click();
-  await page.getByText("Ответ с файлом", { exact: true }).waitFor();
+  await page.locator(".message-bubble.outgoing").getByText("Ответ с файлом", { exact: true }).waitFor();
   assert.deepEqual(sends[0], sends[1], "unknown result must retain exact payload and retry key");
   assert.equal(await page.locator(".message-bubble.outgoing").count(), 1);
   writable = false;
-  await page.getByRole("button", { name: "Обновить", exact: true }).click();
+  await page.waitForTimeout(3200);
   await page.getByText(/Чат доступен только для чтения\. Отправка/).waitFor();
   assert.equal(await page.getByRole("button", { name: "Отправить сообщение", exact: true }).isDisabled(), true);
   const before = sends.length;
   assert.equal(await page.getByRole("button", { name: "Прикрепить файл до 8 МБ" }).isDisabled(), true);
   assert.equal(sends.length, before);
   for (const width of [1024, 390]) { await page.setViewportSize({ width, height: 1080 }); await page.waitForTimeout(320); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 2)); }
-  available = false; await page.getByRole("button", { name: "Обновить", exact: true }).click(); await page.locator(".recruitment-conversation").waitFor({ state: "detached" });
+  available = false; await page.waitForTimeout(3200); await page.getByText("Чат недоступен для этого приглашения", { exact: true }).waitFor();
+  assert.equal(await page.locator(".message-bubble").count(), 0, "unavailable conversation hides private history");
   const settledReads = reads; await page.waitForTimeout(2800); assert.equal(reads, settledReads, "unavailable conversation stops history reads");
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ result: "passed", checks: ["shared bubbles and composer", "cursor history beyond 100 messages", "candidate-only authority", "attachments upload/download", "immutable send retry", "read-only and unavailable gates", "1024/390 no overflow"] }));

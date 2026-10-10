@@ -1,6 +1,7 @@
 import { ApiError } from "@comit/api-client";
 import { Dialog } from "@comit/ui-kit/app-shell";
-import { RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
+import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
+import { RecruitmentConversation, RecruitmentChatList, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { GRADES, SPECIALIZATIONS, type CandidateDeclaredNarrative, type CandidateDeclaredSkill, type CandidateProfileFields, type CandidateProfileMutation, type CandidateProfileView, type RecruitmentAction, type RecruitmentState, type RecruitmentView } from "@comit/shared";
 import { Action, Checkbox, Field, Icon, PageTitle, Reveal, Select, State, Tags } from "@comit/ui-kit/design";
@@ -162,7 +163,7 @@ export function OfferScreen({ id, navigate }: { id: string; navigate: Navigate }
   if (!item || !terms) return <State empty="Предложение не найдено" />;
   return <Reveal><PageTitle title={`${terms.company_name} · ${terms.vacancy_title || "Предложение о работе"}`} back={() => navigate("/offers")} /><div className="candidate-offer-detail"><section className="panel candidate-offer-terms"><span className="candidate-offer-status">{states[item.state]}</span><h2>{terms.company_name}</h2><div className="candidate-offer-salary">{salary(terms.salary.from_rub, terms.salary.to_rub)}</div><Tags className="candidate-chips" variant="blue" values={[terms.city, workTypes[terms.work_type as keyof typeof workTypes] ?? terms.work_type, terms.daily]} /><p>{terms.description}</p><small>Приглашение от {date(item.invited_at || item.created_at)}</small><div className="candidate-offer-actions">{item.allowed_actions.includes("accept") && <Action variant="primary" disabled={busy} onClick={() => void act("accept")}>Принять приглашение</Action>}{item.allowed_actions.includes("decline") && <Action disabled={busy} onClick={() => setDeclining(true)}>Отклонить приглашение</Action>}<Action disabled={busy} onClick={resource.refresh}>Обновить</Action></div>{declining && <form className="candidate-decline" onSubmit={event => { event.preventDefault(); void act("decline", { reason: reason.trim() }); }}><Field label="Причина отказа"><textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field><div className="candidate-offer-actions"><Action type="button" disabled={busy} onClick={() => setDeclining(false)}>Отмена</Action><Action type="submit" disabled={busy}>Подтвердить отказ</Action></div></form>}{error && <p role="alert" className="form-error">{error}</p>}</section>
     {(item.interviews.length > 0 || item.offers.length > 0) && <section className="panel candidate-offer-progress"><h2>Собеседования и офферы</h2>{item.interviews.map(interview => <article key={interview.id}><h3>{interview.kind === "technical" ? "Техническое собеседование" : "Собеседование"}</h3><p>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "long", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} · {interview.time_zone}</p><p>{interview.location}</p>{interview.state === "proposed" && item.allowed_actions.includes("interview_accept") && <Action disabled={busy} onClick={() => void act("interview_accept", { interview_id: interview.id })}>Подтвердить время</Action>}{interview.state === "proposed" && item.allowed_actions.includes("interview_decline") && <Action disabled={busy} onClick={() => { setDecliningInterview(interview.id); setReason(""); }}>Отклонить время собеседования</Action>}{decliningInterview === interview.id && <form className="candidate-decline" onSubmit={event => { event.preventDefault(); void act("interview_decline", { interview_id: interview.id, reason: reason.trim() }); }}><Field label="Почему время не подходит?"><textarea required maxLength={2000} value={reason} onChange={event => setReason(event.target.value)} disabled={busy} /></Field><div className="candidate-offer-actions"><Action type="button" disabled={busy} onClick={() => setDecliningInterview(null)}>Отмена</Action><Action type="submit" disabled={busy}>Отправить ответ</Action></div></form>}</article>)}{item.offers.map(offer => <article key={offer.id}><h3>Предложение о работе</h3><p>{new Intl.NumberFormat("ru-RU").format(offer.salary_rub)} ₽</p><p>{offer.description}</p><small>Действует до {date(offer.expires_at)}</small>{offer.state === "sent" && item.allowed_actions.includes("offer_accept") && <Action variant="primary" disabled={busy} onClick={() => void act("offer_accept", { offer_id: offer.id })}>Принять оффер</Action>}{offer.state === "sent" && item.allowed_actions.includes("offer_decline") && <Action disabled={busy} onClick={() => void act("offer_decline", { offer_id: offer.id })}>Отклонить оффер</Action>}</article>)}</section>}
-    {item.chat_available ? <ProcessChat item={item} /> : <section className="panel"><h2>Чат с работодателем</h2><p>Переписка по этому приглашению пока недоступна.</p></section>}</div></Reveal>;
+    {item.chat_available ? <Action onClick={() => navigate(`/chat/${item.id}`)}>Перейти в чат</Action> : <p className="muted">Переписка по этому приглашению пока недоступна.</p>}</div></Reveal>;
 }
 
 const candidateConversationTransport: ConversationTransport = {
@@ -172,9 +173,34 @@ const candidateConversationTransport: ConversationTransport = {
   downloadFile: (id, fileId) => api.downloadChatFile("candidate", id, fileId),
 };
 
-/** Candidate-scoped wrapper of the exact employer conversation component. */
-function ProcessChat({ item }: { item: RecruitmentView }) {
-  return <section className="candidate-process-chat"><h2>Чат с работодателем</h2><RecruitmentConversation key={item.id} process={item} accountId={item.candidate_id} transport={candidateConversationTransport} errorText={errorText} emptyText="Напишите работодателю, чтобы начать разговор." messageLabel="Сообщение работодателю" /></section>;
+/** The chat directory reads invitation metadata only; private messages load after choosing a thread. */
+export function ChatsScreen({ navigate }: { navigate: Navigate }) {
+  const resource = useResource(readInvitations);
+  const items = (resource.data || []).flatMap(item => item.chat_available && item.terms ? [{ id: item.id, title: item.terms.company_name, subtitle: item.terms.vacancy_title || "Предложение о работе", state: states[item.state] }] : []);
+  return <Reveal><PageTitle title="Чаты" /><RecruitmentChatList items={items} loading={resource.loading} error={resource.error} retry={resource.refresh} emptyText="Здесь появятся чаты с работодателями" onOpen={id => navigate(`/chat/${id}`)} /></Reveal>;
+}
+
+/** A standalone authorized conversation keeps the caller in its URL and refreshes server permissions. */
+export function ChatScreen({ id, route, navigate }: { id: string; route: string; navigate: Navigate }) {
+  const resource = useResource(() => api.getRecruitment("candidate", id), [id]);
+  const [pollError, setPollError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    setPollError(null);
+    const poll = async () => {
+      try {
+        const process = await api.getRecruitment("candidate", id);
+        if (active) { resource.setData(process); setPollError(null); }
+      } catch (reason) {
+        if (active) { setPollError(errorText(reason)); resource.setData(current => current ? { ...current, chat_writable: false } : current); }
+      } finally { if (active) timer = setTimeout(poll, 3000); }
+    };
+    timer = setTimeout(poll, 3000);
+    return () => { active = false; clearTimeout(timer); };
+  }, [id]);
+  const item = resource.data;
+  return <section className="recruitment-screen"><div className="chat-back"><Action className="circle" aria-label="Вернуться" onClick={() => navigate(chatReturnRoute(route, "/chat"))}><Icon name="back" /></Action><h1>Чат</h1></div>{resource.loading || resource.error ? <div className="recruitment-thread"><State loading={resource.loading} error={resource.error} retry={resource.refresh} /></div> : item ? <div className="recruitment-thread"><header className="participant-header"><span className="anonymous-avatar" aria-hidden="true"><Icon name="candidates" /></span><div className="participant-name"><strong>{item.terms?.company_name || "Работодатель"}</strong><small>{states[item.state]}</small></div></header>{pollError && <p className="form-error" role="alert">{pollError}</p>}<RecruitmentConversation key={item.id} process={item} accountId={item.candidate_id} transport={candidateConversationTransport} errorText={errorText} emptyText="Напишите работодателю, чтобы начать разговор." messageLabel="Сообщение работодателю" /></div> : <div className="recruitment-thread"><State empty="Чат не найден" /></div>}</section>;
 }
 
 /** Owner dashboard with shared grid rows; only declared per-skill levels are charted. */

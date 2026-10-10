@@ -1,4 +1,5 @@
 import { ApiError, createApiClient } from "@comit/api-client";
+import { withChatOrigin } from "@comit/ui-kit/chat-navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CandidateProfileView, RecruitmentView } from "@comit/shared";
 /** Candidate APIs use the same-origin gateway and role-specific HttpOnly session. */
@@ -61,7 +62,7 @@ export function useRoute() {
   const read = () => window.location.hash.slice(1) || "/resume";
   const [route, setRoute] = useState(read);
   useEffect(() => { const update = () => setRoute(read()); window.addEventListener("hashchange", update); return () => window.removeEventListener("hashchange", update); }, []);
-  const navigate = useCallback((path: string) => { window.location.hash = path; }, []);
+  const navigate = useCallback((path: string) => { window.location.hash = withChatOrigin(path, window.location.hash.slice(1) || "/resume", "/resume"); }, []);
   return { route, navigate };
 }
 /** Whole RUB salary comes from the immutable invitation or the private profile. */

@@ -6,7 +6,7 @@ import type { AccountView } from "@comit/shared";
 import { Action, Backdrop, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
-import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen } from "./screens";
+import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen } from "./screens";
 const navigation = [
   { path: "/resume", label: "Резюме", icon: "resumes" },
   { path: "/offers", label: "Предложения", icon: "vacancies" },
@@ -16,7 +16,8 @@ const navigation = [
 const legal = import.meta.glob("../../../docs/legal/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 /** Cookie-authenticated candidate shell shares the employer design and motion primitives. */
 export default function App() {
-  const { route, navigate } = useRoute();
+  const { route: fullRoute, navigate } = useRoute();
+  const route = fullRoute.split("?")[0] || "/resume";
   const [account, setAccount] = useState<AccountView | null>(null);
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -93,11 +94,11 @@ export default function App() {
     <AppShellHeader brandHref="#/resume" brandLabel="Comit — резюме" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
-      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); setSearch(true); }} secondaryLabel="Предложения работы" secondaryIcon="bell" onSecondary={() => navigate("/offers")}
-      menuContent={<><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
+      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); setSearch(true); }} secondaryLabel="Чаты" secondaryIcon="message" onSecondary={() => navigate("/chat")}
+      menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
     />
     <main className="main-content candidate-content" key={account.id}>
-     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
+     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate}/> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
               <PageTitle title="Настройки"/>
               <section className="panel candidate-settings">
               <h2>Аккаунт</h2>
@@ -133,7 +134,7 @@ export default function App() {
 function CandidateArt({ route }: {
   route: string;
 }) {
-  const group = route === "/statistics" ? "statistics" : route.startsWith("/offer") ? "offers" : "resume";
+  const group = route === "/statistics" ? "statistics" : route.startsWith("/offer") || route.startsWith("/chat") ? "offers" : "resume";
   const asset = (name: string) => `${import.meta.env.BASE_URL}design/${name}`;
   return <div className={`candidate-art candidate-art-${group}`} aria-hidden="true">{group === "resume" ? <>
     <img className="candidate-art-one" src={asset("f4e60.png")} alt=""/>

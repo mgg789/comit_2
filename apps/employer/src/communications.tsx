@@ -1,4 +1,4 @@
-import { RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
+import { RecruitmentChatList, RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import {
   useEffect,
   useLayoutEffect,
@@ -23,6 +23,7 @@ import { AgentReply, CopyMessage, agentHistoryProgress, groupAgentMessages } fro
 import { api, asset, documentErrorText, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
+import { ChatComposer } from "@comit/ui-kit/chat-composer";
 import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
 
@@ -83,96 +84,37 @@ function saveFile(name: string, base64: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Invitation conversations remain participant scoped; names/contacts unlock only after acceptance. */
-export function RecruitmentChat({
-  account,
-  initialProcessId,
-  onProfile,
-  onBack,
-}: {
-  account: AccountView;
-  initialProcessId?: string;
-  onProfile: (candidateId: string) => void;
-  onBack: () => void;
+/** Participant-scoped chats list and standalone conversation use distinct routes. */
+export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, onOpen, backLabel }: {
+  account: AccountView; initialProcessId?: string; onProfile: (candidateId: string) => void;
+  onBack: () => void; onOpen: (id: string) => void; backLabel: string;
 }) {
+  if (initialProcessId) return <section className="recruitment-screen">
+    <div className="chat-back"><Action className="circle" onClick={onBack} aria-label="Вернуться"><Icon name="back" /></Action><h1>{backLabel}</h1></div>
+    <RecruitmentThread key={initialProcessId} id={initialProcessId} account={account} onProfile={onProfile} />
+  </section>;
+  return <RecruitmentChats onOpen={onOpen} />;
+}
+
+/** Fetch only list snapshots here; selecting a tile opens a separate message route. */
+function RecruitmentChats({ onOpen }: { onOpen: (id: string) => void }) {
   const list = useResource(() => api.getRecruitmentList("employer", 100));
-  const [selected, setSelected] = useState(initialProcessId || "");
-  const [listError, setListError] = useState<string | null>(null);
-  useEffect(() => {
-    if (initialProcessId) setSelected(initialProcessId);
-  }, [initialProcessId]);
-  const id = selected || list.data?.items[0]?.id;
-  if (!id)
-    return (
-      <section className="recruitment-empty">
-        <PageTitle title="Чаты" back={onBack} />
-        <State
-          loading={list.loading}
-          error={list.error}
-          empty="Чаты появятся после отправки приглашений кандидатам"
-          retry={list.refresh}
-        />
-      </section>
-    );
-  return (
-    <section className="recruitment-screen">
-      <div className="chat-back">
-        <Action className="circle" onClick={onBack} aria-label="К вакансиям">
-          <Icon name="back" />
-        </Action>
-        <h1>Чаты</h1>
-      </div>
-      {list.data && list.data.items.length > 1 && (
-        <select
-          className="chat-picker glass"
-          aria-label="Выберите разговор"
-          value={id}
-          onChange={(event) => setSelected(event.target.value)}
-        >
-          {list.data.items.map((item, index) => (
-            <option value={item.id} key={item.id}>
-              {item.terms?.vacancy_title || "Вакансия"} · Кандидат {index + 1}
-            </option>
-          ))}
-        </select>
-      )}
-      {list.data?.has_more && (
-        <Action
-          className="chat-more"
-          onClick={async () => {
-            try {
-              const page = await api.getRecruitmentList(
-                "employer",
-                100,
-                list.data?.next_cursor || undefined,
-                list.data?.items.length || 0,
-              );
-              list.setData((current) =>
-                current
-                  ? { ...page, items: [...current.items, ...page.items] }
-                  : page,
-              );
-            } catch (error) {
-              setListError(errorText(error));
-            }
-          }}
-        >
-          Другие разговоры
-        </Action>
-      )}
-      {listError && (
-        <p className="communication-error" role="alert">
-          {listError}
-        </p>
-      )}
-      <RecruitmentThread
-        key={id}
-        id={id}
-        account={account}
-        onProfile={onProfile}
-      />
-    </section>
-  );
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  async function loadMore() {
+    if (loadingMore || !list.data?.has_more) return;
+    setLoadingMore(true); setMoreError(null);
+    try {
+      const page = await api.getRecruitmentList("employer", 100, list.data.next_cursor || undefined, list.data.items.length);
+      list.setData(current => current ? { ...page, items: [...current.items, ...page.items.filter(item => !current.items.some(prior => prior.id === item.id))] } : page);
+    } catch (reason) { setMoreError(errorText(reason)); } finally { setLoadingMore(false); }
+  }
+  return <section><PageTitle title="Чаты" />
+    <RecruitmentChatList items={(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state] }))}
+      loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
+      hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
+    {moreError && <p className="communication-error" role="alert">{moreError}</p>}
+  </section>;
 }
 
 /** Cursor polling survives server stream expiry; failed sends reuse the complete UUID-bound payload. */
@@ -483,10 +425,8 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
   const [uploadedDocuments, setUploadedDocuments] = useState<
     AgentsDocumentView[]
   >([]);
-  const [composerMultiline, setComposerMultiline] = useState(false);
   const documentInput = useRef<HTMLInputElement>(null);
   const documentUploadInFlight = useRef(false);
-  const composerField = useRef<HTMLTextAreaElement>(null);
   const composerWrap = useRef<HTMLDivElement>(null);
   const [historyBottom, setHistoryBottom] = useState<number>();
   const pending = useRef<{
@@ -527,21 +467,6 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
     const timer = setTimeout(() => setShowLoading(true), 450);
     return () => clearTimeout(timer);
   }, [loading]);
-  useLayoutEffect(() => {
-    const field = composerField.current;
-    if (!field) return;
-    const fit = () => {
-      field.style.height = "0px";
-      const line = Number.parseFloat(getComputedStyle(field).lineHeight) || 24;
-      const naturalHeight = field.scrollHeight;
-      setComposerMultiline(naturalHeight > line + 1);
-      field.style.height = `${Math.max(line, Math.min(naturalHeight, line * 8))}px`;
-      field.style.overflowY = naturalHeight > line * 8 + 1 ? "auto" : "hidden";
-    };
-    fit();
-    window.addEventListener("resize", fit);
-    return () => window.removeEventListener("resize", fit);
-  }, [text]);
   useLayoutEffect(() => {
     const wrap = composerWrap.current;
     if (!wrap) return;
@@ -955,80 +880,14 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
             {error}
           </p>
         )}
-        <form
-          className={`communication-composer glass${composerMultiline ? " multiline" : ""}`}
-          onSubmit={send}
-          onMouseDown={(event) => {
-            if (
-              !(event.target instanceof Element) ||
-              event.target.closest("button, textarea")
-            )
-              return;
-            event.preventDefault();
-            composerField.current?.focus();
-          }}
-        >
-          <input
-            ref={documentInput}
-            type="file"
-            accept=".pdf,.txt,.md"
-            hidden
-            onChange={(event) => void uploadDocument(event.target.files?.[0])}
-          />
-          <button
-            type="button"
-            className="attach-button"
-            aria-label="Загрузить PDF, TXT или MD до 5 МБ"
-            disabled={
-              uploadingDocument || sending || uploadedDocuments.length >= 3
-            }
-            onClick={() => documentInput.current?.click()}
-          >
-            {uploadingDocument ? (
-              <span className="spinner" />
-            ) : (
-              <Icon name="plus" />
-            )}
-          </button>
-          <textarea
-            ref={composerField}
-            rows={1}
-            autoFocus
-            aria-label="Сообщение AI-агенту"
-            placeholder="Отправьте сообщение"
-            value={text}
-            maxLength={8000}
-            disabled={sending}
-            onKeyDown={(event) => {
-              if (
-                event.key !== "Enter" ||
-                !preferences.submitWithEnter ||
-                event.shiftKey ||
-                event.nativeEvent.isComposing
-              )
-                return;
-              event.preventDefault();
-              event.currentTarget.form?.requestSubmit();
-            }}
-            onChange={(event) => {
-              setText(event.target.value);
-              pending.current = null;
-            }}
-          />
-          <Action
-            className="circle send-button"
-            type="submit"
-            aria-label="Отправить сообщение агенту"
-            disabled={
-              sending ||
-              uploadingDocument ||
-              !!activeTurn.current ||
-              (!text.trim() && !uploadedDocuments.length)
-            }
-          >
-            <Icon name="send" />
-          </Action>
-        </form>
+        <ChatComposer text={text} onTextChange={value => { setText(value); pending.current = null; }} onSubmit={send}
+          messageLabel="Сообщение AI-агенту" sendLabel="Отправить сообщение агенту" maxLength={8000}
+          autoFocus disabled={sending} submitWithEnter={preferences.submitWithEnter}
+          canSubmit={!sending && !uploadingDocument && !activeTurn.current && (!!text.trim() || !!uploadedDocuments.length)}
+          attachLabel="Загрузить PDF, TXT или MD до 5 МБ" attachDisabled={uploadingDocument || sending || uploadedDocuments.length >= 3}
+          onAttach={() => documentInput.current?.click()} uploading={uploadingDocument}>
+          <input ref={documentInput} type="file" accept=".pdf,.txt,.md" hidden onChange={event => void uploadDocument(event.target.files?.[0])} />
+        </ChatComposer>
         <p className="communication-attribution">
           <img
             className="droidje-ai-logo"

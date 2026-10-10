@@ -1,3 +1,4 @@
+import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { AppShellHeader, Dialog } from "@comit/ui-kit/app-shell";
@@ -265,7 +266,9 @@ export default function App() {
     screen = (
       <RecruitmentChat
         account={account}
-        onBack={() => navigate("/vacancies")}
+        onBack={() => navigate(chatReturnRoute(route, "/chat"))}
+        onOpen={id => navigate(`/chat/${id}`)}
+        backLabel={chatReturnRoute(route, "/chat").startsWith("/vacancy/") ? "К вакансии" : chatReturnRoute(route, "/chat") === "/chat" ? "К чатам" : "Назад"}
         initialProcessId={pieces[1]}
         onProfile={(candidateId) => navigate(`/resume/${candidateId}`)}
       />

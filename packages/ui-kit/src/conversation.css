@@ -179,3 +179,98 @@
 }
 
 .attach-button .icon { width: 24rem; height: 24rem; }
+
+.message-composer {
+  background: var(--employer-composer-glass);
+  height: auto;
+  min-height: 80rem;
+  border-radius: 40rem;
+  align-items: center;
+}
+.message-composer.multiline {
+  align-items: flex-end;
+}
+.message-composer textarea {
+  align-self: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  max-height: 192rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  resize: none;
+  background: transparent;
+  color: var(--employer-paint-fff);
+  font: inherit;
+  font-size: 20rem;
+  line-height: 24rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+}
+.message-composer textarea::placeholder {
+  color: var(--employer-paint-f5f4fb);
+}
+.message-composer .send-button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+.message-composer .send-button {
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease), opacity var(--employer-hover-duration) var(--employer-hover-ease);
+}
+
+@media (max-width: 760px) {
+  .message-composer {
+  background: var(--employer-composer-glass);
+    height: auto;
+    min-height: 58rem;
+    border-radius: 29rem;
+  }
+  .message-composer textarea {
+    font-size: 14rem;
+    line-height: 20rem;
+    max-height: 160rem;
+  }
+}
+
+.communication-attribution .qgramm-mark { width: 22.5098rem; height: 24rem; object-fit: contain; margin-right: 3rem; }
+.communication-attribution a { color: var(--employer-paint-5da6ed); text-decoration: none; }
+.communication-attribution a:hover { text-decoration: underline; }
+.recruitment-chat-list { display: flex; flex-direction: column; gap: 16rem; }
+.recruitment-chat-tile { display: flex; align-items: center; width: 100%; gap: 24rem; padding: 24rem 32rem; border: 0; color: var(--employer-paint-fff); text-align: left; cursor: pointer; transition: background var(--employer-hover-duration) var(--employer-hover-ease); }
+.recruitment-chat-tile:hover { background: var(--employer-paint-26262b); }
+.chat-tile-label { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8rem; }
+.chat-tile-label strong { font-size: 24rem; overflow-wrap: anywhere; }
+.chat-tile-label small, .chat-tile-state { font-size: 18rem; color: var(--employer-paint-a5a5af); }
+.recruitment-screen { position: relative; }
+.chat-back { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 20rem; }
+.chat-back h1 { font-size: 42rem; font-weight: 700; letter-spacing: -1rem; }
+.chat-back .circle { width: 66rem; height: 66rem; }
+.recruitment-thread { width: min(964rem, 100%); margin: 0 auto; position: relative; }
+.participant-header { min-height: 66rem; border-radius: 40rem; background: var(--employer-paint-fff); color: var(--employer-paint-282b34); display: flex; align-items: center; padding: 6rem 12rem; gap: 14rem; }
+.anonymous-avatar { width: 54rem; height: 54rem; flex-shrink: 0; border-radius: 50%; background: var(--employer-paint-dedee3); display: grid; place-items: center; border: 0; color: var(--employer-paint-282b34); }
+.anonymous-avatar .icon { width: 30rem; height: 30rem; }
+.participant-name { display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: none; border: 0; color: inherit; gap: 3rem; min-width: 0; }
+.participant-name strong { font-size: 22rem; font-weight: 700; }
+.participant-name small { font-size: 18rem; }
+.recruitment-thread .recruitment-messages { height: max(180rem, calc(100dvh - 440rem)); }
+.recruitment-thread .communication-composer-wrap { bottom: 56rem; }
+@media (max-width: 760px) {
+  .communication-attribution .qgramm-mark { width: 15rem; height: 16rem; }
+  .chat-back { position: static; margin-bottom: 18rem; }
+  .chat-back h1 { font-size: 26rem; }
+  .chat-back .circle { width: 44rem; height: 44rem; }
+  .participant-header { min-height: 54rem; padding: 5rem 8rem; gap: 8rem; }
+  .anonymous-avatar { width: 42rem; height: 42rem; }
+  .participant-name strong { font-size: 16rem; } .participant-name small { font-size: 12rem; }
+  .recruitment-chat-tile { gap: 12rem; padding: 18rem; flex-wrap: wrap; }
+  .chat-tile-label strong { font-size: 18rem; } .chat-tile-label small, .chat-tile-state { font-size: 13rem; }
+  .chat-tile-state { flex-basis: 100%; padding-left: 54rem; }
+  .recruitment-thread .recruitment-messages { height: max(180rem, calc(100dvh - 430rem)); }
+  .recruitment-thread .communication-composer-wrap { bottom: 180rem; }
+}
+
+.message-composer .attach-button .icon { width: 28rem; height: 28rem; }

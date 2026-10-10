@@ -12,7 +12,9 @@
     "./email-login": "./src/email-login.tsx",
     "./app-shell": "./src/app-shell.tsx",
     "./recruitment-conversation": "./src/recruitment-conversation.tsx",
-    "./conversation.css": "./src/conversation.css"
+    "./conversation.css": "./src/conversation.css",
+    "./chat-navigation": "./src/chat-navigation.ts",
+    "./chat-composer": "./src/chat-composer.tsx"
   },
   "scripts": {
     "build": "tsc --noEmit",
