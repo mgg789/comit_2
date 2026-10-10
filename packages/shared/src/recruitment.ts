@@ -82,7 +82,7 @@ export type RecruitmentAction = RecruitmentActionIdentity & (
   | { action: "offer_decline"; offer_id: string; reason: string }
 );
 
-/** Contact-free process snapshot; chat remains unavailable in this lifecycle increment. */
+/** Contact-free participant-scoped process snapshot with separately authorized chat access. */
 export interface RecruitmentView {
   id: string;
   owner_id: string;
@@ -103,6 +103,8 @@ export interface RecruitmentView {
   chat_available: boolean;
   /** Writing requires a live publication; historical chat remains readable when false. */
   chat_writable: boolean;
+  /** Incoming unread messages for this caller; absent/null means unread status unavailable. */
+  chat_unread_count?: number | null;
   created_at: string;
   updated_at: string;
 }

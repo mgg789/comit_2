@@ -445,7 +445,10 @@ OpenAPI; DTO живут в packages/shared/recruitment.ts и использую�
 
 Симметричные role-auth маршруты `/{role}/recruitment/{id}/chat/messages`
 (GET history, POST SendChatMessage), `/files` (POST UploadChatFile) и
-`/files/{file_id}` (GET DownloadChatFile) описаны в Fastify OpenAPI.
+`/files/{file_id}` (GET DownloadChatFile), `/read` (POST ChatReadRequest →
+ChatReadStatus) описаны в Fastify OpenAPI. GET recruitment одного процесса и
+списков дополняется текущим participant-scoped `chat_unread_count`: число
+входящих сообщений или `null`, если метадата недоступна.
 DTO в `packages/shared/chat.ts`, типизированные методы в api-client.
 Участники и комната определяются API из приглашения, не из body/header клиента.
 Чат доступен до accept, контакты — по прежнему правилу после accept.

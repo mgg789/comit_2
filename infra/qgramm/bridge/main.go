@@ -218,6 +218,10 @@ func (b *Bridge) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 	switch r.URL.Path {
+	case "/internal/chat/read":
+		b.handleRead(w, r)
+	case "/internal/chat/unread":
+		b.handleUnread(w, r)
 	case "/internal/chat/history":
 		b.handleHistory(w, r)
 	case "/internal/chat/events":

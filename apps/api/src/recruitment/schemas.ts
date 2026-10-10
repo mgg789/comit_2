@@ -63,8 +63,8 @@ export const recruitmentViewSchema = object({
   closure: nullable(object({ reason: nonempty(10000), actor: enumeration(["candidate", "employer"]), at: timestamp })),
   interviews: { type: "array", items: interview }, offers: { type: "array", items: offer },
   allowed_actions: { type: "array", items: enumeration(actions), uniqueItems: true },
-  chat_available: { type: "boolean" }, chat_writable: { type: "boolean" }, created_at: timestamp, updated_at: timestamp,
-});
+  chat_available: { type: "boolean" }, chat_writable: { type: "boolean" }, chat_unread_count: nullable(integer(0)), created_at: timestamp, updated_at: timestamp,
+}, ["id", "owner_id", "candidate_id", "vacancy_id", "draft_id", "profile_revision", "revision", "state", "terms", "invited_at", "closure", "interviews", "offers", "allowed_actions", "chat_available", "chat_writable", "created_at", "updated_at"]);
 
 /** Participant-scoped list response with explicit pagination bounds. */
 export const recruitmentPageSchema = object({ items: { type: "array", items: recruitmentViewSchema },

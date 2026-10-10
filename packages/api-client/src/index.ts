@@ -13,7 +13,7 @@ import type { AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, 
   EmployerStatisticsQuery, EmployerStatistics,
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
-  ChatPage, ChatMessage, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
+  ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
   AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
@@ -182,6 +182,8 @@ export interface ApiClient {
   getRecruitmentEvents(role: AccountRole, afterSequence?: number, limit?: number): Promise<RecruitmentEventPage>;
   /** Poll ascending messages after the last processed cursor in a participant's invitation. */
   getChatMessages(role: AccountRole, processId: string, afterSequence?: number, limit?: number): Promise<ChatPage>;
+  /** Acknowledge only messages rendered while this conversation is visible. */
+  acknowledgeChatRead(role: AccountRole, processId: string, body: ChatReadRequest): Promise<ChatReadStatus>;
   /** Consume one bounded chat SSE connection; persist event cursors and reconnect with the returned cursor. */
   streamChatEvents(role: AccountRole, processId: string, onEvent: (event: ChatEvent) => void | Promise<void>, options?: EventStreamOptions): Promise<number>;
   /** Consume contact-free recruitment notifications using the same account session and durable cursor. */
@@ -346,6 +348,7 @@ export function createApiClient({
     actOnRecruitment: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/actions`, body),
     getRecruitmentContacts: processId => request("GET", `/employer/recruitment/${encodeURIComponent(processId)}/contacts`),
     getRecruitmentEvents: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment-events?after_sequence=${afterSequence}&limit=${limit}`),
+    acknowledgeChatRead: (role, processId, body) => request("POST", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/read`, body),
     getChatMessages: (role, processId, afterSequence = 0, limit = 50) => request("GET", `/${role}/recruitment/${encodeURIComponent(processId)}/chat/messages?after_sequence=${afterSequence}&limit=${limit}`),
     streamChatEvents: (role, processId, onEvent, options) => stream(`/${role}/recruitment/${encodeURIComponent(processId)}/chat/events`, onEvent, options),
     streamRecruitmentEvents: (role, onEvent, options) => stream(`/${role}/recruitment-events/stream`, onEvent, options),

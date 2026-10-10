@@ -6,13 +6,14 @@ import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import swagger from "@fastify/swagger";
 import { Pool } from "pg";
-import type { AccountRole, ChatFile, ChatMessage, ChatPage, DownloadChatFile } from "@comit/shared";
+import type { AccountRole, ChatFile, ChatMessage, ChatPage, ChatReadStatus, DownloadChatFile, RecruitmentView, RecruitmentPage } from "@comit/shared";
 import { AuthStore } from "../src/auth/store.js";
 import { loadAuthConfig } from "../src/auth/config.js";
 import { signSession } from "../src/auth/session.js";
 import { migrate } from "../src/auth/migrate.js";
 import { ProfileStore } from "../src/profiles/store.js";
 import { RecruitmentStore } from "../src/recruitment/store.js";
+import { recruitmentRoutes } from "../src/routes/recruitment.js";
 import { chatConfiguration, chatRoutes } from "../src/routes/chat.js";
 import { authRoutes } from "../src/routes/auth.js";
 import { createApiClient } from "../../../packages/api-client/src/index.js";
@@ -78,6 +79,7 @@ test("invitation chat: two authenticated participants, files, polling, retries, 
       }
       return fetch(input, init);
     };
+    await app.register(recruitmentRoutes, { store, config, profiles, recruitment, mailConfigured: false, chatUrl, chatToken, chatTransport });
     await app.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false, chatUrl, chatToken, chatTransport });
     const baseUrl = await app.listen({ host: "127.0.0.1", port: 0 });
     const http = async (input: { url: string; method?: string; headers?: Record<string, string>; payload?: unknown }) => {
@@ -136,6 +138,19 @@ test("invitation chat: two authenticated participants, files, polling, retries, 
     assert.equal(retry.statusCode, 200, retry.body);
     assert.equal(retry.json<ChatMessage>().id, message.id);
     assert.equal((await http({ method: "POST", url: `${employerPath}/messages`, headers: owner.headers, payload: { ...payload, text: "changed" } })).statusCode, 409);
+    const candidateView = await http({ url: `/candidate/recruitment/${id}`, headers: candidate.headers });
+    assert.equal(candidateView.statusCode, 200);
+    assert.equal(candidateView.json<RecruitmentView>().chat_unread_count, 1);
+    const ownerView = await http({ url: `/employer/recruitment/${id}`, headers: owner.headers });
+    assert.equal(ownerView.json<RecruitmentView>().chat_unread_count, 0);
+    const candidateList = await http({ url: `/candidate/recruitment`, headers: candidate.headers });
+    assert.equal(candidateList.statusCode, 200);
+    assert.equal(candidateList.json<RecruitmentPage>().items.find(item => item.id === id)?.chat_unread_count, 1);
+    upstreamMode = "offline";
+    const degraded = await http({ url: `/candidate/recruitment/${id}`, headers: candidate.headers });
+    assert.equal(degraded.statusCode, 200);
+    assert.equal(degraded.json<RecruitmentView>().chat_unread_count, null);
+    upstreamMode = "real";
     // Cross the QGramm chunk boundary and the usual nginx 1 MiB default with synthetic bytes.
     const bytes = Buffer.concat([Buffer.from("Синтетический файл: encrypted attachment"), Buffer.alloc(1048576 + 17, 0x78)]);
     const upload = { idempotency_key: randomUUID(), name: "cv.txt", media_type: "text/plain", data_base64: bytes.toString("base64") };
@@ -184,6 +199,18 @@ test("invitation chat: two authenticated participants, files, polling, retries, 
     assert.equal(reply.statusCode, 200, reply.body);
     assert.equal(reply.json<ChatMessage>().sender_id, candidate.id);
     assert.equal((await http({ url: `${employerPath}/files/${file.id}`, headers: other.headers })).statusCode, 404);
+    assert.equal((await http({ method: "POST", url: `${employerPath}/read`, headers: other.headers, payload: { through_sequence: message.sequence } })).statusCode, 404);
+    assert.equal((await http({ method: "POST", url: `${candidatePath}/read`, headers: candidate.headers, payload: { through_sequence: -1 } })).statusCode, 400);
+    assert.equal((await http({ method: "POST", url: `${candidatePath}/read`, headers: candidate.headers, payload: { through_sequence: message.sequence, actor_id: owner.id } })).statusCode, 400);
+    assert.equal((await http({ method: "POST", url: `${candidatePath}/read`, headers: candidate.headers, payload: { through_sequence: Number.MAX_SAFE_INTEGER } })).statusCode, 400);
+    const marked = await streaming.acknowledgeChatRead("candidate", id, { through_sequence: attached.json<ChatMessage>().sequence });
+    assert.equal(marked.unread_count, 0, "own outgoing messages must not count as unread");
+    const older = await streaming.acknowledgeChatRead("candidate", id, { through_sequence: message.sequence });
+    assert.equal(older.read_sequence, marked.read_sequence, "older retries cannot undo a read receipt");
+    assert.equal(older.unread_count, 0);
+    const ownerRead = await http({ method: "POST", url: `${employerPath}/read`, headers: owner.headers, payload: { through_sequence: message.sequence } });
+    assert.equal(ownerRead.statusCode, 200);
+    assert.equal(ownerRead.json<ChatReadStatus>().unread_count, 1, "candidate reply remains unread for employer");
     const cookieHeaders = { cookie: `comit_candidate_session=${candidate.token}`, origin: "http://evil.example" };
     assert.equal((await http({ method: "POST", url: `${candidatePath}/messages`, headers: cookieHeaders, payload: { ...payload, idempotency_key: randomUUID() } })).statusCode, 403);
     // Pool withdrawal does not break an existing invitation; processing withdrawal blocks both reads and writes.
@@ -203,12 +230,14 @@ test("invitation chat: two authenticated participants, files, polling, retries, 
     } finally { release(); pauseHistory = null; }
     assert.equal((await inFlight).statusCode, 200);
     await revoke;
+    assert.equal((await http({ method: "POST", url: `${candidatePath}/read`, headers: candidate.headers, payload: { through_sequence: message.sequence } })).statusCode, 409);
     for (const path of [`${candidatePath}/messages`, `${employerPath}/files/${file.id}`])
       assert.equal((await http({ url: path, headers: path.startsWith("/candidate") ? candidate.headers : owner.headers })).statusCode, 409);
     assert.equal((await recruitment.get("candidate", candidate.id, id)).chat_available, false);
     await profiles.save(candidate.id, { expected_revision: 3, fields: {}, consent: { processing: true, pool: false, version: "profile-v1" } });
     await recruitment.act("candidate", candidate.id, id, { action: "decline", expected_revision: 1, idempotency_key: randomUUID() });
     assert.equal((await http({ url: `${candidatePath}/messages`, headers: candidate.headers })).statusCode, 200);
+    assert.equal((await http({ method: "POST", url: `${candidatePath}/read`, headers: candidate.headers, payload: { through_sequence: message.sequence } })).statusCode, 200, "readonly history permits read acknowledgement");
     assert.equal((await http({ method: "POST", url: `${employerPath}/messages`, headers: owner.headers, payload: { ...payload, idempotency_key: randomUUID() } })).statusCode, 409);
     assert.equal((await http({ method: "POST", url: `${employerPath}/files`, headers: owner.headers, payload: { ...upload, idempotency_key: randomUUID() } })).statusCode, 409);
     const paths = app.swagger().paths ?? {};

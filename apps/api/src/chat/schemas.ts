@@ -31,3 +31,11 @@ export const chatDownloadSchema = { ...chatFileSchema,
   required: [...chatFileSchema.required, "data_base64"], properties: {
     ...chatFileSchema.properties, data_base64: chatUploadSchema.properties.data_base64,
   } };
+
+/** Only the already rendered message cursor is caller-controlled, never participant IDs. */
+export const chatReadSchema = { type: "object", additionalProperties: false,
+  required: ["through_sequence"], properties: { through_sequence: integer } };
+
+/** Current participant-specific counters after a durable acknowledgement. */
+export const chatReadStatusSchema = { type: "object", additionalProperties: false,
+  required: ["read_sequence", "unread_count"], properties: { read_sequence: integer, unread_count: integer } };
