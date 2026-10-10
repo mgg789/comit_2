@@ -15,4 +15,7 @@ COPY infra/nginx/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/apps/welcome/dist /usr/share/nginx/html/welcome/
 COPY --from=build /src/apps/candidate/dist /usr/share/nginx/html/candidate/
 COPY --from=build /src/apps/employer/dist /usr/share/nginx/html/employer/
+# Immutable releases are extracted under umask 077; public copied assets must be
+# readable by nginx workers, not only the root build user.
+RUN chmod -R a+rX /usr/share/nginx/html
 EXPOSE 80

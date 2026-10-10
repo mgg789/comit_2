@@ -191,5 +191,37 @@ class ImmutableRollbackTests(unittest.TestCase):
         self.assertIn(str(release), command)
 
 
+class RunningReleaseTests(unittest.TestCase):
+    """Background workers must stay running even when Compose has no healthcheck."""
+
+    def setUp(self):
+        self.container = {'Config': {'Labels': {'com.docker.compose.service': 'agents-worker',
+            'com.docker.compose.project': 'comit'}, 'Env': ['COMIT_RELEASE=revision']},
+            'State': {'Status': 'running'}, 'RestartCount': 0, 'Image': 'sha256:worker'}
+
+    def check(self, running):
+        deploy.check_running_release(running, ['agents-worker'],
+                                     {'agents-worker': {'id': 'sha256:worker'}}, 'revision')
+
+    def test_stable_worker_accepted(self):
+        self.check([self.container])
+
+    def test_missing_worker_rejected(self):
+        with self.assertRaisesRegex(ValueError, 'not stable'):
+            self.check([])
+
+    def test_worker_restart_or_exit_rejected(self):
+        for status, restarts in [('restarting', 1), ('exited', 0), ('running', 1)]:
+            container = copy.deepcopy(self.container)
+            container.update(State={'Status': status}, RestartCount=restarts)
+            with self.subTest(status=status, restarts=restarts), self.assertRaisesRegex(ValueError, 'not stable'):
+                self.check([container])
+
+    def test_unhealthy_service_rejected(self):
+        self.container['State']['Health'] = {'Status': 'unhealthy'}
+        with self.assertRaisesRegex(ValueError, 'not healthy'):
+            self.check([self.container])
+
+
 if __name__ == '__main__':
     unittest.main()
