@@ -54,6 +54,8 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 без PG и модели, выполняется уже в обычной джобе `python`. Протокол обновления
 снимка — [matching.md](matching.md#регрессия-скоринга-golden).
 
+API SSE regression подтверждает открытие настоящего HTTP-потока до отзыва согласия/сессии; проверки безопасного закрытия не зависят от 80-мс fixture timeout и скорости PostgreSQL под coverage.
+
 Тесты `services/agents-service` и `services/verification-engine` теперь входят в обе Python-джобы.
 Matching PG-fixture `test_recommendations_integration.py` читает API-owned канонические
 consent-таблицы. Runner запускает этот fixture последним в отдельной disposable БД, применяя настоящие
