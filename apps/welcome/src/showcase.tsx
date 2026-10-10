@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createApiClient, ApiError } from "@comit/api-client";
 import { GRADES, SPECIALIZATIONS, type PublicShowcaseCandidate, type PublicShowcaseVacancy, type PublicShowcasePage, type PublicShowcaseQuery } from "@comit/shared";
 import { PublicShellHeader, Dialog } from "@comit/ui-kit/app-shell";
-import { Action, Backdrop, Icon, Select, State, Tags, VacancyCardArrow } from "@comit/ui-kit/design";
+import { Action, Backdrop, Icon, Select, State, Tags } from "@comit/ui-kit/design";
 import { usePersistentState } from "@comit/ui-kit/ui-state";
 import { WelcomeBackground, candidateUrl, employerUrl } from "./entry";
 
@@ -63,10 +63,10 @@ export function PublicShowcase({ kind }: { kind: Kind }) {
       {loading || error ? <State loading={loading} error={error} retry={() => setRetry(value => value + 1)} /> : !data?.items.length ? <section className="panel public-empty" role="status"><h1>{query || specialization || grade || stack ? "Ничего не найдено" : kind === "vacancies" ? "Пока нет опубликованных вакансий" : "Пока нет опубликованных резюме"}</h1><p>Попробуйте изменить фильтры или зайдите позже.</p></section> : <div className={kind === "vacancies" ? "vacancy-grid public-vacancies" : "public-candidates"} aria-label={kind === "vacancies" ? "Публичные вакансии" : "Публичные соискатели"}>
         {data.items.map(card => "vacancy_id" in card ? <article className="vacancy-card glass" key={card.vacancy_id}>
           <span className="status-pill"><span className="status-dot" />Активная</span><h3>{card.title}</h3><Tags shape="pill" values={card.stacks.map(value => stackLabels[value] || value)} /><div className="salary-row"><strong>{salary(card.salary)}</strong><small>за месяц</small></div>
-          <div className="vacancy-footer"><PublicationDate value={card.published_at} /><VacancyCardArrow /></div><button className="public-card-link" aria-label={`Открыть вакансию ${card.title}`} onClick={() => setLogin("vacancies")} />
+          <div className="vacancy-footer"><PublicationDate value={card.published_at} /></div><button className="public-card-link" aria-label={`Открыть вакансию ${card.title}`} onClick={() => setLogin("vacancies")} />
         </article> : <article className="panel public-candidate-row" key={card.candidate_id}>
           <div className="public-avatar" aria-hidden="true"><Icon name="candidates" /></div><div className="public-candidate-name"><h2>{roleLabels[card.category.specialization] || "Специалист"}</h2><p>{gradeLabels[card.category.grade] || card.category.grade}</p></div>
-          <Tags variant="muted" shape="pill" values={[...card.stacks.map(value => stackLabels[value] || value), salary(card.salary), card.city].filter(Boolean)} /><VacancyCardArrow /><button className="public-card-link" aria-label={`Открыть профиль ${roleLabels[card.category.specialization] || "специалиста"}`} onClick={() => setLogin("candidates")} />
+          <Tags variant="muted" shape="pill" values={[...card.stacks.map(value => stackLabels[value] || value), salary(card.salary), card.city].filter(Boolean)} /><button className="public-card-link" aria-label={`Открыть профиль ${roleLabels[card.category.specialization] || "специалиста"}`} onClick={() => setLogin("candidates")} />
         </article>)}
       </div>}
       {data?.has_more && !loading && <div className="public-pagination">{moreError && <p role="alert">{moreError}</p>}<Action disabled={more} onClick={() => void loadMore()}>{more ? "Загружаем…" : "Показать ещё"}</Action>{moreError && <Action onClick={() => setRetry(value => value + 1)}>Обновить список</Action>}</div>}
