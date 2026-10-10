@@ -374,3 +374,12 @@ API миграции `009_organization_agent_tool_receipts.sql` и
 `010_organization_agent_read_receipts.sql` сохраняют immutable hash
 запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
 сохраняют checksum. [Потоки и ограничения](agents.md).
+
+## Очередь событий email (API013)
+
+`notification_mail_outbox` хранит тип, UUID адресата и авторитетного источника,
+срок, attempts, fenced lease и состояния `pending/processing/delivered/failed/dropped`.
+Email и приватные имена разрешаются из текущего источника только перед delivery.
+`notification_mail_cutover` исключает исторические matching likes после обновления
+worker. Вставка `recruitment_interviews` и обе записи outbox транзакционны.
+[Типы, согласия, retry и отсутствующий producer ежемесячных заданий](email-notifications.md).

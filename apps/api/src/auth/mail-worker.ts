@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 import { Pool } from "pg";
 import { createSmtpMailer, type Mailer, type MailDeliveryCode, type VerificationMail } from "./mail.js";
 import { AuthStore } from "./store.js";
+import { NotificationStore } from "../notifications/store.js";
+import { NotificationWorker } from "../notifications/worker.js";
 
 /** A leased row returned by AuthStore.claimMail(). */
 export interface MailJob extends VerificationMail {
@@ -64,16 +66,22 @@ export async function runMailWorker(store: MailJobStore, mailer: Mailer, options
   once?: boolean;
   pollMs?: number;
   stop?: AbortSignal;
+  notifications?: NotificationWorker;
 } = {}): Promise<void> {
   const pollMs = options.pollMs ?? 2_000;
   if (!Number.isInteger(pollMs) || pollMs < 100 || pollMs > 60_000) throw new RangeError("pollMs must be 100..60000");
   if (options.once) {
     await new MailWorker(store, mailer).processOnce();
+    await options.notifications?.processOnce();
     return;
   }
   const worker = new MailWorker(store, mailer);
   while (!options.stop?.aborted) {
-    if (!(await worker.processOnce())) await wait(pollMs, options.stop);
+    const authWorked = await worker.processOnce();
+    let eventWorked = false;
+    try { eventWorked = await options.notifications?.processOnce() ?? false; }
+    catch { /* Event-source outages must not take down verification-code delivery. */ }
+    if (!authWorked && !eventWorked) await wait(pollMs, options.stop);
   }
 }
 
@@ -103,7 +111,11 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
   try {
-    await runMailWorker(new AuthStore(pool, secret), createSmtpMailer(env), { once: argv.includes("--once"), stop: stop.signal });
+    const mailer = createSmtpMailer(env);
+    const notifications = env.PUBLIC_SITE_URL?.trim()
+      ? new NotificationWorker(new NotificationStore(pool, env.PUBLIC_SITE_URL, env.NODE_ENV === "production"), mailer)
+      : undefined;
+    await runMailWorker(new AuthStore(pool, secret), mailer, { once: argv.includes("--once"), stop: stop.signal, notifications });
   } finally {
     process.removeListener("SIGINT", shutdown);
     process.removeListener("SIGTERM", shutdown);
