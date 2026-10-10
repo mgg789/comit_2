@@ -37,8 +37,13 @@ def test_adaptive_engine_decides_a_consistent_strong_candidate() -> None:
     assert adaptive.session_complete(state) is True
 
 
-def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path) -> None:
-    """Create session, answer MCQs, reach a decided grade, read the result."""
+def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path, monkeypatch) -> None:
+    """Create session, answer MCQs, reach a decided grade, read the result.
+
+    Code tasks require the offline fixture judge (TESTING_LOCAL_JUDGE=1):
+    production has no local fallback for untrusted code (issue #18).
+    """
+    monkeypatch.setenv("TESTING_LOCAL_JUDGE", "1")
     client = _client(tmp_path)
     created = client.post("/testing/sessions", json={
         "candidate_key": "candidate-1", "specialization": "algorithms",
@@ -59,9 +64,14 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path) -> None:
                else {"answer": _correct_index(task_payload["prompt"])
                      if task_payload["type"] == "mcq" else "развернутый ответ"})})
         body = answer.json()
+        if task_payload["type"] == "code":
+            # Secure default (issue #18): without a configured judge service,
+            # code answers are recorded unscored.
+            assert body["judge_status"] == "code_judge_unavailable"
+            assert body["correct"] is None
+            continue
         assert body["judge_status"] == "auto", body
-        if task_payload["type"] == "mcq":
-            assert body["correct"] is True, (task_payload["prompt"], task_payload["options"])
+        assert body["correct"] is True, (task_payload["prompt"], task_payload["options"])
         if body["status"] == "finished":
             break
 

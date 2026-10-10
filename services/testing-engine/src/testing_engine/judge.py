@@ -1,16 +1,16 @@
-"""Answer checking: local sandbox judging now, DMOJ/code-judge bridge next pass.
+"""Answer checking: MCQ inline, code via the code-judge service.
 
 - check_mcq: exact server-side comparison (the stored answer never leaves).
-- LocalPythonJudge: runs the candidate function against fixed tests in a
-  subprocess (list argv, shell=False, timeout, isolated env). Before execution
-  the code is parsed and rejected if it imports dangerous modules or touches
-  dunders - the sandbox denies the common escape hatches instead of trusting
-  the input. Running untrusted candidate code is the product's purpose; the
-  sandbox bounds what that code can reach.
 - CodeJudgeClient: HTTP client for the code-judge microservice (env
-  CODE_JUDGE_URL, operator-configured). The URL scheme is validated as
-  http/https and the submission id is format-checked before interpolation;
-  on any transport failure judging degrades to the local sandbox.
+  CODE_JUDGE_URL, operator-configured). There is deliberately NO local
+  fallback: untrusted candidate code never executes inside testing-engine
+  (issue #18: the former local sandbox was an RCE path). Without a configured
+  service, code answers are recorded as unscored ("code_judge_unavailable")
+  and do not affect the grade.
+- LocalPythonJudge remains available ONLY for offline test fixtures behind
+  the explicit TESTING_LOCAL_JUDGE=1 flag; it uses an import allowlist and
+  JSON-based result comparison performed in the parent process, so candidate
+  __eq__/dunder tricks cannot forge a verdict.
 - Extended answers are NOT auto-judged in this pass: recorded as "manual"
   and excluded from scoring (rubric judging lands in a later pass).
 """
@@ -26,9 +26,12 @@ import tempfile
 from pathlib import Path
 
 LOCAL_TIMEOUT_SECONDS = 10
-FORBIDDEN_MODULES = frozenset((
-    "os", "sys", "subprocess", "socket", "shutil", "pathlib", "importlib",
-    "ctypes", "multiprocessing", "threading", "webbrowser", "pty", "signal",
+# Allowlist, not denylist (issue #18): anything not listed is rejected, so new
+# escape-hatch modules cannot appear without a code change.
+ALLOWED_MODULES = frozenset((
+    "math", "json", "re", "itertools", "collections", "functools", "string",
+    "statistics", "heapq", "enum", "dataclasses", "copy", "random", "decimal",
+    "fractions", "typing",
 ))
 
 
@@ -43,17 +46,17 @@ def check_mcq(payload: dict, answer: int | str) -> bool | None:
 
 
 def code_is_safe(code: str) -> bool:
-    """Reject code that imports escape-hatch modules or touches dunders."""
+    """Allowlist imports, reject dunder access and star-imports entirely."""
     try:
         tree = ast.parse(code)
     except (SyntaxError, ValueError):
         return False
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            if any(alias.name.split(".")[0] in FORBIDDEN_MODULES for alias in node.names):
+            if any(alias.name.split(".")[0] not in ALLOWED_MODULES for alias in node.names):
                 return False
         elif isinstance(node, ast.ImportFrom):
-            if (node.module or "").split(".")[0] in FORBIDDEN_MODULES:
+            if (node.module or "").split(".")[0] not in ALLOWED_MODULES:
                 return False
         elif isinstance(node, ast.Attribute) and node.attr.startswith("__") or isinstance(node, ast.Name) and node.id.startswith("__"):
             return False
@@ -61,9 +64,11 @@ def code_is_safe(code: str) -> bool:
 
 
 class LocalPythonJudge:
-    """Run one candidate function against fixed test cases in a subprocess."""
+    """Offline fixture judge: TEST-only, requires TESTING_LOCAL_JUDGE=1."""
 
     def judge(self, payload: dict, code: str) -> tuple[bool | None, str]:
+        if os.environ.get("TESTING_LOCAL_JUDGE") != "1":
+            return None, "local_judge_disabled"
         function_name = str(payload.get("function_name", ""))
         tests = payload.get("tests", [])
         if not function_name or not isinstance(tests, list) or not tests:
@@ -73,14 +78,16 @@ class LocalPythonJudge:
         cases = json.dumps([
             {"args": test.get("args", []), "expected": test.get("expected")}
             for test in tests], ensure_ascii=False)
+        # The child only prints JSON-serialised values; verdict comparison
+        # happens in THIS process against our own data, so candidate-defined
+        # __eq__ can never influence the outcome (issue #18, PoC 2).
         harness = (
             "import json as _json, sys as _sys\n"
             "namespace = {}\n"
             "exec(compile(_sys.stdin.read(), 'solution', 'exec'), namespace)\n"
             "cases = _json.loads(_sys.argv[1])\n"
-            "results = [namespace[" + repr(function_name) + "](*case['args']) == case['expected']\n"
-            "          for case in cases]\n"
-            "print(_json.dumps(results))\n"
+            "values = [namespace[" + repr(function_name) + "](*case['args']) for case in cases]\n"
+            "print(_json.dumps({'values': values}))\n"
         )
         with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as handle:
             handle.write(code)
@@ -100,14 +107,16 @@ class LocalPythonJudge:
         if completed.returncode != 0:
             return False, "runtime_error"
         try:
-            results = json.loads(completed.stdout.strip().splitlines()[-1])
-        except (ValueError, IndexError):
+            values = json.loads(completed.stdout.strip().splitlines()[-1])["values"]
+        except (ValueError, IndexError, KeyError):
             return False, "judge_output_invalid"
-        return (all(results) if results else False), "auto"
+        correct = all(value == case["expected"]
+                      for value, case in zip(values, tests))
+        return correct, "auto"
 
 
 class CodeJudgeClient:
-    """HTTP client for the code-judge microservice; falls back to local judging."""
+    """HTTP client for the code-judge microservice; no local fallback (issue #18)."""
 
     def __init__(self, base_url: str | None = None) -> None:
         self.base_url = (base_url or os.environ.get("CODE_JUDGE_URL", "")).rstrip("/")
@@ -116,11 +125,11 @@ class CodeJudgeClient:
         return self.base_url.startswith(("http://", "https://"))
 
     def judge(self, payload: dict, code: str) -> tuple[bool | None, str]:
-        """Submit code and wait for the verdict; degrade to local judging on failure."""
+        """Submit code and wait for the verdict; never execute code locally."""
         import urllib.request
 
         if not self.configured():
-            return LocalPythonJudge().judge(payload, code)
+            return None, "code_judge_unavailable"
         try:
             request = urllib.request.Request(
                 self.base_url + "/submissions",
@@ -131,7 +140,7 @@ class CodeJudgeClient:
                 created = json.loads(response.read().decode("utf-8"))
             submission_id = str(created.get("submission_id", ""))
             if not submission_id.replace("-", "").isalnum() or len(submission_id) > 64:
-                return LocalPythonJudge().judge(payload, code)
+                return None, "code_judge_unavailable"
             detail_url = self.base_url + "/submissions/" + submission_id
             for _ in range(30):
                 with urllib.request.urlopen(detail_url, timeout=10) as response:
@@ -140,7 +149,7 @@ class CodeJudgeClient:
                     return record.get("correct"), "code_judge:" + str(record.get("verdict_kind", ""))
             return None, "code_judge_timeout"
         except (OSError, ValueError, KeyError):
-            return LocalPythonJudge().judge(payload, code)
+            return None, "code_judge_unavailable"
 
 
 def judge_answer(payload: dict, answer: str) -> tuple[bool | None, str]:
