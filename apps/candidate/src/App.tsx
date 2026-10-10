@@ -23,7 +23,6 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
-  const [search, setSearch] = useState(false);
   const [query, setQuery] = usePersistentState(`candidate:${account?.id || "anonymous"}:search`, "");
   const [logout, setLogout] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,7 +45,7 @@ export default function App() {
     }
   }
   useEffect(() => { void checkAccount(); }, []);
-  useEffect(() => { setMenu(false); setSearch(false); }, [route]);
+  useEffect(() => { setMenu(false); }, [route]);
   useEffect(() => {
     if (!menu)
       return;
@@ -94,11 +93,11 @@ export default function App() {
     <AppShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} brandLabel="Comit — главная" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
-      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); setSearch(true); }} secondaryLabel="Чаты" secondaryIcon="message" onSecondary={() => navigate("/chat")}
+      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); if (route === "/offers") window.dispatchEvent(new Event("candidate:focus-offer-search")); else navigate("/offers?search=1"); }} secondaryLabel="Чаты" secondaryIcon="message" onSecondary={() => navigate("/chat")}
       menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
     />
     <main className="main-content candidate-content" key={account.id}>
-     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate}/> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
+     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate}/> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
               <PageTitle title="Настройки"/>
               <section className="panel candidate-settings">
               <h2>Аккаунт</h2>
@@ -110,15 +109,7 @@ export default function App() {
               </section>
               </> : <State empty="Страница не найдена" retry={() => navigate("/resume")}/>}
     </main>
-    <AnimatePresence>{search && <Dialog title="Поиск предложений" close={() => setSearch(false)}>
-              <form onSubmit={event => { event.preventDefault(); navigate("/offers"); setSearch(false); }}>
-              <label className="field">
-              <span>Компания или название вакансии</span>
-              <input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Что ищем?"/>
-              </label>
-              <Action variant="primary" type="submit">Найти</Action>
-              </form>
-              </Dialog>}</AnimatePresence>
+
     <AnimatePresence>{logout && <Dialog title="Выйти из аккаунта?" close={() => { if (!busy)
                 setLogout(false); }}>
               <p>Для возвращения понадобится код из письма.</p>{failure && <p role="alert">{failure}</p>}<div className="account-confirmation-actions">

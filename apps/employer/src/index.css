@@ -56,41 +56,8 @@
 .discovery-filters .custom-select-trigger .icon {
   color: var(--comit-bg);
 }
-.discovery-search {
-  transform-origin: left center;
-  transition:
-    transform var(--employer-hover-duration) var(--employer-hover-ease),
-    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
-}
-.page-heading > .discovery-search:focus-within {
-  transform: translateY(7rem) scale(1.045);
-  box-shadow: 0 10rem 28rem var(--employer-paint-0000006b);
-}
-.discovery-search input:focus {
-  outline: none;
-}
-.discovery-search button,
-.discovery-search .search-glyph {
-  transition: scale var(--employer-hover-duration) var(--employer-hover-ease);
-}
-.discovery-search:focus-within button,
-.discovery-search:focus-within .search-glyph {
-  scale: 1.1;
-}
 .vacancy-search {
   margin-left: auto;
-}
-.vacancy-search .search-glyph {
-  position: absolute;
-  right: 4rem;
-  top: 4rem;
-  width: 43rem;
-  height: 43rem;
-  border-radius: 50%;
-  background: var(--comit-text);
-  display: grid;
-  place-items: center;
-  pointer-events: none;
 }
 .vacancy-filters {
   display: grid;

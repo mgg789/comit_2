@@ -8,15 +8,7 @@
   white-space: nowrap;
   border: 0;
 }
-.discovery-search {
-  display: flex;
-  align-items: center;
-  background: var(--employer-gradient);
-  border-radius: 27rem;
-  max-width: 310rem;
-  height: 51rem;
-  position: relative;
-}
+
 .resume-vacancy-filter {
   position: relative;
   z-index: 12;
@@ -122,36 +114,7 @@
     font-size: 14rem;
   }
 }
-.discovery-search input {
-  background: transparent;
-  padding: 10rem 45rem 10rem 20rem;
-  min-height: 0;
-  height: 51rem;
-  border: 0;
-  font-size: 20rem;
-  border-radius: 27rem;
-}
-.discovery-search input::placeholder {
-  color: var(--comit-text);
-}
-.discovery-search button {
-  position: absolute;
-  right: 4rem;
-  background: var(--comit-text);
-  border: 0;
-  border-radius: 50%;
-  width: 43rem;
-  height: 43rem;
-  display: grid;
-  place-items: center;
-}
-.discovery-search .icon {
-  width: 25rem;
-  height: 25rem;
-}
-.discovery-search .icon {
-  color: var(--employer-search-icon);
-}
+
 .discovery-filters {
   display: flex;
   gap: 12rem;
@@ -896,20 +859,6 @@
   }
 }
 @media (max-width: 760px) {
-  .discovery-search {
-    height: 40rem;
-    max-width: 100%;
-    flex: 1;
-  }
-  .discovery-search input {
-    height: 40rem;
-    font-size: 14rem;
-    padding: 8rem 40rem 8rem 14rem;
-  }
-  .discovery-search button {
-    width: 32rem;
-    height: 32rem;
-  }
   .discovery-filters {
     flex-wrap: wrap;
     margin: 20rem 0;

@@ -1085,3 +1085,83 @@ textarea::placeholder {
     font-size: 16rem;
   }
 }
+
+/* The established employer list search also serves candidate offer filters. */
+.discovery-search {
+  display: flex;
+  align-items: center;
+  background: var(--employer-gradient);
+  border-radius: 27rem;
+  max-width: 310rem;
+  height: 51rem;
+  position: relative;
+}
+.discovery-search input {
+  background: transparent;
+  padding: 10rem 45rem 10rem 20rem;
+  min-height: 0;
+  height: 51rem;
+  border: 0;
+  font-size: 20rem;
+  border-radius: 27rem;
+}
+.discovery-search input::placeholder {
+  color: var(--comit-text);
+}
+.discovery-search button {
+  position: absolute;
+  right: 4rem;
+  background: var(--comit-text);
+  border: 0;
+  border-radius: 50%;
+  width: 43rem;
+  height: 43rem;
+  display: grid;
+  place-items: center;
+}
+.discovery-search .icon {
+  width: 25rem;
+  height: 25rem;
+}
+.discovery-search .icon {
+  color: var(--employer-search-icon);
+}
+.discovery-search {
+  transform-origin: left center;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    box-shadow var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.page-heading > .discovery-search:focus-within {
+  transform: translateY(7rem) scale(1.045);
+  box-shadow: 0 10rem 28rem var(--employer-paint-0000006b);
+}
+.discovery-search input:focus {
+  outline: none;
+}
+.discovery-search button,
+.discovery-search .search-glyph {
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.discovery-search:focus-within button,
+.discovery-search:focus-within .search-glyph {
+  scale: 1.1;
+}
+
+.discovery-search input { width: 100%; min-width: 0; }
+@media (max-width: 760px) {
+  .discovery-search {
+    height: 40rem;
+    max-width: 100%;
+    flex: 1;
+  }
+  .discovery-search input {
+    height: 40rem;
+    font-size: 14rem;
+    padding: 8rem 40rem 8rem 14rem;
+  }
+  .discovery-search button {
+    width: 32rem;
+    height: 32rem;
+  }
+}

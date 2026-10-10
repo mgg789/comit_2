@@ -8,6 +8,7 @@ import {
   type ButtonHTMLAttributes,
   type ComponentPropsWithRef,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
@@ -536,4 +537,20 @@ export function Checkbox({ className = "", ...props }: Omit<ComponentPropsWithRe
 /** The employer vacancy card navigation glyph, shared by candidate offer cards. */
 export function VacancyCardArrow() {
   return <span className="card-arrow" aria-hidden="true"><Icon name="vacancy-chevron" /></span>;
+}
+
+/** Existing employer inline search, shared across vacancy and candidate lists; submission never reloads the page. */
+export function InlineSearch({ value, onChange, onSubmit, label, placeholder, inputRef, className = "" }: {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit?: () => void;
+  label: string;
+  placeholder?: string;
+  inputRef?: Ref<HTMLInputElement>;
+  className?: string;
+}) {
+  return <form className={`discovery-search ${className}`} role="search" onSubmit={event => { event.preventDefault(); onSubmit?.(); }}>
+    <input ref={inputRef} aria-label={label} placeholder={placeholder || label} value={value} onChange={event => onChange(event.target.value)} />
+    <button aria-label="Найти" type="submit"><Icon name="search" /></button>
+  </form>;
 }

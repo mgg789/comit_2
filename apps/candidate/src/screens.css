@@ -34,6 +34,7 @@
 .candidate-consent a { color: var(--employer-blue); }
 .candidate-offer-filters { display: flex; align-items: center; gap: 24rem; margin: 24rem 0 32rem; }
 .candidate-offer-filters .custom-select { width: 360rem; }
+.candidate-offer-filters .discovery-search { width: 380rem; max-width: 100%; flex-shrink: 0; }
 .candidate-offer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30rem; }
 .candidate-offer-card { min-height: 355rem; border-radius: 30rem; background: var(--employer-card); backdrop-filter: blur(var(--employer-glass-blur)); padding: 16rem; display: flex; flex-direction: column; gap: 26rem; min-width: 0; transition: transform var(--employer-hover-duration) var(--employer-hover-ease), box-shadow var(--employer-hover-duration) var(--employer-hover-ease); }
 .candidate-offer-card:hover { transform: translateY(-3rem); box-shadow: 0 12rem 36rem var(--employer-paint-0000006b); }
@@ -87,7 +88,7 @@
   .candidate-narrative h3 { font-size: 20rem; }
   .candidate-skill-edit { grid-template-columns: minmax(0, 1fr); }
   .candidate-offer-filters { flex-wrap: wrap; }
-  .candidate-offer-filters .custom-select { width: 100%; }
+  .candidate-offer-filters .custom-select, .candidate-offer-filters .discovery-search { width: 100%; flex-basis: 100%; }
   .candidate-offer-card { min-height: 310rem; gap: 22rem; }
   .candidate-offer-open h2 { font-size: 24rem; }
   .candidate-offer-open p, .candidate-offer-card footer > span { font-size: 16rem; }

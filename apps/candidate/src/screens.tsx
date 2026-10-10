@@ -5,7 +5,7 @@ import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { RecruitmentConversation, RecruitmentChatList, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { GRADES, SPECIALIZATIONS, type CandidateDeclaredNarrative, type CandidateDeclaredSkill, type CandidateProfileFields, type CandidateProfileMutation, type CandidateProfileView, type RecruitmentAction, type RecruitmentState, type RecruitmentView } from "@comit/shared";
-import { Action, Checkbox, Field, Icon, PageTitle, Reveal, Select, State, Tags, VacancyCardArrow } from "@comit/ui-kit/design";
+import { Action, Checkbox, Field, Icon, InlineSearch, PageTitle, Reveal, Select, State, Tags, VacancyCardArrow } from "@comit/ui-kit/design";
 import { api, errorText, readInvitations, readProfile, salary, useResource } from "./runtime";
 
 type Navigate = (path: string) => void;
@@ -160,12 +160,19 @@ function ProfileEditor({ profile, onCancel, onSave, onReload }: { profile: Candi
 }
 
 /** Owner-scoped invitation list; all salary and lifecycle data come from immutable API terms. */
-export function OffersScreen({ navigate, query = "" }: { navigate: Navigate; query?: string }) {
+export function OffersScreen({ navigate, query, setQuery, focusSearch = false }: { navigate: Navigate; query: string; setQuery: (value: string) => void; focusSearch?: boolean }) {
+  const searchInput = useRef<HTMLInputElement>(null);
   const resource = useResource(readInvitations);
+  useEffect(() => {
+    const focus = () => searchInput.current?.focus();
+    if (focusSearch) focus();
+    window.addEventListener("candidate:focus-offer-search", focus);
+    return () => window.removeEventListener("candidate:focus-offer-search", focus);
+  }, [focusSearch, resource.loading, resource.error]);
   const [filter, setFilter] = usePersistentState("offers:filter", "all", (value): value is string => typeof value === "string" && ["all", "new", "accepted"].includes(value));
   if (resource.loading || resource.error) return <State loading={resource.loading} error={resource.error} retry={resource.refresh} />;
   const items = (resource.data || []).filter(item => item.terms && (filter === "all" || (filter === "new" ? item.state === "sent" || item.state === "viewed" : ["accepted", "offer_sent", "hired"].includes(item.state))) && (!query || `${item.terms.company_name} ${item.terms.vacancy_title || ""}`.toLocaleLowerCase("ru-RU").includes(query.toLocaleLowerCase("ru-RU"))));
-  return <Reveal><PageTitle title="Входящие предложения" /><div className="candidate-offer-filters"><Select aria-label="Показать предложения" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Все предложения</option><option value="new">Новые приглашения</option><option value="accepted">Принятые приглашения</option></Select><span className="muted">{items.length} предложений</span></div>{items.length ? <div className="candidate-offer-grid">{items.map(item => <InvitationCard key={item.id} item={item} navigate={navigate} />)}</div> : <State empty={query ? "По этому запросу предложений нет" : "Здесь появятся предложения работодателей"} />}</Reveal>;
+  return <Reveal><PageTitle title="Входящие предложения" /><div className="candidate-offer-filters"><InlineSearch inputRef={searchInput} label="Компания или название вакансии" placeholder="Поиск: компания, вакансия" value={query} onChange={setQuery} /><Select aria-label="Показать предложения" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">Все предложения</option><option value="new">Новые приглашения</option><option value="accepted">Принятые приглашения</option></Select><span className="muted">{items.length} предложений</span></div>{items.length ? <div className="candidate-offer-grid">{items.map(item => <InvitationCard key={item.id} item={item} navigate={navigate} />)}</div> : <State empty={query ? "По этому запросу предложений нет" : "Здесь появятся предложения работодателей"} />}</Reveal>;
 }
 function InvitationCard({ item, navigate }: { item: RecruitmentView; navigate: Navigate }) {
   const terms = item.terms; if (!terms) return null;

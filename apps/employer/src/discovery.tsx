@@ -1,3 +1,4 @@
+import { InlineSearch } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
@@ -336,25 +337,10 @@ export function Showcase({
     code ? (pool.data?.items ?? []).filter((item) => item.candidate_id.toLowerCase().startsWith(code)) : (pool.data?.items ?? []),
     sort,
   );
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    setQuery(q);
-  }
   return (
     <Reveal className="discovery-showcase">
       <PageTitle title="Соискатели">
-        <form onSubmit={submit} className="discovery-search">
-          <input
-            ref={searchInput}
-            aria-label="Поиск по имени, роли или стеку"
-            placeholder="Поиск: Имя, роль, стек"
-            value={q}
-            onChange={(event) => setQ(event.target.value)}
-          />
-          <button aria-label="Найти" type="submit">
-            <Icon name="search" />
-          </button>
-        </form>
+        <InlineSearch inputRef={searchInput} label="Поиск по имени, роли или стеку" placeholder="Поиск: Имя, роль, стек" value={q} onChange={setQ} onSubmit={() => setQuery(q)} />
       </PageTitle>
       <div className="discovery-filters">
         <Select

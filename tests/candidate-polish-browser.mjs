@@ -57,6 +57,22 @@ try {
     assert.ok(Math.abs((geometry.button.left + geometry.button.right) / 2 - (geometry.content.left + geometry.content.right) / 2) < 1);
     await page.screenshot({ path: `${output}/offer-detail-${width}.png`, fullPage: true });
     await page.goto(base + "#/offers"); await page.locator(".candidate-offer-card").first().waitFor();
+    const search = page.getByRole("textbox", { name: "Компания или название вакансии", exact: true });
+    assert.equal(await page.locator(".candidate-offer-filters .discovery-search").count(), 1);
+    await search.fill("Другая");
+    await search.press("Enter");
+    assert.equal(await page.locator(".candidate-offer-card").count(), 1);
+    await page.reload(); await search.waitFor();
+    assert.equal(await search.inputValue(), "Другая");
+    await page.locator(".candidate-offer-card").first().waitFor();
+    assert.equal(await page.locator(".candidate-offer-card").count(), 1);
+    await search.fill("");
+    await page.goto(base + "#/statistics");
+    await page.getByRole("button", { name: "Поиск предложений", exact: true }).click();
+    await search.waitFor();
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Компания или название вакансии");
+    assert.equal(await page.getByRole("dialog").count(), 0);
+    await page.screenshot({ path: `${output}/offers-search-${width}.png`, fullPage: true });
     assert.equal(await page.locator(".candidate-company-initial").count(), 0);
     assert.equal(await page.locator(".candidate-offer-card .card-arrow").count(), 2);
     assert.equal(await page.locator(".candidate-offer-card .card-arrow .icon-vacancy-chevron").count(), 2);
@@ -100,5 +116,5 @@ try {
   await page.reload(); await page.getByRole("button", { name: "Редактировать резюме", exact: true }).click();
   assert.equal(await page.getByLabel("Ваше имя", { exact: true }).inputValue(), "Сохранённый локально черновик");
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ result: "passed", checks: ["fullwidth offer and centered normalheight chat button", "offer cards reuse employer arrow and omit company initials", "chat/list select offers tab and unread count clears after incoming message is read", "offer filters and unsaved editor inputs survive navigation and reload", "consents always restored from server rather than browser draft", "explicit revision-checked publication and confirmed withdrawal preserve resume/processing and never infer training"], screenshots: output }));
+  console.log(JSON.stringify({ result: "passed", checks: ["inline shared search filters offers, survives reload and receives header focus without modal", "fullwidth offer and centered normalheight chat button", "offer cards reuse employer arrow and omit company initials", "chat/list select offers tab and unread count clears after incoming message is read", "offer filters and unsaved editor inputs survive navigation and reload", "consents always restored from server rather than browser draft", "explicit revision-checked publication and confirmed withdrawal preserve resume/processing and never infer training"], screenshots: output }));
 } finally { await browser.close(); }

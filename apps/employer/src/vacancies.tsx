@@ -1,4 +1,4 @@
-import { Tags, VacancyCardArrow } from "@comit/ui-kit/design";
+import { InlineSearch, Tags, VacancyCardArrow } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ApiError } from "@comit/api-client";
@@ -100,17 +100,7 @@ export function Vacancies({
           Добавить вакансию
           <Icon name="arrow" />
         </Action>
-        <label className="vacancy-search discovery-search">
-          <input
-            aria-label="Поиск по вакансиям"
-            placeholder="Поиск по вакансиям"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          <span className="search-glyph">
-            <Icon name="search" />
-          </span>
-        </label>
+        <InlineSearch className="vacancy-search" label="Поиск по вакансиям" value={query} onChange={setQuery} />
       </PageTitle>
       {resource.loading || resource.error ? (
         <State
