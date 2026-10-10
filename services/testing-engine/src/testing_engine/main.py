@@ -8,8 +8,27 @@ from fastapi import FastAPI, HTTPException
 
 from testing_engine.blueprints import DEFAULT_BLUEPRINT_DIR, load_blueprints
 from testing_engine.judge import judge_answer
+from testing_engine.supervision import (
+    CAMERA_GRANTED,
+    MEDIA_RETENTION_DAYS,
+    cleanup_expired_media,
+    presence_badge,
+    validate_aggregates,
+)
 
 LEVELS = (1, 2, 3, 4)
+
+
+def _now() -> str:
+    from datetime import UTC, datetime
+
+    return datetime.now(UTC).isoformat()
+
+
+def maintenance(data_dir: Path) -> dict:
+    """Retention pass: remove media older than the 90-day window."""
+    removed = cleanup_expired_media(data_dir, retention_days=MEDIA_RETENTION_DAYS)
+    return {"removed": removed, "retention_days": MEDIA_RETENTION_DAYS}
 
 
 def create_app(blueprint_dir: Path | None = None) -> FastAPI:
@@ -78,8 +97,16 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
         candidate_key = str(body.get("candidate_key") or uuid.uuid4())
         specialization = str(body.get("specialization") or "backend")
         declared_grade = body.get("declared_grade")
+        consents = body.get("consents") if isinstance(body.get("consents"), dict) else {}
         session_id = store.create_session(candidate_key, specialization,
                                           declared_grade if isinstance(declared_grade, str) else None)
+        session = store.read_session(session_id)
+        session["consents"] = {
+            "video_analysis": bool(consents.get("video_analysis", False)),
+            "screen_recording": bool(consents.get("screen_recording", False)),
+            "accepted_at": os.environ.get("TESTING_CONSENT_STAMP") or None,
+        }
+        store.write_session(session)
         return {"session_id": session_id, "status": "active", "tasks_given": 0}
 
     def _session_or_404(session_id: str) -> dict:
@@ -167,6 +194,57 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
                 "answered": state.answered, "decided_grade": grade,
                 "status": "finished" if done else "active"}
 
+    @app.post("/testing/sessions/{session_id}/supervision", tags=["supervision"])
+    async def supervision(session_id: str, body: dict) -> dict:
+        """Accept aggregate supervision counters (never frames) and store the badge.
+
+        The presence badge is computed server-side from the uploaded totals;
+        the employer sees only the badge, counters stay in the operator report.
+        """
+        session = _session_or_404(session_id)
+        clean, problems = validate_aggregates(body)
+        if problems:
+            raise HTTPException(status_code=400, detail=",".join(problems))
+        badge = presence_badge(camera_granted=clean["camera"] == CAMERA_GRANTED,
+                               total_seconds=clean["total_seconds"],
+                               in_frame_seconds=clean["in_frame_seconds"],
+                               multi_face_events=clean["multi_face_events"])
+        session["supervision"] = {**clean, "badge": badge, "uploaded_at": _now()}
+        store.write_session(session)
+        return {"session_id": session_id, "badge": badge}
+
+    @app.post("/testing/sessions/{session_id}/media", tags=["supervision"])
+    async def media(session_id: str, body: dict) -> dict:
+        """Store raw media for a session - only in the explicitly enabled contour.
+
+        TESTING_RECORDING_MODE=full (env, documented in README) switches capture
+        on; the default contour never receives frames, so this endpoint refuses
+        them. Retention: 90 days, cleanup_expired_media removes expired files.
+        """
+        session = _session_or_404(session_id)
+        if os.environ.get("TESTING_RECORDING_MODE", "off") != "full":
+            raise HTTPException(status_code=409, detail="recording_disabled")
+        if not session.get("consents", {}).get("screen_recording"):
+            raise HTTPException(status_code=403, detail="screen_recording_consent_required")
+        data = body.get("data_base64")
+        kind = str(body.get("kind", "screen"))
+        if kind not in ("screen", "webcam") or not isinstance(data, str) or not data:
+            raise HTTPException(status_code=400, detail="invalid_media")
+        media_dir = resolved_data / "media" / session_id
+        media_dir.mkdir(parents=True, exist_ok=True)
+        import base64
+        import binascii
+
+        try:
+            blob = base64.b64decode(data, validate=True)
+        except (ValueError, binascii.Error):
+            raise HTTPException(status_code=400, detail="invalid_base64") from None
+        seq = len(list(media_dir.glob("chunk-*")))
+        target = media_dir / f"chunk-{seq:04d}-{kind}.bin"
+        target.write_bytes(blob)
+        return {"session_id": session_id, "stored": target.name,
+                "retention_days": MEDIA_RETENTION_DAYS}
+
     @app.get("/testing/sessions/{session_id}/result", tags=["sessions"])
     async def result(session_id: str) -> dict:
         session = _session_or_404(session_id)
@@ -177,7 +255,9 @@ def create_testing_app(data_dir: Path | None = None) -> FastAPI:
                 "posterior": dict(zip(adaptive.GRADES, state.posterior)),
                 "items": [{key: row[key] for key in
                            ("item_id", "level", "answer", "correct", "judge_status")}
-                          for row in session["items"]]}
+                          for row in session["items"]],
+                "supervision": session.get("supervision", {}).get("badge"),
+                "consents": session.get("consents", {})}
 
     return app
 
