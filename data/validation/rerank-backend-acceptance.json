@@ -1,0 +1,33 @@
+{
+  "state": "passed",
+  "database": "comit_reranker_acceptance_20261005_211117",
+  "migrations": [
+    "001_candidate_pipeline.sql",
+    "002_vacancy_pipeline.sql",
+    "003_vacancy_city_required.sql",
+    "004_matching_pipeline.sql",
+    "005_baseline_reranker.sql"
+  ],
+  "profiles": 5,
+  "vacancies": 3,
+  "real_harrier_dimensions": 640,
+  "public_pdf_count": 5,
+  "schema_backfill": "37->38",
+  "learned_artifact_active": false,
+  "quality_claim": "contractual backend acceptance only; real teacher pilot stopped",
+  "delivery": {
+    "candidate_pending": 0,
+    "vacancy_pending": 0,
+    "acknowledged_count": 24,
+    "queued_count": 0,
+    "quarantined_count": 0,
+    "retrying_count": 0
+  },
+  "built_fastify_real_http": {
+    "state": "passed",
+    "vacancies": 3,
+    "anonymous": 401,
+    "recommended_and_reserve": true,
+    "idempotent_requeue": true
+  }
+}

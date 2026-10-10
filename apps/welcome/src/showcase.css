@@ -1,0 +1,55 @@
+.public-showcase { display: flow-root; min-height: 100svh; }
+.public-showcase .welcome-glow { display: none; }
+.public-showcase .welcome-background { --welcome-unit: min(0.0520833333vw, 1px); position: absolute; overflow: clip; }
+.public-content { margin-top: 63rem; }
+.public-topbar { margin-top: 50rem; }
+.public-login { border-radius: 97rem; min-height: 66rem; padding: 16rem 32rem; text-decoration: none; }
+.public-filters { display: grid; grid-template-columns: minmax(240rem, 430rem) repeat(3, minmax(140rem, 209rem)) minmax(180rem, 1fr); align-items: center; gap: 12rem; margin-bottom: 48rem; }
+.public-filters .custom-select-trigger, .public-query { width: 100%; min-height: 67rem; border-radius: 20rem; border: 0; padding: 18rem 20rem; background: var(--comit-text); color: var(--employer-ink); font-size: 20rem; }
+.public-filters .custom-select-trigger .icon { color: var(--employer-ink); }
+.public-query::placeholder { color: var(--employer-ink); opacity: .7; }
+.public-sort .custom-select-trigger { background: transparent; color: var(--comit-text-muted); font-size: 18rem; }
+.public-sort .custom-select-trigger .icon { color: var(--comit-text-muted); }
+.public-filters .custom-select { min-width: 0; }
+.public-vacancies .vacancy-card { border: 1px solid var(--employer-line); height: auto; min-height: 355rem; }
+.public-vacancies .tags { margin-top: 18rem; }
+.public-vacancies .vacancy-card h3 { margin-top: 22rem; line-height: 1.3; flex-shrink: 0; white-space: normal; overflow-wrap: anywhere; }
+.public-vacancies .vacancy-footer { font-size: 22rem; }
+.public-vacancies .salary-row { margin-bottom: 22rem; }
+.public-card-link { position: absolute; inset: 0; border: 0; border-radius: inherit; background: transparent; color: inherit; }
+.public-card-link:focus-visible { outline-offset: 4rem; }
+.public-empty { display: grid; gap: 20rem; padding: 40rem; }
+.public-candidates { display: grid; gap: 16rem; }
+.public-candidate-row { display: flex; position: relative; align-items: center; gap: 24rem; min-height: 120rem; padding: 25rem; transition: transform var(--employer-hover-duration) var(--employer-hover-ease), background-color var(--employer-hover-duration) var(--employer-hover-ease); }
+.public-candidate-row:hover { transform: translateY(-3rem); background: var(--employer-paint-2f2f2d); }
+.public-avatar { display: grid; place-items: center; width: 70rem; height: 70rem; border-radius: 12rem; background: var(--employer-paint-2f2f2d); flex-shrink: 0; }
+.public-avatar .icon { width: 44rem; height: 44rem; }
+.public-candidate-name { flex: 0 1 430rem; min-width: 0; }
+.public-candidate-name h2 { font-size: 28rem; overflow-wrap: anywhere; }
+.public-candidate-name p { color: var(--comit-text-muted); font-size: 20rem; margin-top: 6rem; }
+.public-candidate-row > .tags { flex: 1; }
+.public-pagination { display: grid; justify-items: center; gap: 20rem; margin-top: 32rem; }
+.public-login-options { display: grid; gap: 16rem; margin: 24rem 0; }
+.public-login-options .action { text-decoration: none; border-radius: 20rem; }
+@media (max-width: 1200px) and (min-width: 761px) {
+  .public-filters { grid-template-columns: minmax(160rem, 2fr) repeat(3, minmax(130rem, 1fr)); }
+  .public-sort { grid-column: 1 / -1; justify-self: end; min-width: 200rem; }
+  .public-vacancies { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .public-topbar { margin: 20rem; }
+  .public-login { min-height: 50rem; padding: 12rem 18rem; font-size: 16rem; }
+  .public-content { margin-top: 36rem; }
+  .public-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12rem; margin-bottom: 24rem; }
+  .public-filters .custom-select-trigger, .public-query { min-height: 50rem; padding: 12rem; font-size: 14rem; }
+  .public-sort { grid-column: 1 / -1; }
+  .public-vacancies .vacancy-footer { font-size: 14rem; }
+  .public-vacancies .vacancy-card { height: auto; min-height: 285rem; }
+  .public-candidate-row { display: grid; grid-template-columns: 50rem minmax(0, 1fr); gap: 16rem; padding: 20rem; }
+  .public-avatar { width: 50rem; height: 50rem; }
+  .public-avatar .icon { width: 32rem; height: 32rem; }
+  .public-candidate-name h2 { font-size: 20rem; }
+  .public-candidate-name p { font-size: 14rem; }
+  .public-candidate-row > .tags { grid-column: 1 / -1; grid-row: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .public-candidate-row { transition: none; } }

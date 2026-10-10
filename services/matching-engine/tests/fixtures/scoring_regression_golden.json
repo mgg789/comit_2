@@ -1,0 +1,3002 @@
+{
+  "meta": {
+    "candidate_count": 22,
+    "corpus_digest": "e2a8146fcdb7a24e5154444e0631d578516b5f1613b3eb1cbe3d0d623b567080",
+    "policy_hash": "740117168040d9bd5e4ad54a35e77c6e3d808c6224bb92706737f07bca674438",
+    "policy_version": "main-v2",
+    "strict_schema_hash": "3f450d72cf68bbd9d3f3fae1bf3800fbcc90dc5eb44f2019b7cdd501061c6f43",
+    "strict_schema_version": 1,
+    "top_k": 50
+  },
+  "vacancies": {
+    "hybrid-alias-city": {
+      "filter_decisions": {
+        "2b49eee9-2a11-5082-927e-70d948c3b5cf": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "salary_disjoint",
+            "relocation_destination_mismatch"
+          ]
+        },
+        "38c09cf2-0e69-5b87-bab2-f2a15015f851": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_mismatch",
+            "relocation_unknown"
+          ]
+        },
+        "3916b81f-5e01-5747-90ed-c510fe242336": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "relocation_accepted"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "423e0558-ab3c-5a3f-978f-56ff844f2507": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_unknown",
+            "relocation_unknown"
+          ]
+        },
+        "4ace5dcb-d932-5374-bb61-215d0f1cb9b9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "4ca55cb5-bb91-5eab-ad00-f94d745047f6": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown",
+            "strict_schema_mismatch"
+          ]
+        },
+        "5a0f3e46-f240-53d1-82f8-ce3002994140": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "relocation_accepted"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "5e4f0e1a-c498-5f15-875a-ab407555436d": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "5f909e57-100a-5d39-ad2e-a2ffb4a7587f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "72e293fa-e4b8-53c9-8021-f81952c01b3c": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "757320bc-50f2-5ae0-9cae-4b96e0f73d3f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "7bd390fc-be1a-554f-8655-8e3c957b28df": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "847d741b-2528-53c4-90f1-cbb2256645e1": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "class_mismatch",
+            "relocation_unknown"
+          ]
+        },
+        "89838320-c414-5f70-999d-09372e1a1fa2": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "aa4280a7-e524-5093-a07c-211f630cf94e": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "b962b895-07f7-5565-af2f-9cd07bdbb4a4": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "bbc6545a-f0c4-5d29-8b90-a0d0c9173d02": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "cfc2459b-7a62-5c31-b21d-361784a9f901": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_not_ready"
+          ]
+        },
+        "d00a8fb9-41a7-5add-9bfc-536d79a89ee9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_destination_mismatch"
+          ]
+        },
+        "d9f406bb-619c-5858-82c7-cfd6f1bddd96": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "f9d88d77-cb79-523e-b864-bd2fdcf8249f": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        }
+      },
+      "selection": {
+        "filter_counts": {
+          "class_mismatch": 1,
+          "relocation_destination_mismatch": 2,
+          "relocation_not_ready": 1,
+          "relocation_unknown": 16,
+          "salary_disjoint": 1,
+          "strict_schema_mismatch": 1,
+          "work_type_mismatch": 1,
+          "work_type_unknown": 1
+        },
+        "items": [
+          {
+            "candidate_id": "3916b81f-5e01-5747-90ed-c510fe242336",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression excluded-elsewhere",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.50625,
+              "rating_score": 0.9,
+              "score": 0.88125,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "relocation_accepted"
+            ],
+            "position": 1,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/excluded-elsewhere/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5a0f3e46-f240-53d1-82f8-ce3002994140",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-ready",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.421875,
+              "rating_score": 0.75,
+              "score": 0.796875,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "relocation_accepted"
+            ],
+            "position": 2,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-ready/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "f9d88d77-cb79-523e-b864-bd2fdcf8249f",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Saint Petersburg",
+            "confirmed_strength": 7,
+            "display_name": "Regression city-alias-spb",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.39375,
+              "rating_score": 0.7,
+              "score": 0.76875,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 3,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/city-alias-spb/resume.pdf",
+            "salary": {
+              "from_rub": 190000,
+              "to_rub": 250000
+            }
+          }
+        ],
+        "passed_count": 3,
+        "scanned_count": 22
+      }
+    },
+    "hybrid-relocation": {
+      "filter_decisions": {
+        "2b49eee9-2a11-5082-927e-70d948c3b5cf": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "relocation_accepted"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "38c09cf2-0e69-5b87-bab2-f2a15015f851": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_mismatch",
+            "relocation_unknown"
+          ]
+        },
+        "3916b81f-5e01-5747-90ed-c510fe242336": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "relocation_accepted"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "423e0558-ab3c-5a3f-978f-56ff844f2507": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_unknown",
+            "relocation_unknown"
+          ]
+        },
+        "4ace5dcb-d932-5374-bb61-215d0f1cb9b9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "4ca55cb5-bb91-5eab-ad00-f94d745047f6": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown",
+            "strict_schema_mismatch"
+          ]
+        },
+        "5a0f3e46-f240-53d1-82f8-ce3002994140": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "relocation_accepted"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "5e4f0e1a-c498-5f15-875a-ab407555436d": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "5f909e57-100a-5d39-ad2e-a2ffb4a7587f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "72e293fa-e4b8-53c9-8021-f81952c01b3c": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "757320bc-50f2-5ae0-9cae-4b96e0f73d3f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "7bd390fc-be1a-554f-8655-8e3c957b28df": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "847d741b-2528-53c4-90f1-cbb2256645e1": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "class_mismatch",
+            "relocation_unknown"
+          ]
+        },
+        "89838320-c414-5f70-999d-09372e1a1fa2": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "aa4280a7-e524-5093-a07c-211f630cf94e": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "b962b895-07f7-5565-af2f-9cd07bdbb4a4": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "bbc6545a-f0c4-5d29-8b90-a0d0c9173d02": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "cfc2459b-7a62-5c31-b21d-361784a9f901": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_not_ready"
+          ]
+        },
+        "d00a8fb9-41a7-5add-9bfc-536d79a89ee9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_destination_mismatch"
+          ]
+        },
+        "d9f406bb-619c-5858-82c7-cfd6f1bddd96": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "f9d88d77-cb79-523e-b864-bd2fdcf8249f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        }
+      },
+      "selection": {
+        "filter_counts": {
+          "class_mismatch": 1,
+          "relocation_destination_mismatch": 1,
+          "relocation_not_ready": 1,
+          "relocation_unknown": 17,
+          "strict_schema_mismatch": 1,
+          "work_type_mismatch": 1,
+          "work_type_unknown": 1
+        },
+        "items": [
+          {
+            "candidate_id": "2b49eee9-2a11-5082-927e-70d948c3b5cf",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-salary-disjoint",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.534375,
+              "rating_score": 0.95,
+              "score": 0.915783155,
+              "semantic_contribution": 0.006408155,
+              "semantic_cosine": 0.707106781,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "relocation_accepted"
+            ],
+            "position": 1,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-salary-disjoint/resume.pdf",
+            "salary": {
+              "from_rub": 300000,
+              "to_rub": 400000
+            }
+          },
+          {
+            "candidate_id": "3916b81f-5e01-5747-90ed-c510fe242336",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression excluded-elsewhere",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.50625,
+              "rating_score": 0.9,
+              "score": 0.889646893,
+              "semantic_contribution": 0.008396893,
+              "semantic_cosine": 0.707106781,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "relocation_accepted"
+            ],
+            "position": 2,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/excluded-elsewhere/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5a0f3e46-f240-53d1-82f8-ce3002994140",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-ready",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.421875,
+              "rating_score": 0.75,
+              "score": 0.811238106,
+              "semantic_contribution": 0.014363106,
+              "semantic_cosine": 0.707106781,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.375,
+              "strict_score": 0.857142857,
+              "top_matched_features": [
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 0.857142857,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 7.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "relocation_accepted"
+            ],
+            "position": 3,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-ready/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          }
+        ],
+        "passed_count": 3,
+        "scanned_count": 22
+      }
+    },
+    "onsite-mixed": {
+      "filter_decisions": {
+        "2b49eee9-2a11-5082-927e-70d948c3b5cf": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "salary_disjoint"
+          ]
+        },
+        "38c09cf2-0e69-5b87-bab2-f2a15015f851": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_mismatch"
+          ]
+        },
+        "3916b81f-5e01-5747-90ed-c510fe242336": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "selection_state_excluded",
+            "relocation_destination_mismatch"
+          ]
+        },
+        "423e0558-ab3c-5a3f-978f-56ff844f2507": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_unknown"
+          ]
+        },
+        "4ace5dcb-d932-5374-bb61-215d0f1cb9b9": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "4ca55cb5-bb91-5eab-ad00-f94d745047f6": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "strict_schema_mismatch"
+          ]
+        },
+        "5a0f3e46-f240-53d1-82f8-ce3002994140": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_destination_mismatch"
+          ]
+        },
+        "5e4f0e1a-c498-5f15-875a-ab407555436d": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "5f909e57-100a-5d39-ad2e-a2ffb4a7587f": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "72e293fa-e4b8-53c9-8021-f81952c01b3c": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "757320bc-50f2-5ae0-9cae-4b96e0f73d3f": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "7bd390fc-be1a-554f-8655-8e3c957b28df": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "847d741b-2528-53c4-90f1-cbb2256645e1": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "class_mismatch"
+          ]
+        },
+        "89838320-c414-5f70-999d-09372e1a1fa2": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "aa4280a7-e524-5093-a07c-211f630cf94e": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "b962b895-07f7-5565-af2f-9cd07bdbb4a4": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "bbc6545a-f0c4-5d29-8b90-a0d0c9173d02": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        },
+        "cfc2459b-7a62-5c31-b21d-361784a9f901": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_not_ready"
+          ]
+        },
+        "d00a8fb9-41a7-5add-9bfc-536d79a89ee9": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_destination_mismatch"
+          ]
+        },
+        "d9f406bb-619c-5858-82c7-cfd6f1bddd96": {
+          "factors": [
+            "class_match",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "same_city"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "f9d88d77-cb79-523e-b864-bd2fdcf8249f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "relocation_unknown"
+          ]
+        }
+      },
+      "selection": {
+        "filter_counts": {
+          "class_mismatch": 1,
+          "relocation_destination_mismatch": 3,
+          "relocation_not_ready": 1,
+          "relocation_unknown": 2,
+          "salary_disjoint": 1,
+          "selection_state_excluded": 1,
+          "strict_schema_mismatch": 1,
+          "work_type_mismatch": 1,
+          "work_type_unknown": 1
+        },
+        "items": [
+          {
+            "candidate_id": "b962b895-07f7-5565-af2f-9cd07bdbb4a4",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-confirmed-match",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.45,
+              "rating_score": 0.8,
+              "score": 0.898172687,
+              "semantic_contribution": 0.010672687,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.4375,
+              "strict_score": 1.0,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 0.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": "confirmed",
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 1,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-confirmed-match/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "7bd390fc-be1a-554f-8655-8e3c957b28df",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression semantic-space-legacy",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.45,
+              "rating_score": 0.8,
+              "score": 0.778125,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "semantic_space_mismatch",
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 2,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/semantic-space-legacy/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "aa4280a7-e524-5093-a07c-211f630cf94e",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-semantic-negative",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.39375,
+              "rating_score": 0.7,
+              "score": 0.761120639,
+              "semantic_contribution": -0.070129361,
+              "semantic_cosine": -0.843661488,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.4375,
+              "strict_score": 1.0,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 0.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": "confirmed",
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 3,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-semantic-negative/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5e4f0e1a-c498-5f15-875a-ab407555436d",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "г. Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression city-prefix-normalized",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.365625,
+              "rating_score": 0.65,
+              "score": 0.722803426,
+              "semantic_contribution": 0.029053426,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 4,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/city-prefix-normalized/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "4ace5dcb-d932-5374-bb61-215d0f1cb9b9",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression zero-target-rejected",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.3375,
+              "rating_score": 0.6,
+              "score": 0.697346598,
+              "semantic_contribution": 0.031721598,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 5.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": "rejected",
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 5,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/zero-target-rejected/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "757320bc-50f2-5ae0-9cae-4b96e0f73d3f",
+            "category": {
+              "grade": "middle",
+              "grade_status": "self_reported",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-self-reported-grade",
+            "explanation": {
+              "grade_confidence": 0.6,
+              "grade_status": "self_reported",
+              "rating_contribution": 0.30375,
+              "rating_score": 0.9,
+              "score": 0.666798404,
+              "semantic_contribution": 0.034923404,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 6,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-self-reported-grade/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "89838320-c414-5f70-999d-09372e1a1fa2",
+            "category": {
+              "grade": "junior",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression tie-beta",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.28125,
+              "rating_score": 0.5,
+              "score": 0.646432941,
+              "semantic_contribution": 0.037057941,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 7,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/tie-beta/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "d9f406bb-619c-5858-82c7-cfd6f1bddd96",
+            "category": {
+              "grade": "junior",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression tie-alpha",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.28125,
+              "rating_score": 0.5,
+              "score": 0.646432941,
+              "semantic_contribution": 0.037057941,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.328125,
+              "strict_score": 0.75,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 6.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "confirmed",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 8,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/tie-alpha/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "72e293fa-e4b8-53c9-8021-f81952c01b3c",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-partial-lower",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.3375,
+              "rating_score": 0.6,
+              "score": 0.61531904,
+              "semantic_contribution": 0.04031904,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.2375,
+              "strict_score": 0.542857143,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 0.6,
+                  "contribution": 0.6,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "self_reported",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 4.0,
+                  "confidence": 0.8,
+                  "contribution": 0.571428571,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "partial",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 9,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-partial-lower/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5f909e57-100a-5d39-ad2e-a2ffb4a7587f",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-salary-edge-included",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.28125,
+              "rating_score": 0.5,
+              "score": 0.550262701,
+              "semantic_contribution": 0.047137701,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.221875,
+              "strict_score": 0.507142857,
+              "top_matched_features": [
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 4.0,
+                  "confidence": 1.0,
+                  "contribution": 1.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": "confirmed",
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 1.0,
+                  "candidate_level": 5.0,
+                  "confidence": 0.6,
+                  "contribution": 0.6,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "self_reported",
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 0.857142857,
+                  "candidate_level": 5.0,
+                  "confidence": 0.5,
+                  "contribution": 0.428571429,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": "pending",
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 10,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-salary-edge-included/resume.pdf",
+            "salary": {
+              "from_rub": 250000,
+              "to_rub": 400000
+            }
+          },
+          {
+            "candidate_id": "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression missing-all-evidence",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.225,
+              "rating_score": 0.4,
+              "score": 0.298522956,
+              "semantic_contribution": 0.073522956,
+              "semantic_cosine": 0.948683298,
+              "semantic_unavailable_reason": null,
+              "strict_contribution": 0.0,
+              "strict_score": 0.0,
+              "top_matched_features": [
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": null,
+                  "target_level": 5.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "stack",
+                  "index": 15,
+                  "key": "python",
+                  "status": null,
+                  "target_level": 6.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "stack",
+                  "index": 17,
+                  "key": "go",
+                  "status": null,
+                  "target_level": 4.0
+                },
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "soft_skill",
+                  "index": 31,
+                  "key": "teamwork",
+                  "status": null,
+                  "target_level": 0.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_match",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "same_city"
+            ],
+            "position": 11,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/missing-all-evidence/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          }
+        ],
+        "passed_count": 11,
+        "scanned_count": 22
+      }
+    },
+    "remote-requirements": {
+      "filter_decisions": {
+        "2b49eee9-2a11-5082-927e-70d948c3b5cf": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "salary_disjoint"
+          ]
+        },
+        "38c09cf2-0e69-5b87-bab2-f2a15015f851": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "3916b81f-5e01-5747-90ed-c510fe242336": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "423e0558-ab3c-5a3f-978f-56ff844f2507": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "work_type_unknown"
+          ]
+        },
+        "4ace5dcb-d932-5374-bb61-215d0f1cb9b9": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "4ca55cb5-bb91-5eab-ad00-f94d745047f6": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "strict_schema_mismatch"
+          ]
+        },
+        "5a0f3e46-f240-53d1-82f8-ce3002994140": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "5e4f0e1a-c498-5f15-875a-ab407555436d": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "5f909e57-100a-5d39-ad2e-a2ffb4a7587f": {
+          "factors": [],
+          "passed": false,
+          "reasons": [
+            "salary_disjoint"
+          ]
+        },
+        "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "72e293fa-e4b8-53c9-8021-f81952c01b3c": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "757320bc-50f2-5ae0-9cae-4b96e0f73d3f": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "7bd390fc-be1a-554f-8655-8e3c957b28df": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "847d741b-2528-53c4-90f1-cbb2256645e1": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "89838320-c414-5f70-999d-09372e1a1fa2": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "aa4280a7-e524-5093-a07c-211f630cf94e": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "b962b895-07f7-5565-af2f-9cd07bdbb4a4": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "bbc6545a-f0c4-5d29-8b90-a0d0c9173d02": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "cfc2459b-7a62-5c31-b21d-361784a9f901": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "d00a8fb9-41a7-5add-9bfc-536d79a89ee9": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "d9f406bb-619c-5858-82c7-cfd6f1bddd96": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        },
+        "f9d88d77-cb79-523e-b864-bd2fdcf8249f": {
+          "factors": [
+            "class_unrestricted",
+            "salary_overlap",
+            "work_type_accepted",
+            "strict_schema_current",
+            "remote_location"
+          ],
+          "passed": true,
+          "reasons": []
+        }
+      },
+      "selection": {
+        "filter_counts": {
+          "salary_disjoint": 2,
+          "strict_schema_mismatch": 1,
+          "work_type_unknown": 1
+        },
+        "items": [
+          {
+            "candidate_id": "3916b81f-5e01-5747-90ed-c510fe242336",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression excluded-elsewhere",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.50625,
+              "rating_score": 0.9,
+              "score": 0.81875,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 1,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/excluded-elsewhere/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "847d741b-2528-53c4-90f1-cbb2256645e1",
+            "category": {
+              "grade": "senior",
+              "grade_status": "approved",
+              "specialization": "frontend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression frontend-class-mismatch",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.478125,
+              "rating_score": 0.85,
+              "score": 0.790625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 2,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/frontend-class-mismatch/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "7bd390fc-be1a-554f-8655-8e3c957b28df",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression semantic-space-legacy",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.45,
+              "rating_score": 0.8,
+              "score": 0.7625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 3,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/semantic-space-legacy/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "b962b895-07f7-5565-af2f-9cd07bdbb4a4",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-confirmed-match",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.45,
+              "rating_score": 0.8,
+              "score": 0.7625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 4,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-confirmed-match/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5a0f3e46-f240-53d1-82f8-ce3002994140",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-ready",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.421875,
+              "rating_score": 0.75,
+              "score": 0.734375,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 5,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-ready/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "aa4280a7-e524-5093-a07c-211f630cf94e",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-semantic-negative",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.39375,
+              "rating_score": 0.7,
+              "score": 0.70625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 6,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-semantic-negative/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "bbc6545a-f0c4-5d29-8b90-a0d0c9173d02",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-unknown",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.39375,
+              "rating_score": 0.7,
+              "score": 0.70625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 7,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-unknown/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "5e4f0e1a-c498-5f15-875a-ab407555436d",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "г. Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression city-prefix-normalized",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.365625,
+              "rating_score": 0.65,
+              "score": 0.678125,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 8,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/city-prefix-normalized/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "cfc2459b-7a62-5c31-b21d-361784a9f901",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-not-ready",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.365625,
+              "rating_score": 0.65,
+              "score": 0.678125,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 9,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-not-ready/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "4ace5dcb-d932-5374-bb61-215d0f1cb9b9",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression zero-target-rejected",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.3375,
+              "rating_score": 0.6,
+              "score": 0.65,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 10,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/zero-target-rejected/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "d00a8fb9-41a7-5add-9bfc-536d79a89ee9",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Казань",
+            "confirmed_strength": 7,
+            "display_name": "Regression relocation-destination-mismatch",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.3375,
+              "rating_score": 0.6,
+              "score": 0.65,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 11,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/relocation-destination-mismatch/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "38c09cf2-0e69-5b87-bab2-f2a15015f851",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression worktype-remote-only",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.309375,
+              "rating_score": 0.55,
+              "score": 0.621875,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 12,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/worktype-remote-only/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "757320bc-50f2-5ae0-9cae-4b96e0f73d3f",
+            "category": {
+              "grade": "middle",
+              "grade_status": "self_reported",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-self-reported-grade",
+            "explanation": {
+              "grade_confidence": 0.6,
+              "grade_status": "self_reported",
+              "rating_contribution": 0.30375,
+              "rating_score": 0.9,
+              "score": 0.61625,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 13,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-self-reported-grade/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "89838320-c414-5f70-999d-09372e1a1fa2",
+            "category": {
+              "grade": "junior",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression tie-beta",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.28125,
+              "rating_score": 0.5,
+              "score": 0.59375,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 14,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/tie-beta/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "d9f406bb-619c-5858-82c7-cfd6f1bddd96",
+            "category": {
+              "grade": "junior",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression tie-alpha",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.28125,
+              "rating_score": 0.5,
+              "score": 0.59375,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.3125,
+              "strict_score": 0.714285714,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 1.0,
+                  "contribution": 0.714285714,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "confirmed",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 15,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/tie-alpha/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "72e293fa-e4b8-53c9-8021-f81952c01b3c",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression backend-partial-lower",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.3375,
+              "rating_score": 0.6,
+              "score": 0.525,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.1875,
+              "strict_score": 0.428571429,
+              "top_matched_features": [
+                {
+                  "agreement": 0.714285714,
+                  "candidate_level": 5.0,
+                  "confidence": 0.6,
+                  "contribution": 0.428571429,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": "self_reported",
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 16,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/backend-partial-lower/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          },
+          {
+            "candidate_id": "f9d88d77-cb79-523e-b864-bd2fdcf8249f",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Saint Petersburg",
+            "confirmed_strength": 7,
+            "display_name": "Regression city-alias-spb",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.39375,
+              "rating_score": 0.7,
+              "score": 0.39375,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.0,
+              "strict_score": 0.0,
+              "top_matched_features": [
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": null,
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 17,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/city-alias-spb/resume.pdf",
+            "salary": {
+              "from_rub": 190000,
+              "to_rub": 250000
+            }
+          },
+          {
+            "candidate_id": "6f0b9853-d0de-577a-9cde-99ad5a3eb9c9",
+            "category": {
+              "grade": "middle",
+              "grade_status": "approved",
+              "specialization": "backend"
+            },
+            "city": "Москва",
+            "confirmed_strength": 7,
+            "display_name": "Regression missing-all-evidence",
+            "explanation": {
+              "grade_confidence": 1.0,
+              "grade_status": "approved",
+              "rating_contribution": 0.225,
+              "rating_score": 0.4,
+              "score": 0.225,
+              "semantic_contribution": 0.0,
+              "semantic_cosine": null,
+              "semantic_unavailable_reason": "vacancy_bio_absent",
+              "strict_contribution": 0.0,
+              "strict_score": 0.0,
+              "top_matched_features": [
+                {
+                  "agreement": 0.0,
+                  "candidate_level": 0.0,
+                  "confidence": 0.0,
+                  "contribution": 0.0,
+                  "group": "domain",
+                  "index": 1,
+                  "key": "sql",
+                  "status": null,
+                  "target_level": 3.0
+                }
+              ]
+            },
+            "filter_factors": [
+              "class_unrestricted",
+              "salary_overlap",
+              "work_type_accepted",
+              "strict_schema_current",
+              "remote_location"
+            ],
+            "position": 18,
+            "profile_revision": 1,
+            "rank": 5,
+            "resume_url": "/internal/candidates/missing-all-evidence/resume.pdf",
+            "salary": {
+              "from_rub": 160000,
+              "to_rub": 240000
+            }
+          }
+        ],
+        "passed_count": 18,
+        "scanned_count": 22
+      }
+    }
+  }
+}

@@ -1,1 +1,25 @@
 @import "tailwindcss";
+@import "@comit/ui-kit/design.css";
+@import "@comit/ui-kit/auth.css";
+@import "./screens.css";
+.candidate-settings { display: grid; gap: 24rem; max-width: 900rem; }
+.candidate-settings .action { justify-self: start; }
+.candidate-legal pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
+
+/* Contain main-content bottom margins so artwork covers the entire document. */
+.candidate-app { display: flow-root; }
+.candidate-app:not(.is-login) > .ambient { display: none; }
+.candidate-art { position: absolute; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
+.candidate-art img { position: absolute; object-fit: cover; opacity: .7; filter: blur(15rem); }
+.candidate-art-resume .candidate-art-one { width: 2148.406rem; height: 1432.27rem; left: -707.691rem; top: 759.469rem; transform: rotate(-158.38deg); opacity: .35; }
+.candidate-art-resume .candidate-art-two { width: 2148.406rem; height: 1432.27rem; left: -439.691rem; top: 1817.469rem; transform: rotate(21.62deg); opacity: .35; }
+.candidate-art-resume .candidate-art-three { width: 1802.65rem; height: 1201.767rem; left: 397.364rem; top: -372.561rem; transform: rotate(4.07deg); opacity: .28; }
+.candidate-art-offers .candidate-art-one { width: 1346rem; height: 2020rem; left: 440rem; top: -512rem; opacity: .8; }
+.candidate-art-statistics .candidate-art-one { width: 1256rem; height: 1884rem; left: calc(50% + 90rem); top: -700rem; transform: scaleY(-1); opacity: .56; }
+.candidate-art-statistics .candidate-art-two { width: 1256rem; height: 1884rem; left: -557rem; bottom: -240rem; transform: scaleX(-1); opacity: .8; }
+
+.candidate-offer-card { --employer-feedback-transition: var(--employer-hover-duration); }
+@media (max-width: 700px) {
+  .candidate-content { margin-bottom: calc(120rem + env(safe-area-inset-bottom)); }
+  .candidate-app .nav { bottom: calc(18rem + env(safe-area-inset-bottom)); }
+}

@@ -1,0 +1,79 @@
+{
+  "state": "passed",
+  "purpose": "User-authorized bounded mixed-generator pilot; teacher expansion remains stopped",
+  "model_list_verified": [
+    "qwen3.8-27b",
+    "gemma4-vlm"
+  ],
+  "generators": [
+    {
+      "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+      "model": "qwen3.8-27b",
+      "prompt_version": "rerank-sverk-generation-v2"
+    },
+    {
+      "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+      "model": "gemma4-vlm",
+      "prompt_version": "rerank-sverk-generation-gemma4-v1"
+    }
+  ],
+  "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+  "remote_concurrency_maximum": 5,
+  "pilot_parallel_calls": 2,
+  "family_id": "frontend-06",
+  "split": "validation",
+  "receipts": [
+    {
+      "batch": 1,
+      "generator": {
+        "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+        "model": "qwen3.8-27b",
+        "prompt_version": "rerank-sverk-generation-v2"
+      },
+      "source_request_hash": "67e0df4d9035f2739e75ce54da6ebd9852589fe8ea4842fbbd3b5b83640e4e76",
+      "source_response_hash": "3eb4fc0697d3d8c6e8ffdb17dc43ba058648497b507a46a7dca581596055e178",
+      "batch_receipt_hash": "23d12271a2c24bd4ac291f01a9ea26bd87c395892a7c289d8e1f901901604ab6",
+      "profiles": 5,
+      "elapsed_seconds": 51.909465790959075,
+      "actual_usage": {
+        "completion_tokens": 779,
+        "prompt_tokens": 174,
+        "total_tokens": 953
+      }
+    },
+    {
+      "batch": 2,
+      "generator": {
+        "endpoint": "https://ai.sverk.tech/v1/chat/completions",
+        "model": "gemma4-vlm",
+        "prompt_version": "rerank-sverk-generation-gemma4-v1"
+      },
+      "source_request_hash": "6b0397b25b1477a288cc656e398c322ba8e7cc52e53e493fdeaeb8a568485ed9",
+      "source_response_hash": "c465531a2a5bb3b74519f7f3637c450cfa2c316950d6ac0cc33167c77cc38be4",
+      "batch_receipt_hash": "ae434d2f7ce8f3cdf15f12ec7d84b16bfb9dcfa724059af48ef5297d71b8ff95",
+      "profiles": 5,
+      "elapsed_seconds": 13.865675000008196,
+      "actual_usage": {
+        "completion_tokens": 738,
+        "prompt_tokens": 175,
+        "total_tokens": 913
+      }
+    }
+  ],
+  "shared_attempt_ledger": {
+    "generation": 28,
+    "pair": 656,
+    "grade": 119
+  },
+  "raw_profiles_including_history": 140,
+  "valid_raw_profiles": 139,
+  "completed_families": 12,
+  "completed_profiles": 119,
+  "unassembled_valid_profiles": 20,
+  "usage_estimated": false,
+  "additional_luna_calls": 0,
+  "teacher_expansion_state": "stopped_frontend-05_swap_consistency_1_of_3",
+  "training_started": false,
+  "learned_artifact_active": false,
+  "report_hash": "10c111136a35244de3f3929257dcdc68f5862e82e8933408a51cf061254368f6"
+}

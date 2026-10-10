@@ -1,5 +1,5 @@
 # session/tool state
-/.mimosa
+.mimosa/
 
 # environment & secrets
 .env
@@ -14,7 +14,8 @@ coverage/
 # python
 __pycache__/
 *.pyc
-.venv/
+.venv*/
+*.egg-info/
 .pytest_cache/
 .ruff_cache/
 
@@ -23,3 +24,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Real-card exports and their private pseudonym keys
+/data/learning/

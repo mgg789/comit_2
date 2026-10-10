@@ -1,9 +1,80 @@
+"""Explicit serve/migrate/worker entry points; serving never mutates the schema."""
+
+import argparse
+import logging
 import os
+import signal
+import threading
 
 import uvicorn
 
+from matching_engine.database import migrate
 from matching_engine.main import create_app
+from matching_engine.store import Store
+
+
+def main() -> None:
+    """Run one chosen mode, using environment configuration without exposing credentials."""
+    parser = argparse.ArgumentParser(description="Comit candidate pipeline")
+    parser.add_argument("mode", nargs="?", default="serve",
+                        choices=("serve", "migrate", "worker", "vacancy-worker", "combine-worker", "rerank-worker", "preference-worker", "feed-refill-worker"))
+    parser.add_argument("--once", action="store_true", help="Process one available worker job")
+    args = parser.parse_args()
+    if args.mode == "serve":
+        uvicorn.run(create_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8101")))
+        return
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        parser.error("DATABASE_URL must be configured")
+    if args.mode == "migrate":
+        for name in migrate(database_url):
+            print(f"Applied migration: {name}")
+        return
+    from matching_engine.combine_store import CombineStore
+    from matching_engine.combine_worker import CombineWorker
+    from matching_engine.feed_refill import FeedRefillStore
+    from matching_engine.feed_refill_worker import FeedRefillWorker
+    from matching_engine.rerank_store import RerankStore
+    from matching_engine.rerank_worker import RerankWorker
+    from matching_engine.vacancy_store import VacancyStore
+    from matching_engine.vacancy_worker import VacancyWorker
+    from matching_engine.worker import Worker
+    options = {
+        "lease_seconds": int(os.environ.get("PIPELINE_LEASE_SECONDS", "300")),
+        "max_attempts": int(os.environ.get("PIPELINE_MAX_ATTEMPTS", "5")),
+        "retry_base_seconds": int(os.environ.get("PIPELINE_RETRY_BASE_SECONDS", "30")),
+    }
+    if args.mode == "preference-worker":
+        from matching_engine.preference_store import PreferenceStore
+        from matching_engine.preference_worker import PreferenceWorker
+        worker = PreferenceWorker(PreferenceStore(database_url), **options)
+    elif args.mode == "feed-refill-worker":
+        worker = FeedRefillWorker(FeedRefillStore(database_url), **options)
+    elif args.mode == "rerank-worker":
+        reranks = RerankStore(database_url)
+        from matching_engine.rerank_activation import bootstrap_packaged
+        from matching_engine.store import ConflictError
+        try:
+            bootstrap_packaged(reranks)
+        except (ConflictError, ValueError, OSError):
+            # The reviewed initial rollout never overrides an operator rollback.
+            # Corrupt/incompatible packaged inputs leave explicit main fallback.
+            logging.getLogger(__name__).warning("reviewed rerank bootstrap unavailable; preserving registry state")
+        worker = RerankWorker(reranks, **options)
+    elif args.mode == "combine-worker":
+        worker = CombineWorker(CombineStore(database_url), **options)
+    elif args.mode == "vacancy-worker":
+        worker = VacancyWorker(VacancyStore(database_url), **options)
+    else:
+        worker = Worker(Store(database_url), **options)
+    if args.once:
+        worker.process_once()
+        return
+    stop = threading.Event()
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda _signal, _frame: stop.set())
+    worker.run(stop, poll_seconds=float(os.environ.get("PIPELINE_POLL_SECONDS", "2")))
+
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8101"))
-    uvicorn.run(create_app(), host="0.0.0.0", port=port)
+    main()

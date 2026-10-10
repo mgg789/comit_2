@@ -25,6 +25,13 @@ jobs:
         run: pnpm -r typecheck
       - name: Build
         run: pnpm -r build
+      - name: Shared package production runtime
+        run: node --test apps/api/tests/runtime-shared.test.mjs
+      - name: Existing frontend regression tests
+        run: |
+          pnpm --filter @comit/ui-kit test
+          pnpm --filter @comit/web-employer test
+          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts
 
   python:
     name: Python services tests
@@ -38,14 +45,109 @@ jobs:
           pip install --no-cache-dir \
             -e "./services/matching-engine[dev]" \
             -e "./services/testing-engine[dev]" \
-            -e "./services/integration-engine[dev]"
-      - name: Run tests
-        run: >
-          pytest
-          services/matching-engine/tests
-          services/testing-engine/tests
-          services/integration-engine/tests
-          -q
+            -e "./services/integration-engine[dev]" \
+            -e "./services/agents-service[dev]" \
+            -e "./services/verification-engine[dev]"
+      - name: Coverage gate regression tests
+        run: python -m unittest discover -s tests/coverage-gates -p "test_*.py"
+      - name: Unit coverage (database skips are reported, no full coverage claim)
+        run: |
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+            python tests/coverage-gates/python.py "$service" --unit || exit $?
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-unit-coverage
+          path: coverage/unit/
+
+
+  regression:
+    name: Python regression suite (PostgreSQL)
+    runs-on: [self-hosted, regression]
+    # One regression runner exists; the disposable database must never be shared.
+    container:
+      image: python:3.12-bookworm
+    services:
+      postgres:
+        # pgvector extension is required by matching migrations; same image as the dev/prod stack.
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: comit
+          POSTGRES_PASSWORD: comit-regression
+          POSTGRES_DB: coverage_test
+        options: >-
+          --health-cmd "pg_isready -U comit -d coverage_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Test-only credentials for a database that is destroyed with the job.
+      COVERAGE_TEST_DATABASE_URL: postgresql://comit:comit-regression@postgres:5432/coverage_test
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install services with dev deps
+        run: |
+          pip install --no-cache-dir \
+            -e "./services/matching-engine[dev]" \
+            -e "./services/testing-engine[dev]" \
+            -e "./services/integration-engine[dev]" \
+            -e "./services/agents-service[dev]" \
+            -e "./services/verification-engine[dev]"
+      - name: Full backend tests and per-package coverage gates
+        run: |
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+            python tests/coverage-gates/python.py "$service" || exit $?
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-backend-coverage
+          path: coverage/backend/
+
+  api:
+    name: API tests and coverage (isolated PostgreSQL)
+    runs-on: [self-hosted, ci]
+    container:
+      image: python:3.12-bookworm
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: comit
+          POSTGRES_PASSWORD: comit-coverage
+          POSTGRES_DB: coverage_test
+        options: >-
+          --health-cmd "pg_isready -U comit -d coverage_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      COVERAGE_TEST_DATABASE_URL: postgresql://comit:comit-coverage@postgres:5432/coverage_test
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - name: Install runtimes
+        run: |
+          npm install -g pnpm@9.14.2
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install agents schema migration dependency
+        run: |
+          python -m venv /tmp/coverage-schema
+          /tmp/coverage-schema/bin/pip install -e ./services/agents-service
+      - name: Run API tests and coverage gate
+        env:
+          COVERAGE_SCHEMA_PYTHON: /tmp/coverage-schema/bin/python
+        run: pnpm coverage:api
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-backend-coverage
+          path: coverage/backend/api/
+
 
   smoke:
     name: Compose smoke gate
@@ -61,19 +163,45 @@ jobs:
       MATCHING_PORT: 38101
       TESTING_PORT: 38102
       INTEGRATION_PORT: 38103
+      AGENTS_PORT: 38104
+      VERIFICATION_PORT: 38105
       POSTGRES_PORT: 38432
+      SMOKE_MODE: dev
+      AUTH_ALLOWED_ORIGINS: http://localhost:38088
+      PUBLIC_SITE_URL: http://localhost:38088
+      FSP_DEMO_CALLBACK_URL: http://localhost:38088/api/candidate/profile/fsp/demo/callback
+      FSP_DEMO_PUBLIC_URL: http://localhost:38103
     steps:
       # Container jobs run as root and leave root-owned files in the shared
       # workspace; a root container chowns them back to the runner user.
       - name: Fix workspace ownership
-        run: >
-          docker run --rm -v "/home/mgg/actions-runners/${RUNNER_NAME}:/work" alpine:3.20
-          chown -R "$(id -u):$(id -g)" /work/_work/comit_2
+        run: |
+          case "$RUNNER_NAME" in
+            mgg-ci-[123]) ;;
+            *) echo "Unsupported CI runner for workspace ownership repair" >&2; exit 1 ;;
+          esac
+          docker run --rm \
+            --mount "type=bind,source=/home/mgg/actions-runners/${RUNNER_NAME}/_work/comit_2,target=/work" \
+            alpine:3.20 chown -R "$(id -u):$(id -g)" /work
       - uses: actions/checkout@v5
+      - name: Build explicit dev stack
+        run: docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev build
+      - name: Provision exact real Harrier cache for isolated smoke
+        run: |
+          docker volume create comit-ci_harrier_cache >/dev/null
+          # Read model files only, never copy HF credentials or write the production cache.
+          if docker volume inspect comit_harrier_cache >/dev/null 2>&1; then
+            docker run --rm \
+              --mount type=volume,source=comit_harrier_cache,target=/source,readonly \
+              --mount type=volume,source=comit-ci_harrier_cache,target=/destination \
+              alpine:3.20 sh -ec 'if [ -d /source/hub/models--microsoft--harrier-oss-v1-270m ]; then mkdir -p /destination/hub; cp -a /source/hub/models--microsoft--harrier-oss-v1-270m /destination/hub/; fi'
+          fi
+          docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev run --rm --no-deps matching-engine \
+            python -c 'from huggingface_hub import snapshot_download; from matching_engine.embeddings import HarrierEncoder, MODEL_ID, MODEL_REVISION; encoder=HarrierEncoder(); snapshot_download(MODEL_ID, revision=MODEL_REVISION) if not encoder.is_available else None; assert encoder.is_available, "exact Harrier snapshot unavailable"'
       - name: Start dev stack (isolated project and ports)
-        run: docker compose -p comit-ci -f infra/docker-compose.yml up -d --build
+        run: docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev up -d --wait --wait-timeout 180
       - name: Run smoke gate
         run: ./tests/smoke.sh
       - name: Tear down
         if: always()
-        run: docker compose -p comit-ci -f infra/docker-compose.yml down -v --remove-orphans
+        run: docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev down -v --remove-orphans

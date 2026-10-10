@@ -1,0 +1,714 @@
+{
+  "state": "stopped",
+  "family_id": "frontend-05",
+  "split": "validation",
+  "old_pairs": [
+    {
+      "a": 0,
+      "b": 1,
+      "state": {
+        "A": {
+          "description": "Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.",
+          "duration_months": null,
+          "grade": "junior",
+          "levels": {
+            "python": 2,
+            "react": 3,
+            "rest_api": 2,
+            "sql": 1,
+            "teamwork": 6
+          },
+          "production_support": null,
+          "salary_min": 50000,
+          "status": "pending",
+          "structured_facts_available": false
+        },
+        "B": {
+          "description": "Junior-разработчик с опытом в React. Уверенно работает с API, стремится к командной синергии. Разумные ожидания по зарплате, готов к поддержке прод-среды.",
+          "duration_months": 12,
+          "grade": "middle",
+          "levels": {
+            "python": 1,
+            "react": 4,
+            "rest_api": 3,
+            "sql": 2,
+            "teamwork": 5
+          },
+          "production_support": true,
+          "salary_min": 65000,
+          "status": "self_reported",
+          "structured_facts_available": true
+        },
+        "preferences": "Prefer teamwork and economical salary expectations within an acceptable technical fit.",
+        "vacancy": {
+          "bio": "Разработка API и интерфейсов, SQL, взаимодействие в команде",
+          "class": "frontend",
+          "domens": {},
+          "salary": {
+            "max": 200000,
+            "min": 50000
+          },
+          "soft_skills": {},
+          "stacks": {}
+        }
+      },
+      "direct_source_hash": "0834cffc61a974d7c62d63782c4708a79e2fd14ec9d8b2c9328450e2ad9b4369",
+      "reverse_source_hash": "33191dd5dee4d0cdf41238daad60a323ea274236fa9dfcbe5397a7e5b3b344b2",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.3684,
+        "probabilities": {
+          "A": 0.1704,
+          "B": 0.5263,
+          "tie": 0.1949,
+          "insufficient": 0.1084
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.5399,
+        "probabilities": {
+          "A": 0.6549,
+          "B": 0.0989,
+          "tie": 0.1334,
+          "insufficient": 0.1128
+        }
+      },
+      "exact_swap": true,
+      "raw_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 2,
+      "state": {
+        "A": {
+          "description": "Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.",
+          "duration_months": null,
+          "grade": "junior",
+          "levels": {
+            "python": 2,
+            "react": 3,
+            "rest_api": 2,
+            "sql": 1,
+            "teamwork": 6
+          },
+          "production_support": null,
+          "salary_min": 50000,
+          "status": "pending",
+          "structured_facts_available": false
+        },
+        "B": {
+          "description": "Средний фронтендер с сильными soft skills. Отлично работает в команде, помогает новичкам. Стабильный доход в среднем сегменте, опыт поддержки production.",
+          "duration_months": 36,
+          "grade": "senior",
+          "levels": {
+            "python": 3,
+            "react": 5,
+            "rest_api": 4,
+            "sql": 3,
+            "teamwork": 7
+          },
+          "production_support": true,
+          "salary_min": 90000,
+          "status": "confirmed",
+          "structured_facts_available": true
+        },
+        "preferences": "Prefer teamwork and economical salary expectations within an acceptable technical fit.",
+        "vacancy": {
+          "bio": "Разработка API и интерфейсов, SQL, взаимодействие в команде",
+          "class": "frontend",
+          "domens": {},
+          "salary": {
+            "max": 200000,
+            "min": 50000
+          },
+          "soft_skills": {},
+          "stacks": {}
+        }
+      },
+      "direct_source_hash": "f8043da579d23369b33216b952020e9dab9bed08c8b8a70e9a75f04512ceca18",
+      "reverse_source_hash": "299399dc784871d323e626a1d6824e41e4fe2b7abac844239a523157ec4051bb",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.1284,
+        "probabilities": {
+          "A": 0.3463,
+          "B": 0.3308,
+          "tie": 0.1573,
+          "insufficient": 0.1657
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.5496,
+        "probabilities": {
+          "A": 0.6622,
+          "B": 0.103,
+          "tie": 0.1167,
+          "insufficient": 0.1182
+        }
+      },
+      "exact_swap": true,
+      "raw_consistent": false
+    },
+    {
+      "a": 0,
+      "b": 3,
+      "state": {
+        "A": {
+          "description": "Мотивированный студент с базовыми навыками React. Ищет первую работу для роста, ценит наставничество и командную работу. Готов работать за минимальный бюджет.",
+          "duration_months": null,
+          "grade": "junior",
+          "levels": {
+            "python": 2,
+            "react": 3,
+            "rest_api": 2,
+            "sql": 1,
+            "teamwork": 6
+          },
+          "production_support": null,
+          "salary_min": 50000,
+          "status": "pending",
+          "structured_facts_available": false
+        },
+        "B": {
+          "description": "Senior с фокусом на архитектуру React. Ценит коллективную разработку и менторство. Готов к гибким условиям, если проект интересен и команда сильна.",
+          "duration_months": 60,
+          "grade": "intern",
+          "levels": {
+            "python": 2,
+            "react": 6,
+            "rest_api": 5,
+            "sql": 4,
+            "teamwork": 6
+          },
+          "production_support": true,
+          "salary_min": 120000,
+          "status": "partial",
+          "structured_facts_available": true
+        },
+        "preferences": "Prefer teamwork and economical salary expectations within an acceptable technical fit.",
+        "vacancy": {
+          "bio": "Разработка API и интерфейсов, SQL, взаимодействие в команде",
+          "class": "frontend",
+          "domens": {},
+          "salary": {
+            "max": 200000,
+            "min": 50000
+          },
+          "soft_skills": {},
+          "stacks": {}
+        }
+      },
+      "direct_source_hash": "a80591a0db9b9a1e8d36dc0b90c7fe664e874eeba6ca3c96ba064cd487d3ed9a",
+      "reverse_source_hash": "47d6250848ee05e869fe3044b97f00ac2cddb47dd3d733356535d4064e908c9d",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.194,
+        "probabilities": {
+          "A": 0.3955,
+          "B": 0.2214,
+          "tie": 0.1872,
+          "insufficient": 0.1958
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.4176,
+        "probabilities": {
+          "A": 0.5632,
+          "B": 0.1441,
+          "tie": 0.1335,
+          "insufficient": 0.1592
+        }
+      },
+      "exact_swap": true,
+      "raw_consistent": false
+    }
+  ],
+  "old_raw_consistency": 0.3333333333333333,
+  "cache_audit_hash": "c49c744ee5f0e8add0fd92e99d1c379b9dfed6f4ffce5e92c9ef40de2f4f62f6",
+  "blind_packet_hash": "9f3ebc48fc46ff3360d40b96042622b4d44a10a30d1da580a407a9bef216e98c",
+  "assistant_blind_review": {
+    "packet_hash": "9f3ebc48fc46ff3360d40b96042622b4d44a10a30d1da580a407a9bef216e98c",
+    "reviewer_kind": "assistant",
+    "reviewer": "blind_frontend_facts (critic, no conversation history)",
+    "independent_human_evaluation": false,
+    "teacher_or_main_scores_exposed": false,
+    "scope": "Three factual comparisons only; subjective employer tradeoffs, not objective relevance ground truth",
+    "clarification": "Formal grade test and free narrative role are distinct axes; partial/self_reported statuses are uncertainty, not factual errors. Clarified without exposing teacher answers.",
+    "cases": [
+      {
+        "case_id": "9f36f9035ace",
+        "label": "B",
+        "confidence": "medium",
+        "factual_errors": [],
+        "rationale": "B: React5/API4/SQL3/teamwork7, confirmed, production36months, salary90000. A cheaper50000/pending; no technical minima or monetary tradeoff weights. Stronger fit preferred subjectively."
+      },
+      {
+        "case_id": "b01944661df0",
+        "label": "A",
+        "confidence": "medium",
+        "factual_errors": [],
+        "rationale": "A: React6/API5/SQL4, partial, production60months, salary120000. B cheaper50000/pending. Formal intern grade does not erase declared experience or reinterpret narrative Senior. Stronger fit preferred subjectively."
+      },
+      {
+        "case_id": "50712c728dc4",
+        "label": "A",
+        "confidence": "medium",
+        "factual_errors": [],
+        "rationale": "A: React4/API3/SQL2/self_reported, production12months, salary65000. B cheaper50000/teamwork6/pending; experience unknown, not absent. Stronger technical fit preferred subjectively, no minimum requirements supplied."
+      }
+    ],
+    "review_hash": "b00b0b87060810b1e195d040f982a9a366d508b1478ce3ca8bb72f1d20e3c35c"
+  },
+  "pilot_manifest_hash": "f807fed19d1cb2bbc226c0f1ac1c2ab3f79a8b41a4dc935f58ca7ffa343efcbc",
+  "pilot_teacher": {
+    "endpoint": "https://ai.sverk.tech/v1/systemone",
+    "model": "kev-latest",
+    "prompt_version": "rerank-systemone-pair-v2"
+  },
+  "pilot_abstention_policy": {
+    "minimum_confidence": 0.2,
+    "minimum_probability_gap": 0.05,
+    "calibrated": false
+  },
+  "pilot_comparisons": [
+    {
+      "a": 0,
+      "b": 1,
+      "original_hard_case": true,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "B",
+      "reverse_label": "A",
+      "direct_raw_label": "B",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.5766,
+        "probabilities": {
+          "A": 0.0357,
+          "B": 0.6824,
+          "tie": 0.185,
+          "insufficient": 0.0969
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.629,
+        "probabilities": {
+          "A": 0.7218,
+          "B": 0.0309,
+          "tie": 0.1349,
+          "insufficient": 0.1124
+        }
+      },
+      "cache_keys": [
+        "090e6d000c73550ada671947daf4d8c980376a8993d78146fce2442ebdf35cfc",
+        "fe89b067e87527f2ee13e6c0dfbb4d61575bd893402c1b496f75fa3a158a7c36"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 2,
+      "original_hard_case": true,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "B",
+      "reverse_label": "A",
+      "direct_raw_label": "B",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.5266,
+        "probabilities": {
+          "A": 0.0513,
+          "B": 0.645,
+          "tie": 0.1649,
+          "insufficient": 0.1389
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.6524,
+        "probabilities": {
+          "A": 0.7393,
+          "B": 0.0454,
+          "tie": 0.0919,
+          "insufficient": 0.1234
+        }
+      },
+      "cache_keys": [
+        "b219325c2d4abb90b9e5a55fd852bbf3e6a871b41bdeef6f10f743a9d14d3b43",
+        "ced5541f25316a1b4dbad787f4001182b0cb1abd24aaca26ce957106364d4885"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 3,
+      "original_hard_case": true,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "B",
+      "reverse_label": "A",
+      "direct_raw_label": "B",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.2037,
+        "probabilities": {
+          "A": 0.0976,
+          "B": 0.4028,
+          "tie": 0.2582,
+          "insufficient": 0.2414
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.5112,
+        "probabilities": {
+          "A": 0.6334,
+          "B": 0.0478,
+          "tie": 0.1515,
+          "insufficient": 0.1673
+        }
+      },
+      "cache_keys": [
+        "42bd97435ca1fa8b19fadfbf9fa569f3643edea9fb85d58d0e5e0ea1cf7bb786",
+        "2a1bae54f41562cc9a166b9536df1e7f4e9f871525223f2f0fcb99dfdf9fc137"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 5,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": true,
+      "direct_label": "tie",
+      "reverse_label": "tie",
+      "direct_raw_label": "tie",
+      "reverse_raw_label": "tie",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.2935,
+        "probabilities": {
+          "A": 0.1081,
+          "B": 0.2024,
+          "tie": 0.4701,
+          "insufficient": 0.2194
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.2642,
+        "probabilities": {
+          "A": 0.2401,
+          "B": 0.0794,
+          "tie": 0.4481,
+          "insufficient": 0.2324
+        }
+      },
+      "cache_keys": [
+        "66bb7a3995bc96857fda6e30f0a7b9ce2b4de0ba449e713f8ccb54401be9297f",
+        "490efefc3ed8dcebe49f23e7c94feda1e85705a93db017862778dbb35854f34b"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 4,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "insufficient",
+      "reverse_label": "A",
+      "direct_raw_label": "tie",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.1171,
+        "probabilities": {
+          "A": 0.2225,
+          "B": 0.1868,
+          "tie": 0.3378,
+          "insufficient": 0.2529
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.4778,
+        "probabilities": {
+          "A": 0.6083,
+          "B": 0.0501,
+          "tie": 0.1965,
+          "insufficient": 0.1451
+        }
+      },
+      "cache_keys": [
+        "90936880cedd0d970d6c93e7d2819474366954b94f76e7aec6c4f84f56c712ba",
+        "9666d060beab189c5e209d7ed62dd375c0541707af11e9a40c1d3d99ee5072c0"
+      ],
+      "raw_consistent": false,
+      "final_consistent": false
+    },
+    {
+      "a": 0,
+      "b": 6,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "B",
+      "reverse_label": "A",
+      "direct_raw_label": "B",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.5403,
+        "probabilities": {
+          "A": 0.0415,
+          "B": 0.6552,
+          "tie": 0.175,
+          "insufficient": 0.1283
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.7509,
+        "probabilities": {
+          "A": 0.8132,
+          "B": 0.0203,
+          "tie": 0.0828,
+          "insufficient": 0.0837
+        }
+      },
+      "cache_keys": [
+        "5d1c09a66a6ab57c8facd93635712bf3424d7e2d7ba5bd4b189105abcf0c946d",
+        "354e2095b7bc168141470c23d1a41e9f01bf8e894d8003b66030585b4c858708"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 7,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "B",
+      "reverse_label": "A",
+      "direct_raw_label": "B",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "B",
+        "confidence": 0.5448,
+        "probabilities": {
+          "A": 0.0599,
+          "B": 0.6586,
+          "tie": 0.1628,
+          "insufficient": 0.1188
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.7151,
+        "probabilities": {
+          "A": 0.7863,
+          "B": 0.0272,
+          "tie": 0.0894,
+          "insufficient": 0.0971
+        }
+      },
+      "cache_keys": [
+        "b597c8327637b82e589b6c4c7e3fbba64813db77df13a576529d6b20787b511d",
+        "50c0ddd87b9eb23e95898795fe98a7bc725a085ae5b0d391ad5b6e4da8e48083"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    },
+    {
+      "a": 0,
+      "b": 8,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "insufficient",
+      "reverse_label": "insufficient",
+      "direct_raw_label": "A",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.0606,
+        "probabilities": {
+          "A": 0.2955,
+          "B": 0.2859,
+          "tie": 0.1834,
+          "insufficient": 0.2352
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.1995,
+        "probabilities": {
+          "A": 0.3996,
+          "B": 0.2085,
+          "tie": 0.1506,
+          "insufficient": 0.2412
+        }
+      },
+      "cache_keys": [
+        "8b525cd9eb8dd75b2530012c0936bbff1a598200fed0bc0728b52295604c282f",
+        "afd01b983324d29020b0f37376616794b8b202c7b4ad515611f04f7fdd70c392"
+      ],
+      "raw_consistent": false,
+      "final_consistent": true
+    },
+    {
+      "a": 1,
+      "b": 2,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "tie",
+      "reverse_label": "A",
+      "direct_raw_label": "tie",
+      "reverse_raw_label": "A",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.2346,
+        "probabilities": {
+          "A": 0.0546,
+          "B": 0.3759,
+          "tie": 0.426,
+          "insufficient": 0.1436
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "A",
+        "confidence": 0.3365,
+        "probabilities": {
+          "A": 0.5023,
+          "B": 0.0778,
+          "tie": 0.2651,
+          "insufficient": 0.1547
+        }
+      },
+      "cache_keys": [
+        "87ee862721865b0f9b7a3f5fbc231d05cc16857752f225653063e8fe1778c9c3",
+        "b67d11a7fae7ee2630f385f8aa000011d3a597c7f764f56c366b66dd0765d7b4"
+      ],
+      "raw_consistent": false,
+      "final_consistent": false
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "original_hard_case": false,
+      "salary_focused_nonisolated_control": false,
+      "direct_label": "tie",
+      "reverse_label": "tie",
+      "direct_raw_label": "tie",
+      "reverse_raw_label": "tie",
+      "direct_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.2465,
+        "probabilities": {
+          "A": 0.1869,
+          "B": 0.1729,
+          "tie": 0.4349,
+          "insufficient": 0.2054
+        }
+      },
+      "reverse_answer": {
+        "type": "choice",
+        "choice": "tie",
+        "confidence": 0.2709,
+        "probabilities": {
+          "A": 0.1351,
+          "B": 0.2445,
+          "tie": 0.4531,
+          "insufficient": 0.1673
+        }
+      },
+      "cache_keys": [
+        "3f72806d99a455e2fd517a018532862ed56450461de5e15f70d5d655a06becae",
+        "dbd33b216c2b6183796be95c027c0379fe7bed227f330f5d30acf28a5216a8b6"
+      ],
+      "raw_consistent": true,
+      "final_consistent": true
+    }
+  ],
+  "pilot_gates": {
+    "raw_consistent": 7,
+    "final_consistent": 8,
+    "direct_decisive": 5,
+    "hard_cases_passed": true,
+    "passed": false
+  },
+  "pilot_report_hash": "ec4a640965cf72938ee0c87d0e2393f590dcb7ee21aaaff2ff42cf8c7c33967a",
+  "pilot_elapsed_seconds": 10.678037415957078,
+  "pilot_actual_usage": {
+    "input_tokens": 13824,
+    "output_tokens": 1515
+  },
+  "usage_estimated": false,
+  "shared_ledger_before": {
+    "generation": 28,
+    "pair": 656,
+    "grade": 119
+  },
+  "shared_ledger_after": {
+    "generation": 28,
+    "pair": 676,
+    "grade": 119
+  },
+  "historical_cache_bytes_preserved": true,
+  "failed_pilot_replay_verified_without_http_or_key_reads": true,
+  "new_profile_or_grade_requests": 0,
+  "luna_additional_calls": 0,
+  "cohort_teacher_changed": false,
+  "training_started": false,
+  "activation_allowed": false,
+  "observed_causes": [
+    "Two exact swaps produce A/A: objective invariance violation independent of employer tradeoff judgement.",
+    "v1 pair adapter always accepts a unique maximum; weak confidence 0.1284/0.194 and narrow margin did not trigger abstention.",
+    "Input omitted definitions for evidence/unknown experience and formal grade vs narrative role. Class-only vacancy lacks explicit technical minima and monetary tradeoff weights."
+  ],
+  "causal_limits": "API exposes choice/distribution, not internal rationale. A/B accuracy is not established by an assistant preference judgement. Multiple prompt changes were tested together; this is not an isolated causal experiment.",
+  "decision": "No expansion, fitting, default teacher switch or automatic second pilot; v2 hard three pairs fixed, but raw consistency7/10<8/10 and direct decisive5<6.",
+  "historical_metadata_correction": {
+    "source_report": "rerank-mixed-generation-pilot.json",
+    "source_report_hash": "10c111136a35244de3f3929257dcdc68f5862e82e8933408a51cf061254368f6",
+    "field": "split",
+    "recorded_value": "validation",
+    "actual_value": "calibration",
+    "split_manifest_hash": "69dcc2131f1832a426878f222c4e3bff2bcb8e562699317c2e7323f5e83d747f",
+    "scope": "Report metadata only; frozen dataset assignments were unchanged."
+  },
+  "confidence_definition": "(maximum probability - 1/4) / (1 - 1/4); not calibrated correctness",
+  "confidence_source": "https://github.com/jaredpalmer/kev/blob/main/kev/api.py",
+  "report_hash": "2ab74d34b14decd4cca3c9cbed6be9f991e0422234dfe6a8724e4ed1baa0b09f"
+}

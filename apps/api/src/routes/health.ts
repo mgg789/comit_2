@@ -7,7 +7,7 @@ export interface HealthResponse {
 }
 
 /** Health routes are the smoke-gate contract: every service answers /healthz (docs/ci.md). */
-export async function healthRoutes(app: FastifyInstance): Promise<void> {
+export async function healthRoutes(app: FastifyInstance, options: { readiness?: () => Promise<boolean> } = {}): Promise<void> {
   app.get<{ Reply: HealthResponse }>(
     "/healthz",
     {
@@ -29,11 +29,13 @@ export async function healthRoutes(app: FastifyInstance): Promise<void> {
     async () => ({ status: "ok", service: "api-core", version: "0.1.0" }),
   );
 
-  // DB connectivity check joins here once migrations land (S1); /ready must fail
-  // loudly when Postgres is unreachable so the LB stops routing to a broken pod.
-  app.get<{ Reply: HealthResponse }>("/ready", { schema: { tags: ["health"] } }, async () => ({
-    status: "ok",
-    service: "api-core",
-    version: "0.1.0",
-  }));
+  app.get("/ready", { schema: { tags: ["health"], response: {
+    200: { type: "object", properties: { status: { const: "ok" }, service: { type: "string" }, version: { type: "string" } } },
+    503: { type: "object", properties: { status: { const: "unavailable" }, service: { type: "string" } } }
+  } } }, async (_request, reply) => {
+    try {
+      if (options.readiness && await options.readiness()) return { status: "ok", service: "api-core", version: "0.1.0" };
+    } catch { /* Readiness never exposes connection strings or provider errors. */ }
+    return reply.code(503).send({ status: "unavailable", service: "api-core" });
+  });
 }

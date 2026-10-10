@@ -1,0 +1,89 @@
+{
+  "state": "stopped",
+  "luna_calls": 0,
+  "luna_unavailable_reason": "collaboration agent thread limit reached",
+  "limits": {
+    "families": 60,
+    "profiles": 600,
+    "pair_attempts": 3000,
+    "grade_attempts": 600
+  },
+  "generation_seconds": 15.365513709140942,
+  "comparisons": [
+    {
+      "a": 0,
+      "b": 1,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 1.2622304579708725
+    },
+    {
+      "a": 0,
+      "b": 2,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.01974070887081325
+    },
+    {
+      "a": 0,
+      "b": 3,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.11277899984270334
+    },
+    {
+      "a": 0,
+      "b": 4,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.020268999971449375
+    },
+    {
+      "a": 1,
+      "b": 2,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.018414000049233437
+    },
+    {
+      "a": 1,
+      "b": 3,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.019154417095705867
+    },
+    {
+      "a": 1,
+      "b": 4,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.023659082828089595
+    },
+    {
+      "a": 2,
+      "b": 3,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.018241292098537087
+    },
+    {
+      "a": 2,
+      "b": 4,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.018143750028684735
+    },
+    {
+      "a": 3,
+      "b": 4,
+      "forward": "B",
+      "backward": "B",
+      "seconds": 0.02005733409896493
+    }
+  ],
+  "swap_consistency": 0.0,
+  "decisive_pairs": 10,
+  "reason": "teacher pilot failed swap consistency or decisive-label coverage",
+  "elapsed_seconds": 16.89902750006877,
+  "report_hash": "945fe39fe8a225fa03fce14d6b26c17ab185ebe763ccc9c7c17f01da5c654c91"
+}

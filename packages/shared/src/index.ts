@@ -4,7 +4,38 @@
  * Salary range is mandatory in vacancies AND invitations (TZ rule 2.2.1).
  */
 
+export type { EmployerStatisticsQuery, EmployerStatistics, EmployerExpenses, EmployerExpenseCategory, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
+
+export type {
+  CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
+  CandidateProfileFields, CandidateProfileConsentInput, CandidateProfileMutation,
+  CandidateClaimEvidence, CandidateExternalEvidence, CandidateProjectionDelivery, CandidateProfileView,
+  CandidateVerificationRequest, CandidateVerificationDocument, CandidateVerificationDocumentUpload,
+} from "./candidate-profile.js";
+export type {
+  CandidateIntake, CandidatePipelineStatus, CandidatePoolEntry, ClaimStatus,
+  CoordinateGroup, JsonValue, PipelineNarrative, PipelineSkill,
+  StrictCoordinateEvidence,
+} from "./candidate-pipeline.js";
+export type {
+  VacancyIntake, VacancyPipelineStatus, VacancyReady, VacancyReadyPage, VacancyWorkType,
+} from "./vacancy-pipeline.js";
+export type {
+  CandidateCard, CombineRequest, CombineStatus, DeliveryStatus, MatchedFeature,
+  ScoreBreakdown, SelectionPage, SelectionState, SelectionStateInput,
+  RerankCard, RerankPage, RerankRequest, RerankStatus,
+  FeedRequest, FeedCard, FeedPage, FeedRefillStatus, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, SavedCard, VisitedCard, FeedListPage,
+  PreferenceStatus, PreferenceCommand,
+  HypothesisId, HypothesisSummary, HypothesisStatus,
+} from "./matching.js";
+
 export type Role = "candidate" | "employer";
+export type * from "./agents.js";
+export type * from "./auth.js";
+export type * from "./recruitment.js";
+export type * from "./chat.js";
+export type * from "./showcase.js";
+export type * from "./public-showcase.js";
 
 export const GRADES = ["intern", "junior", "middle", "senior"] as const;
 export type Grade = (typeof GRADES)[number];
@@ -16,14 +47,16 @@ export const SPECIALIZATIONS = [
   "mobile",
   "devops",
   "data",
+  "ml",
   "qa",
 ] as const;
 export type Specialization = (typeof SPECIALIZATIONS)[number];
 
-/** Category = specialization × grade, assigned only via survey + grade test (TZ §2). */
+/** Category records the chosen direction and the explicit evidence state of its grade. */
 export interface Category {
   specialization: Specialization;
   grade: Grade;
+  grade_status?: "approved" | "self_reported";
 }
 
 export interface SalaryRange {
@@ -36,11 +69,10 @@ export interface SalaryRange {
 /** Vacancy lifecycle (context/30-domain-model.md). */
 export type VacancyStatus =
   | "draft"
-  | "active"
-  | "has_candidates"
-  | "suspended"
+  | "open"
+  | "pending"
   | "closed"
-  | "archived";
+  | "done";
 
 /** Candidate position inside one vacancy's selection funnel. */
 export type SelectionStage =
@@ -83,3 +115,10 @@ export interface CandidateProfile {
   ratingPoints: number;
   fsp: FspProfile | null;
 }
+
+export * from "./business-time.js";
+export * from "./recommendations.js";
+export type * from "./notifications.js";
+export type * from "./employer-profile.js";
+
+export type * from "./testing-history.js";

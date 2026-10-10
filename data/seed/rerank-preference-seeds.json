@@ -1,0 +1,18 @@
+{
+  "source": "gpt-6-luna",
+  "reasoning": "low",
+  "calls": 1,
+  "actual_token_usage": null,
+  "purpose": "Supporting scenario design only; no labels and no activation evidence",
+  "scenarios": [
+    {"id":"grade_fit","preference":"Prefer demonstrated role fit over a higher grade when the target role’s core work is clearly a closer match.","contrast":"A higher grade with weaker core-role fit should rank below a lower grade with strong fit."},
+    {"id":"confirmed_declared","preference":"Give confirmed skills and experience more weight than self-declared claims.","contrast":"A declared-only match should rank below a comparable confirmed match."},
+    {"id":"domain_stack","preference":"Prefer relevant domain experience when the role requires domain knowledge; otherwise prefer the role’s required stack.","contrast":"Domain relevance should not outweigh a clearly required stack match without a domain requirement."},
+    {"id":"depth_breadth","preference":"Prefer depth in the role’s essential skills over broad but shallow coverage.","contrast":"Broad coverage should win only when the role explicitly needs several distinct skill areas."},
+    {"id":"relevant_duration","preference":"Count duration when it reflects sustained, relevant work with the required skills.","contrast":"Longer unrelated experience should not outrank shorter, directly relevant experience."},
+    {"id":"production_support","preference":"For roles requiring operational ownership, prefer production responsibility and support experience.","contrast":"For roles without that requirement, production support should not dominate role-specific delivery evidence."},
+    {"id":"soft_hard","preference":"Treat soft-skill evidence as a tie-breaker; preserve essential hard-skill requirements as primary.","contrast":"Strong soft skills should not compensate for a missing essential hard skill; moderate hard-skill evidence may still be outweighed by substantially stronger role evidence."},
+    {"id":"salary_tradeoff","preference":"When salary fit is an explicit constraint, prefer candidates whose expectations fit the stated range, all else equal.","contrast":"A small salary mismatch should not outweigh a materially stronger role fit unless the range is a hard constraint."}
+  ],
+  "review_note": "Salary mismatch suggestion is not adopted: mandatory salary overlap is enforced before R0; preferences compare only eligible candidates. Operational ownership is not inferred from free text."
+}

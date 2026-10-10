@@ -1,0 +1,666 @@
+{
+  "version": "grounded-cohort-acceptance-v1",
+  "state": "completed_test_only_numeric_gate_failed",
+  "source_cohort": "rerank-grounded-cohort-v9",
+  "effective_namespace": "rerank-grounded-pair-repair-v4",
+  "families": 60,
+  "profiles": 420,
+  "profiles_per_family": 7,
+  "splits": {
+    "train": 32,
+    "validation": 8,
+    "calibration": 8,
+    "golden": 12
+  },
+  "directions": {
+    "backend": 8,
+    "frontend": 8,
+    "fullstack": 7,
+    "mobile": 7,
+    "devops": 7,
+    "data": 8,
+    "qa": 7,
+    "ml": 8
+  },
+  "profile_root_statuses": {
+    "confirmed": 244,
+    "partial": 46,
+    "self_reported": 58,
+    "pending": 47,
+    "rejected": 25
+  },
+  "strict_parameters": 37,
+  "conservative_generated_profile_bound": 595,
+  "global_caps": {
+    "generation": 120,
+    "pair": 3000,
+    "grade": 600,
+    "profiles": 600
+  },
+  "global_ledger": {
+    "generation": 99,
+    "pair": 2423,
+    "grade": 579
+  },
+  "raw_teacher_quality": {
+    "minimum_golden_decisive_pairs": 16,
+    "swap_correct": 172,
+    "swap_total": 180,
+    "quarantined_families": [
+      "frontend-01",
+      "qa-06"
+    ],
+    "passed": false
+  },
+  "effective_label_quality": {
+    "passed": true,
+    "swap_correct": 129,
+    "swap_total": 132,
+    "teacher_passed": true,
+    "oracle_passed": true,
+    "oracle_swap_correct": 48,
+    "oracle_swap_total": 48,
+    "quarantined_families": [],
+    "golden_families": 12,
+    "minimum_golden_decisive_pairs": 16,
+    "by_split": {
+      "train": {
+        "families": 24,
+        "swap_correct": 70,
+        "swap_total": 72,
+        "decisive_pairs": 481
+      },
+      "validation": {
+        "families": 0,
+        "swap_correct": 0,
+        "swap_total": 0,
+        "decisive_pairs": 0
+      },
+      "calibration": {
+        "families": 8,
+        "swap_correct": 24,
+        "swap_total": 24,
+        "decisive_pairs": 156
+      },
+      "golden": {
+        "families": 12,
+        "swap_correct": 35,
+        "swap_total": 36,
+        "decisive_pairs": 238
+      }
+    }
+  },
+  "label_source_splits": {
+    "llm_pair_teacher": {
+      "calibration": 8,
+      "golden": 12,
+      "train": 24,
+      "validation": 0
+    },
+    "rule_derived_class_only": {
+      "calibration": 0,
+      "golden": 0,
+      "train": 8,
+      "validation": 8
+    }
+  },
+  "oracle_local_receipts": 384,
+  "oracle_remote_calls": 0,
+  "prior_failed_pilots": {
+    "v1": {
+      "valid": 16,
+      "correct": 16,
+      "reverse_correct": 8,
+      "reverse_total": 10,
+      "charges": 24
+    },
+    "v2": {
+      "valid": 12,
+      "correct": 11,
+      "reverse_correct": 4,
+      "reverse_total": 10,
+      "charges": 28
+    }
+  },
+  "v3_charges": 78,
+  "v4": {
+    "pilot_valid": 8,
+    "pilot_correct": 8,
+    "pilot_reverse_correct": 4,
+    "logical_jobs": 32,
+    "distinct_charges": 25,
+    "cache_reuses": 7,
+    "whole_family": "qa-06"
+  },
+  "assistant_blind_review": {
+    "reviewed": 20,
+    "agreements": 20,
+    "disagreements": 0,
+    "factual_issues": 0,
+    "human_evaluation": false,
+    "metadata_rebound_only": true,
+    "new_blind_decisions_from_rebind": 0
+  },
+  "user_blind_review": {
+    "state": "pending",
+    "pairs": 20,
+    "disjoint_from_assistant": true
+  },
+  "description_audit": {
+    "derived_train_variants": 3,
+    "status": "passed",
+    "typed_facts_byte_equal": true,
+    "independence_established": false,
+    "max_document_cosine_distance": 0.07628642635837368,
+    "max_semantic_cosine_delta": 0.009391521879411169,
+    "max_main_score_delta": 0.0006280192738274404
+  },
+  "pair_label_counts": {
+    "B": 552,
+    "A": 649,
+    "tie": 57,
+    "insufficient": 2
+  },
+  "cyclic_family_ids": [],
+  "recorded_usage_by_namespace": {
+    "rerank-grounded-cohort-v9": {
+      "raw_receipts": 1860,
+      "recorded_usage_receipts": 1860,
+      "prompt_tokens": 6748898,
+      "completion_tokens": 269655,
+      "total_tokens": 7018553
+    },
+    "rerank-grounded-pair-repair-v3": {
+      "raw_receipts": 78,
+      "recorded_usage_receipts": 78,
+      "prompt_tokens": 300111,
+      "completion_tokens": 12510,
+      "total_tokens": 312621
+    },
+    "rerank-grounded-pair-repair-v2": {
+      "raw_receipts": 28,
+      "recorded_usage_receipts": 28,
+      "prompt_tokens": 59879,
+      "completion_tokens": 3620,
+      "total_tokens": 63499
+    },
+    "rerank-grounded-pair-repair-v1": {
+      "raw_receipts": 24,
+      "recorded_usage_receipts": 24,
+      "prompt_tokens": 44950,
+      "completion_tokens": 3258,
+      "total_tokens": 48208
+    },
+    "rerank-grounded-pair-repair-v4": {
+      "raw_receipts": 25,
+      "recorded_usage_receipts": 25,
+      "prompt_tokens": 47132,
+      "completion_tokens": 2466,
+      "total_tokens": 49598
+    }
+  },
+  "usage_scope": "Validated current labeling and repair namespaces only; historical generation/teachers excluded; no monetary estimate",
+  "model": {
+    "version": "rerank-grounded-pair-repair-v4-test-linear-r0-v1",
+    "features": 756,
+    "selected_C": 0.01,
+    "C_grid": [
+      0.01,
+      0.1,
+      1.0,
+      10.0
+    ],
+    "fit_runs": 1,
+    "protocol_valid": true,
+    "test_only": true,
+    "promotion_eligible": false,
+    "tail_gap": null,
+    "semantic_space_id": "microsoft/harrier-oss-v1-270m@31de22b673913c7d658c0f03f792d77c2dcf8ebd:640:last-token:l2",
+    "score_is_hiring_probability": false
+  },
+  "metrics": {
+    "calibration": {
+      "decisive_pairs": 156,
+      "golden_families": 8,
+      "macro_ndcg": 0.9991964896677247,
+      "macro_ndcg_delta": 0.0,
+      "macro_pair_accuracy": 0.9577380952380952,
+      "macro_pair_delta": -0.011607142857142858,
+      "micro_pair_accuracy": 0.9551282051282052,
+      "minimum_decisive_pairs_per_family": 11,
+      "ndcg_delta_ci_low": 0.0,
+      "ndcg_families": 8,
+      "pair_delta_ci_low": -0.04166666666666667,
+      "pair_families": 8,
+      "passed": false,
+      "supported_slices": [
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.011607142857142858,
+          "slice": "mixed"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.011607142857142858,
+          "slice": "mixed_evidence"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.011607142857142858,
+          "slice": "partial_facts"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.011607142857142858,
+          "slice": "semantic_available"
+        }
+      ]
+    },
+    "golden": {
+      "decisive_pairs": 238,
+      "golden_families": 12,
+      "label_validation_passed": true,
+      "macro_ndcg": 0.9985374540515776,
+      "macro_ndcg_delta": 0.0026473218966538334,
+      "macro_pair_accuracy": 0.9586431356168198,
+      "macro_pair_delta": 0.039814814814814824,
+      "micro_pair_accuracy": 0.957983193277311,
+      "minimum_decisive_pairs_per_family": 16,
+      "ndcg_delta_ci_low": 0.0,
+      "ndcg_families": 12,
+      "pair_delta_ci_low": -0.005291005291005291,
+      "pair_families": 12,
+      "passed": false,
+      "protocol_valid": true,
+      "supported_slices": [
+        {
+          "families": 8,
+          "ndcg_delta": 0.003569612023916882,
+          "pair_delta": 0.029960317460317465,
+          "slice": "bio_absent"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.003569612023916882,
+          "pair_delta": 0.029960317460317465,
+          "slice": "domain_only"
+        },
+        {
+          "families": 12,
+          "ndcg_delta": 0.0026473218966538334,
+          "pair_delta": 0.039814814814814824,
+          "slice": "mixed_evidence"
+        },
+        {
+          "families": 12,
+          "ndcg_delta": 0.0026473218966538334,
+          "pair_delta": 0.039814814814814824,
+          "slice": "partial_facts"
+        },
+        {
+          "families": 4,
+          "ndcg_delta": 0.0008027416421277356,
+          "pair_delta": 0.059523809523809534,
+          "slice": "semantic_available"
+        },
+        {
+          "families": 4,
+          "ndcg_delta": 0.0008027416421277356,
+          "pair_delta": 0.059523809523809534,
+          "slice": "stack_only"
+        }
+      ],
+      "tail": {
+        "calibration_recall": 0,
+        "golden_recall": 0,
+        "golden_relevant_count": 67,
+        "golden_wilson_low": 0,
+        "validated": false
+      }
+    },
+    "tail": {
+      "calibration_relevant": 41,
+      "cohort": "reranked_main_top_k",
+      "gap": null,
+      "golden_relevant": 67,
+      "reason": "insufficient_relevant_support"
+    },
+    "validation": {
+      "decisive_pairs": 164,
+      "golden_families": 8,
+      "macro_ndcg": 0.9852645223237804,
+      "macro_ndcg_delta": 0.0,
+      "macro_pair_accuracy": 0.9330357142857143,
+      "macro_pair_delta": -0.006547619047619038,
+      "micro_pair_accuracy": 0.9329268292682927,
+      "minimum_decisive_pairs_per_family": 20,
+      "ndcg_delta_ci_low": 0.0,
+      "ndcg_families": 8,
+      "pair_delta_ci_low": -0.0485193452380952,
+      "pair_families": 8,
+      "passed": false,
+      "supported_slices": [
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.006547619047619038,
+          "slice": "class_only"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.006547619047619038,
+          "slice": "mixed_evidence"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.006547619047619038,
+          "slice": "partial_facts"
+        },
+        {
+          "families": 8,
+          "ndcg_delta": 0.0,
+          "pair_delta": -0.006547619047619038,
+          "slice": "semantic_available"
+        }
+      ]
+    }
+  },
+  "golden_baseline": {
+    "macro_ndcg": 0.9958901321549237,
+    "macro_pair_accuracy": 0.9188283208020049,
+    "maximum_possible_ndcg_gain": 0.004109867845076276,
+    "required_ndcg_gain": 0.02
+  },
+  "golden_family_metrics": [
+    {
+      "baseline_ndcg": 0.9741708819798082,
+      "baseline_pair_accuracy": 0.7,
+      "correct_pairs": 19,
+      "decisive_pairs": 20,
+      "direction": "backend",
+      "family_id": "backend-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.95,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 1
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 0.6666666666666666,
+      "correct_pairs": 18,
+      "decisive_pairs": 21,
+      "direction": "backend",
+      "family_id": "backend-08",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.8571428571428571,
+      "slice_tags": [
+        "stack_only",
+        "semantic_available",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 0
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 0.9523809523809523,
+      "correct_pairs": 21,
+      "decisive_pairs": 21,
+      "direction": "frontend",
+      "family_id": "frontend-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 1.0,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 0
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 0.9047619047619048,
+      "correct_pairs": 19,
+      "decisive_pairs": 21,
+      "direction": "frontend",
+      "family_id": "frontend-08",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.9047619047619048,
+      "slice_tags": [
+        "stack_only",
+        "semantic_available",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 0
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 1.0,
+      "correct_pairs": 17,
+      "decisive_pairs": 18,
+      "direction": "fullstack",
+      "family_id": "fullstack-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.9444444444444444,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 3
+    },
+    {
+      "baseline_ndcg": 0.9824494486189316,
+      "baseline_pair_accuracy": 0.9473684210526315,
+      "correct_pairs": 18,
+      "decisive_pairs": 19,
+      "direction": "mobile",
+      "family_id": "mobile-07",
+      "insufficient": 0,
+      "ndcg": 0.9824494486189316,
+      "pair_accuracy": 0.9473684210526315,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 2
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 0.9523809523809523,
+      "correct_pairs": 21,
+      "decisive_pairs": 21,
+      "direction": "devops",
+      "family_id": "devops-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 1.0,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 0
+    },
+    {
+      "baseline_ndcg": 0.9972722218288568,
+      "baseline_pair_accuracy": 1.0,
+      "correct_pairs": 16,
+      "decisive_pairs": 16,
+      "direction": "data",
+      "family_id": "data-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 1.0,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 5
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 1.0,
+      "correct_pairs": 20,
+      "decisive_pairs": 20,
+      "direction": "data",
+      "family_id": "data-08",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 1.0,
+      "slice_tags": [
+        "stack_only",
+        "semantic_available",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 1
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 0.95,
+      "correct_pairs": 19,
+      "decisive_pairs": 20,
+      "direction": "qa",
+      "family_id": "qa-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.95,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 1
+    },
+    {
+      "baseline_ndcg": 1.0,
+      "baseline_pair_accuracy": 1.0,
+      "correct_pairs": 19,
+      "decisive_pairs": 20,
+      "direction": "ml",
+      "family_id": "ml-07",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 0.95,
+      "slice_tags": [
+        "domain_only",
+        "bio_absent",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 1
+    },
+    {
+      "baseline_ndcg": 0.9967890334314891,
+      "baseline_pair_accuracy": 0.9523809523809523,
+      "correct_pairs": 21,
+      "decisive_pairs": 21,
+      "direction": "ml",
+      "family_id": "ml-08",
+      "insufficient": 0,
+      "ndcg": 1.0,
+      "pair_accuracy": 1.0,
+      "slice_tags": [
+        "stack_only",
+        "semantic_available",
+        "mixed_evidence",
+        "partial_facts"
+      ],
+      "ties": 0
+    }
+  ],
+  "activation_allowed": false,
+  "runtime_model_changed": false,
+  "gate_failures": [
+    "ndcg_delta_below_0.02",
+    "ndcg_delta_ci_low_not_positive",
+    "pair_delta_ci_low_not_positive",
+    "tail_calibration_relevant_below_50",
+    "user20_pending"
+  ],
+  "limitations": [
+    "All eight validation families are rule-derived class-only: C selection is not independent nonclass validation.",
+    "Suitability grades retain original policy; pair-policy revision is a distinct target.",
+    "Seven profiles per family: NDCG@10 evaluates all seven.",
+    "Golden already evaluated: no tuning or convenient family exclusion.",
+    "Synthetic success is not real employer preference validation.",
+    "Source receipts and inactive model remain in local ignored artifacts; tracked report alone is not a retraining dataset."
+  ],
+  "cache_only_replay": {
+    "fit_invocations": 0,
+    "training_bytes_unchanged": true
+  },
+  "verification": {
+    "python_postgresql": {
+      "passed": 1058,
+      "command": "pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q (isolated PostgreSQL env)"
+    },
+    "scoped_ruff": {
+      "passed": true,
+      "command": "ruff check src tests/test_rerank_class_only_oracle.py tests/test_rerank_cohort_pair_repair.py tests/test_rerank_cohort_training.py tests/test_rerank_cohort_pair_completion.py"
+    },
+    "full_ruff": {
+      "passed": false,
+      "preexisting_I001_files": 12,
+      "verified_against": "6098834"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "pnpm -r typecheck"
+    },
+    "build": {
+      "passed": true,
+      "command": "pnpm -r build"
+    },
+    "api_tests": {
+      "passed": 31,
+      "skipped": 7,
+      "failed": 0,
+      "command": "pnpm --filter @comit/api test"
+    },
+    "smoke": {
+      "passed": 12,
+      "command": "make smoke (own loopback services, existing nginx)"
+    },
+    "production": "not_run"
+  },
+  "hashes": {
+    "base_dataset": "41f6a194322d0ac4cd675ec0b06007687350ee69026d679b208f8f74a7ddaeda",
+    "base_report": "93e275520dc3209f6ea0f6f3db85bb53aa4101555b215e9cce9adf86e2ab5c66",
+    "effective_dataset": "d42408e96cf39fe594507e54aedccf9262b131ac4c96aaef744d3d38003fbb29",
+    "repair_report": "80d35c4c68cdf15d40550a654999b173dbe9e24a4820a68ee6b53b7281b0de84",
+    "comparison": "a1319fcc730a246b8fbbb964a1d58ecd8d8ec93fc11a10cc34a8f82e794479d8",
+    "model": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+    "training_report": "dd87a6072f904c9ba2adbe4ea4b2cea6c1fe0d0fb4312853965960a552287596",
+    "feature_schema": "9e19397bf169fb86f61fd514224525ed8b67aa3d184df317c39b5e111d49eca9",
+    "strict_schema": "3f450d72cf68bbd9d3f3fae1bf3800fbcc90dc5eb44f2019b7cdd501061c6f43",
+    "description_audit": "84e5cd5b3ceffb92f5440ba034d6a7fca642061284d5c9f4e7435b725eb26923"
+  },
+  "report_hash": "e12348068a25c69117838b0dcc921edadf5c32a88c22124e397d14b6345ed2d4"
+}

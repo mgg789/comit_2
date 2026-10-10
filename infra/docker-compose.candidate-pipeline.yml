@@ -1,0 +1,121 @@
+# Opt-in candidate, vacancy and main-selection runtime, layered over dev compose.
+# Pre-provision the pinned Harrier snapshot in the shared HF cache before real jobs.
+services:
+  api:
+    environment:
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      CANDIDATE_PIPELINE_TOKEN: ${CANDIDATE_PIPELINE_TOKEN:?Set a private service token}
+
+  matching-engine:
+    environment:
+      CANDIDATE_PIPELINE_TOKEN: ${CANDIDATE_PIPELINE_TOKEN:?Set a private service token}
+      HF_HOME: /models
+    volumes:
+      - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+
+  candidate-migrate:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "migrate"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  candidate-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      HF_HOME: /models
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    volumes:
+      - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  vacancy-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "vacancy-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      HF_HOME: /models
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    volumes:
+      - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  combine-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "combine-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  rerank-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "rerank-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  feed-refill-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "feed-refill-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  preference-worker:
+    build:
+      context: ..
+      dockerfile: infra/matching-engine.Dockerfile
+    command: ["python", "-m", "matching_engine", "preference-worker"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  harrier_cache:

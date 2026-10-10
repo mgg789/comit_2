@@ -1,0 +1,50 @@
+{
+  "description": "Contractual synthetic main-selection oracle; not labelled real-world hiring relevance.",
+  "replicas_per_pattern": 10,
+  "canonical_note": "The initial registry has no generic JavaScript coordinate; frontend fixtures explicitly require the available react and node coordinates. No registry extension or skill substitution is hidden in these fixtures.",
+  "defaults": {
+    "primary_direction": "backend", "grade": "middle", "evidence_status": "confirmed",
+    "city": "Москва", "salary": {"from_rub": 100000, "to_rub": 200000},
+    "work_types": ["remote", "onsite", "hybrid"], "relocation_ready": false,
+    "relocation_cities": [], "stacks": {"python": 6}, "domains": {"sql": 5}
+  },
+  "patterns": [
+    {"pattern": 0, "name": "senior_confirmed", "overrides": {"grade": "senior"}},
+    {"pattern": 1, "name": "self_reported", "overrides": {"evidence_status": "self_reported"}},
+    {"pattern": 2, "name": "intern_low", "overrides": {"grade": "intern", "stacks": {"python": 1}, "domains": {"sql": 1}}},
+    {"pattern": 3, "name": "frontend_senior", "overrides": {"primary_direction": "frontend", "grade": "senior", "stacks": {"react": 6, "node": 6}, "domains": {}}},
+    {"pattern": 4, "name": "ml_middle", "overrides": {"primary_direction": "ml", "stacks": {"python": 5}, "domains": {"classical_ml": 5}}},
+    {"pattern": 5, "name": "salary_disjoint", "overrides": {"salary": {"from_rub": 250000, "to_rub": 300000}}},
+    {"pattern": 6, "name": "kazan_no_relocation", "overrides": {"city": "Казань", "relocation_ready": false}},
+    {"pattern": 7, "name": "kazan_any_relocation", "overrides": {"city": "Казань", "relocation_ready": true}},
+    {"pattern": 8, "name": "kazan_relocation_unknown", "overrides": {"city": "Казань", "relocation_ready": null}},
+    {"pattern": 9, "name": "kazan_tyumen_only", "overrides": {"city": "Казань", "relocation_ready": true, "relocation_cities": ["Тюмень"]}},
+    {"pattern": 10, "name": "work_type_unknown", "overrides": {"work_types": null}},
+    {"pattern": 11, "name": "kazan_remote_only", "overrides": {"city": "Казань", "work_types": ["remote"]}},
+    {"pattern": 12, "name": "moscow_onsite_only", "overrides": {"work_types": ["onsite"]}},
+    {"pattern": 13, "name": "partial_evidence", "overrides": {"evidence_status": "partial"}},
+    {"pattern": 14, "name": "pending_evidence", "overrides": {"evidence_status": "pending"}},
+    {"pattern": 15, "name": "rejected_evidence", "overrides": {"evidence_status": "rejected"}},
+    {"pattern": 16, "name": "absent_hard_claims", "overrides": {"stacks": {}, "domains": {}}},
+    {"pattern": 17, "name": "explicit_zero_confirmed", "overrides": {"stacks": {"python": 0}, "domains": {"sql": 0}}},
+    {"pattern": 18, "name": "confirmed_maximum", "overrides": {"stacks": {"python": 7}, "domains": {"sql": 7}}},
+    {"pattern": 19, "name": "junior_confirmed", "overrides": {"grade": "junior"}}
+  ],
+  "vacancy_defaults": {
+    "source_revision": 1, "owner_id": "62000000-0000-4000-8000-000000000001",
+    "status": "open", "zp_min": 100000, "zp_max": 200000, "daily": "5/2",
+    "type": "remote", "city": "Казань", "class": "backend"
+  },
+  "vacancies": [
+    {"scenario": 0, "name": "backend_onsite_moscow", "overrides": {"type": "onsite", "city": "Москва", "stacks": {"python": 6}, "domens": {"sql": 5}, "bio": "Разработка backend API на Python с PostgreSQL и SQL, проектирование надёжных сервисов и интеграций."}, "eligible_patterns": [0,1,2,7,12,13,14,15,16,17,18,19]},
+    {"scenario": 1, "name": "backend_remote_kazan", "overrides": {"stacks": {"python": 6}, "domens": {"sql": 5}}, "eligible_patterns": [0,1,2,6,7,8,9,11,13,14,15,16,17,18,19]},
+    {"scenario": 2, "name": "frontend_remote", "overrides": {"class": "frontend", "stacks": {"react": 6, "node": 6}}, "eligible_patterns": [3]},
+    {"scenario": 3, "name": "ml_remote", "overrides": {"class": "ml", "stacks": {"python": 5}, "domens": {"classical_ml": 5}}, "eligible_patterns": [4]},
+    {"scenario": 4, "name": "backend_class_only", "overrides": {}, "eligible_patterns": [0,1,2,6,7,8,9,11,13,14,15,16,17,18,19]},
+    {"scenario": 5, "name": "classless_stack_only", "overrides": {"class": null, "stacks": {"python": 5}}, "eligible_patterns": [0,1,2,3,4,6,7,8,9,11,13,14,15,16,17,18,19]},
+    {"scenario": 6, "name": "classless_domain_only_onsite", "overrides": {"class": null, "type": "onsite", "city": "Москва", "domens": {"sql": 5}}, "eligible_patterns": [0,1,2,3,4,7,12,13,14,15,16,17,18,19]},
+    {"scenario": 7, "name": "backend_explicit_zero", "overrides": {"stacks": {"python": 0}}, "eligible_patterns": [0,1,2,6,7,8,9,11,13,14,15,16,17,18,19]},
+    {"scenario": 8, "name": "backend_hybrid_tyumen", "overrides": {"type": "hybrid", "city": "Тюмень", "stacks": {"python": 6}}, "eligible_patterns": [7,9]},
+    {"scenario": 9, "name": "empty_salary_location_intersection", "overrides": {"type": "onsite", "city": "Владивосток", "zp_min": 1000000, "zp_max": 1200000}, "eligible_patterns": []}
+  ]
+}

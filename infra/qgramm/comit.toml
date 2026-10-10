@@ -1,0 +1,37 @@
+[server]
+listen = "127.0.0.1:18080"
+allow_insecure_loopback = true
+
+[storage]
+path = "/data/qgramm.sqlite"
+files = "/data/files"
+
+[security]
+issuer = "comit-qgramm"
+audience = "comit-chat"
+token_public_key_env = "CHAT_Q_TOKEN_PUBLIC_KEY"
+management_secret_env = "QGRAMM_MANAGEMENT_SECRET"
+master_key_env = "QGRAMM_MASTER_KEY"
+hpke_key_env = "QGRAMM_HPKE_KEY"
+
+[features]
+files = true
+
+[capacity]
+expected_concurrent_users = 32
+max_connections = 128
+queue_depth = 128
+workers = 4
+
+[policy]
+history = "all"
+delete_mode = "global"
+reaction_types = []
+event_retention_hours = 720
+dedup_retention_hours = 24
+max_message_bytes = 131072
+max_batch = 16
+max_file_bytes = 8388860
+max_chunk_bytes = 1048576
+max_storage_bytes = 1073741824
+upload_ttl_hours = 24

@@ -1,0 +1,133 @@
+{
+  "version": "continuous-preference-acceptance-v1",
+  "state": "passed_live_mechanics_not_real_employer_quality",
+  "checked_at": "2026-10-06T20:30:52.848885+00:00",
+  "implementation_commit": "cb80e6c",
+  "e2e_receipt": {
+    "version": "live-preference-acceptance-v1",
+    "state": "passed",
+    "checked_at": "2026-10-06T20:17:24.122392+00:00",
+    "contour": "isolated_synthetic_actual_facts_and_explicit_actions",
+    "profiles": 48,
+    "reactions": 40,
+    "real_harrier_dimensions": 640,
+    "migrations": [
+      "001_candidate_pipeline.sql",
+      "002_vacancy_pipeline.sql",
+      "003_vacancy_city_required.sql",
+      "004_matching_pipeline.sql",
+      "005_baseline_reranker.sql",
+      "006_declared_grade.sql",
+      "007_employer_feed.sql",
+      "008_real_card_learning.sql",
+      "009_live_preferences.sql"
+    ],
+    "baseline_hash": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+    "model_hash": "e0ecff9cca8df46d7c2f25f58a23f19f85ab98f5434c4e9cbf1d1a04ae84ca7f",
+    "input_hash": "d94dcb74c8327fab5374447701c515d1a19c7c311b709eea1814d07cb1204a81",
+    "plan_hash": "788d3c89c4c3dc8d26d511ad6f0a8016006965b363e7808efa15c7de5a24555e",
+    "partitions": {
+      "train": 24,
+      "validation": 8,
+      "golden": 8
+    },
+    "metrics": {
+      "validation": {
+        "logloss": -0.08151719717339245,
+        "ndcg_at_10": 0.32336270110701193,
+        "pair_accuracy": 0.625,
+        "loss_improvement": 0.08151719717339245
+      },
+      "golden": {
+        "logloss": -0.08152727587671782,
+        "ndcg_at_10": 0.32336270110701193,
+        "pair_accuracy": 0.625,
+        "loss_improvement": 0.08152727587671782
+      }
+    },
+    "gate": {
+      "passed": true,
+      "reasons": [],
+      "policy_hash": "113abd3d5b06b04cfa8fb556d7668fcf268a2d96350fbc5197153da08081b069"
+    },
+    "continuous_worker": true,
+    "worker_requested_automatically": true,
+    "actual_suffix_reordered": true,
+    "source_only_withdrawal_fallback": true,
+    "coefficients_purged": true,
+    "reset_discards_old_actions": true,
+    "schema_change_fallback": true,
+    "network_model_calls": 0,
+    "production": "not_run",
+    "selection_bias": "synthetic_deterministic_feedback_not_real_employer_quality",
+    "report_hash": "fedf2dbd9898ba8897114a9e5983bbe7ffdee76e46e5dd5d6e9425417cfcc3b3",
+    "metrics_are": "learned_minus_baseline_deltas_on_synthetic_holdouts"
+  },
+  "e2e_receipt_hash_scope": "original_private_report_including_isolated_database_name",
+  "verification": {
+    "full_python_postgresql": {
+      "passed": 1128,
+      "skipped": 0,
+      "command": "python -m pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q",
+      "environment": "dedicated PostgreSQL test databases",
+      "scope": "full suite before final clock and delivery metadata adjustments"
+    },
+    "final_affected_python_postgresql": {
+      "passed": 28,
+      "skipped": 0,
+      "command": "python -m pytest test_preference_live_integration.py test_preference_live_policy.py test_learning_store.py test_feed_integration.py -q",
+      "scope": "final code, including additional actual-clock lease expiry test"
+    },
+    "api": {
+      "passed": 44,
+      "skipped": 1,
+      "command": "pnpm --filter @comit/api test",
+      "skip": "external QGramm integration service not configured",
+      "new_owner_proxy_test": "passed"
+    },
+    "typecheck": {
+      "command": "pnpm -r typecheck",
+      "state": "passed"
+    },
+    "build": {
+      "command": "pnpm -r build",
+      "state": "passed"
+    },
+    "ruff": {
+      "state": "passed",
+      "scope": "four new preference modules, two new test modules, acceptance script"
+    },
+    "smoke": {
+      "command": "make smoke",
+      "passed": 12,
+      "failed": 0,
+      "scope": "local pipeline services; existing nginx retained"
+    },
+    "final_integration_cases": [
+      "fresh audit candidates after 16 new reactions",
+      "concurrent claims and crash recovery",
+      "stale worker cannot publish",
+      "lease expiring during fit cannot publish",
+      "owner authorization and CAS",
+      "corrupt features and bounded technical retry",
+      "matching consent withdrawal",
+      "source-only withdrawal before matching projection",
+      "served cards and cursors stay immutable",
+      "rollback and reset"
+    ],
+    "migration_timing": "Real-Harrier E2E applied 001-009. Additive 010 was then applied to that DB; final PostgreSQL tests and smoke passed with 010.",
+    "schema_evidence": "Acceptance extends 37 to 38 coordinates after reset; incompatible context/model behavior also covered by runtime guards and final integration/policy tests."
+  },
+  "boundaries": {
+    "source": "declared synthetic profiles and explicit synthetic reactions",
+    "operational_training": "wired; real employer quality not measured",
+    "selection_propensity": null,
+    "exploration": false,
+    "main_filters_changed": false,
+    "harrier_retrained": false,
+    "network_model_calls": 0,
+    "production_deployed": false,
+    "existing_llm_budgets_and_caches": "unchanged"
+  },
+  "report_hash": "1005d302c3cb1499cdfb64a87ec37c89296c9477d8aeaa0fd9212fbbab2aa1d0"
+}

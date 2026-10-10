@@ -1,0 +1,179 @@
+[
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000001",
+    "case": "class_only",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "class": "back",
+      "city": "Москва"
+    },
+    "expected_ready": true
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000002",
+    "case": "domains_only",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "domens": {
+        "sql": 4
+      },
+      "city": "Москва"
+    },
+    "expected_ready": true
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000003",
+    "case": "stacks_only",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "stacks": {
+        "python": 5
+      },
+      "city": "Москва"
+    },
+    "expected_ready": true
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000004",
+    "case": "mixed_ml",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "class": "ML",
+      "domens": {
+        "classical_ml": 5
+      },
+      "stacks": {
+        "python": 4
+      },
+      "soft_skills": {
+        "teamwork": 3
+      },
+      "bio": "Разработчик машинного обучения: проекты классификации, обработка данных, обучение моделей на Python.",
+      "city": "Москва"
+    },
+    "expected_ready": true
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000005",
+    "case": "explicit_zero",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "stacks": {
+        "python": 0
+      },
+      "city": "Москва"
+    },
+    "expected_ready": true
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000006",
+    "case": "soft_only",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "soft_skills": {
+        "teamwork": 5
+      },
+      "city": "Москва"
+    },
+    "expected_ready": false
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000007",
+    "case": "bio_only",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "bio": "Разработка API и баз данных.",
+      "city": "Москва"
+    },
+    "expected_ready": false
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000008",
+    "case": "empty",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "city": "Москва"
+    },
+    "expected_ready": false
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000009",
+    "case": "missing_salary",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "open",
+      "zp_min": null,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "class": "front",
+      "city": "Москва"
+    },
+    "expected_ready": false
+  },
+  {
+    "vacancy_id": "30000000-0000-4000-8000-000000000010",
+    "case": "pending",
+    "input": {
+      "source_revision": 1,
+      "owner_id": "20000000-0000-4000-8000-000000000001",
+      "status": "pending",
+      "zp_min": 100000,
+      "zp_max": 220000,
+      "daily": "5/2, 8 часов",
+      "type": "дистант",
+      "class": "back",
+      "city": "Москва"
+    },
+    "expected_ready": false
+  }
+]

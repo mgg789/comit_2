@@ -1,0 +1,317 @@
+{
+  "acknowledgements": {
+    "failed_quality_gate": true,
+    "missing_independent_human_review": true,
+    "review_limitations": true,
+    "sort_only_no_tail": true,
+    "test_only_training": true
+  },
+  "action": "activate",
+  "actor": "operator:user-authorized-manual-rollout",
+  "artifact_hash": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+  "evaluation_hash": "049852a2bb884e4e95df472232391f1e108a170c5a7525e2d7e34fe4570568a8",
+  "gate_snapshot": {
+    "decisive_pairs": 238,
+    "families": [
+      {
+        "baseline_ndcg": 0.9741708819798082,
+        "baseline_pair_accuracy": 0.7,
+        "correct_pairs": 19,
+        "decisive_pairs": 20,
+        "direction": "backend",
+        "family_id": "backend-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.95,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 1
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 0.6666666666666666,
+        "correct_pairs": 18,
+        "decisive_pairs": 21,
+        "direction": "backend",
+        "family_id": "backend-08",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.8571428571428571,
+        "slice_tags": [
+          "stack_only",
+          "semantic_available",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 0
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 0.9523809523809523,
+        "correct_pairs": 21,
+        "decisive_pairs": 21,
+        "direction": "frontend",
+        "family_id": "frontend-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 1.0,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 0
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 0.9047619047619048,
+        "correct_pairs": 19,
+        "decisive_pairs": 21,
+        "direction": "frontend",
+        "family_id": "frontend-08",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.9047619047619048,
+        "slice_tags": [
+          "stack_only",
+          "semantic_available",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 0
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 1.0,
+        "correct_pairs": 17,
+        "decisive_pairs": 18,
+        "direction": "fullstack",
+        "family_id": "fullstack-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.9444444444444444,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 3
+      },
+      {
+        "baseline_ndcg": 0.9824494486189316,
+        "baseline_pair_accuracy": 0.9473684210526315,
+        "correct_pairs": 18,
+        "decisive_pairs": 19,
+        "direction": "mobile",
+        "family_id": "mobile-07",
+        "insufficient": 0,
+        "ndcg": 0.9824494486189316,
+        "pair_accuracy": 0.9473684210526315,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 2
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 0.9523809523809523,
+        "correct_pairs": 21,
+        "decisive_pairs": 21,
+        "direction": "devops",
+        "family_id": "devops-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 1.0,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 0
+      },
+      {
+        "baseline_ndcg": 0.9972722218288568,
+        "baseline_pair_accuracy": 1.0,
+        "correct_pairs": 16,
+        "decisive_pairs": 16,
+        "direction": "data",
+        "family_id": "data-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 1.0,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 5
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 1.0,
+        "correct_pairs": 20,
+        "decisive_pairs": 20,
+        "direction": "data",
+        "family_id": "data-08",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 1.0,
+        "slice_tags": [
+          "stack_only",
+          "semantic_available",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 1
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 0.95,
+        "correct_pairs": 19,
+        "decisive_pairs": 20,
+        "direction": "qa",
+        "family_id": "qa-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.95,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 1
+      },
+      {
+        "baseline_ndcg": 1.0,
+        "baseline_pair_accuracy": 1.0,
+        "correct_pairs": 19,
+        "decisive_pairs": 20,
+        "direction": "ml",
+        "family_id": "ml-07",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 0.95,
+        "slice_tags": [
+          "domain_only",
+          "bio_absent",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 1
+      },
+      {
+        "baseline_ndcg": 0.9967890334314891,
+        "baseline_pair_accuracy": 0.9523809523809523,
+        "correct_pairs": 21,
+        "decisive_pairs": 21,
+        "direction": "ml",
+        "family_id": "ml-08",
+        "insufficient": 0,
+        "ndcg": 1.0,
+        "pair_accuracy": 1.0,
+        "slice_tags": [
+          "stack_only",
+          "semantic_available",
+          "mixed_evidence",
+          "partial_facts"
+        ],
+        "ties": 0
+      }
+    ],
+    "golden_families": 12,
+    "label_validation_passed": true,
+    "macro_ndcg": 0.9985374540515776,
+    "macro_ndcg_delta": 0.0026473218966538334,
+    "macro_pair_accuracy": 0.9586431356168198,
+    "macro_pair_delta": 0.039814814814814824,
+    "micro_pair_accuracy": 0.957983193277311,
+    "minimum_decisive_pairs_per_family": 16,
+    "ndcg_delta_ci_low": 0.0,
+    "ndcg_families": 12,
+    "pair_delta_ci_low": -0.005291005291005291,
+    "pair_families": 12,
+    "passed": false,
+    "protocol_valid": true,
+    "supported_slices": [
+      {
+        "families": 8,
+        "ndcg_delta": 0.003569612023916882,
+        "pair_delta": 0.029960317460317465,
+        "slice": "bio_absent"
+      },
+      {
+        "families": 8,
+        "ndcg_delta": 0.003569612023916882,
+        "pair_delta": 0.029960317460317465,
+        "slice": "domain_only"
+      },
+      {
+        "families": 12,
+        "ndcg_delta": 0.0026473218966538334,
+        "pair_delta": 0.039814814814814824,
+        "slice": "mixed_evidence"
+      },
+      {
+        "families": 12,
+        "ndcg_delta": 0.0026473218966538334,
+        "pair_delta": 0.039814814814814824,
+        "slice": "partial_facts"
+      },
+      {
+        "families": 4,
+        "ndcg_delta": 0.0008027416421277356,
+        "pair_delta": 0.059523809523809534,
+        "slice": "semantic_available"
+      },
+      {
+        "families": 4,
+        "ndcg_delta": 0.0008027416421277356,
+        "pair_delta": 0.059523809523809534,
+        "slice": "stack_only"
+      }
+    ],
+    "tail": {
+      "calibration_recall": 0,
+      "golden_recall": 0,
+      "golden_relevant_count": 67,
+      "golden_wilson_low": 0,
+      "validated": false
+    }
+  },
+  "reason": "User explicitly requested this reviewed research R0 in the main pipeline despite the failed quality gate. Preserve test-only and absent independent human review evidence; sorting only, without tail exclusion.",
+  "receipt_hash": "5149d72428631204cfa6d6b96c90e45bca6c9774593e87bc882d29c9fbb821fd",
+  "review_evidence": {
+    "artifact_hash": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+    "assistant_comparison_hash": "a1319fcc730a246b8fbbb964a1d58ecd8d8ec93fc11a10cc34a8f82e794479d8",
+    "assistant_packet_hash": "76811b1a771110c0dfcb6027a01e7f357c05fd25554bfe20860e96ad1a62946e",
+    "assistant_pairs": 20,
+    "assistant_review_hash": "1599d5d5841bbb36e9592256bfc2e30b285ba070ee7604c6aed25d5343b6e5eb",
+    "correction_receipt_hash": "a99605446251f2a0577c53ac16d287f1cf375a7bd50995c182689b0e10d53fe2",
+    "dataset_hash": "e235f5cbcd8405a1d5c7e4cfd00ce92e0b296c412de831f9f0727da24d263e97",
+    "disagreements": 0,
+    "factual_errors": 0,
+    "independent_human_evaluation": false,
+    "training_report_hash": "dd87a6072f904c9ba2adbe4ea4b2cea6c1fe0d0fb4312853965960a552287596",
+    "user_pairs": 0
+  },
+  "reviews_snapshot": {
+    "assistant_pairs": 0,
+    "factual_issues": [],
+    "user_pairs": 0
+  },
+  "scope": "sort_only",
+  "training_test_only": true,
+  "version": "manual-sort-only-activation-v1"
+}

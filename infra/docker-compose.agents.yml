@@ -1,0 +1,69 @@
+# Opt-in editorial/agent contour. Layer AFTER docker-compose.candidate-pipeline.yml.
+# Laya stays on the host: this container is a client, not an MLX runtime.
+services:
+  api:
+    environment:
+      AGENTS_SERVICE_URL: http://agents-service:8104
+      AGENTS_SERVICE_TOKEN: ${AGENTS_SERVICE_TOKEN:?Set a private agents service token}
+
+  agents-service:
+    build:
+      context: ..
+      dockerfile: infra/agents-service.Dockerfile
+    environment: &agents-env
+      PORT: 8104
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+      AGENTS_SERVICE_TOKEN: ${AGENTS_SERVICE_TOKEN:?Set a private agents service token}
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      AGENTS_MODE: ${AGENTS_MODE:-auto}
+      CANDIDATE_PIPELINE_TOKEN: ${CANDIDATE_PIPELINE_TOKEN:?Set a private matching token}
+      JEV_LOCAL_URL: ${JEV_LOCAL_URL:-http://host.docker.internal:12444}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ORGANIZATION_API_URL: http://api:8080
+      AGENT_INPUT_USD_PER_MILLION: ${AGENT_INPUT_USD_PER_MILLION:-0.2}
+      AGENT_OUTPUT_USD_PER_MILLION: ${AGENT_OUTPUT_USD_PER_MILLION:-0.7}
+      AGENT_CACHED_INPUT_USD_PER_MILLION: ${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}
+      JEV_API_URL: ${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}
+      JEV_MODEL: ${JEV_MODEL:-kev-latest}
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      JEV_INPUT_USD_PER_MILLION: ${JEV_INPUT_USD_PER_MILLION:-0.042}
+      JEV_OUTPUT_USD_PER_MILLION: ${JEV_OUTPUT_USD_PER_MILLION:-0}
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  agents-migrate:
+    build:
+      context: ..
+      dockerfile: infra/agents-service.Dockerfile
+    command: ["python", "-m", "agents_service", "migrate"]
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit}@postgres:5432/comit
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  agents-worker:
+    build:
+      context: ..
+      dockerfile: infra/agents-service.Dockerfile
+    command: ["python", "-m", "agents_service", "worker"]
+    environment: *agents-env
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  organization-agent-worker:
+    build:
+      context: ..
+      dockerfile: infra/agents-service.Dockerfile
+    command: ["python", "-m", "agents_service", "organization-worker"]
+    environment: *agents-env
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped

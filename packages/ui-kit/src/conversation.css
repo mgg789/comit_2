@@ -1,0 +1,316 @@
+.recruitment-messages {
+  height: 590rem;
+  overflow: auto;
+  padding: 48rem 0 24rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 38rem;
+}
+.message-bubble {
+  width: max-content;
+  max-width: 680rem;
+  border-radius: 20rem;
+  padding: 15rem 24rem;
+  font-size: 21rem;
+  line-height: 24rem;
+  position: relative;
+  flex-shrink: 0;
+}
+.message-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message-bubble.outgoing {
+  align-self: flex-end;
+  background: var(--employer-paint-181816);
+  color: var(--employer-paint-fff);
+}
+.message-bubble.incoming {
+  align-self: flex-start;
+  background: var(--employer-paint-fff);
+  color: var(--employer-paint-191921);
+}
+.message-bubble time {
+  display: block;
+  font-size: 12rem;
+  line-height: 16rem;
+  opacity: 0.45;
+  text-align: right;
+  margin-top: 5rem;
+}
+.message-file {
+  display: block;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+  text-align: left;
+  margin-top: 10rem;
+  cursor: pointer;
+}
+.conversation-empty {
+  margin: auto;
+  color: var(--employer-paint-a5a5af);
+  font-size: 22rem;
+  text-align: center;
+}
+.communication-composer-wrap {
+  position: fixed;
+  bottom: 56rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 706rem;
+  z-index: 4;
+}
+.communication-composer {
+  border-radius: 80rem;
+  height: 80rem;
+  display: flex;
+  gap: 16rem;
+  align-items: center;
+  padding: 8rem;
+  box-shadow: inset 0 0 0 1rem var(--employer-paint-ffffff30);
+}
+.communication-composer > input:not([type="file"]) {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--employer-paint-fff);
+  font: inherit;
+  font-size: 20rem;
+  padding: 0;
+}
+.communication-composer input::placeholder {
+  color: var(--employer-paint-f5f4fb);
+}
+.attach-button {
+  width: 60rem;
+  height: 60rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1rem solid var(--employer-paint-b4e9ff50);
+  color: var(--employer-paint-fff);
+  font-size: 36rem;
+  font-weight: 300;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  background: var(--employer-gradient);
+  box-shadow: inset 0 0 15rem var(--employer-paint-fff4);
+  cursor: pointer;
+  transition: transform var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.attach-button:hover {
+  transform: scale(1.06);
+}
+.attach-button:active {
+  transform: scale(0.98);
+}
+.communication-composer .send-button {
+  width: 60rem;
+  height: 60rem;
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 0;
+}
+.send-button .icon {
+  width: 25rem;
+  height: 25rem;
+}
+.communication-attribution {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5rem;
+  margin-top: 16rem;
+  color: var(--employer-paint-9c9da5);
+  font-size: 14rem;
+}
+.communication-attribution .icon {
+  width: 22rem;
+  height: 22rem;
+  margin-right: 3rem;
+  opacity: 0.5;
+}
+.communication-attribution span {
+  color: var(--employer-paint-5da6ed);
+}
+.communication-error {
+  font-size: 18rem;
+  background: var(--employer-paint-282020);
+  border-radius: 16rem;
+  padding: 12rem 18rem;
+  margin-bottom: 12rem;
+}
+.pending-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rem;
+  margin-bottom: 12rem;
+}
+.pending-files button {
+  background: var(--employer-paint-26262b);
+  color: var(--employer-paint-fff);
+  border: 0;
+  border-radius: 14rem;
+  padding: 8rem 14rem;
+  font-size: 16rem;
+}
+
+.recruitment-conversation { min-width: 0; }
+@media (max-width: 760px) {
+  .recruitment-messages { height: calc(100dvh - 470rem); min-height: 180rem; gap: 18rem; padding-top: 24rem; }
+  .message-bubble { max-width: 90%; padding: 12rem 15rem; font-size: 15rem; line-height: 20rem; border-radius: 16rem; }
+  .communication-composer-wrap { width: calc(100% - 36rem); bottom: 100rem; }
+  .communication-composer { height: 58rem; gap: 10rem; padding: 6rem; }
+  .attach-button, .communication-composer .send-button { width: 44rem; height: 44rem; font-size: 28rem; }
+  .communication-composer > input:not([type="file"]) { font-size: 14rem; }
+  .communication-attribution { font-size: 10rem; margin-top: 8rem; }
+  .communication-attribution .icon { width: 16rem; height: 16rem; }
+  .communication-error { font-size: 13rem; }
+  .pending-files button { font-size: 12rem; }
+}
+
+.attach-button .icon { width: 24rem; height: 24rem; }
+
+.message-composer {
+  background: var(--employer-composer-glass);
+  height: auto;
+  min-height: 80rem;
+  border-radius: 40rem;
+  align-items: center;
+}
+.message-composer.multiline {
+  align-items: flex-end;
+}
+.message-composer textarea {
+  align-self: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  max-height: 192rem;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  resize: none;
+  background: transparent;
+  color: var(--employer-paint-fff);
+  font: inherit;
+  font-size: 20rem;
+  line-height: 24rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--employer-paint-333) transparent;
+}
+.message-composer textarea::placeholder {
+  color: var(--employer-paint-f5f4fb);
+}
+.message-composer .send-button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+.message-composer .send-button {
+  transition: scale var(--employer-hover-duration) var(--employer-hover-ease), opacity var(--employer-hover-duration) var(--employer-hover-ease);
+}
+
+@media (max-width: 760px) {
+  .message-composer {
+  background: var(--employer-composer-glass);
+    height: auto;
+    min-height: 58rem;
+    border-radius: 29rem;
+  }
+  .message-composer textarea {
+    font-size: 14rem;
+    line-height: 20rem;
+    max-height: 160rem;
+  }
+}
+
+.communication-attribution .qgramm-mark { width: 22.5098rem; height: 24rem; object-fit: contain; margin-right: 3rem; }
+.communication-attribution a { color: var(--employer-paint-5da6ed); text-decoration: none; }
+.communication-attribution a:hover { text-decoration: underline; }
+.recruitment-chat-list { display: flex; flex-direction: column; gap: 16rem; }
+.recruitment-chat-tile { display: flex; align-items: center; width: 100%; gap: 24rem; padding: 24rem 32rem; border: 0; color: var(--employer-paint-fff); text-align: left; cursor: pointer; transition: background var(--employer-hover-duration) var(--employer-hover-ease); }
+.recruitment-chat-tile:hover { background: var(--employer-paint-26262b); }
+.chat-tile-label { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 8rem; }
+.chat-tile-label strong { font-size: 24rem; overflow-wrap: anywhere; }
+.chat-tile-label small, .chat-tile-state { font-size: 18rem; color: var(--employer-paint-a5a5af); }
+.recruitment-screen { position: relative; }
+.chat-back { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 20rem; }
+.chat-back h1 { font-size: 42rem; font-weight: 700; letter-spacing: -1rem; }
+.chat-back .circle { width: 66rem; height: 66rem; }
+.recruitment-thread { width: min(964rem, 100%); margin: 0 auto; position: relative; }
+.participant-header { min-height: 66rem; border-radius: 40rem; background: var(--employer-paint-fff); color: var(--employer-paint-282b34); display: flex; align-items: center; padding: 6rem 12rem; gap: 14rem; }
+.anonymous-avatar { width: 54rem; height: 54rem; flex-shrink: 0; border-radius: 50%; background: var(--employer-paint-dedee3); display: grid; place-items: center; border: 0; color: var(--employer-paint-282b34); }
+.anonymous-avatar .icon { width: 30rem; height: 30rem; }
+.participant-name { display: flex; flex-direction: column; align-items: flex-start; text-align: left; background: none; border: 0; color: inherit; gap: 3rem; min-width: 0; }
+.participant-name strong { font-size: 22rem; font-weight: 700; }
+.participant-name small { font-size: 18rem; }
+.recruitment-thread .recruitment-messages { height: max(180rem, calc(100dvh - 440rem)); }
+.recruitment-thread .communication-composer-wrap { bottom: 56rem; }
+@media (max-width: 760px) {
+  .communication-attribution .qgramm-mark { width: 15rem; height: 16rem; }
+  .chat-back { position: static; margin-bottom: 18rem; }
+  .chat-back h1 { font-size: 26rem; }
+  .chat-back .circle { width: 44rem; height: 44rem; }
+  .participant-header { min-height: 54rem; padding: 5rem 8rem; gap: 8rem; }
+  .anonymous-avatar { width: 42rem; height: 42rem; }
+  .participant-name strong { font-size: 16rem; } .participant-name small { font-size: 12rem; }
+  .recruitment-chat-tile { gap: 12rem; padding: 18rem; flex-wrap: wrap; }
+  .chat-tile-label strong { font-size: 18rem; } .chat-tile-label small, .chat-tile-state { font-size: 13rem; }
+  .chat-tile-state { flex-basis: 100%; padding-left: 54rem; }
+  .recruitment-thread .recruitment-messages { height: max(180rem, calc(100dvh - 430rem)); }
+  .recruitment-thread .communication-composer-wrap { bottom: 180rem; }
+}
+
+.message-composer .attach-button .icon { width: 28rem; height: 28rem; }
+
+/* Fine alignment of the shared participant capsule. */
+.participant-header { padding-left: 10rem; }
+.participant-name small { transform: translateY(-2rem); }
+
+.chat-read-edge { height: 1px; }
+.chat-tile-state.has-unread { color: var(--employer-blue); }
+
+@media (max-width: 760px) { .participant-header { padding-left: 6rem; } }
+
+.system-avatar { background: var(--employer-ink); color: var(--comit-text); }
+.system-avatar .icon { width: 34rem; height: 34rem; }
+
+/* A conversation owns viewport space; only its message history scrolls. */
+body:has(.chat-page) { overflow: hidden; }
+.chat-page { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+.chat-page .main-content { min-height: 0; margin-bottom: 0; flex: 1; overflow: hidden; }
+.chat-page .main-content > div, .chat-page .recruitment-screen, .chat-page .recruitment-thread { height: 100%; min-height: 0; }
+.chat-page .recruitment-thread { display: flex; flex-direction: column; }
+.chat-page .participant-header { flex-shrink: 0; padding-left: 8rem; }
+.chat-page .recruitment-conversation { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.chat-page .recruitment-thread .recruitment-messages { min-height: 0; flex: 1; height: auto; padding-block: 48rem; overscroll-behavior: contain; mask-image: linear-gradient(to bottom, transparent, black 48rem, black calc(100% - 48rem), transparent); }
+.chat-page .system-inbox .chat-history-viewport { flex: 1; margin-bottom: 40rem; }
+.system-inbox .message-bubble > .action { margin-top: 20rem; }
+@media (max-width: 760px) {
+  .chat-page .recruitment-screen { display: flex; flex-direction: column; }
+  .chat-page .recruitment-thread { flex: 1; height: auto; min-height: 0; }
+  .chat-page .chat-back { flex-shrink: 0; }
+  .chat-page .participant-header { padding-left: 4rem; }
+  .chat-page .system-inbox .chat-history-viewport { margin-bottom: 100rem; }
+}
+
+.chat-page .recruitment-conversation .recruitment-messages { flex: 0 1 auto; }
+.chat-page > .topbar { flex-shrink: 0; }
+
+.chat-history-viewport { position: relative; min-height: 0; overflow: hidden; }
+.chat-page .chat-history-viewport > .recruitment-messages { height: 100%; }
+.chat-history-viewport::before, .chat-history-viewport::after { content: ""; position: absolute; left: 0; right: 0; height: 48rem; z-index: 2; pointer-events: none; backdrop-filter: blur(4rem); }
+.chat-history-viewport::before { top: 0; mask-image: linear-gradient(black, transparent); }
+.chat-history-viewport::after { bottom: 0; mask-image: linear-gradient(transparent, black); }

@@ -1,0 +1,88 @@
+{
+  "state": "passed",
+  "contour": "isolated_synthetic_only",
+  "database": "comit_cards_learning_8f3e2a6e",
+  "profiles": 5,
+  "vacancies": 1,
+  "selected": 3,
+  "passed_outside_top_k": 1,
+  "model_hash": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+  "activation_kind": "manual_override",
+  "approval_receipt_hash": "5149d72428631204cfa6d6b96c90e45bca6c9774593e87bc882d29c9fbb821fd",
+  "gate_changed": false,
+  "real_harrier_dimensions": 640,
+  "runtime_fit": false,
+  "tail_cut": false,
+  "initial_mode": "learned",
+  "impression_replay": true,
+  "explicit_decisions": 2,
+  "export_rows": 3,
+  "source_revocation_rows": 2,
+  "feature_payload_purged": true,
+  "schema_change": "37->38",
+  "schema_change_fallback": "feature_schema_mismatch",
+  "migrations": [
+    "001_candidate_pipeline.sql",
+    "002_vacancy_pipeline.sql",
+    "003_vacancy_city_required.sql",
+    "004_matching_pipeline.sql",
+    "005_baseline_reranker.sql",
+    "006_declared_grade.sql",
+    "007_employer_feed.sql",
+    "008_real_card_learning.sql"
+  ],
+  "bootstrap_activated": true,
+  "checked_at": "2026-10-06T18:38:35.310517+00:00",
+  "production": "not_run",
+  "verification": {
+    "python_postgresql": {
+      "passed": 1088,
+      "command": "pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests -q (isolated PostgreSQL)"
+    },
+    "post_migration_guard_checks": {
+      "passed": 31,
+      "command": "pytest test_learning_store.py test_rerank_activation.py test_pipeline_integration.py::test_migrations_are_idempotent_and_checksum_guarded -q"
+    },
+    "source_consent_concurrency": {
+      "passed": 1,
+      "command": "pytest test_learning_consent_lock.py -q (isolated Harrier acceptance DB)"
+    },
+    "api": {
+      "passed": 43,
+      "skipped": 1,
+      "command": "pnpm --filter @comit/api test",
+      "skip_reason": "external QGramm test service not configured"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "pnpm -r typecheck"
+    },
+    "build": {
+      "passed": true,
+      "command": "pnpm -r build"
+    },
+    "scoped_ruff": {
+      "passed": true,
+      "command": "ruff check src tests/test_learning_store.py tests/test_learning_consent_lock.py tests/test_rerank_activation.py ../../tests/real_card_learning_acceptance.py"
+    },
+    "smoke": {
+      "passed": 12,
+      "command": "make smoke (own loopback services, existing nginx)"
+    },
+    "real_harrier_acceptance": {
+      "passed": true,
+      "command": "python tests/real_card_learning_acceptance.py",
+      "network_model_calls": 0,
+      "training_runs": 0
+    }
+  },
+  "limitations": [
+    "Real users were not ingested or deployed by this acceptance; all profiles are explicitly synthetic.",
+    "Operational consent/export path was exercised with synthetic source records.",
+    "Client visibility endpoint exists; future Tinder viewport integration is not implemented.",
+    "Behavioral like/dislike labels do not mean hiring suitability; no-action remains unlabeled.",
+    "No automatic retraining, exploration propensity or real-data split is fabricated.",
+    "Historical synthetic activation gates still fail; activation uses a separate user-authorized sort-only receipt."
+  ],
+  "report_hash": "22df57272b1a5cfe93414cb127776843d8adcbceee32ec8f6cdb3b4ab3dc223f"
+}

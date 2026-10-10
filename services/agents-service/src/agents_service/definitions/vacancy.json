@@ -1,0 +1,14 @@
+{
+  "key": "vacancy",
+  "version": "1.0.1",
+  "knowledge_version": "1.0.1",
+  "tools": ["get_draft", "get_taxonomy", "set_fields", "approve", "show_interaction"],
+  "limits": {
+    "max_rounds": 8,
+    "max_tool_calls": 16,
+    "max_output_tokens": 1536,
+    "max_total_tokens": 16000,
+    "context_chars": 24000,
+    "latest_messages": 8
+  }
+}

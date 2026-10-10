@@ -1,0 +1,8 @@
+{
+  "api": { "kind": "c8", "lines": 85, "branches": 75 },
+  "matching-engine": { "kind": "python", "lines": 80, "branches": 70 },
+  "agents-service": { "kind": "python", "lines": 80, "branches": 55 },
+  "integration-engine": { "kind": "python", "lines": 80, "branches": 60 },
+  "verification-engine": { "kind": "python", "lines": 50, "branches": 25 },
+  "testing-engine": { "kind": "python", "lines": 75, "branches": 60 }
+}

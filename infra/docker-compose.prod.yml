@@ -1,86 +1,577 @@
+# Compatibility entry point for existing deployment jobs. Keep synchronized with docker-compose.yml.
+---
 name: comit
-
-# Production stack for mgg-server (/home/mgg/comit, docs/deploy.md).
-# Same images as dev; restart policies on. Only web is published externally;
-# api and engines are bound to 127.0.0.1 for on-server debugging and the
-# smoke gate (the deploy workflow reads the port map from /home/mgg/comit/.env).
-
 services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: comit
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
       POSTGRES_DB: comit
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    - pgdata:/var/lib/postgresql/data
+    - "./postgres/init:/docker-entrypoint-initdb.d:ro"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U comit -d comit"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U comit -d comit
       interval: 5s
       timeout: 3s
       retries: 12
     restart: unless-stopped
-
   api:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/api.Dockerfile
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD}@postgres:5432/comit
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      JWT_SECRET: "${JWT_SECRET:-}"
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private service
+        token}"
+      AGENTS_SERVICE_URL: http://agents-service:8104
+      AGENTS_SERVICE_TOKEN: "${AGENTS_SERVICE_TOKEN:?Set a private agents service
+        token}"
+      AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET with at least 32 random bytes}"
+      AUTH_ALLOWED_ORIGINS: "${AUTH_ALLOWED_ORIGINS:?Set explicit browser origins}"
+      AUTH_COOKIE_SECURE: 'true'
+      AUTH_KEY_ID: "${AUTH_KEY_ID:-v1}"
+      ACCOUNT_CONSENT_VERSION: "${ACCOUNT_CONSENT_VERSION:-account-v1}"
+      TRUST_PROXY: "${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}"
+      SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
+      SMTP_PORT: "${SMTP_PORT:-2525}"
+      SMTP_USER: "${SMTP_USER:?Set existing SMTP credentials}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:?Set existing SMTP credentials}"
+      SMTP_FROM: "${SMTP_FROM:-Comit <noreply@mail.droidje.com>}"
+      SMTP_TLS_SERVERNAME: "${SMTP_TLS_SERVERNAME:-mail.droidje.com}"
+      CHAT_SERVICE_URL: http://qgramm-chat:8080
+      CHAT_SERVICE_TOKEN: "${CHAT_SERVICE_TOKEN:?Set a random private chat token of
+        at least 32 characters}"
+      NODE_ENV: production
+      DEV_AUTH_EXPOSE_CODE: 'false'
+      VERIFICATION_ENGINE_URL: http://verification-engine:8105
+      VERIFICATION_ENGINE_TOKEN: "${VERIFICATION_ENGINE_TOKEN:?Set VERIFICATION_ENGINE_TOKEN}"
+      VERIFICATION_DOCUMENT_KEY: "${VERIFICATION_DOCUMENT_KEY:?Set VERIFICATION_DOCUMENT_KEY}"
+      FSP_DEMO_ENABLED: 'false'
+      TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
+      PUBLIC_SITE_URL: "${PUBLIC_SITE_URL:?Set HTTPS public site URL}"
     depends_on:
       postgres:
         condition: service_healthy
+      auth-migrate:
+        condition: service_completed_successfully
+      qgramm-chat:
+        condition: service_healthy
+      matching-engine:
+        condition: service_healthy
+      agents-service:
+        condition: service_healthy
+      verification-engine:
+        condition: service_healthy
+      testing-engine:
+        condition: service_healthy
     ports:
-      - "127.0.0.1:${API_PORT:-28080}:8080"
+    - 127.0.0.1:${API_PORT:-28080}:8080
     restart: unless-stopped
-
+    networks:
+    - default
+    - chat-private
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - "-e"
+      - fetch('http://127.0.0.1:8080/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    extra_hosts:
+    - host.docker.internal:host-gateway
   matching-engine:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/matching-engine.Dockerfile
     environment:
       PORT: 8101
-      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD}@postgres:5432/comit
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private service
+        token}"
+      HF_HOME: "/models"
     depends_on:
       postgres:
         condition: service_healthy
+      candidate-migrate:
+        condition: service_completed_successfully
     ports:
-      - "127.0.0.1:${MATCHING_PORT:-28101}:8101"
+    - 127.0.0.1:${MATCHING_PORT:-28101}:8101
     restart: unless-stopped
-
+    volumes:
+    - harrier_cache:/models
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - "-c"
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8101/ready',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
   testing-engine:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/testing-engine.Dockerfile
     environment:
       PORT: 8102
-      BLUEPRINT_DIR: /app/blueprints
+      BLUEPRINT_DIR: "/app/blueprints"
+      TESTING_API_URL: http://api:8080
+      TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
+      TESTING_DATA_DIR: /data/testing
     ports:
-      - "127.0.0.1:${TESTING_PORT:-8102}:8102"
+    - 127.0.0.1:${TESTING_PORT:-8102}:8102
+    volumes:
+    - testing-data:/data/testing
     restart: unless-stopped
-
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - "-c"
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/healthz',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
   integration-engine:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/integration-engine.Dockerfile
     environment:
+      APP_ENV: production
       PORT: 8103
+      FSP_DEMO_ENABLED: 'false'
     ports:
-      - "127.0.0.1:${INTEGRATION_PORT:-8103}:8103"
+    - 127.0.0.1:${INTEGRATION_PORT:-8103}:8103
     restart: unless-stopped
-
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - "-c"
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8103/ready',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
   web:
     build:
-      context: ..
+      context: ".."
       dockerfile: infra/web.Dockerfile
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
-      - "${WEB_PORT:-8088}:80"
+    - "${WEB_PORT:-8088}:80"
     restart: unless-stopped
-
+  candidate-migrate:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - migrate
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+    depends_on:
+      postgres:
+        condition: service_healthy
+  candidate-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      HF_HOME: "/models"
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    volumes:
+    - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  vacancy-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - vacancy-worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      HF_HOME: "/models"
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    volumes:
+    - harrier_cache:/models
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  combine-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - combine-worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  rerank-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - rerank-worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  feed-refill-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - feed-refill-worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  preference-worker:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    command:
+    - python
+    - "-m"
+    - matching_engine
+    - preference-worker
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      PIPELINE_MAX_ATTEMPTS: 5
+      PIPELINE_LEASE_SECONDS: 300
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  agents-service:
+    build:
+      context: ".."
+      dockerfile: infra/agents-service.Dockerfile
+    environment:
+      PORT: 8104
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      AGENTS_SERVICE_TOKEN: "${AGENTS_SERVICE_TOKEN:?Set a private agents service
+        token}"
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      AGENTS_MODE: auto
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
+        token}"
+      JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      ORGANIZATION_API_URL: http://api:8080
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_INPUT_USD_PER_MILLION: "${JEV_INPUT_USD_PER_MILLION:-0.042}"
+      JEV_OUTPUT_USD_PER_MILLION: "${JEV_OUTPUT_USD_PER_MILLION:-0}"
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - "-c"
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8104/ready',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+    - 127.0.0.1:${AGENTS_PORT:-28104}:8104
+  agents-migrate:
+    build:
+      context: ".."
+      dockerfile: infra/agents-service.Dockerfile
+    command:
+    - python
+    - "-m"
+    - agents_service
+    - migrate
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+    depends_on:
+      candidate-migrate:
+        condition: service_completed_successfully
+  agents-worker:
+    build:
+      context: ".."
+      dockerfile: infra/agents-service.Dockerfile
+    command:
+    - python
+    - "-m"
+    - agents_service
+    - worker
+    environment:
+      PORT: 8104
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      AGENTS_SERVICE_TOKEN: "${AGENTS_SERVICE_TOKEN:?Set a private agents service
+        token}"
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      AGENTS_MODE: auto
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
+        token}"
+      JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      ORGANIZATION_API_URL: http://api:8080
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_INPUT_USD_PER_MILLION: "${JEV_INPUT_USD_PER_MILLION:-0.042}"
+      JEV_OUTPUT_USD_PER_MILLION: "${JEV_OUTPUT_USD_PER_MILLION:-0}"
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_healthy
+    restart: unless-stopped
+  organization-agent-worker:
+    build:
+      context: ".."
+      dockerfile: infra/agents-service.Dockerfile
+    command:
+    - python
+    - "-m"
+    - agents_service
+    - organization-worker
+    environment:
+      PORT: 8104
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      AGENTS_SERVICE_TOKEN: "${AGENTS_SERVICE_TOKEN:?Set a private agents service
+        token}"
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      AGENTS_MODE: auto
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
+        token}"
+      JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      ORGANIZATION_API_URL: http://api:8080
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_INPUT_USD_PER_MILLION: "${JEV_INPUT_USD_PER_MILLION:-0.042}"
+      JEV_OUTPUT_USD_PER_MILLION: "${JEV_OUTPUT_USD_PER_MILLION:-0}"
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_healthy
+    restart: unless-stopped
+  auth-migrate:
+    build:
+      context: ".."
+      dockerfile: infra/api.Dockerfile
+    command:
+    - node
+    - dist/auth/migrate.js
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+    depends_on:
+      agents-migrate:
+        condition: service_completed_successfully
+  auth-mail-worker:
+    build:
+      context: ".."
+      dockerfile: infra/api.Dockerfile
+    command:
+    - node
+    - dist/auth/mail-worker.js
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      AUTH_SECRET: "${AUTH_SECRET:?Set AUTH_SECRET with at least 32 random bytes}"
+      SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
+      SMTP_PORT: "${SMTP_PORT:-2525}"
+      SMTP_USER: "${SMTP_USER:?Set existing SMTP credentials}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:?Set existing SMTP credentials}"
+      SMTP_FROM: "${SMTP_FROM:-Comit <noreply@mail.droidje.com>}"
+      SMTP_TLS_SERVERNAME: "${SMTP_TLS_SERVERNAME:-mail.droidje.com}"
+      NODE_ENV: production
+      DEV_AUTH_EXPOSE_CODE: 'false'
+      PUBLIC_SITE_URL: "${PUBLIC_SITE_URL:?Set HTTPS public site URL}"
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    extra_hosts:
+    - host.docker.internal:host-gateway
+  qgramm-chat:
+    build:
+      context: ".."
+      dockerfile: infra/qgramm/Dockerfile
+    environment:
+      CHAT_BRIDGE_LISTEN: 0.0.0.0:8080
+      CHAT_SERVICE_TOKEN: "${CHAT_SERVICE_TOKEN:?Set a random private chat token}"
+      CHAT_DEVICE_SECRET: "${CHAT_DEVICE_SECRET:?Set a stable base64 32-byte device
+        derivation key}"
+      CHAT_SIGNING_KEY: "${CHAT_SIGNING_KEY:?Set a stable base64 32-byte Ed25519 seed}"
+      QGRAMM_MANAGEMENT_SECRET: "${QGRAMM_MANAGEMENT_SECRET:?Set a stable private
+        management secret}"
+      QGRAMM_MASTER_KEY: "${QGRAMM_MASTER_KEY:?Set a stable base64 32-byte storage
+        key}"
+      QGRAMM_HPKE_KEY: "${QGRAMM_HPKE_KEY:?Set a stable base64 32-byte HPKE key}"
+    volumes:
+    - chat-data:/data
+    networks:
+    - chat-private
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    read_only: true
+    tmpfs:
+    - "/tmp"
+  candidate-profile-worker:
+    build:
+      context: ".."
+      dockerfile: infra/api.Dockerfile
+    command:
+    - node
+    - dist/profiles/worker.js
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private service
+        token}"
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      candidate-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_healthy
+    restart: unless-stopped
+  recommendation-worker:
+    build:
+      context: ".."
+      dockerfile: infra/api.Dockerfile
+    command:
+    - node
+    - dist/recommendations/worker.js
+    environment:
+      DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
+      MATCHING_ENGINE_URL: http://matching-engine:8101
+      CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private service
+        token}"
+      AGENTS_SERVICE_URL: http://agents-service:8104
+      AGENTS_SERVICE_TOKEN: "${AGENTS_SERVICE_TOKEN:?Set a private agents service
+        token}"
+      NODE_ENV: production
+    depends_on:
+      auth-migrate:
+        condition: service_completed_successfully
+      matching-engine:
+        condition: service_healthy
+      agents-service:
+        condition: service_healthy
+    restart: unless-stopped
+  verification-engine:
+    build:
+      context: ".."
+      dockerfile: infra/verification-engine.Dockerfile
+    environment:
+      PORT: 8105
+      INTEGRATION_ENGINE_URL: http://integration-engine:8103
+      VERIFICATION_ENGINE_TOKEN: "${VERIFICATION_ENGINE_TOKEN:?Set VERIFICATION_ENGINE_TOKEN}"
+      HH_API_TOKEN: "${HH_API_TOKEN:-}"
+      HH_USER_AGENT: "${HH_USER_AGENT:-comit-verification/0.1}"
+      FSP_DEMO_ENABLED: 'false'
+    depends_on:
+    - integration-engine
+    expose:
+    - '8105'
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - "-c"
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8105/healthz',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    ports:
+    - 127.0.0.1:${VERIFICATION_PORT:-28105}:8105
+    restart: unless-stopped
 volumes:
+  testing-data:
   pgdata:
+  harrier_cache:
+  chat-data:
+networks:
+  chat-private:
+    internal: true

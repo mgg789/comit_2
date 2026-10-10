@@ -1,0 +1,20 @@
+{
+ "apply": {
+  "adjustment": 0.0,
+  "contributions_digest": "63fafd62460c329d3011c3ae0fe41c8529c3dbcd44c4a0a5249c86f6ff69f0ee",
+  "score": 0.5,
+  "uncertainty": 0.0
+ },
+ "calibration_intercept": 0.0901989377,
+ "calibration_slope": 0.0,
+ "coefficients_digest": "daf7e69c35ec0ff6601e9434a93b0b0e38d1b0b6f51b628d64feecee467bc0ff",
+ "diagnostics": {
+  "class_balance": 1.0,
+  "iterations": 5,
+  "n_examples": 24
+ },
+ "gamma": 0.2717426603,
+ "means_digest": "2e28b664632a2781e229a7fdb4ea9cdef99b6baf072fd7c02e04ef7ad7807fc5",
+ "scales_digest": "78421aa220b2589cbbc4fc504d1a51fbf74968876556b202f20127cb7c6594e7",
+ "trust": 0.2717426603
+}

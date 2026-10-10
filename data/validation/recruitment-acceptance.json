@@ -1,0 +1,38 @@
+{
+  "result": "passed",
+  "checked_at": "2026-10-06T14:19:00+03:00",
+  "source_commit": "4c5057d",
+  "scope": "authenticated_post_like_backend_without_chat",
+  "database": "comit_profile_acceptance_recruitment_final",
+  "candidate_count": 3,
+  "top_k": 3,
+  "embedding_provider": "pinned_local_harrier_640d",
+  "rerank_mode": "main_fallback",
+  "smtp_used": false,
+  "checks": [
+    "real_auth_source_projection_harrier_pdf_pool",
+    "published_vacancy_main_fallback_topk_three_likes",
+    "invitations_idempotent_candidate_acceptance_contact_gate_owner_isolation",
+    "immediate_offer_without_interviews_and_terminal_hired",
+    "two_real_scheduled_completed_interviews_limit_and_offer_decline",
+    "preinvitation_rejection_hidden_from_candidate",
+    "durable_scoped_events_and_live_processing_consent_revocation"
+  ],
+  "verification": {
+    "api_postgresql": { "passed": 42, "skipped": 0 },
+    "matching_postgresql": { "passed": 689, "skipped": 0 },
+    "typecheck": "passed",
+    "build": "passed",
+    "scoped_ruff": "passed",
+    "smoke": { "passed": 14, "failed": 0 },
+    "code_review": "approved",
+    "read_only_inspection": "ready_for_commit"
+  },
+  "limitations": [
+    "No UI, internal chat, SMTP notification delivery or production deployment.",
+    "Durable participant event polling is implemented; external consumers are separate work.",
+    "Learned reranker quality and personalized feedback learning were not evaluated.",
+    "Offer expiry, concurrent actions and cancellation are covered by PostgreSQL tests; the HTTP harness exercises real-clock interview completion.",
+    "Closed process reopening, invitation expiry, no-show and SLA automation remain separate contracts."
+  ]
+}
