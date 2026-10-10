@@ -23,11 +23,17 @@ await context.route("**/api/**", async route => {
   if (path === "/api/candidate/profile") {
     if (request.method() === "GET") return reply(profile);
     const body = request.postDataJSON(); saves++;
+    if (saves === 3) {
+      assert.equal(body.expected_revision, 3); assert.deepEqual(body.fields, {});
+      assert.deepEqual(body.consent, { processing: false, pool: false, version: "profile-v1", training: false });
+      profile = { ...profile, revision: 4, consents: { ...profile.consents, ...body.consent, training_version: null, training_accepted_at: null } };
+      return reply(profile);
+    }
     assert.equal(body.fields.fsp_id, undefined); assert.equal(body.fields.fsp_claim_id, undefined); assert.equal(body.evidence, undefined);
     assert.deepEqual(body.fields.projects[0].facts, { role: "developer", duration_months: 12 });
     if (saves === 1) { assert.equal(body.expected_revision, 1); profile = { ...profile, revision: 2 }; return reply({ detail: "profile_revision_conflict" }, 409); }
-    assert.equal(body.expected_revision, 2); assert.equal(body.consent.processing, false); assert.equal(body.consent.pool, false); assert.equal(body.consent.training, false); assert.equal(body.consent.training_version, undefined);
-    profile = { ...profile, revision: 3, fields: { ...profile.fields, ...body.fields }, consents: { ...profile.consents, ...body.consent, training_version: null } }; return reply(profile);
+    assert.equal(body.expected_revision, 2); assert.equal(body.consent, undefined);
+    profile = { ...profile, revision: 3, fields: { ...profile.fields, ...body.fields }, consents: { ...profile.consents, ...body.consent } }; return reply(profile);
   }
   if (path === "/api/candidate/recruitment") {
     if (url.searchParams.get("cursor") === "next-page") { cursorReads++; return reply({ items: [second], limit: 100, offset: 0, has_more: false }); }
@@ -64,8 +70,26 @@ try {
   await page.getByRole("button", { name: "Загрузить актуальное резюме", exact: true }).click();
   await page.getByRole("button", { name: "Редактировать резюме", exact: false }).first().click();
   await page.getByLabel("Ваше имя", { exact: true }).fill("Обновлённый кандидат");
-  await page.getByLabel("Согласен(а) на обработку данных резюме", { exact: true }).uncheck();
-  await page.getByLabel("Показывать резюме работодателям в подборе", { exact: true }).uncheck();
+  const processing = page.getByLabel("Согласен(а) на обработку данных резюме", { exact: true });
+  const pool = page.getByLabel("Показывать резюме работодателям в подборе", { exact: true });
+  const save = page.getByRole("button", { name: "Сохранить резюме", exact: true });
+  assert.equal(await processing.isChecked(), true); assert.equal(await pool.isChecked(), true);
+  await processing.uncheck(); assert.equal(await save.isDisabled(), true);
+  await page.locator(".candidate-profile-editor form").evaluate(form => form.requestSubmit());
+  await page.getByRole("alert").waitFor(); assert.equal(saves, 1);
+  await processing.focus(); await page.keyboard.press("Space"); assert.equal(await processing.isChecked(), true);
+  await pool.uncheck(); assert.equal(await save.isDisabled(), true);
+  await pool.check(); assert.equal(await save.isDisabled(), false);
+  const onsite = page.getByLabel("В офисе", { exact: true });
+  await onsite.focus(); await page.keyboard.press("Space"); assert.equal(await onsite.isChecked(), true);
+  assert.equal(await onsite.evaluate(input => getComputedStyle(input).appearance), "none");
+  for (const width of [1920, 1024, 390]) {
+    await page.setViewportSize({ width, height: 1080 });
+    assert.equal(await processing.evaluate(input => getComputedStyle(input).appearance), "none");
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+    await page.screenshot({ path: `${output}/resume-checkboxes-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.getByRole("button", { name: "Сохранить резюме", exact: true }).click();
   await page.getByRole("heading", { name: "Обновлённый кандидат", exact: true }).waitFor(); assert.equal(saves, 2);
   await page.getByRole("button", { name: "Предложения", exact: true }).click();
@@ -98,6 +122,35 @@ try {
       await page.screenshot({ path: `${output}/${route.startsWith("/offer/") ? "offer-detail" : route.slice(1)}-${width}.png`, fullPage: true });
     }
   }
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto(base + "#/resume");
+  await page.getByRole("button", { name: "Редактировать резюме", exact: true }).click();
+  await page.getByLabel("Согласен(а) на обработку данных резюме", { exact: true }).uncheck();
+  await page.getByLabel("Показывать резюме работодателям в подборе", { exact: true }).uncheck();
+  assert.equal(await page.getByRole("button", { name: "Сохранить резюме", exact: true }).isDisabled(), true);
+  await page.getByRole("button", { name: "Отозвать согласия резюме", exact: true }).click();
+  const withdrawal = page.getByRole("dialog", { name: "Отозвать согласия резюме?", exact: true });
+  await withdrawal.getByRole("button", { name: "Отмена", exact: true }).click();
+  assert.equal(saves, 2);
+  await page.getByLabel("Ваше имя", { exact: true }).fill("Эта правка не должна сохраниться");
+  await page.getByRole("button", { name: "Отозвать согласия резюме", exact: true }).click();
+  await page.screenshot({ path: `${output}/consent-withdrawal-confirmation.png`, fullPage: true });
+  await withdrawal.getByRole("button", { name: "Отозвать согласия", exact: true }).click();
+  await page.getByRole("heading", { name: "Обновлённый кандидат", exact: true }).waitFor(); assert.equal(saves, 3);
+  await page.getByRole("button", { name: "Редактировать резюме", exact: true }).click();
+  assert.equal(await page.getByLabel("Согласен(а) на обработку данных резюме", { exact: true }).isChecked(), false);
+  assert.equal(await page.getByLabel("Показывать резюме работодателям в подборе", { exact: true }).isChecked(), false);
+  assert.equal(await page.getByRole("button", { name: "Сохранить резюме", exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole("button", { name: "Отозвать согласия резюме", exact: true }).count(), 0);
+  profile = { ...profile, revision: 5, fields: {}, consents: { ...profile.consents, processing: true, pool: true } };
+  await page.reload();
+  await page.getByRole("button", { name: "Редактировать резюме", exact: true }).click();
+  await page.getByRole("button", { name: "Сохранить резюме", exact: true }).click();
+  await page.getByRole("alert").waitFor();
+  assert.match(await page.getByRole("alert").innerText(), /имя, город, зарплатные ожидания, направление, категорию опыта/);
+  assert.equal(saves, 3);
+  await page.locator(".candidate-profile-editor form").evaluate(form => form.requestSubmit());
+  assert.equal(saves, 3);
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ result: "passed", checks: ["CAS conflict then explicit reload", "FSP/evidence never in mutations", "consent withdrawal revokes training", "paginated invitations and mandatory salary", "view recorded once", "allowed actions with stable retry keys", "interview decline reason", "chat read/send stable retry", "1920/1024/390 no overflow"], screenshots: output }));
+  console.log(JSON.stringify({ result: "passed", checks: ["CAS conflict then explicit reload", "FSP/evidence never in mutations", "editor consent gate, persisted values and keyboard checkbox controls", "separate consent withdrawal confirmation, cancel and no unsaved field mutation", "missing matching fields show complete readable list before any request", "paginated invitations and mandatory salary", "view recorded once", "allowed actions with stable retry keys", "interview decline reason", "chat read/send stable retry", "1920/1024/390 no overflow"], screenshots: output }));
 } finally { await browser.close(); }

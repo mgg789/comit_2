@@ -1,4 +1,4 @@
-.candidate-profile-page { padding-top: 100rem; }
+.candidate-profile-page { padding-top: 32rem; }
 .candidate-profile-hero { display: flex; flex-direction: column; align-items: center; gap: 36rem; text-align: center; }
 .candidate-profile-hero h1 { font-size: 64rem; max-width: 100%; overflow-wrap: anywhere; }
 .candidate-profile-avatar { width: 300rem; height: 300rem; display: grid; place-items: center; font-family: var(--employer-display); font-size: 88rem; border-radius: 50%; background: var(--employer-gradient); color: var(--comit-text); box-shadow: 0 20rem 80rem var(--employer-paint-0000006b); }
@@ -29,7 +29,7 @@
 .candidate-skill-edit { display: grid; grid-template-columns: 1fr 220rem auto; align-items: end; gap: 16rem; }
 .candidate-checks { display: flex; flex-wrap: wrap; align-items: center; gap: 28rem; }
 .candidate-checks label, .candidate-consent label { display: flex; align-items: center; gap: 12rem; }
-.candidate-checks input, .candidate-consent input { width: 22rem; height: 22rem; min-height: 0; padding: 0; flex-shrink: 0; accent-color: var(--employer-blue); }
+.candidate-checks .comit-checkbox, .candidate-consent .comit-checkbox { min-height: 0; padding: 0; }
 .candidate-consent { display: grid; gap: 20rem; margin-top: 24rem; }
 .candidate-consent a { color: var(--employer-blue); }
 .candidate-offer-filters { display: flex; align-items: center; gap: 24rem; margin: 24rem 0 32rem; }
@@ -99,7 +99,7 @@
 }
 
 /* Preserve the Figma panel hierarchy even when an API metric is unavailable. */
-.candidate-profile-page { padding-top: 108rem; }
+.candidate-profile-page { padding-top: 32rem; }
 .candidate-profile-hero { position: relative; gap: 24rem; min-height: 587rem; }
 .candidate-profile-hero > .action { position: absolute; right: 0; top: -80rem; }
 .candidate-profile-hero > .candidate-chips { max-width: 1000rem; }

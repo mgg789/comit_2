@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { designAsset as asset } from "./design-assets";
-import { Action, Icon } from "./design";
+import { Action, Checkbox, Icon } from "./design";
 
 /** Server receipt needed to render the resend timer; no authentication state is held here. */
 export interface EmailLoginReceipt {
@@ -286,9 +286,8 @@ export function EmailLogin<Account>({
           <div
             className={`checkbox login-consent ${consentError ? "has-error" : ""}`}
           >
-            <input
+            <Checkbox
               ref={consentInput}
-              type="checkbox"
               aria-label="Согласие на обработку данных"
               aria-invalid={consentError}
               aria-describedby={consentError ? "consent-error" : undefined}

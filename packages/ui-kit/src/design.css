@@ -896,3 +896,45 @@ textarea::placeholder {
 .reduce-motion .modal-shade > section.glass {
   animation: none;
 }
+
+/* Shared native checkbox from the established email consent control. */
+.comit-checkbox[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex: 0 0 max(24rem, var(--employer-checkbox-min));
+  width: max(24rem, var(--employer-checkbox-min));
+  height: max(24rem, var(--employer-checkbox-min));
+  margin: 0;
+  border: 1px solid var(--employer-border);
+  border-radius: max(7rem, 5px);
+  background: var(--employer-paint-ffffff08);
+  cursor: pointer;
+  transition:
+    background 0.16s,
+    border-color 0.16s,
+    box-shadow 0.16s;
+}
+.comit-checkbox[type="checkbox"]:checked {
+  background: var(--employer-blue);
+  border-color: var(--employer-blue);
+}
+.comit-checkbox[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  width: 30%;
+  height: 50%;
+  left: 35%;
+  top: 12%;
+  border: solid var(--employer-ink);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.comit-checkbox[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--employer-blue);
+  outline-offset: 4rem;
+}
+
+@media (max-width: 760px) {
+  .comit-checkbox[type="checkbox"] { width: 20rem; height: 20rem; flex-basis: 20rem; }
+  .comit-checkbox[type="checkbox"]:checked::after { left: 6rem; top: 2rem; width: 6rem; height: 10rem; }
+}

@@ -388,41 +388,6 @@
 .login-consent a:focus-visible {
   text-decoration-color: currentColor;
 }
-.login-consent input {
-  appearance: none;
-  position: relative;
-  flex: 0 0 max(24rem, var(--employer-checkbox-min));
-  width: max(24rem, var(--employer-checkbox-min));
-  height: max(24rem, var(--employer-checkbox-min));
-  margin: 0;
-  border: 1px solid var(--employer-border);
-  border-radius: max(7rem, 5px);
-  background: var(--employer-paint-ffffff08);
-  cursor: pointer;
-  transition:
-    background 0.16s,
-    border-color 0.16s,
-    box-shadow 0.16s;
-}
-.login-consent input:checked {
-  background: var(--employer-blue);
-  border-color: var(--employer-blue);
-}
-.login-consent input:checked::after {
-  content: "";
-  position: absolute;
-  width: 30%;
-  height: 50%;
-  left: 35%;
-  top: 12%;
-  border: solid var(--employer-ink);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.login-consent input:focus-visible {
-  outline: 2px solid var(--employer-blue);
-  outline-offset: 4rem;
-}
 .login-consent.has-error input {
   border-color: var(--employer-danger);
   box-shadow: 0 0 0 4rem var(--employer-paint-ffffff08);
@@ -485,15 +450,6 @@
   .login-card .checkbox {
     margin-top: 18rem;
     padding: 0;
-  }
-  .login-consent input {
-    flex-basis: 20rem;
-  }
-  .login-consent input:checked::after {
-    left: 6rem;
-    top: 2rem;
-    width: 6rem;
-    height: 10rem;
   }
 }
 

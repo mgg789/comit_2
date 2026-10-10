@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type ComponentPropsWithRef,
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
@@ -524,4 +525,9 @@ export function Tags({ values, variant = "light", shape = "rounded", className =
   values: readonly string[]; variant?: "light" | "blue" | "muted"; shape?: "rounded" | "pill"; className?: string;
 }) {
   return <div className={`tags ${className}`.trim()}>{values.filter(Boolean).map((value, index) => <span key={`${value}-${index}`} className={`tag ${variant === "light" ? "" : variant} ${shape === "pill" ? "pill" : ""}`.trim()}>{value}</span>)}</div>;
+}
+
+/** Native checkbox sharing the proven login appearance; accepts standard input props, including refs. */
+export function Checkbox({ className = "", ...props }: Omit<ComponentPropsWithRef<"input">, "type">) {
+  return <input {...props} type="checkbox" className={`comit-checkbox ${className}`} />;
 }
