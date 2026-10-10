@@ -94,14 +94,16 @@ class LayaClient:
     version = "laya-requirements-v1"
 
     def __init__(self, base_url: str | None = None, client: httpx.Client | None = None):
-        self.base_url = (base_url or os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444")).rstrip("/")
+        self.base_url = (base_url if base_url is not None else os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444")).rstrip("/")
         parsed = urlparse(self.base_url)
-        if parsed.hostname not in ("localhost", "127.0.0.1", "host.docker.internal"):
+        if self.base_url and parsed.hostname not in ("localhost", "127.0.0.1", "host.docker.internal"):
             raise ValueError("JEV_LOCAL_URL must refer to the local host")
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
 
     def derive(self, fields: dict, schema: dict) -> dict:
-        """Evaluate every current coordinate in batches <=32; return editable groups and evidence."""
+        """Evaluate current coordinates; an unconfigured optional provider fails without I/O."""
+        if not self.base_url:
+            raise ProviderError("laya_not_configured", False)
         groups = {"domain": "domens", "stack": "stacks", "soft_skill": "soft_skills"}
         result = {name: {} for name in groups.values()}
         evidence = {}
