@@ -286,3 +286,31 @@
 
 .system-avatar { background: var(--employer-ink); color: var(--comit-text); }
 .system-avatar .icon { width: 34rem; height: 34rem; }
+
+/* A conversation owns viewport space; only its message history scrolls. */
+body:has(.chat-page) { overflow: hidden; }
+.chat-page { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+.chat-page .main-content { min-height: 0; margin-bottom: 0; flex: 1; overflow: hidden; }
+.chat-page .main-content > div, .chat-page .recruitment-screen, .chat-page .recruitment-thread { height: 100%; min-height: 0; }
+.chat-page .recruitment-thread { display: flex; flex-direction: column; }
+.chat-page .participant-header { flex-shrink: 0; padding-left: 8rem; }
+.chat-page .recruitment-conversation { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.chat-page .recruitment-thread .recruitment-messages { min-height: 0; flex: 1; height: auto; padding-block: 48rem; overscroll-behavior: contain; mask-image: linear-gradient(to bottom, transparent, black 48rem, black calc(100% - 48rem), transparent); }
+.chat-page .system-inbox .chat-history-viewport { flex: 1; margin-bottom: 40rem; }
+.system-inbox .message-bubble > .action { margin-top: 20rem; }
+@media (max-width: 760px) {
+  .chat-page .recruitment-screen { display: flex; flex-direction: column; }
+  .chat-page .recruitment-thread { flex: 1; height: auto; min-height: 0; }
+  .chat-page .chat-back { flex-shrink: 0; }
+  .chat-page .participant-header { padding-left: 4rem; }
+  .chat-page .system-inbox .chat-history-viewport { margin-bottom: 100rem; }
+}
+
+.chat-page .recruitment-conversation .recruitment-messages { flex: 0 1 auto; }
+.chat-page > .topbar { flex-shrink: 0; }
+
+.chat-history-viewport { position: relative; min-height: 0; overflow: hidden; }
+.chat-page .chat-history-viewport > .recruitment-messages { height: 100%; }
+.chat-history-viewport::before, .chat-history-viewport::after { content: ""; position: absolute; left: 0; right: 0; height: 48rem; z-index: 2; pointer-events: none; backdrop-filter: blur(4rem); }
+.chat-history-viewport::before { top: 0; mask-image: linear-gradient(black, transparent); }
+.chat-history-viewport::after { bottom: 0; mask-image: linear-gradient(transparent, black); }

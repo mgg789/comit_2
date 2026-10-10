@@ -68,7 +68,7 @@ export function SystemInbox({ transport, errorText, navigate }: { transport: Sys
     const observer = new IntersectionObserver(entries => {
       if (document.visibilityState !== "visible") return;
       for (const entry of entries) if (entry.isIntersecting && entry.intersectionRatio >= 0.95) setVisibleSequence(prior => Math.max(prior, Number((entry.target as HTMLElement).dataset.sequence) || 0));
-    }, { threshold: 0.95 });
+    }, { root: history.current, threshold: 0.95 });
     history.current?.querySelectorAll("[data-sequence]").forEach(element => observer.observe(element));
     return () => observer.disconnect();
   }, [items]);
@@ -84,7 +84,7 @@ export function SystemInbox({ transport, errorText, navigate }: { transport: Sys
   }, [transport, visibleSequence]);
   return <div className="recruitment-thread system-inbox">
     <header className="participant-header"><span className="anonymous-avatar system-avatar"><Icon name="logo" /></span><div className="participant-name"><strong>Comit</strong><small>Уведомления платформы</small></div></header>
-    <div className="recruitment-messages" ref={history} aria-label="Уведомления Comit">
+    <div className="chat-history-viewport"><div className="recruitment-messages" ref={history} aria-label="Уведомления Comit">
       {(loading || error) && <State loading={loading} error={error} retry={() => setAttempt(value => value + 1)} />}
       {!loading && !error && !items.length && <p className="empty-note">Здесь появятся уведомления платформы.</p>}
       {items.map(item => {
@@ -92,6 +92,6 @@ export function SystemInbox({ transport, errorText, navigate }: { transport: Sys
         return <article className="message-bubble incoming" data-sequence={item.sequence} key={item.id}><p>{item.text}</p>{path && <Action onClick={() => navigate(path)}>Открыть</Action>}<time dateTime={item.created_at}>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.created_at))}</time></article>;
       })}
       {more && <Action disabled={loading} onClick={() => window.dispatchEvent(new Event("comit:system-load-more"))}>Другие уведомления</Action>}
-    </div>
+    </div></div>
   </div>;
 }

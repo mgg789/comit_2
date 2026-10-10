@@ -286,7 +286,7 @@ export default function App() {
     );
   return (
     <PersistentStateScope scope={`employer:${account?.id || "guest"}`}><MotionConfig reducedMotion={preferences.reducedMotion ? "always" : "user"}>
-      <div className={`employer-app ${account ? "" : "is-login"} ${preferences.reducedMotion ? "reduce-motion" : ""}`}>
+      <div className={`employer-app ${account && pieces[0] === "chat" && pieces[1] ? "chat-page" : ""} ${account ? "" : "is-login"} ${preferences.reducedMotion ? "reduce-motion" : ""}`}>
         <Backdrop />
         {pieces[0] === "legal" ? (
           <LegalDocument name={pieces[1] || "privacy-policy"} />

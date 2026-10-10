@@ -98,7 +98,7 @@ export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, 
   account: AccountView; initialProcessId?: string; systemUnread?: number; onProfile: (candidateId: string) => void;
   onBack: () => void; onOpen: (id: string) => void; backLabel: string; navigate: (path: string) => void;
 }) {
-  if (initialProcessId === "comit-system") return <section className="recruitment-screen"><PageTitle title="Comit" back={onBack} /><SystemInbox transport={employerInboxTransport} errorText={errorText} navigate={navigate} /></section>;
+  if (initialProcessId === "comit-system") return <section className="recruitment-screen"><div className="chat-back"><Action className="circle" onClick={onBack} aria-label="Вернуться"><Icon name="back" /></Action><h1>Comit</h1></div><SystemInbox transport={employerInboxTransport} errorText={errorText} navigate={navigate} /></section>;
   if (initialProcessId) return <section className="recruitment-screen">
     <div className="chat-back"><Action className="circle" onClick={onBack} aria-label="Вернуться"><Icon name="back" /></Action><h1>{backLabel}</h1></div>
     <RecruitmentThread key={initialProcessId} id={initialProcessId} account={account} onProfile={onProfile} />
@@ -293,7 +293,7 @@ function RecruitmentThread({
 }
 
 /** Backend-provided allowed actions determine visibility; CAS prevents stale state changes. */
-function ProcessCommand({
+export function ProcessCommand({
   process,
   command,
   onClose,

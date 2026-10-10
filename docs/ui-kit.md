@@ -81,3 +81,9 @@
 `SystemInbox` (`@comit/ui-kit/system-inbox`) переиспользует layout и пузырьки переписки, но намеренно не предоставляет send/attachment/composer. Caller передаёт role-bound transport и navigate; внутренние ссылки проходят allowlist. Receipts относятся только к доставленным видимым сообщениям. `useChatUnread` читает подтверждённые счётчики аккаунта, сбрасывает их при смене account ID и повторяет чтение после событий `comit:chat-read`.
 
 `RecruitmentChatList` принимает optional `system` для логотипа, `AppShellHeader` — nullable `secondaryUnreadCount` для badge 99+. `RecruitmentClock` из design отображает RecruitmentDeadline, используя shared weekday helper; business transitions принадлежат серверу. `RejectionFeedback` и чистый `rejectionFeedbackError` задают единые требования подробной ОС во всех формах работодателя.
+
+## Область истории и загрузка
+
+`chat-page` ограничивает кабинет высотой окна, `chat-history-viewport` задаёт мягкие края истории с маской и блюром, не перехватывая клики. `RecruitmentConversation` прокручивает собственный список вместо `scrollIntoView`; `SystemInbox` подтверждает чтение через observer с корнем в списке сообщений. Спиннер сохраняет непрерывное вращение при reduced motion: это обратная связь о незавершённой загрузке; декоративные анимации сохраняют общий режим уменьшения движения.
+
+Регрессия `tests/chat-viewport-browser.mjs` проверяет оба кабинета на desktop/mobile с синтетическими API: документ не прокручивается, последнее действие доступно выше мягкого края и мобильной навигации. Дополнительно реальные локальные чаты проверены в 12 сочетаниях роли, типа чата и размера окна.

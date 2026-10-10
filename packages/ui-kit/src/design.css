@@ -1177,3 +1177,6 @@ textarea::placeholder {
 .recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-181816); color: var(--comit-text); margin: 20rem 0; }
 .recruitment-deadline p { margin: 8rem 0; font-size: 18rem; }
 .recruitment-deadline small { color: var(--comit-text-muted); }
+
+/* Loading is ongoing progress feedback even when decorative motion is reduced. */
+:is(.employer-app, .candidate-app) .spinner { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }

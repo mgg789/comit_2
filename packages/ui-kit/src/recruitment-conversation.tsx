@@ -71,7 +71,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
     if (!wrap || !list) return;
     const fit = () => {
       const unit = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 1;
-      setHistoryHeight(Math.max(120 * unit, Math.floor(wrap.getBoundingClientRect().top - list.getBoundingClientRect().top - 16 * unit)));
+      setHistoryHeight(Math.max(0, Math.floor(wrap.getBoundingClientRect().top - list.getBoundingClientRect().top - 16 * unit)));
     };
     const observer = new ResizeObserver(fit); observer.observe(wrap); fit();
     window.addEventListener("resize", fit);
@@ -116,7 +116,8 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
     };
   }, [id, process.chat_available]);
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
+    const list = history.current;
+    list?.scrollTo({ top: list.scrollHeight, behavior: reduced ? "auto" : "smooth" });
   }, [messages.length]);
   const acknowledged = useRef(0);
   useEffect(() => { acknowledged.current = 0; }, [id]);
@@ -197,7 +198,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
     }
   }
   return <div className="recruitment-conversation">{header}<RecruitmentClock deadline={process.deadline} />
-      <div ref={history} className="recruitment-messages" style={{ height: historyHeight }} aria-live="polite">
+      <div className="chat-history-viewport" style={{ height: historyHeight }}><div ref={history} className="recruitment-messages" aria-live="polite">
         {historyLoading && <State loading />}
         {!process.chat_available && (
           <State empty="Чат недоступен для этого приглашения" />
@@ -244,7 +245,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
           ))}
         </AnimatePresence>
         <div ref={end} className="chat-read-edge" />
-      </div>
+      </div></div>
       <div ref={composer} className="communication-composer-wrap">
         {error && (
           <p className="communication-error" role="alert">

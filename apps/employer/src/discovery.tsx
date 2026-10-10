@@ -1,3 +1,7 @@
+import { createPortal } from "react-dom";
+import { Dialog } from "@comit/ui-kit/app-shell";
+import { ProcessCommand } from "./communications";
+import { recruitmentStage, recruitmentTileAction } from "./recruitment-stage";
 import { rejectionFeedbackError } from "@comit/ui-kit/rejection-feedback";
 import { RejectionFeedback } from "@comit/ui-kit/design";
 import { rejectionReasonCategories, type RejectionReasonCategory } from "@comit/shared";
@@ -886,22 +890,10 @@ export function Resume({
 }
 
 function Milestones({ process }: { process?: RecruitmentView }) {
-  const interview = process?.interviews.some(
-    (item) => item.state === "scheduled" || item.state === "completed",
-  );
-  const stage =
-    process?.state === "hired"
-      ? 4
-      : process?.offers.length
-        ? 3
-        : interview
-          ? 2
-          : process
-            ? 1
-            : 0;
+  const stage = recruitmentStage(process);
   return (
     <div className="discovery-milestones">
-      {["Подбор", "Приглашение", "Собеседование", "Оффер", "Приём"].map(
+      {["Лайк", "Приглашение", "Собеседование", "Оффер", "Приём"].map(
         (item, index) => (
           <span
             key={item}
@@ -1164,20 +1156,7 @@ export function Resumes({ navigate }: Navigation) {
                   </div>
                 </>
               )}
-              <Milestones process={row.process} />
-              <Action
-                className="discovery-dark"
-                title={row.vacancy.fields.title || "Без названия"}
-                onClick={() =>
-                  navigate(
-                    row.process
-                      ? `/chat/${row.process.id}`
-                      : `/resume/${row.id}?draft=${row.vacancy.draft_id}`,
-                  )
-                }
-              >
-                {row.process ? "Обратная связь" : "Открыть профиль"}
-              </Action>
+              <RecruitmentTileButton candidateId={row.id} draftId={row.vacancy.draft_id} process={row.process} navigate={navigate} />
             </article>
           ))}
           {pages.data?.some(
@@ -1340,19 +1319,7 @@ export function VacancyResumes({
                   </div>
                 </>
               )}
-              <Milestones process={row.process} />
-              <Action
-                className="discovery-dark"
-                onClick={() =>
-                  navigate(
-                    row.process
-                      ? `/chat/${row.process.id}`
-                      : `/resume/${id}?draft=${draftId}`,
-                  )
-                }
-              >
-                {row.process ? "Обратная связь" : "Профиль кандидата"}
-              </Action>
+              <RecruitmentTileButton candidateId={id} draftId={draftId} process={row.process} navigate={navigate} />
             </article>
           ))}
           {(data.data?.saved.has_more || data.data?.processes.has_more) && (
@@ -1666,4 +1633,30 @@ export function Statistics({ navigate }: Navigation) {
       </p>
     </Reveal>
   );
+}
+
+/** Reuse recruitment command forms directly from both saved-resume lists. */
+function RecruitmentTileButton({ candidateId, draftId, process: initial, navigate }: Navigation & { candidateId: string; draftId: string; process?: RecruitmentView }) {
+  const [updated, setUpdated] = useState<RecruitmentView | undefined>();
+  const process = updated && (!initial || Number(updated.revision) >= Number(initial.revision)) ? updated : initial;
+  const [open, setOpen] = useState(false);
+  const action = recruitmentTileAction(process);
+  return <><Milestones process={process} /><Action className="discovery-dark" disabled={action.disabled} title={action.disabled && ["sent", "viewed"].includes(process?.state || "") ? "Собеседование можно назначить после принятия приглашения кандидатом" : undefined} onClick={() => action.command === "chat" && process ? navigate(`/chat/${process.id}`) : setOpen(true)}>{action.label}</Action>{createPortal(<AnimatePresence>{open && (action.command === "invite" ? <SavedCandidateInvitation candidateId={candidateId} draftId={draftId} onClose={() => setOpen(false)} onDone={value => { setUpdated(value); setOpen(false); }} navigate={navigate} /> : process && (action.command === "interview_propose" || action.command === "offer_send") ? <ProcessCommand process={process} command={action.command} onClose={() => setOpen(false)} onDone={value => { setUpdated(value); setOpen(false); }} /> : null)}</AnimatePresence>, document.querySelector(".employer-app") || document.body)}</>;
+}
+
+/** Invitation from an already saved candidate uses the existing dialog, fields and invitation API. */
+function SavedCandidateInvitation({ candidateId, draftId, onClose, onDone, navigate }: Navigation & { candidateId: string; draftId: string; onClose: () => void; onDone: (value: RecruitmentView) => void }) {
+  const vacancy = useResource(() => api.getVacancy(draftId), [draftId]);
+  const organization = useResource(() => api.getEmployerProfile());
+  const [description, setDescription] = usePersistentState(`vacancy.${draftId}.invitation.description`, "");
+  const clearDraft = useClearPersistentState();
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const key = useRef(crypto.randomUUID());
+  async function submit(event: FormEvent) {
+    event.preventDefault(); if (busy) return; setBusy(true); setError("");
+    try { const value = await api.inviteCandidate(draftId, { candidate_id: candidateId, description: description.trim(), idempotency_key: key.current }); clearDraft(`vacancy.${draftId}.invitation.description`); onDone(value); }
+    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+  }
+  const company = organization.data?.company_name;
+  return <Dialog title="Пригласить кандидата" close={() => { if (!busy) onClose(); }}><form className="form-grid" onSubmit={event => void submit(event)}><fieldset disabled={busy}><Field label="Вакансия"><p>{vacancy.data?.fields.title}</p></Field><Field label="Зарплата"><p>{salary(vacancy.data?.fields.zp_min, vacancy.data?.fields.zp_max)}</p></Field><Field label="Компания"><p>{company || "Название компании пока не указано"}</p></Field>{!company && <Action type="button" onClick={() => navigate("/settings")}>Указать компанию в настройках</Action>}<Field label="Сообщение кандидату"><textarea required maxLength={10000} value={description} onChange={event => { setDescription(event.target.value); key.current = crypto.randomUUID(); }} /></Field></fieldset>{(organization.loading || organization.error || vacancy.loading || vacancy.error) && <State loading={organization.loading || vacancy.loading} error={organization.error || vacancy.error} retry={() => { organization.refresh(); vacancy.refresh(); }} />}{error && <p className="form-error" role="alert">{error}</p>}<div className="form-actions"><Action type="button" disabled={busy} onClick={onClose}>Отмена</Action><Action type="submit" variant="light" disabled={busy || !company || vacancy.loading || !!vacancy.error}>{busy ? "Отправляем…" : "Отправить приглашение"}</Action></div></form></Dialog>;
 }

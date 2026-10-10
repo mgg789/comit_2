@@ -5,7 +5,7 @@ import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state
 import { AppShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
-import { Action, Backdrop, PageTitle, State } from "@comit/ui-kit/design";
+import { Action, Backdrop, Icon, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
 import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen, RecommendationConsentSettings } from "./screens";
@@ -80,7 +80,7 @@ export default function App() {
   }
   const selected = route.startsWith("/offer") || route.startsWith("/chat") ? "/offers" : route;
   return <MotionConfig reducedMotion="user">
-  <div className={`candidate-app comit-design ${!account ? "is-login" : ""}`}>
+  <div className={`candidate-app comit-design ${account && route.startsWith("/chat/") ? "chat-page" : ""} ${!account ? "is-login" : ""}`}>
   <Backdrop />{account && <CandidateArt route={route}/>}
   {route.startsWith("/legal/") ? <main className="main-content candidate-legal panel">
     <a href="#/resume">← Вернуться</a>
@@ -101,7 +101,7 @@ export default function App() {
       menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
     />
     <main className="main-content candidate-content" key={account.id}>
-     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate} systemUnread={unread?.system_unread_count}/> : route === "/chat/comit-system" ? <section className="recruitment-screen"><PageTitle title="Comit" back={() => navigate("/chat")} /><SystemInbox transport={candidateInboxTransport} errorText={errorText} navigate={navigate} /></section> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
+     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate} systemUnread={unread?.system_unread_count}/> : route === "/chat/comit-system" ? <section className="recruitment-screen"><div className="chat-back"><Action className="circle" onClick={() => navigate("/chat")} aria-label="Вернуться"><Icon name="back" /></Action><h1>Comit</h1></div><SystemInbox transport={candidateInboxTransport} errorText={errorText} navigate={navigate} /></section> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
               <PageTitle title="Настройки"/>
               <section className="panel candidate-settings">
               <h2>Аккаунт</h2>
