@@ -148,3 +148,5 @@
 
 .candidate-skill-assessment { display: flex; align-items: center; flex-wrap: wrap; gap: 20rem; }
 .candidate-skill-assessment > strong { flex: 1; min-width: 120rem; }
+
+.candidate-stat-recommendations { grid-column: 1 / -1; display: grid; gap: 20rem; }

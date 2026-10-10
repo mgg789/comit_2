@@ -973,3 +973,115 @@ textarea::placeholder {
     font-size: 24rem;
   }
 }
+
+/* Vacancy card presentation reused by employer and public showcase. */
+.vacancy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 40rem 20rem;
+}
+.vacancy-card {
+  height: 355rem;
+  padding: 16rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--employer-card);
+  border-radius: 30rem;
+  position: relative;
+  transition:
+    transform var(--employer-hover-duration) var(--employer-hover-ease),
+    border-color var(--employer-hover-duration) var(--employer-hover-ease);
+  text-align: left;
+}
+.vacancy-card:hover {
+  transform: translateY(-3rem);
+  border-color: var(--employer-border);
+}
+.status-pill {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+  padding: 18rem 12rem;
+  font-size: 18rem;
+  border-radius: 20rem;
+  line-height: 1;
+  background: var(--employer-glass);
+}
+.status-dot {
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  background: var(--employer-success);
+}
+.status-dot.closed {
+  background: var(--employer-warning);
+}
+.status-dot.draft {
+  background: var(--employer-violet);
+}
+.vacancy-card h3 {
+  font-size: 32rem;
+  margin-top: 22rem;
+  line-height: 1.12;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.salary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rem;
+  flex-wrap: wrap;
+  margin-top: 28rem;
+}
+.salary-row strong {
+  font-family: var(--employer-display);
+  font-size: 32rem;
+}
+.salary-row small {
+  font-size: 20rem;
+  color: var(--employer-paint-ffffff99);
+}
+.vacancy-footer {
+  margin-top: auto;
+  border-top: 1px solid var(--employer-line);
+  padding-top: 18rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--comit-text-muted);
+  font-size: 24rem;
+}
+.vacancy-footer .date {
+  display: flex;
+  align-items: center;
+  gap: 12rem;
+}
+
+@media (max-width: 760px) {
+  .vacancy-grid { grid-template-columns: 1fr; gap: 20rem; }
+  .vacancy-card {
+    height: 260rem;
+  }
+  .status-pill {
+    font-size: 14rem;
+    padding: 12rem;
+  }
+  .status-dot {
+    width: 12rem;
+    height: 12rem;
+  }
+  .vacancy-card h3 {
+    font-size: 24rem;
+  }
+  .salary-row strong {
+    font-size: 24rem;
+  }
+  .salary-row small {
+    font-size: 14rem;
+  }
+  .vacancy-footer {
+    font-size: 16rem;
+  }
+}

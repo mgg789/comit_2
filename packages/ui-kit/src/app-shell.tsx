@@ -15,9 +15,7 @@ export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, 
 }) {
   return <header className={`topbar ${assistantOpen ? "assistant-open" : ""}`}>
     <a className="brand glass" href={brandHref} aria-label={brandLabel}><Icon name="logo" /><span className="brand-word">comit</span></a>
-    <nav className="nav" aria-label={navigationLabel}>{items.map(item => <button key={item.id} className={`nav-item glass ${selected === item.id ? "selected" : ""}`} onClick={() => navigate(item.path)} aria-label={item.label} aria-current={selected === item.id ? "page" : undefined}>
-      <Icon name={item.icon} /><motion.span className="nav-label" aria-hidden={selected !== item.id} initial={false} animate={{ width: selected === item.id ? "auto" : 0, opacity: selected === item.id ? 1 : 0, marginLeft: selected === item.id ? "10rem" : "0rem" }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}>{item.label}</motion.span>
-    </button>)}</nav>
+    <ShellNavigation navigationLabel={navigationLabel} items={items} selected={selected} navigate={navigate} />
     <div className="account-tools glass" ref={toolsRef}>
       <button className="plain-icon" aria-label={searchLabel} onClick={onSearch}><Icon name="search" /></button>
       {toolsContent}
@@ -54,4 +52,26 @@ export function Dialog({ title, close, children, manageFocus = true }: { title: 
     return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", key); previous?.focus(); };
   }, [manageFocus]);
   return <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={event => { if (event.target === event.currentTarget) close(); }}><section ref={panel} className="modal account-confirmation glass" role="dialog" aria-modal="true" aria-labelledby={titleId}><h2 id={titleId}>{title}</h2>{children}</section></motion.div>;
+}
+
+type ShellNavigationProps = {
+  navigationLabel: string;
+  items: readonly { id: string; label: string; path: string; icon: ComponentProps<typeof Icon>["name"] }[];
+  selected: string;
+  navigate: (path: string) => void;
+};
+
+function ShellNavigation({ navigationLabel, items, selected, navigate }: ShellNavigationProps) {
+  return <nav className="nav" aria-label={navigationLabel}>{items.map(item => <button key={item.id} className={`nav-item glass ${selected === item.id ? "selected" : ""}`} onClick={() => navigate(item.path)} aria-label={item.label} aria-current={selected === item.id ? "page" : undefined}>
+      <Icon name={item.icon} /><motion.span className="nav-label" aria-hidden={selected !== item.id} initial={false} animate={{ width: selected === item.id ? "auto" : 0, opacity: selected === item.id ? 1 : 0, marginLeft: selected === item.id ? "10rem" : "0rem" }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}>{item.label}</motion.span>
+    </button>)}</nav>;
+}
+
+/** Public entrance shares the authenticated shell navigation, branding and motion without account controls. */
+export function PublicShellHeader({ brandHref, loginHref, ...navigation }: ShellNavigationProps & { brandHref: string; loginHref: string }) {
+  return <header className="topbar public-topbar">
+    <a className="brand glass" href={brandHref} aria-label="Comit — главная"><Icon name="logo" /><span className="brand-word">comit</span></a>
+    <ShellNavigation {...navigation} />
+    <a className="action glass public-login" href={loginHref}>Войти<Icon name="login" /></a>
+  </header>;
 }

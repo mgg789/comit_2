@@ -25,7 +25,8 @@ try {
     const geometry = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, appBottom: document.querySelector(".candidate-app").getBoundingClientRect().bottom + scrollY, width: innerWidth, scrollWidth: document.documentElement.scrollWidth, cards: [...document.querySelectorAll(".candidate-statistics > section")].map(card => ({ top: card.getBoundingClientRect().top, bottom: card.getBoundingClientRect().bottom })) }));
     if (process.env.CANDIDATE_STATS_BEFORE) { console.log(width, geometry); continue; }
     assert.ok(geometry.scrollWidth <= width + 1); assert.ok(geometry.appBottom >= geometry.height - 1, JSON.stringify(geometry));
-    if (width > 1200) for (const [left, right] of [[0, 1], [2, 3], [4, 5]]) { assert.ok(Math.abs(geometry.cards[left].top - geometry.cards[right].top) < 1); assert.ok(Math.abs(geometry.cards[left].bottom - geometry.cards[right].bottom) < 1); }
+    if (width > 1200) for (const [left, right] of [[1, 2], [3, 4], [5, 6]]) { assert.ok(Math.abs(geometry.cards[left].top - geometry.cards[right].top) < 1); assert.ok(Math.abs(geometry.cards[left].bottom - geometry.cards[right].bottom) < 1); }
+    assert.equal(await page.locator(".candidate-statistics > section").first().getByRole("heading").textContent(), "Рекомендации от платформы");
     assert.equal(await page.getByText("Вы на платформе", { exact: true }).count(), 0);
     assert.equal(await page.locator(".candidate-stat-skills").innerText(), "");
     const bars = await page.locator(".candidate-skill-map .candidate-skill-value").evaluateAll(nodes => nodes.map(node => Number(node.getAttribute("width")))); assert.deepEqual(bars, [500 * 4 / 7, 500 * 3 / 7]);

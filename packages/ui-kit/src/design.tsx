@@ -31,6 +31,7 @@ import { designAsset as asset, type DesignAssetName } from "./design-assets";
  * `currentColor` (active pills, light buttons) without per-context image filters.
  */
 const glyphs = {
+  login: "public-login.svg",
   vacancies: "6d4cf8ae48179dc57156f25db4b058cc5cb57a8e.svg",
   plus: "43ffb38ed0f5604cad3f1adb9680d6c0b20d69c9.svg",
   send: "2cb013b9ea483d6e784177684fd4c6fbb33f9969.svg",
@@ -338,7 +339,7 @@ export function Select({
 }
 
 /** Refractive backdrop filter and Figma background imagery, isolated from content. */
-export function Backdrop() {
+export function Backdrop({ imagery = true }: { imagery?: boolean } = {}) {
   const map = (vertical: boolean) =>
     `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x2="${vertical ? "0" : "1"}" y2="${vertical ? "1" : "0"}"><stop stop-color="${vertical ? "#000000" : "#00007f"}"/><stop offset=".08" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset=".92" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset="1" stop-color="${vertical ? "#00ff00" : "#ff007f"}"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/></svg>`)}`;
   return (
@@ -386,7 +387,7 @@ export function Backdrop() {
           </filter>
         </defs>
       </svg>
-      <div className="ambient" aria-hidden="true">
+      {imagery && <div className="ambient" aria-hidden="true">
         <img
           className="ambient-upper"
           src={asset("b2e5fa1dc7bd97f4194c3281ddf16908ee7734b3.png")}
@@ -402,7 +403,7 @@ export function Backdrop() {
           src={asset("9ac3e2c307951c9256502142bc9fbad65b066af3.svg")}
           alt=""
         />
-      </div>
+      </div>}
     </>
   );
 }

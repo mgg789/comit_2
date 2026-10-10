@@ -1,5 +1,6 @@
 /** Original exported artwork bundled by Vite for either application. */
 const artwork = {
+  "public-login.svg": new URL("./design-assets/public-login.svg", import.meta.url).href,
   "6d4cf8ae48179dc57156f25db4b058cc5cb57a8e.svg": new URL("./design-assets/6d4cf8ae48179dc57156f25db4b058cc5cb57a8e.svg", import.meta.url).href,
   "268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg": new URL("./design-assets/268c55656abd4564896f3ed9b7ea042f24cbf9d6.svg", import.meta.url).href,
   "43ffb38ed0f5604cad3f1adb9680d6c0b20d69c9.svg": new URL("./design-assets/43ffb38ed0f5604cad3f1adb9680d6c0b20d69c9.svg", import.meta.url).href,
