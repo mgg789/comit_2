@@ -19,6 +19,7 @@ import {
   Check,
   Copy,
   Heart,
+  Info,
   MessageCircle,
   Pencil,
   ScrollText,
@@ -67,6 +68,7 @@ const lucide = {
   heart: Heart,
   "heart-filled": Heart,
   close: X,
+  info: Info,
 } as const satisfies Record<string, LucideIcon>;
 
 /** Every icon name: a Figma mask, a lucide glyph, or the light arrow disc of primary actions. */
