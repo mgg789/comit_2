@@ -1,3 +1,4 @@
+import { rejectionReasonCategories, workingMillisecondsBetween, type RejectionReasonCategory, type RecruitmentDeadline } from "@comit/shared";
 import {
   Children,
   isValidElement,
@@ -553,4 +554,26 @@ export function InlineSearch({ value, onChange, onSubmit, label, placeholder, in
     <input ref={inputRef} aria-label={label} placeholder={placeholder || label} value={value} onChange={event => onChange(event.target.value)} />
     <button aria-label="Найти" type="submit"><Icon name="search" /></button>
   </form>;
+}
+
+const rejectionLabels: Record<RejectionReasonCategory, string> = { technical_skills: "Профессиональные навыки", experience: "Опыт", communication: "Общение", salary: "Зарплатные ожидания", work_format: "Формат работы", location: "Местоположение", other: "Другая причина" };
+/** Shared detailed feedback form; categories identify aggregate topics and do not reveal employer identity. */
+export function RejectionFeedback({ reason, setReason, categories, setCategories, disabled = false }: { reason: string; setReason: (value: string) => void; categories: RejectionReasonCategory[]; setCategories: (value: RejectionReasonCategory[]) => void; disabled?: boolean }) {
+  const helpId = useId();
+  return <fieldset className="rejection-feedback" disabled={disabled}><legend>Причины отказа</legend><Field label="Подробная обратная связь"><textarea name="reason" aria-label="Подробная обратная связь" value={reason} onChange={event => setReason(event.target.value)} required minLength={80} maxLength={4000} aria-describedby={helpId} /></Field><p className="muted" id={helpId}>Объясните, каких навыков или опыта не хватило и что поможет улучшить результат. Не менее 80 символов и 10 слов.</p><div className="rejection-categories">{rejectionReasonCategories.map(category => <label key={category}><Checkbox checked={categories.includes(category)} onChange={event => setCategories(event.target.checked ? [...categories, category] : categories.filter(value => value !== category))} />{rejectionLabels[category]}</label>)}</div><p className="muted">Выберите хотя бы одну причину. Обратная связь поможет платформе подготовить обезличенные рекомендации.</p></fieldset>;
+}
+
+/** Display the server-owned weekday clock; this presentation never changes a hiring state. */
+export function RecruitmentClock({ deadline }: { deadline?: RecruitmentDeadline | null }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60_000); return () => clearInterval(timer); }, []);
+  if (!deadline) return null;
+  if (deadline.stage === "interview_wait") return null;
+  if (!deadline.due_at) return null;
+  let remaining = 0;
+  try { remaining = workingMillisecondsBetween(new Date(now), deadline.due_at); } catch { return null; }
+  const minutes = Math.ceil(remaining / 60_000), days = Math.floor(minutes / 1440), hours = Math.floor(minutes % 1440 / 60);
+  const weekday = new Date(now + 3 * 3_600_000).getUTCDay();
+  const label = deadline.stage === "initial" ? "Свяжитесь в чате, назначьте собеседование или примите решение" : deadline.stage === "conversation" ? "Назначьте собеседование или примите решение" : "Примите решение после собеседования";
+  return <aside className="recruitment-deadline" aria-label="Срок следующего действия"><strong>{remaining > 0 ? `Осталось: ${days} д. ${String(hours).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")} рабочего времени` : "Срок действия истёк. Обновляем состояние предложения."}</strong><p>{label}. Выходные не учитываются.{[0, 6].includes(weekday) ? " Таймер приостановлен до понедельника." : ""}</p><small>До {new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short", timeZone: deadline.time_zone }).format(new Date(deadline.due_at))} · Москва</small></aside>;
 }

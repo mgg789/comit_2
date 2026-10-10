@@ -1,3 +1,7 @@
+import { rejectionFeedbackError } from "@comit/ui-kit/rejection-feedback";
+import { RejectionFeedback } from "@comit/ui-kit/design";
+import { rejectionReasonCategories, type RejectionReasonCategory } from "@comit/shared";
+import { SystemInbox, type SystemInboxTransport } from "@comit/ui-kit/system-inbox";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 import { RecruitmentChatList, RecruitmentConversation, type ConversationTransport } from "@comit/ui-kit/recruitment-conversation";
 import {
@@ -28,6 +32,8 @@ import { ChatComposer } from "@comit/ui-kit/chat-composer";
 import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
 
+const employerInboxTransport: SystemInboxTransport = { getPage: (after, limit) => api.getSystemChat("employer", after, limit), markRead: read_sequence => api.markSystemChatRead("employer", { read_sequence }) };
+
 const employerConversationTransport: ConversationTransport = {
   markRead: (id, through_sequence) => api.acknowledgeChatRead("employer", id, { through_sequence }),
   getMessages: (id, after, limit) => api.getChatMessages("employer", id, after, limit),
@@ -47,6 +53,7 @@ export const recruitmentStateNames: Record<RecruitmentView["state"], string> = {
   hired: "Кандидат нанят",
   offer_declined: "Оффер отклонён",
   withdrawn: "Приглашение отозвано",
+  expired: "Предложение отозвано по сроку",
 };
 
 /** Original assistant artwork; no stock candidate photographs are used. */
@@ -87,19 +94,20 @@ function saveFile(name: string, base64: string) {
 }
 
 /** Participant-scoped chats list and standalone conversation use distinct routes. */
-export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, onOpen, backLabel }: {
-  account: AccountView; initialProcessId?: string; onProfile: (candidateId: string) => void;
-  onBack: () => void; onOpen: (id: string) => void; backLabel: string;
+export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, onOpen, backLabel, systemUnread, navigate }: {
+  account: AccountView; initialProcessId?: string; systemUnread?: number; onProfile: (candidateId: string) => void;
+  onBack: () => void; onOpen: (id: string) => void; backLabel: string; navigate: (path: string) => void;
 }) {
+  if (initialProcessId === "comit-system") return <section className="recruitment-screen"><PageTitle title="Comit" back={onBack} /><SystemInbox transport={employerInboxTransport} errorText={errorText} navigate={navigate} /></section>;
   if (initialProcessId) return <section className="recruitment-screen">
     <div className="chat-back"><Action className="circle" onClick={onBack} aria-label="Вернуться"><Icon name="back" /></Action><h1>{backLabel}</h1></div>
     <RecruitmentThread key={initialProcessId} id={initialProcessId} account={account} onProfile={onProfile} />
   </section>;
-  return <RecruitmentChats onOpen={onOpen} />;
+  return <RecruitmentChats onOpen={onOpen} systemUnread={systemUnread} />;
 }
 
 /** Fetch only list snapshots here; selecting a tile opens a separate message route. */
-function RecruitmentChats({ onOpen }: { onOpen: (id: string) => void }) {
+function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => void; systemUnread?: number }) {
   const list = useResource(() => api.getRecruitmentList("employer", 100));
   const loaded = useRef(list.data?.items || []);
   loaded.current = list.data?.items || [];
@@ -142,7 +150,7 @@ function RecruitmentChats({ onOpen }: { onOpen: (id: string) => void }) {
     } catch (reason) { setMoreError(errorText(reason)); } finally { moreInFlight.current = false; paginationEpoch.current += 1; setLoadingMore(false); }
   }
   return <section><PageTitle title="Чаты" />
-    <RecruitmentChatList items={(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))}
+    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
       loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
       hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
     {moreError && <p className="communication-error" role="alert">{moreError}</p>}
@@ -161,7 +169,7 @@ function RecruitmentThread({
 }) {
   const process = useResource(() => api.getRecruitment("employer", id), [id]);
   const [contacts, setContacts] = useState<ContactsView | null>(null);
-  const [command, setCommand] = useState<"reject" | "withdraw" | "interview_propose" | "offer_send" | null>(null);
+  const [command, setCommand] = useState<"reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send" | null>(null);
   useEffect(() => {
     let active = true;
     setContacts(null);
@@ -242,7 +250,7 @@ function RecruitmentThread({
             )}
             <p>{salary(p.terms?.salary.from_rub, p.terms?.salary.to_rub)}</p>
             {(
-              ["interview_propose", "offer_send", "reject", "withdraw"] as const
+              ["interview_propose", "interview_complete", "offer_send", "reject", "withdraw"] as const
             )
               .filter((action) => p.allowed_actions.includes(action))
               .map((action) => (
@@ -250,6 +258,7 @@ function RecruitmentThread({
                   {
                     {
                       interview_propose: "Назначить интервью",
+                      interview_complete: "Результат собеседования",
                       offer_send: "Отправить оффер",
                       reject: "Отказать кандидату",
                       withdraw: "Отозвать приглашение",
@@ -291,7 +300,7 @@ function ProcessCommand({
   onDone,
 }: {
   process: RecruitmentView;
-  command: "reject" | "withdraw" | "interview_propose" | "offer_send";
+  command: "reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send";
   onClose: () => void;
   onDone: (value: RecruitmentView) => void;
 }) {
@@ -299,13 +308,15 @@ function ProcessCommand({
   const [busy, setBusy] = useState(false);
   const formKey = `process:${process.id}:${process.revision}:${command}:fields`;
   const clearDraft = useClearPersistentState();
-  const defaults = { reason: "", kind: "technical", starts_at: "", duration: "60", format: "remote", location: "", salary: "", description: "", expires_at: "" };
+  const defaults = { reason: "", kind: "technical", starts_at: "", duration: "60", format: "remote", location: "", salary: "", description: "", expires_at: "", interview_id: process.interviews.find(item => item.state === "scheduled")?.id || "", outcome: "neutral" };
   const [fields, setFields] = usePersistentState<Record<string, string>>(formKey, defaults, (value): value is Record<string, string> => !!value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([name, item]) => Object.hasOwn(defaults, name) && typeof item === "string"));
+  const [categories, setCategories] = usePersistentState<RejectionReasonCategory[]>(`${formKey}:categories`, [], (value): value is RejectionReasonCategory[] => Array.isArray(value) && value.every(item => rejectionReasonCategories.includes(item)));
   const bind = (name: keyof typeof defaults) => ({ value: fields[name] ?? defaults[name], onChange: (event: { target: { value: string } }) => setFields(prior => ({ ...prior, [name]: event.target.value })) });
   const key = useRef(crypto.randomUUID());
   const request = useRef<RecruitmentAction | null>(null);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (command === "reject" || (command === "interview_complete" && fields.outcome === "failed")) { const feedbackError = rejectionFeedbackError(fields.reason || "", categories); if (feedbackError) { setError(feedbackError); return; } }
     const data = new FormData(event.currentTarget);
     const identity = {
       expected_revision: process.revision,
@@ -324,6 +335,8 @@ function ProcessCommand({
             format: value("format") === "onsite" ? "onsite" : "remote",
             location: value("location"),
           }
+        : command === "interview_complete"
+          ? { ...identity, action: command, interview_id: value("interview_id"), outcome: value("outcome") === "passed" ? "passed" : value("outcome") === "failed" ? "failed" : "neutral", feedback: (fields.reason || "").trim(), ...(fields.outcome === "failed" ? { categories } : {}) }
         : command === "offer_send"
           ? {
               ...identity,
@@ -332,13 +345,14 @@ function ProcessCommand({
               description: value("description"),
               expires_at: new Date(value("expires_at")).toISOString(),
             }
-          : { ...identity, action: command, reason: value("reason") };
+          : command === "reject" ? { ...identity, action: command, reason: (fields.reason || "").trim(), categories } : { ...identity, action: command, reason: value("reason") };
     setBusy(true);
     setError(null);
     request.current ||= action;
     try {
       const updated = await api.actOnRecruitment("employer", process.id, request.current);
       clearDraft(formKey);
+      clearDraft(`${formKey}:categories`);
       onDone(updated);
     } catch (reason) {
       setError(errorText(reason));
@@ -367,15 +381,16 @@ function ProcessCommand({
               reject: "Отказ кандидату",
               withdraw: "Отзыв приглашения",
               interview_propose: "Назначить интервью",
+              interview_complete: "Результат собеседования",
               offer_send: "Отправить оффер",
             }[command]
           }
         </h2>
-        {command === "reject" || command === "withdraw" ? (
+        {command === "reject" ? <RejectionFeedback reason={fields.reason || ""} setReason={reason => setFields(prior => ({ ...prior, reason }))} categories={categories} setCategories={setCategories} disabled={busy} /> : command === "withdraw" ? (
           <Field label="Причина">
             <textarea name="reason" {...bind("reason")} required maxLength={4000} />
           </Field>
-        ) : command === "interview_propose" ? (
+        ) : command === "interview_complete" ? <><Field label="Собеседование"><select name="interview_id" {...bind("interview_id")} required><option value="" hidden>Выберите собеседование</option>{process.interviews.filter(item => item.state === "scheduled").map(item => <option value={item.id} key={item.id}>{new Date(item.starts_at).toLocaleString("ru-RU")}</option>)}</select></Field><Field label="Результат"><select name="outcome" {...bind("outcome")}><option value="neutral">Нужно дополнительное обсуждение</option><option value="passed">Успешно</option><option value="failed">Отказ</option></select></Field>{fields.outcome === "failed" ? <RejectionFeedback reason={fields.reason || ""} setReason={reason => setFields(prior => ({ ...prior, reason }))} categories={categories} setCategories={setCategories} disabled={busy} /> : <Field label="Обратная связь"><textarea name="reason" {...bind("reason")} required maxLength={4000} /></Field>}</> : command === "interview_propose" ? (
           <>
             <Field label="Вид интервью">
               <select name="kind" {...bind("kind")}>

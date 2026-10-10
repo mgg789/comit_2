@@ -96,7 +96,7 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
         const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         if (!request.compileValidationSchema(schema)(parsed)) throw new RecruitmentError(503, "chat_invalid_response");
         return parsed;
-      });
+      }, operation === "send");
       return reply.send(result);
     } catch (error) {
       if (error instanceof RecruitmentError) return reply.code(error.status).send({ detail: error.code });

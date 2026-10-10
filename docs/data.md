@@ -383,3 +383,17 @@ Email и приватные имена разрешаются из текуще�
 `notification_mail_cutover` исключает исторические matching likes после обновления
 worker. Вставка `recruitment_interviews` и обе записи outbox транзакционны.
 [Типы, согласия, retry и отсутствующий producer ежемесячных заданий](email-notifications.md).
+
+
+## Компания, inbox и процессы найма (API014–016)
+
+Миграция 014 добавляет `employer_profiles`, `system_inboxes`, `system_notifications` и cutover источников. Номер сообщения локален для аккаунта; idempotency key уникален в его inbox. Read cursor монотонен и не превышает реально выданные сообщения. Схема и producer API: [system-inbox.md](system-inbox.md).
+
+Миграция 015 хранит уникальные недельные recommendation jobs, lease, попытки и результаты; отзыв обязательных согласий немедленно удаляет записи. Matching017 отдельно хранит реальные candidate-scoped причины, срок хранения 90 дней и порог четырёх разных вакансий. Детали: [recommendations.md](recommendations.md).
+
+Миграция 016 добавляет `deadline`, `deadline_suspended`, `employer_contacted_at`, `reminder_sent_at`, interview reason_categories, terminal expired и idempotent `recruitment_hire_applications`. Принятие оффера обновляет profile/source revision, опыт, pool consent и projection outbox внутри hiring-транзакции. Миграции уже применённого файла не редактируются. Таблица переходов: [recruitment.md](recruitment.md).
+
+Недельные рекомендации требуют нового явного согласия `training-v2`. Версия
+`training-v1` совместима с прежним ранжированием, но не включает рекомендации.
+Миграция API `017_recommendation_consent_version.sql` расширяет допустимые версии
+и очищает результаты без нового согласия. Обновления резюме сохраняют выбранную версию.

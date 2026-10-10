@@ -27,14 +27,15 @@ page.on("pageerror", error => errors.push(error.message));
 try {
   await page.goto((process.env.EMPLOYER_URL || "http://127.0.0.1:5174/employer/") + "#/chat");
   await page.getByText("Чат 1", { exact: true }).waitFor();
-  assert.equal(await page.locator(".recruitment-chat-tile").count(), 100);
+  assert.equal(await page.locator(".recruitment-chat-tile").count(), 101);
+  assert.match(await page.locator(".recruitment-chat-tile").first().innerText(), /Comit/);
   await page.getByRole("button", { name: "Другие разговоры", exact: true }).click();
   await page.getByText("Чат 101", { exact: true }).waitFor();
   items = [item(102), ...items.map(row => row.id === id(101) ? { ...row, chat_unread_count: 2 } : row)];
   await page.getByText("Чат 102", { exact: true }).waitFor({ timeout: 12000 });
   const last = page.locator(".recruitment-chat-tile").filter({ has: page.getByText("Чат 101", { exact: true }) });
   await last.getByText("2 новых сообщения", { exact: true }).waitFor();
-  assert.equal(await page.locator(".recruitment-chat-tile").count(), 102);
+  assert.equal(await page.locator(".recruitment-chat-tile").count(), 103);
   assert.equal(histories, 0, "directory must not read message history");
   assert.deepEqual(errors, []);
   console.log("PASS newly created chats and unread on loaded second page update without fetching private history");

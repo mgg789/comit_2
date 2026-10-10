@@ -1,3 +1,4 @@
+import { SystemInbox, useChatUnread, type SystemInboxTransport } from "@comit/ui-kit/system-inbox";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state";
@@ -7,7 +8,9 @@ import type { AccountView } from "@comit/shared";
 import { Action, Backdrop, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
-import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen } from "./screens";
+import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen, RecommendationConsentSettings } from "./screens";
+const candidateInboxTransport: SystemInboxTransport = { getPage: (after, limit) => api.getSystemChat("candidate", after, limit), markRead: read_sequence => api.markSystemChatRead("candidate", { read_sequence }) };
+const candidateUnread = () => api.getChatUnread("candidate");
 const navigation = [
   { path: "/resume", label: "Резюме", icon: "resumes" },
   { path: "/offers", label: "Предложения", icon: "vacancies" },
@@ -20,6 +23,7 @@ export default function App() {
   const { route: fullRoute, navigate } = useRoute();
   const route = fullRoute.split("?")[0] || "/resume";
   const [account, setAccount] = useState<AccountView | null>(null);
+  const unread = useChatUnread(account?.id, candidateUnread);
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
@@ -93,17 +97,18 @@ export default function App() {
     <AppShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} brandLabel="Comit — главная" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
-      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); if (route === "/offers") window.dispatchEvent(new Event("candidate:focus-offer-search")); else navigate("/offers?search=1"); }} secondaryLabel="Чаты" secondaryIcon="message" onSecondary={() => navigate("/chat")}
+      searchLabel="Поиск предложений" onSearch={() => { setMenu(false); if (route === "/offers") window.dispatchEvent(new Event("candidate:focus-offer-search")); else navigate("/offers?search=1"); }} secondaryLabel="Чаты" secondaryIcon="message" secondaryUnreadCount={unread?.total_unread_count} onSecondary={() => navigate("/chat")}
       menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
     />
     <main className="main-content candidate-content" key={account.id}>
-     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate}/> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
+     {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate} systemUnread={unread?.system_unread_count}/> : route === "/chat/comit-system" ? <section className="recruitment-screen"><PageTitle title="Comit" back={() => navigate("/chat")} /><SystemInbox transport={candidateInboxTransport} errorText={errorText} navigate={navigate} /></section> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
               <PageTitle title="Настройки"/>
               <section className="panel candidate-settings">
               <h2>Аккаунт</h2>
               <p>{account.email}</p>
               <p>Данные резюме и согласие на показ работодателям можно изменить в резюме.</p>
               <Action variant="primary" onClick={() => navigate("/resume")}>К резюме</Action>
+              <RecommendationConsentSettings />
               <Action onClick={() => { setLogout(true); setFailure(null); }}>Выйти из аккаунта</Action>
               <a href="#/legal/privacy-policy">Политика конфиденциальности</a>
               </section>

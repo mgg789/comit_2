@@ -283,3 +283,6 @@
 .chat-tile-state.has-unread { color: var(--employer-blue); }
 
 @media (max-width: 760px) { .participant-header { padding-left: 6rem; } }
+
+.system-avatar { background: var(--employer-ink); color: var(--comit-text); }
+.system-avatar .icon { width: 34rem; height: 34rem; }

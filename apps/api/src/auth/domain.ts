@@ -15,6 +15,13 @@ import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore } from "../statistics/store.js";
 import { statisticsRoutes } from "../routes/statistics.js";
 import { organizationAgentToolsRoutes } from "../routes/organization-agent-tools.js";
+import { EmployerProfileStore } from "../employers/store.js";
+import { employerProfileRoutes } from "../routes/employer-profile.js";
+import { SystemNotificationsStore } from "../notifications/system-store.js";
+import { notificationRoutes } from "../routes/notifications.js";
+import { CandidateRecommendationsStore } from "../recommendations/store.js";
+import { recommendationsRoutes } from "../recommendations/routes.js";
+import { WeeklyRecommendationWorker } from "../recommendations/worker.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
 /** Wire production dependencies once; unavailable config never creates a demo session or leaks a code. */
@@ -47,7 +54,9 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   let mailConfigured = true;
   try { readSmtpConfig(); } catch { mailConfigured = false; }
   const vacancyLifecycle = new VacancyLifecycle(pool, correlatedFetch());
-  const options = { config, store, mailConfigured, profiles: new ProfileStore(pool), transport: correlatedFetch(), vacancyLifecycle };
+  const notifications = new SystemNotificationsStore(pool);
+  const employerProfiles = new EmployerProfileStore(pool);
+  const options = { config, store, employerProfiles, mailConfigured, profiles: new ProfileStore(pool), transport: correlatedFetch(), vacancyLifecycle };
   let resuming = false;
   const resume = async () => {
     if (resuming) return;
@@ -62,7 +71,34 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   await app.register(candidateProfileRoutes, options);
   await app.register(accountRoutes, options);
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
-    (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client));
+    (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client),
+    { initialWorkingDays: 4, reminderWorkingDays: 3, hireOn: "offer_accept" }, notifications);
+  await app.register(employerProfileRoutes, { ...options, employerProfiles });
+  await app.register(notificationRoutes, { ...options, notifications });
+  const recommendations = new CandidateRecommendationsStore(pool, { notifyInTransaction: async (client, candidateId, item) => {
+    await notifications.append(client, candidateId, `recommendation:${item.recommendation_id}`, "recommendation.weekly",
+      item.state === "ready" ? "Новые рекомендации от платформы готовы. Посмотрите их в статистике." : "Обновлены рекомендации от платформы. Посмотрите их в статистике.",
+      { kind: "candidate_profile", path: "/statistics" });
+  } });
+  await app.register(recommendationsRoutes, { ...options, recommendations });
+  const recommendationWorker = new WeeklyRecommendationWorker(recommendations, {
+    matchingUrl: process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101", matchingToken: process.env.CANDIDATE_PIPELINE_TOKEN ?? "",
+    agentsUrl: process.env.AGENTS_SERVICE_URL ?? "http://agents-service:8104", agentsToken: process.env.AGENTS_SERVICE_TOKEN ?? "", transport: correlatedFetch() });
+  let sweeping = false, recommending = false;
+  const sweep = async () => {
+    if (sweeping) return; sweeping = true;
+    try { await recruitment.processDeadlines(); } catch { app.log.warn({ code: "recruitment_deadlines_retry" }, "Hiring clock reconciliation deferred"); }
+    finally { sweeping = false; }
+  };
+  const recommend = async () => {
+    if (recommending) return; recommending = true;
+    try { await recommendations.enqueueCurrentWeek(); await recommendationWorker.processOnce(); }
+    catch { app.log.warn({ code: "recommendations_retry" }, "Weekly recommendation reconciliation deferred"); }
+    finally { recommending = false; }
+  };
+  const hiringInterval = setInterval(() => { void sweep(); }, 5000); hiringInterval.unref();
+  const recommendationInterval = setInterval(() => { void recommend(); }, 60_000); recommendationInterval.unref();
+  app.addHook("onClose", async () => { clearInterval(hiringInterval); clearInterval(recommendationInterval); });
   await app.register(recruitmentRoutes, { ...options, recruitment });
   await app.register(chatRoutes, { ...options, recruitment });
   const statistics = new EmployerStatisticsStore(pool);

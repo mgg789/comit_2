@@ -190,4 +190,6 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     app.include_router(combine_router(combine_repository, require_internal))
     app.include_router(rerank_router(rerank_repository, require_internal))
     app.include_router(feed_router(feed_repository, require_internal))
+    from matching_engine.recommendations import recommendation_router
+    app.include_router(recommendation_router(pipeline_store, require_internal))
     return app

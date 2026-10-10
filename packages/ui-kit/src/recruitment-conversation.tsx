@@ -2,7 +2,7 @@ import { usePersistentState } from "./ui-state";
 import { useLayoutEffect, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ChatFile, ChatMessage, ChatPage, DownloadChatFile, RecruitmentView, SendChatMessage, UploadChatFile } from "@comit/shared";
-import { Action, Icon, State } from "./design";
+import { Action, Icon, RecruitmentClock, State } from "./design";
 import "./conversation.css";
 import { ChatComposer } from "./chat-composer";
 const qgrammMark = new URL("./qgramm-mark.svg", import.meta.url).href;
@@ -76,7 +76,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
     const observer = new ResizeObserver(fit); observer.observe(wrap); fit();
     window.addEventListener("resize", fit);
     return () => { observer.disconnect(); window.removeEventListener("resize", fit); };
-  }, [id]);
+  }, [id, process.deadline?.stage]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!process.chat_available) {
@@ -131,7 +131,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
       const bounds = list.getBoundingClientRect(), bottom = edge.getBoundingClientRect();
       if (bottom.bottom > Math.min(bounds.bottom, innerHeight) + 2 || bottom.top < Math.max(bounds.top, 0)) return;
       busy = true;
-      try { const status = await transportRef.current.markRead?.(id, lastIncoming); if (active && status) acknowledged.current = Math.max(acknowledged.current, status.read_sequence); }
+      try { const status = await transportRef.current.markRead?.(id, lastIncoming); if (active && status) { acknowledged.current = Math.max(acknowledged.current, status.read_sequence); window.dispatchEvent(new Event("comit:chat-read")); } }
       catch { /* A read receipt failure must not block the conversation; retry while visible. */ }
       finally { busy = false; }
     };
@@ -196,7 +196,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
       if (input.current) input.current.value = "";
     }
   }
-  return <div className="recruitment-conversation">{header}
+  return <div className="recruitment-conversation">{header}<RecruitmentClock deadline={process.deadline} />
       <div ref={history} className="recruitment-messages" style={{ height: historyHeight }} aria-live="polite">
         {historyLoading && <State loading />}
         {!process.chat_available && (
@@ -289,14 +289,14 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
 
 /** The same list tiles for both roles; listing chats never mounts a conversation or fetches its messages. */
 export function RecruitmentChatList({ items, loading, error, emptyText, retry, onOpen, hasMore, loadMore, loadingMore }: {
-  items: readonly { id: string; title: string; subtitle: string; state: string; unread?: number | null }[];
+  items: readonly { id: string; title: string; subtitle: string; state: string; unread?: number | null; system?: boolean }[];
   loading: boolean; error: string | null; emptyText: string; retry: () => void;
   onOpen: (id: string) => void; hasMore?: boolean; loadMore?: () => void; loadingMore?: boolean;
 }) {
   return <div className="recruitment-chat-list">
     {(loading || error || !items.length) && <State loading={loading} error={error} empty={!items.length ? emptyText : undefined} retry={retry} />}
     {items.map(item => <button key={item.id} className="recruitment-chat-tile panel" onClick={() => onOpen(item.id)}>
-      <span className="anonymous-avatar"><Icon name="candidates" /></span>
+      <span className={`anonymous-avatar${item.system ? " system-avatar" : ""}`}><Icon name={item.system ? "logo" : "candidates"} /></span>
       <span className="chat-tile-label"><strong>{item.title}</strong><small>{item.subtitle}</small></span>
       <span className={`chat-tile-state${item.unread && item.unread > 0 ? " has-unread" : ""}`}>{item.unread && item.unread > 0 ? unreadMessageLabel(item.unread) : item.state}</span><Icon name="arrow" />
     </button>)}

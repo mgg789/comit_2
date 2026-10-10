@@ -603,3 +603,17 @@ Internal gateway сохраняет проверенный заголовок, b
 `GET /api/public/showcase/vacancies` и `GET /api/public/showcase/candidates` —
 read-only списки без сессии и без detail/PDF/contact-доступа. Краткие карточки,
 фильтры, opaque cursor и fences описаны в [контракте витрины](public-showcase.md).
+
+
+## Профиль компании, сроки и уведомления
+
+`GET/PATCH /api/employer/profile`, `GET /api/{candidate|employer}/system-chat`, `POST /api/{role}/system-chat/read` и `GET /api/{role}/chat-unread` используют владельца из сессии. DTO, CAS, пагинация, read receipts и fallback счётчика описаны в [system-inbox.md](system-inbox.md). API client использует те же контракты.
+
+`RecruitmentView` дополнен `deadline` и terminal состоянием `expired`; closure допускает `actor=system`, категории feedback. `company_name` в InviteRequest стал необязательным совместимым полем: авторитетное название берётся из employer profile; несовпадение отклоняется. Причины отказа требуют содержательного текста и категорий. Полная таблица переходов — [recruitment.md](recruitment.md).
+
+`GET /api/candidate/recommendations/latest` возвращает только собственную недельную рекомендацию либо `item=null`, включая честные insufficient_data/provider_unavailable. Источники, внутренние endpoint и leased worker описаны в [recommendations.md](recommendations.md). API автоматически возобновляет недельную очередь каждую минуту; уникальность кандидат/неделя предотвращает повторную генерацию. CLI `pnpm --filter @comit/api recommendations:worker` использует тот же durable store и атомарное уведомление.
+
+Недельные рекомендации требуют нового явного согласия `training-v2`. Версия
+`training-v1` совместима с прежним ранжированием, но не включает рекомендации.
+Миграция API `017_recommendation_consent_version.sql` расширяет допустимые версии
+и очищает результаты без нового согласия. Обновления резюме сохраняют выбранную версию.

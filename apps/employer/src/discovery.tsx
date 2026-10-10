@@ -1,3 +1,6 @@
+import { rejectionFeedbackError } from "@comit/ui-kit/rejection-feedback";
+import { RejectionFeedback } from "@comit/ui-kit/design";
+import { rejectionReasonCategories, type RejectionReasonCategory } from "@comit/shared";
 import { InlineSearch } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -54,6 +57,7 @@ const statusLabels: Record<string, string> = {
   hired: "Приём",
   offer_declined: "Оффер отклонён",
   withdrawn: "Отозвано",
+  expired: "Предложение отозвано по сроку",
 };
 const stageLabels: Record<EmployerStatisticStage, string> = {
   delivered: "Выдано в подбор",
@@ -516,7 +520,8 @@ export function Resume({
   const clearDraft = useClearPersistentState();
   const formKey = `resume.${candidateId}.${draftId || "all"}`;
   const [selected, setSelected] = usePersistentState(`${formKey}.selected`, draftId || "");
-  const [company, setCompany] = usePersistentState(`${formKey}.company`, "");
+  const organization = useResource(() => api.getEmployerProfile());
+  const company = organization.data?.company_name || "";
   const [description, setDescription] = usePersistentState(`${formKey}.description`, "");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -530,6 +535,7 @@ export function Resume({
   }
   const [reject, setReject] = useState(false);
   const [reason, setReason] = usePersistentState(`${formKey}.reason`, "");
+  const [categories, setCategories] = usePersistentState<RejectionReasonCategory[]>(`${formKey}.categories`, [], (value): value is RejectionReasonCategory[] => Array.isArray(value) && value.every(item => rejectionReasonCategories.includes(item)));
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) {
@@ -548,7 +554,6 @@ export function Resume({
     try {
       const result = await api.inviteCandidate(selected, {
         candidate_id: candidateId,
-        company_name: company.trim(),
         description: description.trim(),
         idempotency_key: mutationKey(
           JSON.stringify([
@@ -572,19 +577,22 @@ export function Resume({
   async function rejectCandidate(event: FormEvent) {
     event.preventDefault();
     if (!draftId) return;
+    const feedbackError = rejectionFeedbackError(reason, categories);
+    if (feedbackError) { setNotice(feedbackError); return; }
     setBusy(true);
     try {
       if (process)
         await api.actOnRecruitment("employer", process.id, {
           action: "reject",
           reason: reason.trim(),
+          categories,
           expected_revision: process.revision,
           idempotency_key: mutationKey(
             JSON.stringify([
               "reject",
               process.id,
               process.revision,
-              reason.trim(),
+              reason.trim(), categories,
             ]),
           ),
         });
@@ -592,16 +600,18 @@ export function Resume({
         await api.rejectSavedCandidate(draftId, {
           candidate_id: candidateId,
           reason: reason.trim(),
+          categories,
           idempotency_key: mutationKey(
             JSON.stringify([
               "reject_saved",
               draftId,
               candidateId,
-              reason.trim(),
+              reason.trim(), categories,
             ]),
           ),
         });
       clearDraft(`${formKey}.reason`);
+      clearDraft(`${formKey}.categories`);
       setReject(false);
       recruitment.refresh();
       setNotice("Решение сохранено.");
@@ -826,13 +836,7 @@ export function Resume({
                         {salary(vacancy.fields.zp_min, vacancy.fields.zp_max)}
                       </p>
                     )}
-                    <Field label="Компания">
-                      <input
-                        required
-                        value={company}
-                        onChange={(event) => setCompany(event.target.value)}
-                      />
-                    </Field>
+                    <Field label="Компания"><p>{company || "Название компании пока не указано"}</p></Field>{organization.error && <State error={organization.error} retry={organization.refresh} />}{!company && <Action type="button" onClick={() => navigate("/settings")}>Указать компанию в настройках</Action>}
                     <Field label="Текст приглашения">
                       <textarea
                         required
@@ -846,13 +850,7 @@ export function Resume({
                     </p>
                   </>
                 ) : (
-                  <Field label="Причина">
-                    <textarea
-                      required
-                      value={reason}
-                      onChange={(event) => setReason(event.target.value)}
-                    />
-                  </Field>
+                  <RejectionFeedback reason={reason} setReason={setReason} categories={categories} setCategories={setCategories} disabled={busy} />
                 )}
                 {notice && <p className="form-error">{notice}</p>}
                 <div className="form-actions">

@@ -1165,3 +1165,15 @@ textarea::placeholder {
     height: 32rem;
   }
 }
+
+.chat-header-button { position: relative; }
+.chat-unread-badge { position: absolute; top: -5rem; right: -6rem; display: grid; place-items: center; min-width: 20rem; height: 20rem; padding: 0 4rem; border-radius: 20rem; background: var(--employer-blue); color: var(--employer-ink); font-size: 12rem; font-weight: 600; line-height: 1; pointer-events: none; }
+@media (max-width: 760px) { .chat-unread-badge { min-width: 16rem; height: 16rem; font-size: 10rem; top: -3rem; right: -4rem; } }
+
+.rejection-feedback { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 14rem; }
+.rejection-feedback legend { font-size: 20rem; margin-bottom: 14rem; }
+.rejection-categories { display: flex; flex-wrap: wrap; gap: 16rem 24rem; }
+.rejection-categories label { display: flex; gap: 10rem; align-items: center; font-size: 18rem; }
+.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-181816); color: var(--comit-text); margin: 20rem 0; }
+.recruitment-deadline p { margin: 8rem 0; font-size: 18rem; }
+.recruitment-deadline small { color: var(--comit-text-muted); }

@@ -18,7 +18,7 @@ test("recruitment commands accept every action and reject extra fields without s
     const commands: RecruitmentAction[] = [
       { ...identity, action: "view" }, { ...identity, action: "accept" },
       { ...identity, action: "decline", reason: "Salary" }, { ...identity, action: "withdraw", reason: "Closed" },
-      { ...identity, action: "reject", reason: "Skills" },
+      { ...identity, action: "reject", reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable.", categories: ["technical_skills"] },
       { ...identity, action: "interview_propose", kind: "technical", starts_at: "2026-10-07T10:00:00Z",
         time_zone: "Europe/Moscow", duration_minutes: 60, format: "remote", location: "Meeting link" },
       { ...identity, action: "interview_accept", interview_id },
@@ -40,6 +40,8 @@ test("recruitment commands accept every action and reject extra fields without s
     assert.equal((await app.inject({ method: "POST", url: "/invitations", payload: { ...invitation, salary: { from_rub: 1, to_rub: 2 } } })).statusCode, 200);
     for (const payload of [
       { ...identity, action: "decline", reason: "   " },
+      { ...identity, action: "reject", reason: "Too short", categories: ["experience"] },
+      { ...identity, action: "reject", reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable." },
       { ...identity, action: "offer_accept", offer_id: "invalid" },
       { ...identity, action: "view", expected_revision: 0 },
       { ...identity, action: "view", expected_revision: "1" },
@@ -55,7 +57,7 @@ test("recruitment commands accept every action and reject extra fields without s
       { ...invitation, salary: { from_rub: 1, to_rub: 2, currency: "USD" } },
       { ...invitation, contacts: { email: "candidate@example.test" } },
     ]) assert.equal((await app.inject({ method: "POST", url: "/invitations", payload })).statusCode, 400);
-    const rejection = { candidate_id: randomUUID(), idempotency_key: randomUUID(), reason: "Missing required experience" };
+    const rejection = { candidate_id: randomUUID(), idempotency_key: randomUUID(), reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable.", categories: ["experience"] };
     assert.equal((await app.inject({ method: "POST", url: "/reject-saved", payload: rejection })).statusCode, 200);
     for (const payload of [{ ...rejection, reason: " " }, { ...rejection, company_name: "Comit" },
       { candidate_id: rejection.candidate_id, idempotency_key: rejection.idempotency_key },

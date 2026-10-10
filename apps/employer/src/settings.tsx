@@ -1,5 +1,7 @@
+import { useState, type FormEvent } from "react";
+import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 import type { AccountView } from "@comit/shared";
-import { api, useResource } from "./runtime";
+import { api, errorText, useResource } from "./runtime";
 import { useEmployerPreferences } from "./preferences";
 import { Action, Field, PageTitle, Select, State } from "./ui";
 import "./settings.css";
@@ -33,6 +35,20 @@ export function Settings({
   onConfirmLogoutAll,
   onConfirmDelete,
 }: EmployerSettingsProps) {
+  const organization = useResource(() => api.getEmployerProfile());
+  const [companyDraft, setCompanyDraft] = usePersistentState("organization.company.draft", { value: "", dirty: false });
+  const clearDraft = useClearPersistentState();
+  const [savingCompany, setSavingCompany] = useState(false), [companyError, setCompanyError] = useState<string | null>(null), [companySaved, setCompanySaved] = useState(false);
+  const company = companyDraft.dirty ? companyDraft.value : organization.data?.company_name || "";
+  async function saveCompany(event: FormEvent) {
+    event.preventDefault();
+    if (!organization.data || savingCompany) return;
+    if (!company.trim()) { setCompanyError("Укажите название компании."); return; }
+    setSavingCompany(true); setCompanyError(null); setCompanySaved(false);
+    try { const updated = await api.updateEmployerProfile({ expected_revision: organization.data.revision, company_name: company.trim() }); organization.setData(updated); clearDraft("organization.company.draft"); setCompanyDraft({ value: "", dirty: false }); setCompanySaved(true); }
+    catch (reason) { setCompanyError(errorText(reason)); }
+    finally { setSavingCompany(false); }
+  }
   const budget = useResource(() => api.getOrganizationBudget());
   const { preferences, updatePreferences } = useEmployerPreferences();
   return (
@@ -49,6 +65,7 @@ export function Settings({
             <div><dt>Согласие на обработку данных</dt><dd>{date(account.consent.accepted_at)} · версия {account.consent.version}</dd></div>
           </dl>
         </section>
+        <section className="settings-card glass" aria-labelledby="settings-company"><h2 id="settings-company">Компания</h2><p className="settings-description">Это название автоматически подставляется во все новые приглашения. Ранее отправленные приглашения сохраняют прежнее название.</p>{organization.loading || organization.error ? <State loading={organization.loading} error={organization.error} retry={organization.refresh} /> : <form onSubmit={saveCompany}><Field label="Название компании"><input required maxLength={200} value={company} disabled={savingCompany} onChange={event => { setCompanyDraft({ value: event.target.value, dirty: true }); setCompanySaved(false); }} /></Field><Action type="submit" variant="primary" disabled={savingCompany}>{savingCompany ? "Сохраняем…" : "Сохранить название"}</Action>{companyError && <p className="form-error" role="alert">{companyError}</p>}{companySaved && <p role="status">Название компании сохранено.</p>}</form>}</section>
         <section className="settings-card glass" aria-labelledby="settings-ai">
           <h2 id="settings-ai">AI-ассистент</h2>
           <p className="settings-description">Настройки ввода и глубина рассуждений при открытии AI в этом браузере.</p>

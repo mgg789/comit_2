@@ -75,3 +75,9 @@
 ## Общий поиск списков
 
 `InlineSearch` из `@comit/ui-kit/design` использует исходный `discovery-search` работодателя. Он получает `value`, `onChange`, доступное название `label`, необязательные `placeholder`, `inputRef`, `onSubmit` и `className`. Submit предотвращает перезагрузку: поиск соискателей подтверждает запрос кнопкой или Enter, собственные вакансии и предложения кандидата фильтруются при вводе. Исходные CSS-правила фокуса и мобильных размеров перенесены в `design.css`, без второго набора стилей в приложениях. Поле сохраняет локальное состояние силами вызывающего списка.
+
+## Уведомления и обратная связь
+
+`SystemInbox` (`@comit/ui-kit/system-inbox`) переиспользует layout и пузырьки переписки, но намеренно не предоставляет send/attachment/composer. Caller передаёт role-bound transport и navigate; внутренние ссылки проходят allowlist. Receipts относятся только к доставленным видимым сообщениям. `useChatUnread` читает подтверждённые счётчики аккаунта, сбрасывает их при смене account ID и повторяет чтение после событий `comit:chat-read`.
+
+`RecruitmentChatList` принимает optional `system` для логотипа, `AppShellHeader` — nullable `secondaryUnreadCount` для badge 99+. `RecruitmentClock` из design отображает RecruitmentDeadline, используя shared weekday helper; business transitions принадлежат серверу. `RejectionFeedback` и чистый `rejectionFeedbackError` задают единые требования подробной ОС во всех формах работодателя.

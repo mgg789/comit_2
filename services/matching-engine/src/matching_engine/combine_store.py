@@ -354,6 +354,8 @@ class CombineStore:
             published = connection.execute("SELECT * FROM matching_pipeline.runs WHERE run_id=%s", (job.run_id,)).fetchone()
             from matching_engine.learning_store import LearningStore
             LearningStore.capture_main(connection, published)
+            from matching_engine.recommendations import capture_main
+            capture_main(connection, job, result)
             RerankStore.queue(connection, published)
             return True
 

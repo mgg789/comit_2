@@ -1087,7 +1087,8 @@ export function VacancyDetail({
   );
   const [invite, setInvite] = useState<SavedCard | null>(null);
   const clearDraft = useClearPersistentState();
-  const [company, setCompany] = usePersistentState("invitation.company", "");
+  const organization = useResource(() => api.getEmployerProfile());
+  const company = organization.data?.company_name || "";
   const [description, setDescription] = usePersistentState(`vacancy.${draftId}.invitation.description`, "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1179,13 +1180,12 @@ export function VacancyDetail({
   );
   const sendInvite = async (event: FormEvent) => {
     event.preventDefault();
-    if (!invite) return;
+    if (!invite || !company.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const process = await api.inviteCandidate(draftId, {
         candidate_id: invite.candidate_id,
-        company_name: company.trim(),
         description: description.trim(),
         idempotency_key: inviteKey.current,
       });
@@ -1473,17 +1473,7 @@ export function VacancyDetail({
               </p>
               <form className="form-grid" onSubmit={sendInvite}>
                 <fieldset className="invite-fields" disabled={busy}>
-                  <Field label="Компания">
-                    <input
-                      value={company}
-                      required
-                      maxLength={300}
-                      onChange={(event) => {
-                        setCompany(event.target.value);
-                        inviteKey.current = crypto.randomUUID();
-                      }}
-                    />
-                  </Field>
+                  <Field label="Компания"><p>{company || "Название компании пока не указано"}</p></Field>{organization.error && <State error={organization.error} retry={organization.refresh} />}{!company && <Action type="button" onClick={() => navigate("/settings")}>Указать компанию в настройках</Action>}
                   <Field label="Сообщение кандидату">
                     <textarea
                       value={description}
@@ -1496,7 +1486,7 @@ export function VacancyDetail({
                     />
                   </Field>
                 </fieldset>
-                <Action type="submit" variant="light" disabled={busy}>
+                <Action type="submit" variant="light" disabled={busy || !company.trim()}>
                   Отправить приглашение
                 </Action>
                 {error && (

@@ -3945,6 +3945,98 @@
           }
         }
       }
+    },
+    "/internal/candidates/{candidate_id}/recommendation-evidence": {
+      "get": {
+        "summary": "Evidence",
+        "operationId": "evidence_internal_candidates__candidate_id__recommendation_evidence_get",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "After"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "title": "Before"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4632,7 +4724,10 @@
             "anyOf": [
               {
                 "type": "string",
-                "const": "training-v1"
+                "enum": [
+                  "training-v1",
+                  "training-v2"
+                ]
               },
               {
                 "type": "null"
@@ -4861,6 +4956,51 @@
         ],
         "title": "DeliveryStatus",
         "description": "Persisted acknowledgement counts for the two outbox streams and combine queue."
+      },
+      "EvidenceCount": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "const": "matching",
+            "title": "Source",
+            "default": "matching"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 4.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "count"
+        ],
+        "title": "EvidenceCount",
+        "description": "A category observed in at least four distinct vacancies, with no source IDs."
+      },
+      "EvidenceResponse": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceCount"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence"
+        ],
+        "title": "EvidenceResponse",
+        "description": "Only current consented candidate's bounded, aggregate matching evidence."
       },
       "ExternalEvidence": {
         "properties": {

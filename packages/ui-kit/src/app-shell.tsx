@@ -18,7 +18,7 @@ export function homePageHref(origin: string, development: boolean, override?: st
 }
 
 /** Existing employer header; role-specific navigation, API actions and assistant lifecycle stay in the application. */
-export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, selected, navigate, email, menu, toggleMenu, menuContent, toolsRef, menuRef, searchLabel, onSearch, secondaryLabel, onSecondary, secondaryIcon = "message", assistantOpen = false, toolsContent, overlayContent }: {
+export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, selected, navigate, email, menu, toggleMenu, menuContent, toolsRef, menuRef, searchLabel, onSearch, secondaryLabel, onSecondary, secondaryIcon = "message", assistantOpen = false, secondaryUnreadCount, toolsContent, overlayContent }: {
   brandHref: string; brandLabel: string; navigationLabel: string;
   items: readonly { id: string; label: string; path: string; icon: ComponentProps<typeof Icon>["name"] }[];
   selected: string; navigate: (path: string) => void; email: string;
@@ -27,14 +27,16 @@ export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, 
   searchLabel: string; onSearch: () => void; secondaryLabel: string; onSecondary: () => void;
   toolsContent?: ReactNode; overlayContent?: ReactNode;
   secondaryIcon?: ComponentProps<typeof Icon>["name"]; assistantOpen?: boolean;
+  secondaryUnreadCount?: number | null;
 }) {
+  const unreadId = useId();
   return <header className={`topbar ${assistantOpen ? "assistant-open" : ""}`}>
     <a className="brand glass" href={brandHref} aria-label={brandLabel}><Icon name="logo" /><span className="brand-word">comit</span></a>
     <ShellNavigation navigationLabel={navigationLabel} items={items} selected={selected} navigate={navigate} />
     <div className="account-tools glass" ref={toolsRef}>
       <button className="plain-icon" aria-label={searchLabel} onClick={onSearch}><Icon name="search" /></button>
       {toolsContent}
-      <button className="plain-icon" aria-label={secondaryLabel} onClick={onSecondary}><Icon name={secondaryIcon} /></button>
+      <button className="plain-icon chat-header-button" aria-label={secondaryLabel} aria-describedby={typeof secondaryUnreadCount === "number" && secondaryUnreadCount > 0 ? unreadId : undefined} onClick={onSecondary}><Icon name={secondaryIcon} />{typeof secondaryUnreadCount === "number" && secondaryUnreadCount > 0 && <span id={unreadId} className="chat-unread-badge" aria-label={`Непрочитанные сообщения: ${secondaryUnreadCount}`}>{secondaryUnreadCount > 99 ? "99+" : secondaryUnreadCount}</span>}</button>
       <button className="plain-icon" onClick={toggleMenu} aria-label="Открыть меню аккаунта" aria-expanded={menu}><span className="account-avatar">{email.slice(0, 1).toUpperCase()}</span><Icon name="chevron" /></button>
     </div>
     {overlayContent}

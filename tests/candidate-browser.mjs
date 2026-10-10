@@ -122,7 +122,8 @@ try {
   await page.getByRole("button", { name: "Чаты", exact: true }).click();
   await page.getByRole("heading", { name: "Чаты", exact: true }).waitFor();
   await page.locator(".recruitment-chat-tile").first().waitFor();
-  assert.equal(await page.locator(".recruitment-chat-tile").count(), 2);
+  assert.equal(await page.locator(".recruitment-chat-tile").count(), 3);
+  assert.match(await page.locator(".recruitment-chat-tile").first().innerText(), /Comit/);
   assert.equal(await page.getByLabel("Сообщение работодателю", { exact: true }).count(), 0);
   assert.equal(chatReads, readsBeforeList);
   await page.locator(".recruitment-chat-tile").filter({ hasText: "Тестовая компания" }).click();

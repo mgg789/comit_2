@@ -745,7 +745,8 @@ try {
   await page.getByRole("heading", { name: "Чаты", exact: true }).waitFor();
   assert.equal(await page.locator(".recruitment-conversation").count(), 0);
   assert.equal(chatReads, 0, "chat directory must not fetch private history");
-  await page.locator(".recruitment-chat-tile").first().click();
+  assert.match(await page.locator(".recruitment-chat-tile").first().innerText(), /Comit/);
+  await page.locator(".recruitment-chat-tile").nth(1).click();
   await page.getByRole("textbox", { name: "Сообщение кандидату" }).waitFor();
   assert.equal(await page.locator(".chat-picker").count(), 0);
   assert.ok(page.url().includes("from=%2Fchat"));

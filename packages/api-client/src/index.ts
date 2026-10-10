@@ -3,7 +3,7 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
@@ -33,6 +33,18 @@ export interface ApiClientOptions {
 }
 
 export interface ApiClient {
+  /** Read account-owned company settings, including initial revision zero. */
+  getEmployerProfile(): Promise<EmployerProfileView>;
+  /** Save company settings with revision CAS. */
+  updateEmployerProfile(body: EmployerProfileMutation): Promise<EmployerProfileView>;
+  /** Page the persistent read-only Comit system chat. */
+  getSystemChat(role: AccountRole, afterSequence?: number, limit?: number): Promise<SystemChatPage>;
+  /** Mark only delivered system notification sequences read. */
+  markSystemChatRead(role: AccountRole, body: SystemChatReadRequest): Promise<SystemChatReadStatus>;
+  /** Count unread items across every authorized hiring chat and the system inbox. */
+  getChatUnread(role: AccountRole): Promise<ChatUnreadStatus>;
+  /** Read the latest persisted candidate recommendation without starting provider work. */
+  getRecommendationsLatest(): Promise<CandidateRecommendationsResponse>;
   get<T>(path: string): Promise<T>;
   post<T>(path: string, body?: unknown): Promise<T>;
   /** Resolve the sole global employer chat from the authenticated account. */
@@ -271,6 +283,12 @@ export function createApiClient({
   }
 
   return {
+    getEmployerProfile: () => request("GET", "/employer/profile"),
+    updateEmployerProfile: body => request("PATCH", "/employer/profile", body),
+    getSystemChat: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/system-chat?after_sequence=${afterSequence}&limit=${limit}`),
+    markSystemChatRead: (role, body) => request("POST", `/${role}/system-chat/read`, body),
+    getChatUnread: role => request("GET", `/${role}/chat-unread`),
+    getRecommendationsLatest: () => request("GET", "/candidate/recommendations/latest"),
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
     getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),
     clearOrganizationMessages: body => request("DELETE", "/employer/organization-agent/messages", body),

@@ -179,7 +179,7 @@ test("transactional recruitment ownership, contacts, interviews, offers and dura
 
     await t.test("silent shortlist rejection is employer-only and cannot become an invitation", async () => {
       const f = await fixture();
-      const request = { candidate_id: f.candidate, idempotency_key: randomUUID(), reason: "Required skills missing" };
+      const request = { candidate_id: f.candidate, idempotency_key: randomUUID(), reason: "The candidate needs more production experience with distributed services and stronger technical skills in API design before this role would be suitable.", categories: ["technical_skills" as const] };
       const view = await store.rejectSaved(f.owner, f.grant.draft_id, f.grant.vacancy_id, 11, request);
       assert.equal(view.state, "rejected");
       assert.equal(view.terms, null);

@@ -1,3 +1,4 @@
+import { useChatUnread } from "@comit/ui-kit/system-inbox";
 import { PersistentStateScope } from "@comit/ui-kit/ui-state";
 import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { useEffect, useRef, useState } from "react";
@@ -26,10 +27,13 @@ import {
   VacancyResumes,
 } from "./discovery";
 
+const employerUnread = () => api.getChatUnread("employer");
+
 /** Employer SPA with a persistent global assistant and cookie-authenticated routes. */
 export default function App() {
   const { route, navigate } = useRoute();
   const [account, setAccount] = useState<AccountView | null>(null);
+  const unread = useChatUnread(account?.id, employerUnread);
   const [checking, setChecking] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [agent, setAgent] = useState(false);
@@ -267,6 +271,8 @@ export default function App() {
     screen = (
       <RecruitmentChat
         account={account}
+        systemUnread={unread?.system_unread_count}
+        navigate={navigate}
         onBack={() => navigate(chatReturnRoute(route, "/chat"))}
         onOpen={id => navigate(`/chat/${id}`)}
         backLabel={chatReturnRoute(route, "/chat").startsWith("/vacancy/") ? "К вакансии" : chatReturnRoute(route, "/chat") === "/chat" ? "К чатам" : "Назад"}
@@ -317,7 +323,7 @@ export default function App() {
               searchLabel="Поиск кандидатов" onSearch={() => leaveAgent(() => {
                 if (pieces[0] === "showcase") window.dispatchEvent(new Event("employer:focus-candidate-search"));
                 else navigate("/showcase?search=1");
-              })} secondaryLabel="Переписка и приглашения" onSecondary={() => leaveAgent(() => navigate("/chat"))}
+              })} secondaryUnreadCount={unread?.total_unread_count} secondaryLabel="Переписка и приглашения" onSecondary={() => leaveAgent(() => navigate("/chat"))}
               toolsContent={<NotificationsButton unseen={notifications.unseen} open={notificationsOpen} onClick={() => { setMenu(false); if (!notificationsOpen) setNotificationsSeenBefore(notifications.markSeen()); setNotificationsOpen(!notificationsOpen); }} />}
               overlayContent={<AnimatePresence>{notificationsOpen && <NotificationsPanel ref={notificationsRef} events={notifications.events} seenBefore={notificationsSeenBefore} onSelect={processId => { setNotificationsOpen(false); leaveAgent(() => navigate(`/chat/${processId}`)); }} />}</AnimatePresence>}
               menuContent={<><Action onClick={() => leaveAgent(() => navigate("/chat"))}>Мои чаты</Action><Action onClick={() => confirmAccountAction("logout")}>Выйти</Action><Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action></>}

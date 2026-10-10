@@ -1,6 +1,7 @@
 /** Participant-authenticated post-selection endpoints; chat routes share this domain's invitation grants. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard, RecruitmentView, RecruitmentPage } from "@comit/shared";
+import type { EmployerProfileStore } from "../employers/store.js";
 import { enrichRecruitmentUnread } from "../chat/unread.js";
 import { chatConfiguration } from "./chat.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
@@ -14,6 +15,7 @@ import {
 
 /** Reuse auth/profile dependencies and injectable private transports without exposing service credentials. */
 export interface RecruitmentOptions extends AccountGatewayOptions {
+  employerProfiles?: EmployerProfileStore;
   recruitment: RecruitmentStore; chatUrl?: string; chatToken?: string; chatTransport?: typeof fetch;
 }
 
@@ -94,6 +96,10 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     const ownerId = actor(request), payload = request.body;
     const receipt = await options.recruitment.receipt(ownerId, payload.idempotency_key, recruitmentFingerprint(`invite:${request.params.draft_id}`, payload));
     if (receipt) return receipt;
+    if (!options.employerProfiles) return invalid(503, "employer_profile_unavailable");
+    const company = await options.employerProfiles.get(ownerId);
+    if (!company.company_name) return invalid(409, "employer_company_required");
+    if (payload.company_name !== undefined && payload.company_name.trim() !== company.company_name) return invalid(409, "employer_company_mismatch");
     const draft = await draftFor(ownerId, request.params.draft_id);
     const saved = await savedFor(ownerId, draft.vacancy_id, payload.candidate_id);
     if (!saved.card || !options.profiles || !matchingToken) return invalid(409, "saved_candidate_source_obsolete");
@@ -111,7 +117,7 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     if (!fields.city || !fields.daily || !fields.type) return invalid(409, "vacancy_terms_incomplete");
     return options.recruitment.invite(ownerId, payload, {
       draft_id: draft.draft_id, vacancy_id: draft.vacancy_id, candidate_id: payload.candidate_id, profile_revision: exposure.profile_revision,
-      terms: { company_name: payload.company_name, description: payload.description, salary, contact_method: "platform",
+      terms: { company_name: company.company_name, description: payload.description, salary, contact_method: "platform",
         vacancy_title: fields.title ?? null, city: fields.city, daily: fields.daily, work_type: fields.type },
     });
   }));
