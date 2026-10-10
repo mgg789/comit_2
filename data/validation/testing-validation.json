@@ -1,0 +1,39 @@
+{
+ "test_retest": {
+  "runs": [
+   "senior",
+   "senior"
+  ],
+  "stability": 1.0
+ },
+ "discrimination": {
+  "weak_ranks": [
+   0,
+   0,
+   0
+  ],
+  "strong_ranks": [
+   3,
+   3,
+   3
+  ],
+  "point_biserial": 1.0,
+  "mean_weak": 0.0,
+  "mean_strong": 3.0
+ },
+ "expert_ground_truth": {
+  "checked": 32,
+  "right_marked_true": 16,
+  "wrong_marked_false": 16,
+  "agreement": 1.0
+ },
+ "leak_resistance": {
+  "leaked_items": 4,
+  "rotated_in": 12,
+  "overlap_with_follower": 1,
+  "leaked_answer_advantage": 1,
+  "repeat_submit_rejected": true
+ },
+ "passed": false,
+ "generated_note": "synthetic candidates, docker MCQ family; expert markup = bank ground truth"
+}
