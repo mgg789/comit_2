@@ -175,13 +175,32 @@
 .discovery-filters input::placeholder {
   color: var(--employer-ink);
 }
-.discovery-sort {
+/* Sort is a text trigger (Figma), not a filled field; the menu reuses the shared select panel. */
+.discovery-filters > .custom-select.discovery-sort {
   margin-left: auto;
-  display: flex;
-  align-items: center;
+  width: auto;
+  min-width: 320rem;
+}
+.discovery-filters .discovery-sort .custom-select-trigger {
+  min-height: 0;
+  padding: 8rem 4rem;
   gap: 20rem;
-  font-size: 18rem;
+  justify-content: flex-end;
+  background: transparent;
   color: var(--comit-text-muted);
+  font-size: 18rem;
+  transition: color var(--employer-hover-duration) var(--employer-hover-ease);
+}
+.discovery-filters .discovery-sort .custom-select-trigger:hover,
+.discovery-filters .discovery-sort .custom-select-trigger[aria-expanded="true"] {
+  color: var(--comit-text);
+}
+.discovery-filters .discovery-sort .custom-select-trigger .icon {
+  color: currentColor;
+}
+/* Options read as plain choices in the menu; only the trigger carries the prefix. */
+.discovery-filters .discovery-sort .custom-select-trigger > span:first-child::before {
+  content: "Сортировка: ";
 }
 .discovery-list {
   display: grid;
@@ -905,10 +924,14 @@
     border-radius: 14rem;
     padding: 10rem;
   }
-  .discovery-sort {
-    font-size: 12rem;
+  .discovery-filters > .custom-select.discovery-sort {
     margin-left: 0;
     width: 100%;
+    min-width: 0;
+  }
+  .discovery-filters .discovery-sort .custom-select-trigger {
+    font-size: 12rem;
+    justify-content: flex-start;
   }
   .discovery-list {
     gap: 12rem;

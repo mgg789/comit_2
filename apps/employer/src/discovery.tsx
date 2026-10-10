@@ -13,6 +13,7 @@ import {
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import { candidateName } from "./candidate-name";
+import { SHOWCASE_SORTS, candidateCode, isShowcaseSort, orderCandidates } from "./showcase-order";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
 import "./discovery.css";
 
@@ -183,6 +184,11 @@ export function Showcase({
     (value): value is string => typeof value === "string" && (value === "" || GRADES.some(item => item === value)));
   const [stack, setStack] = usePersistentState("showcase.stack", "");
   const [draftId, setDraftId] = usePersistentState("showcase.draftId", "");
+  const [sort, setSort] = usePersistentState("showcase.sort", "relevance", isShowcaseSort);
+  // An anonymous code ("0A40") is matched by id prefix; the server's text search cannot see it.
+  const code = candidateCode(query);
+  // Client-side ordering and code lookup need the whole result set, not the first page.
+  const loadAll = sort !== "relevance" || !!code;
   const vacancies = useResource(async () => {
     const items: Awaited<ReturnType<typeof api.getVacancyDrafts>> = [];
     for (let offset = 0; ; offset += 50) {
@@ -195,29 +201,33 @@ export function Showcase({
   useEffect(() => {
     if (vacancies.data && draftId && !selected) setDraftId("");
   }, [vacancies.data, draftId, selected, setDraftId]);
+  const filters = {
+    ...(specialization
+      ? { classes: SPECIALIZATIONS.filter((item) => item === specialization) }
+      : {}),
+    ...(grade ? { grades: GRADES.filter((item) => item === grade) } : {}),
+    ...(stack.trim()
+      ? { groups: { stacks: [{ key: stack.trim().toLowerCase() }] } }
+      : {}),
+    ...(selected ? { vacancy_id: selected.vacancy_id } : {}),
+  };
   const pool = useResource(
-    () =>
-      api.searchCandidates({
-        q: query,
-        limit: 30,
-        filters: {
-          ...(specialization
-            ? {
-                classes: SPECIALIZATIONS.filter(
-                  (item) => item === specialization,
-                ),
-              }
-            : {}),
-          ...(grade ? { grades: GRADES.filter((item) => item === grade) } : {}),
-          ...(stack.trim()
-            ? { groups: { stacks: [{ key: stack.trim().toLowerCase() }] } }
-            : {}),
-          ...(selected ? { vacancy_id: selected.vacancy_id } : {}),
-        },
-      }),
-    [query, specialization, grade, stack, selected?.vacancy_id],
+    async () => {
+      const request = { ...(code ? {} : { q: query }), filters, limit: loadAll ? 100 : 30 };
+      let page = await api.searchCandidates(request);
+      if (!loadAll) return page;
+      const unique = new Map(page.items.map((item) => [item.candidate_id, item]));
+      // Bounded: at most 1000 cards are ordered locally; a larger pool keeps "Показать ещё".
+      for (let step = 1; step < 10 && page.has_more && page.next_cursor; step++) {
+        page = await api.searchCandidates({ ...request, cursor: page.next_cursor });
+        page.items.forEach((item) => unique.set(item.candidate_id, item));
+      }
+      return { ...page, items: [...unique.values()] };
+    },
+    [query, specialization, grade, stack, selected?.vacancy_id, loadAll],
   );
   const filterIdentity = JSON.stringify([
+    loadAll,
     query,
     specialization,
     grade,
@@ -252,23 +262,10 @@ export function Showcase({
     const cursor = pool.data.next_cursor;
     try {
       const next = await api.searchCandidates({
-        q: query,
-        filters: {
-          ...(specialization
-            ? {
-                classes: SPECIALIZATIONS.filter(
-                  (item) => item === specialization,
-                ),
-              }
-            : {}),
-          ...(grade ? { grades: GRADES.filter((item) => item === grade) } : {}),
-          ...(stack.trim()
-            ? { groups: { stacks: [{ key: stack.trim().toLowerCase() }] } }
-            : {}),
-          ...(selected ? { vacancy_id: selected.vacancy_id } : {}),
-        },
+        ...(code ? {} : { q: query }),
+        filters,
         cursor,
-        limit: 30,
+        limit: loadAll ? 100 : 30,
       });
       if (pageScope.current.generation !== generation) return;
       pool.setData((current) => {
@@ -335,6 +332,10 @@ export function Showcase({
     } catch (reason) { setNotice(errorText(reason)); }
     finally { saveLock.current = false; setBusy(null); }
   }
+  const visible = orderCandidates(
+    code ? (pool.data?.items ?? []).filter((item) => item.candidate_id.toLowerCase().startsWith(code)) : (pool.data?.items ?? []),
+    sort,
+  );
   function submit(event: FormEvent) {
     event.preventDefault();
     setQuery(q);
@@ -401,9 +402,18 @@ export function Showcase({
             </option>
           ))}
         </Select>
-        <span className="discovery-sort">
-          Сортировка: по релевантности <Icon name="chevron" />
-        </span>
+        <Select
+          className="discovery-sort"
+          aria-label="Сортировка"
+          value={sort}
+          onChange={(event) => { if (isShowcaseSort(event.target.value)) setSort(event.target.value); }}
+        >
+          {SHOWCASE_SORTS.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </Select>
       </div>
       {notice && (
         <p className="inline-notice" role="status">
@@ -418,11 +428,11 @@ export function Showcase({
       )}
       {pool.loading || pool.error ? (
         <State {...pool} retry={pool.refresh} />
-      ) : !pool.data?.items.length ? (
-        <State empty="Подходящие соискатели не найдены" />
+      ) : !visible.length ? (
+        <State empty={code ? `Кандидат с кодом ${code.toUpperCase()} не найден` : "Подходящие соискатели не найдены"} />
       ) : (
         <div className="discovery-list">
-          {pool.data.items.map((candidate) => (
+          {visible.map((candidate) => (
             <article
               className="discovery-row"
               key={candidate.candidate_id}
@@ -461,7 +471,7 @@ export function Showcase({
               </div>
             </article>
           ))}
-          {pool.data.has_more && (
+          {pool.data?.has_more && (
             <div className="pagination">
               <Action disabled={pageBusy} onClick={() => void loadMore()}>
                 {pageBusy ? "Загружаем…" : "Показать ещё"}
