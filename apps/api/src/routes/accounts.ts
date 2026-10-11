@@ -40,6 +40,81 @@ export interface AccountGatewayOptions extends AuthOptions {
   vacancyLifecycle?: VacancyLifecycle;
 }
 
+/** Reviewed employer operations only; new internal paths or methods require an explicit boundary review. */
+const employerAgentOperations = new Set<string>([
+  "GET /internal/agents/taxonomy",
+  "GET /internal/agents/capabilities",
+  "POST /internal/vacancy-drafts",
+  "GET /internal/vacancy-drafts",
+  "GET /internal/vacancy-drafts/{draft_id}",
+  "PATCH /internal/vacancy-drafts/{draft_id}",
+  "GET /internal/vacancies",
+  "POST /internal/vacancies",
+  "GET /internal/vacancies/{draft_id}",
+  "PATCH /internal/vacancies/{draft_id}",
+  "DELETE /internal/vacancies/{draft_id}",
+  "POST /internal/vacancies/{draft_id}/approve",
+  "POST /internal/vacancies/{draft_id}/publish",
+  "POST /internal/vacancies/{draft_id}/withdraw",
+  "POST /internal/vacancies/{draft_id}/close",
+  "GET /internal/vacancies/{draft_id}/deletion",
+  "GET /internal/vacancies/{draft_id}/lifecycle/{expected_revision}/{action}",
+  "POST /internal/vacancy-drafts/{draft_id}/approve",
+  "POST /internal/vacancy-drafts/{draft_id}/create",
+  "GET /internal/vacancy-drafts/{draft_id}/pipeline",
+  "POST /internal/vacancy-drafts/{draft_id}/enrich",
+  "GET /internal/agents/jobs/{job_id}",
+  "POST /internal/agents/jobs/{job_id}/retry",
+  "POST /internal/agents/sessions",
+  "GET /internal/agents/sessions/{session_id}",
+  "POST /internal/agents/sessions/{session_id}/turns",
+  "POST /internal/agents/sessions/{session_id}/interactions/{interaction_id}",
+  "GET /internal/organization-agent/chat",
+  "GET /internal/organization-agent/messages",
+  "DELETE /internal/organization-agent/messages",
+  "POST /internal/organization-agent/messages",
+  "GET /internal/organization-agent/turns/{turn_id}",
+  "GET /internal/organization-agent/pending-answers",
+  "POST /internal/organization-agent/pending-answers/{answer_id}",
+  "GET /internal/organization-agent/tasks",
+  "POST /internal/organization-agent/tasks",
+  "POST /internal/organization-agent/tasks/{task_id}/availability",
+  "DELETE /internal/organization-agent/tasks/{task_id}",
+  "POST /internal/organization-agent/presence",
+  "PUT /internal/organization-agent/presence",
+  "GET /internal/organization-agent/context",
+  "GET /internal/organization-agent/memory",
+  "PATCH /internal/organization-agent/memory",
+  "GET /internal/organization-agent/budget",
+  "POST /internal/organization-agent/documents",
+  "GET /internal/organization-agent/documents",
+  "GET /internal/organization-agent/documents/{document_id}",
+  "GET /internal/organization-agent/documents/{document_id}/download",
+]);
+
+/** Matching feed/preference operations are reviewed independently of upstream contract growth. */
+const employerMatchingOperations = new Set<string>([
+  "GET /internal/vacancies/{vacancy_id}/preferences",
+  "POST /internal/vacancies/{vacancy_id}/preferences/reset",
+  "POST /internal/vacancies/{vacancy_id}/preferences/rollback",
+  "POST /internal/vacancies/{vacancy_id}/preferences/retry",
+  "GET /internal/vacancies/{vacancy_id}/hypotheses",
+  "POST /internal/vacancies/{vacancy_id}/hypotheses/{action}",
+  "POST /internal/vacancies/{vacancy_id}/showcase-likes",
+  "GET /internal/vacancies/{vacancy_id}/showcase-likes/{idempotency_key}",
+  "POST /internal/vacancies/{vacancy_id}/feed",
+  "POST /internal/vacancies/{vacancy_id}/feed/decisions",
+  "GET /internal/vacancies/{vacancy_id}/feed/decisions/{idempotency_key}",
+  "POST /internal/vacancies/{vacancy_id}/feed/impressions",
+  "GET /internal/vacancies/{vacancy_id}/feed/impressions/{idempotency_key}",
+  "GET /internal/vacancies/{vacancy_id}/feed/exposures/{exposure_id}",
+  "GET /internal/vacancies/{vacancy_id}/feed/{session_id}",
+  "POST /internal/vacancies/{vacancy_id}/feed/{session_id}/refill",
+  "GET /internal/vacancies/{vacancy_id}/saved",
+  "GET /internal/vacancies/{vacancy_id}/visited",
+  "GET /internal/vacancies/{vacancy_id}/saved/{candidate_id}",
+]);
+
 /** Expose employer editorial endpoints and candidate private reads with server-derived UUIDs. */
 export async function accountRoutes(app: FastifyInstance, options: AccountGatewayOptions): Promise<void> {
   const { config, store } = options;
@@ -70,7 +145,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   for (const [path, methods] of Object.entries(agentsSpec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
+      if (!employerAgentOperations.has(`${method.toUpperCase()} ${path}`)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
         responses: Record<string, { content?: { "application/json"?: { schema: Schema } } }> };
@@ -180,7 +255,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     if (!match) continue;
     const suffix = match[1]!;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post"].includes(method)) continue;
+      if (!employerMatchingOperations.has(`${method.toUpperCase()} ${path}`)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
         responses: { "200"?: { content?: { "application/json"?: { schema: Schema } } } } };

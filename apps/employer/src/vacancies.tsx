@@ -12,6 +12,7 @@ import type {
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import { candidateName } from "./candidate-name";
+import { WeeklyActivity } from "./weekly-activity";
 import { domainChoices, featureLabel, softChoices, specializationLabel, stackChoices } from "./labels";
 import "./vacancies.css";
 import "./vacancy-suggestions.css";
@@ -1034,7 +1035,7 @@ function CandidateDeck({
             if (bounds) void decide(info.point.x >= bounds.left + bounds.width / 2 ? "like" : "dislike");
           }}
         >
-          <h2>{candidateName(card.display_name)}</h2>
+          <h2>{candidateName(card.display_name)}<WeeklyActivity expiresAt={card.weekly_activity_expires_at} /></h2>
           <div className="tags">
             <span className="tag">{specializationLabel(card.category.specialization)}</span>
             {card.explanation.top_matched_features

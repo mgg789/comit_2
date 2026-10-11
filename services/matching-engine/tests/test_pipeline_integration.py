@@ -2,19 +2,24 @@
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
+from threading import Event
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from matching_engine.combine_store import CombineStore
-from matching_engine.database import connect, migrate
+from matching_engine.database import PIPELINE_LOCK, connect, migrate
 from matching_engine.embeddings import EmbeddingUnavailable
 from matching_engine.main import create_app
 from matching_engine.models import CoordinateAddition, category_for, confirmed_strength
+from matching_engine.resume import has_current_resume_template, render_resume
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.strict import build_strict_vector
 from matching_engine.strict_evidence import build_strict_evidence
 from matching_engine.worker import Worker
+from pypdf import PdfReader
 from test_contracts import eligible_profile
 
 pytestmark = pytest.mark.integration
@@ -137,6 +142,113 @@ def test_complete_pipeline_api_rank_and_contact_free_pool(store: Store) -> None:
     assert client.get("/ready").status_code == 200
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT count(*) AS n FROM candidate_pipeline.outbox").fetchone()["n"] == 3
+
+
+def test_resume_lazily_upgrades_both_artifacts_without_changing_publication(store: Store, monkeypatch) -> None:
+    candidate_id = uuid4()
+    store.intake(candidate_id, eligible_profile())
+    assert worker(store).process_once()
+    with connect(store.database_url) as connection:
+        before = connection.execute("SELECT * FROM candidate_pipeline.pool WHERE candidate_id=%s",
+                                    (candidate_id,)).fetchone()
+    calls = []
+
+    def counted(profile, category, public=True):
+        calls.append(public)
+        return render_resume(profile, category, public)
+
+    monkeypatch.setattr("matching_engine.store.render_resume", counted)
+    public_pdf = store.resume(candidate_id)
+    owner_pdf = store.resume(candidate_id, public=False)
+    assert calls == [True, False]
+    assert has_current_resume_template(public_pdf) and has_current_resume_template(owner_pdf)
+    public_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(public_pdf)).pages)
+    owner_text = "\n".join(page.extract_text() for page in PdfReader(BytesIO(owner_pdf)).pages)
+    assert "synthetic@example.invalid" not in public_text
+    assert "Synthetic Candidate" not in public_text
+    assert "synthetic@example.invalid" in owner_text
+    assert "Synthetic Candidate" in owner_text
+    assert store.resume(candidate_id) == public_pdf
+    with connect(store.database_url) as connection:
+        after = connection.execute("SELECT * FROM candidate_pipeline.pool WHERE candidate_id=%s",
+                                   (candidate_id,)).fetchone()
+        candidate = connection.execute("SELECT revision,state FROM candidate_pipeline.candidates WHERE candidate_id=%s",
+                                       (candidate_id,)).fetchone()
+        events = connection.execute("SELECT count(*) AS n FROM candidate_pipeline.outbox").fetchone()["n"]
+    assert after["public_pdf"] == public_pdf and after["owner_pdf"] == owner_pdf
+    for key in before.keys() - {"public_pdf", "owner_pdf"}:
+        assert after[key] == before[key], key
+    assert candidate == {"revision": before["revision"], "state": "ready"}
+    assert events == 1
+
+
+def test_concurrent_legacy_resume_gets_cache_one_upgrade(store: Store, monkeypatch) -> None:
+    candidate_id = uuid4()
+    store.intake(candidate_id, eligible_profile())
+    assert worker(store).process_once()
+    calls = []
+
+    def counted(profile, category, public=True):
+        calls.append(public)
+        return render_resume(profile, category, public)
+
+    monkeypatch.setattr("matching_engine.store.render_resume", counted)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(store.resume, candidate_id) for _ in range(2)]
+        artifacts = [future.result(timeout=10) for future in futures]
+    assert artifacts[0] == artifacts[1]
+    assert calls == [True, False]
+
+
+@pytest.mark.parametrize("fence", ["revision", "state", "schema", "withdrawal"])
+def test_lazy_resume_upgrade_rechecks_fences_after_waiting_for_lock(store: Store, monkeypatch, fence: str) -> None:
+    candidate_id = uuid4()
+    store.intake(candidate_id, eligible_profile())
+    assert worker(store).process_once()
+    waiting = Event()
+
+    class ObservedConnection:
+        """Signal after the old snapshot read and before its advisory lock wait."""
+
+        def __init__(self, connection):
+            self.connection = connection
+
+        def __enter__(self):
+            self.connection.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.connection.__exit__(*args)
+
+        def execute(self, query, params=None):
+            if "pg_advisory_xact_lock" in query:
+                waiting.set()
+            return self.connection.execute(query, params)
+
+    monkeypatch.setattr("matching_engine.store.connect", lambda url: ObservedConnection(connect(url)))
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with connect(store.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            future = executor.submit(store.resume, candidate_id)
+            assert waiting.wait(5)
+            if fence == "revision":
+                connection.execute("UPDATE candidate_pipeline.candidates SET revision=revision+1 WHERE candidate_id=%s", (candidate_id,))
+            elif fence == "state":
+                connection.execute("UPDATE candidate_pipeline.candidates SET state='draft' WHERE candidate_id=%s", (candidate_id,))
+            elif fence == "schema":
+                connection.execute("""INSERT INTO candidate_pipeline.strict_schemas(version,schema_hash,coordinates)
+                    SELECT 2,schema_hash || '-next',coordinates FROM candidate_pipeline.strict_schemas WHERE version=1""")
+                connection.execute("UPDATE candidate_pipeline.settings SET active_schema_version=2")
+            else:
+                connection.execute("DELETE FROM candidate_pipeline.pool WHERE candidate_id=%s", (candidate_id,))
+        with pytest.raises(NotFoundError, match="published resume not found"):
+            future.result(timeout=10)
+    with connect(store.database_url) as connection:
+        row = connection.execute("SELECT public_pdf,owner_pdf FROM candidate_pipeline.pool WHERE candidate_id=%s",
+                                 (candidate_id,)).fetchone()
+        if row:
+            assert not has_current_resume_template(bytes(row["public_pdf"]))
+            assert not has_current_resume_template(bytes(row["owner_pdf"]))
 
 
 def test_drafts_persist_original_claims_without_jobs_or_publication(store: Store) -> None:

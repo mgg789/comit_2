@@ -23,6 +23,7 @@ from matching_engine.models import (
     missing_requirements,
 )
 from matching_engine.page_cursor import decode_cursor, encode_cursor
+from matching_engine.resume import has_current_resume_template, render_resume
 from matching_engine.strict import schema_hash, validate_coordinates
 
 
@@ -452,16 +453,48 @@ class Store:
             ) for row in rows], limit=limit, offset=offset, has_more=has_more, next_cursor=next_cursor)
 
     def resume(self, candidate_id: UUID, public: bool = True) -> bytes:
-        """Return a PDF only while its exact revision and vector generation remain published."""
+        """Return the fenced published PDF; lazily cache both projections of older templates.
+
+        Upgrade only artifact bytes, under the same lock as intake/schema/publication.
+        Re-read after acquiring the lock so concurrent GETs do not render twice and
+        withdrawn or replaced snapshots cannot be restored by a design-only refresh.
+        """
         column = "public_pdf" if public else "owner_pdf"
-        with connect(self.database_url) as connection:
-            row = connection.execute(f"""
-                SELECT p.{column} AS pdf FROM candidate_pipeline.pool p
+        query = """
+                SELECT p.public_pdf,p.owner_pdf,p.revision,p.schema_version,p.schema_hash,
+                       p.specialization,p.grade,p.grade_status,c.profile
+                FROM candidate_pipeline.pool p
                 JOIN candidate_pipeline.candidates c
                     ON c.candidate_id=p.candidate_id AND c.revision=p.revision AND c.state='ready'
                 JOIN candidate_pipeline.settings s ON s.active_schema_version=p.schema_version
                 WHERE p.candidate_id=%s
-            """, (candidate_id,)).fetchone()
+        """
+        with connect(self.database_url) as connection:
+            row = connection.execute(query, (candidate_id,)).fetchone()
             if row is None:
                 raise NotFoundError("published resume not found")
-            return bytes(row["pdf"])
+            if all(has_current_resume_template(bytes(row[key])) for key in ("public_pdf", "owner_pdf")):
+                return bytes(row[column])
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            row = connection.execute(query, (candidate_id,)).fetchone()
+            if row is None:
+                raise NotFoundError("published resume not found")
+            if all(has_current_resume_template(bytes(row[key])) for key in ("public_pdf", "owner_pdf")):
+                return bytes(row[column])
+            profile = CandidateProfile.model_validate(row["profile"])
+            category = Category(specialization=row["specialization"], grade=row["grade"],
+                                grade_status=row["grade_status"])
+            public_pdf = render_resume(profile, category, public=True)
+            owner_pdf = render_resume(profile, category, public=False)
+            updated = connection.execute("""
+                UPDATE candidate_pipeline.pool p SET public_pdf=%s,owner_pdf=%s
+                FROM candidate_pipeline.candidates c,candidate_pipeline.settings s
+                WHERE p.candidate_id=%s AND p.revision=%s AND p.schema_version=%s AND p.schema_hash=%s
+                  AND c.candidate_id=p.candidate_id AND c.revision=p.revision AND c.state='ready'
+                  AND s.active_schema_version=p.schema_version
+                RETURNING p.candidate_id
+            """, (public_pdf, owner_pdf, candidate_id, row["revision"], row["schema_version"],
+                  row["schema_hash"])).fetchone()
+            if updated is None:
+                raise NotFoundError("published resume not found")
+            return public_pdf if public else owner_pdf

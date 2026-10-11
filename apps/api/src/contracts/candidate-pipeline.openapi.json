@@ -5141,6 +5141,19 @@
               }
             ]
           },
+          "weekly_activity_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Activity Expires At",
+            "description": "Current server-earned weekly practice deadline, refreshed from the ready profile at delivery; exclusive UTC Monday."
+          },
           "exposure_id": {
             "type": "string",
             "format": "uuid",

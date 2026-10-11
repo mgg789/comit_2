@@ -1,0 +1,13 @@
+{
+  "name": "@comit/help",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "honkit build book ../dist --reload && node scripts/externalize-scripts.mjs",
+    "test": "pnpm build && node --test tests/book.test.mjs"
+  },
+  "devDependencies": {
+    "honkit": "6.2.2"
+  }
+}

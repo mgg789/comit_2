@@ -12,6 +12,8 @@ from matching_engine.fsp_boost import (
     compute_weekly_boost,
     promote,
     promotion_policy,
+    promotion_explanation,
+    weekly_activity_deadline,
 )
 from matching_engine.models import ExternalEvidence
 from matching_engine.rerank_model import RerankScore, rerank_cards, tail_policy_hash
@@ -69,6 +71,24 @@ def test_weekly_reward_bound_and_expiry():
     assert compute_weekly_boost(profile, now=datetime(2026, 10, 5, tzinfo=UTC)) == 0
     fact.status = "self_reported"
     assert compute_weekly_boost(profile, now=now) == 0
+
+
+def test_activity_deadline_is_server_earned_and_independent_of_rollout(monkeypatch):
+    import matching_engine.fsp_boost as boost
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 11, 12, tzinfo=UTC)
+    monkeypatch.setattr(boost, "datetime", FixedDateTime)
+    fact = ExternalEvidence(kind="weekly_challenge", subject="current", status="confirmed", verified_value={
+        "provider": "comit_weekly_challenge:v1", "completed_at": "2026-10-06T00:00:00Z", "expires_at": "2026-10-12T00:00:00Z"})
+    for mode in ("off", "shadow", "active"):
+        explanation = promotion_explanation(candidate(external_evidence=[fact]), PromotionPolicy(mode=mode))
+        assert explanation.weekly_bonus == .005
+    assert weekly_activity_deadline(candidate(external_evidence=[fact])) == datetime(2026, 10, 12, tzinfo=UTC)
+    assert weekly_activity_deadline(candidate()) is None
+    fact.status = "rejected"
+    assert weekly_activity_deadline(candidate(external_evidence=[fact])) is None
 
 
 def test_actual_rerank_fallback_promotion_keeps_scores_and_strict_exclusions(monkeypatch):

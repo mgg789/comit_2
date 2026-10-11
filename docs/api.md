@@ -226,6 +226,16 @@ Private owner PDF существует только во внутреннем ma
 принимает от браузера `grade_result` или evidence и не делает самоотчёт
 подтверждённым.
 
+Employer gateway публикует только явно проверенные пары HTTP-метод + internal-путь
+из отдельных allowlist agents-service и matching-engine в
+`apps/api/src/routes/accounts.ts`: редактор вакансий, agent sessions/jobs,
+organization-agent, feed, saved/visited, preferences, hypotheses и showcase-likes API. Новая операция во внутреннем OpenAPI сама по себе не
+создаёт публичный маршрут. `POST /employer/candidate-resume/parse` и
+`POST /employer/candidate-recommendations/generate` отсутствуют (404), в том числе
+для действующей employer-сессии; обращения к upstream не происходит. Эти worker
+операции остаются только в доверенном внутреннем контуре. Разрешённые маршруты
+сохраняют проверку сессии, origin для изменений и серверный `X-Owner-ID`.
+
 ## Подготовка вакансии к комбайну (цикл 1)
 
 Та же серверная граница `X-Internal-Token` действует для matching-engine. Employer

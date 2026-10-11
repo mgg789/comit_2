@@ -428,3 +428,7 @@
   overflow: hidden;
   mask-image: linear-gradient(90deg, var(--employer-paint-000) 85%, transparent);
 }
+.weekly-activity-flame { position: relative; display: inline-flex; vertical-align: middle; margin-left: 0.5em; color: var(--employer-weekly-activity); cursor: help; }
+.weekly-activity-flame:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.weekly-activity-flame [role="tooltip"] { display: none; position: absolute; z-index: 5; right: 0; top: 100%; width: min(260rem, 65vw); padding: var(--employer-gap); border-radius: var(--comit-radius); background: var(--employer-ink); color: var(--comit-text); font: var(--employer-caption-text-min) var(--employer-font); }
+.weekly-activity-flame:hover [role="tooltip"], .weekly-activity-flame:focus-visible [role="tooltip"] { display: block; }

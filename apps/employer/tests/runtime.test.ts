@@ -9,9 +9,12 @@ test("shows the mandatory salary range in thousands of rubles", () => {
   assert.equal(salary(150500, 230000), "150,5–230к ₽");
 });
 
-test("says honestly when a bound is missing instead of inventing one", () => {
+test("shows a one-sided minimum salary without inventing an upper bound", () => {
   assert.equal(salary(null, 240000), "Зарплата не указана");
-  assert.equal(salary(180000, undefined), "Зарплата не указана");
+  assert.equal(salary(undefined, 240000), "Зарплата не указана");
+  assert.equal(salary(180000, undefined), "от 180к ₽");
+  assert.equal(salary(180000, null), "от 180к ₽");
+  assert.equal(salary(null, null), "Зарплата не указана");
 });
 
 test("maps known API failures to user text without leaking upstream payloads", () => {

@@ -48,6 +48,8 @@ class FeedCard(CandidateCard):
     """A served exposure with immutable source identity and feedback metadata."""
 
     promotion: PromotionExplanation | None = None
+    weekly_activity_expires_at: datetime | None = Field(default=None,
+        description="Current server-earned weekly practice deadline, refreshed from the ready profile at delivery; exclusive UTC Monday.")
     exposure_id: UUID
     session_id: UUID
     kind: Literal["recommended", "reserve", "showcase"]
