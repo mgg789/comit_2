@@ -350,12 +350,20 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                 await publish_result(session)
             raise HTTPException(status_code=409, detail="bank_exhausted")
         record = dict(item)
+        if item["type"] == "mcq":
+            import secrets
+            order = list(range(len(item["options"])))
+            secrets.SystemRandom().shuffle(order)
+            item = {**item, "options": [item["options"][index] for index in order],
+                    "answer_index": order.index(item["answer_index"])}
+            record = dict(item)
         presented_answer = record.pop("answer_index", None)
         record.pop("exposure_count", None)
         record.pop("tests", None)
         record.pop("rubric", None)
         record.pop("expected_answers", None)
-        store.mark_served(item["item_id"])
+        if not store.claim_item(item["item_id"]):
+            return await next_task(session_id, request)
         session["items"].append({"item_id": item["item_id"], "level": item["level"],
                                  "payload": item, "presented_answer": presented_answer,
                                  "answer": None, "correct": None,
@@ -398,6 +406,8 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             correct, judge_status = await asyncio.to_thread(judge_answer, payload, answer_text, owner=session["candidate_key"],
                 key=session_id + ":" + item_id, cache_dir=resolved_data / "rubric-cache")
         if correct is None:
+            if judge_status == "runner_busy":
+                raise HTTPException(status_code=503, detail="runner_busy")
             attempts = int(presented.get("judge_attempts", 0)) + 1
             presented.update(judge_attempts=attempts, last_judge_status=judge_status)
             if attempts >= 3:
@@ -414,6 +424,9 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             raise HTTPException(status_code=503, detail=judge_status)
         if correct is not None:
             adaptive.update(state, payload["level"], correct)
+        if payload["type"] == "code":
+            presented["similarity_evidence"] = store.audit_code_similarity(
+                session["candidate_key"], item_id, answer_text, bool(correct), function_name=payload.get("function_name"))
         store.bump_exposure(item_id)
         presented.update(answer=answer_text, correct=correct, judge_status=judge_status,
                          answered_at=_now())

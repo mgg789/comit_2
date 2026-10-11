@@ -121,7 +121,7 @@ def test_forced_second_type_survives_shared_bank_rotation(tmp_path, monkeypatch,
         bank = json.loads((tmp_path / "items.json").read_text())
         payload = next(row["payload"] for row in bank if row["item_id"] == first["item_id"])
         if first["type"] == "mcq":
-            answer = payload["answer_index"] if index % 2 == 0 else (payload["answer_index"] + 1) % len(payload["options"])
+            answer = first["options"].index(payload["options"][payload["answer_index"]]) if index % 2 == 0 else (first["options"].index(payload["options"][payload["answer_index"]]) + 1) % len(payload["options"])
         else:
             answer = payload["expected_answers"][0] if index % 2 == 0 else "wrong-answer"
         assert client.post(f"/testing/sessions/{sid}/answer", json={
@@ -186,9 +186,10 @@ def test_type_scoped_rotation_keeps_moratorium_retirement_and_session_exclusions
     store.mark_served(identifiers[0])
     # The daily moratorium still prefers an unused item of the requested type.
     assert store.list_items("python", 2, task_types={"code"})[0]["item_id"] == identifiers[1]
-    # If the unused item belongs to this session, fallback can only use the other.
-    assert store.list_items("python", 2, task_types={"code"}, exclude_ids={identifiers[1]})[0]["item_id"] == identifiers[0]
+    # Exhaustion replenishes genuine test cases, never the burned instance.
+    fresh = store.list_items("python", 2, task_types={"code"}, exclude_ids={identifiers[1]})
+    assert fresh and all(row["item_id"] not in identifiers for row in fresh)
     for _ in range(3):
         store.bump_exposure(identifiers[0])
     assert store.retire_expired() == 1
-    assert store.list_items("python", 2, task_types={"code"}, exclude_ids={identifiers[1]}) == []
+    assert all(row["item_id"] not in identifiers for row in store.list_items("python", 2, task_types={"code"}, exclude_ids={identifiers[1]}))

@@ -11,3 +11,9 @@ test("only accepted processes display the authorized candidate name", () => {
   assert.equal(mayReadCandidateName("viewed"), false);
   assert.equal(mayReadCandidateName("hired"), true);
 });
+
+test("direct contacts use only the consented public name snapshot", () => {
+  const direct = {kind: "contact_only" as const, state: "accepted" as const, terms: {...process("accepted").terms!, vacancy_title: "Без вакансии", candidate_display_name: " Алексей Соколов "}};
+  assert.equal(recruitmentChatTitle(direct), "Без вакансии — Алексей Соколов");
+  assert.equal(recruitmentChatTitle({...direct, kind: "vacancy"}, "Another accepted name"), "Без вакансии — Another accepted name");
+});

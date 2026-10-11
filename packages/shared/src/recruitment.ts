@@ -17,6 +17,8 @@ export interface RecruitmentSalary { from_rub: number; to_rub: number }
 
 /** Immutable invitation terms captured from the vacancy at invitation time. */
 export interface InvitationTerms {
+  /** Public, consented name snapshotted only for direct contacts; never a private contact channel. */
+  candidate_display_name?: string;
   company_name: string;
   description: string;
   salary: RecruitmentSalary;
@@ -36,6 +38,9 @@ export interface InviteRequest {
   description: string;
   salary?: RecruitmentSalary;
 }
+
+/** Direct contact retains explicit offer terms without a published vacancy. */
+export interface DirectContactRequest extends InviteRequest { salary: RecruitmentSalary; profile_revision: number }
 
 /** Employer-only shortlist rejection; it creates no candidate-visible invitation. */
 export interface RejectSavedRequest { candidate_id: string; idempotency_key: string; reason: string; categories?: RejectionReasonCategory[] }
@@ -75,7 +80,7 @@ export interface RecruitmentActionIdentity { expected_revision: number; idempote
 /** Strict command union; each operation accepts only its own fields. */
 export type RecruitmentAction = RecruitmentActionIdentity & (
   | { action: "view" | "accept" }
-  | { action: "decline" | "withdraw"; reason: string }
+  | { action: "decline" | "withdraw" | "contact_close"; reason: string }
   | { action: "reject"; reason: string; categories?: RejectionReasonCategory[] }
   | { action: "interview_propose"; kind: InterviewKind; starts_at: string; time_zone: string; duration_minutes: number; format: "remote" | "onsite"; location: string }
   | { action: "interview_accept"; interview_id: string }
@@ -98,6 +103,8 @@ export interface RecruitmentDeadline {
 
 /** Contact-free participant-scoped process snapshot with separately authorized chat access. */
 export interface RecruitmentView {
+  /** Direct contact is visible only in chats and cannot progress to hiring. */
+  kind?: "vacancy" | "contact_only";
   id: string;
   owner_id: string;
   candidate_id: string;

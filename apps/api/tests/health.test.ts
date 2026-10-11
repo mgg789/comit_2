@@ -18,10 +18,11 @@ test("only verified readiness admits traffic", async () => {
 });
 
 test("readiness requires both independent migration branches", async () => {
-  const support = "021_support_console.sql", weekly = "021_weekly_challenges.sql", oauth = "022_yandex_oauth.sql", attachments = "023_system_chat_attachments.sql";
+  const support = "021_support_console.sql", weekly = "021_weekly_challenges.sql", oauth = "022_yandex_oauth.sql", attachments = "023_system_chat_attachments.sql", directContacts = "024_direct_contacts.sql";
   for (const [names, expected] of [
     [[], 503], [[support], 503], [[weekly], 503],
-    [[support, support], 503], [[support, weekly], 503], [[support, weekly, oauth], 503], [[support, weekly, oauth, attachments], 200],
+    [[support, support], 503], [[support, weekly], 503], [[support, weekly, oauth], 503], [[support, weekly, oauth, attachments], 503],
+    [[support, weekly, oauth, attachments, directContacts], 200],
   ] as const) {
     const app = Fastify();
     await app.register(healthRoutes, { readiness: async () => requiredApiMigrationsApplied(names) });

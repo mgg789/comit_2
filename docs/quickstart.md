@@ -14,17 +14,14 @@
 | pnpm | 9.14.2 (`packageManager`) | монорепозиторий JS |
 | Python | ≥ 3.12 (`requires-python` сервисов) | тесты Python-сервисов |
 
-Для dev-стека нужен доступ к изолированному code-judge: dev-compose требует
-`CODE_JUDGE_URL` и `CODE_JUDGE_TOKEN` и без них не стартует
-([подключение](deploy.md#изолированная-проверка-кода)).
+Обычный dev стартует без judge; тестирование при этом честно отключено. Для полного
+грейд-теста используйте отдельный judge: [environments.md](environments.md).
 
 ## 2. Поднять dev-стек
 
 ```sh
-export CODE_JUDGE_URL=…    # адрес изолированного judge
-export CODE_JUDGE_TOKEN=…  # его токен
 make dev-up                # compose-проект comit-dev, отдельные volumes
-SMOKE_MODE=dev make smoke  # health/readiness, web-приложения, границы доступа
+make dev-smoke  # health/readiness, web-приложения, границы доступа
 ```
 
 Порядок старта сериализован: PostgreSQL → `candidate-migrate` → `agents-migrate`
@@ -81,7 +78,7 @@ pnpm typecheck && pnpm build               # все JS-пакеты
 pnpm --filter @comit/api test              # тесты api-core
 make regression                            # Python-регрессия (PostgreSQL-тесты — с PIPELINE_TEST_DATABASE_URL)
 make compose-check                         # согласованность compose-режимов и секретов
-SMOKE_MODE=dev make smoke                  # сквозной smoke на поднятом стеке
+make dev-smoke                  # сквозной smoke на поднятом стеке
 ```
 
 CI повторяет эти шаги и проверяет пороги покрытия ([ci.md](ci.md)).

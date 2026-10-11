@@ -14,6 +14,7 @@ PROBES = (
     ('/employer/', 200, 'html', 'кабинет работодателя'),
     ('/testing/', 200, 'html', 'сервис тестирования'),
     ('/support/', 200, 'html', 'служба поддержки'),
+    ('/help/', 200, 'help', 'Справка Comit'),
     ('/design/comit-mark.svg', 200, 'svg', None),
     ('/design/showcase-icon.svg', 200, 'svg', None),
     ('/api/healthz', 200, 'health', None),
@@ -57,8 +58,8 @@ def validate_response(status: int, content_type: str, body: bytes, probe: tuple[
     if kind == 'status':
         return
     mime = content_type.split(';', 1)[0].strip().lower()
-    if kind == 'html':
-        if mime != 'text/html' or marker not in body.decode('utf-8') or b'id="root"' not in body:
+    if kind in ('html', 'help'):
+        if mime != 'text/html' or marker not in body.decode('utf-8') or (kind == 'html' and b'id="root"' not in body):
             raise ValueError('Expected application HTML shell')
         return
     if kind == 'svg':
@@ -97,6 +98,8 @@ def probe_once(opener: urllib.request.OpenerDirector, base: str, probe: tuple[st
     except urllib.error.HTTPError as error:
         response = error  # 401/404 are expected authentication/privacy boundaries.
     with response:
+        if 'max-age=' not in response.headers.get('Strict-Transport-Security', ''):
+            raise ValueError('Expected HSTS on public HTTPS')
         validate_response(response.status, response.headers.get('Content-Type', ''),
                           response.read(MAX_BODY + 1), probe)
 

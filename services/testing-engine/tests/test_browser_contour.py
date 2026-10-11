@@ -57,7 +57,6 @@ def test_media_idempotence_consent_manifest_and_retention(tmp_path, monkeypatch)
 
 
 def test_abandon_records_cooldown_without_publishing(tmp_path, monkeypatch):
-    from testing_engine.bank_seed import initial_items
     from testing_engine.publisher import TrustedGradePublisher
     def unexpected_publish(self, session):
         raise AssertionError("Interrupted attempt must never publish a grade")
@@ -65,8 +64,8 @@ def test_abandon_records_cooldown_without_publishing(tmp_path, monkeypatch):
     client = client_for(tmp_path, monkeypatch)
     sid = start(client).json()["session_id"]
     task = client.get(f"/testing/sessions/{sid}/next").json()["task"]
-    stored = next(row for row in initial_items() if row["prompt"] == task["prompt"])
-    answer = stored["answer_index"] if task["type"] == "mcq" else stored["expected_answers"][0]
+    stored = next(row["payload"] for row in json.loads((tmp_path / "items.json").read_text()) if row["item_id"] == task["item_id"])
+    answer = task["options"].index(stored["options"][stored["answer_index"]]) if task["type"] == "mcq" else stored["expected_answers"][0]
     first = client.post(f"/testing/sessions/{sid}/answer", json={"item_id": task["item_id"], "answer": answer}).json()
     assert first["correct"] is True
     assert first["answered"] == 1
@@ -82,7 +81,6 @@ def test_abandon_records_cooldown_without_publishing(tmp_path, monkeypatch):
 
 
 def test_result_publication_waits_for_final_evidence_and_is_retryable(tmp_path, monkeypatch):
-    from testing_engine.bank_seed import initial_items
     from testing_engine.publisher import TrustedGradePublisher
     published = []
     def publish(self, session):
@@ -97,8 +95,8 @@ def test_result_publication_waits_for_final_evidence_and_is_retryable(tmp_path, 
         if next_response.status_code == 409:
             break
         task = next_response.json()["task"]
-        stored = next(row for row in initial_items() if row["prompt"] == task["prompt"])
-        answer = stored["answer_index"] if task["type"] == "mcq" else stored["expected_answers"][0] if task["type"] == "short_answer" else "typed response"
+        stored = next(row["payload"] for row in json.loads((tmp_path / "items.json").read_text()) if row["item_id"] == task["item_id"])
+        answer = task["options"].index(stored["options"][stored["answer_index"]]) if task["type"] == "mcq" else stored["expected_answers"][0] if task["type"] == "short_answer" else "typed response"
         response = client.post(f"/testing/sessions/{sid}/answer", json={"item_id": task["item_id"], "answer": answer})
         assert response.status_code == 200
         retry = client.post(f"/testing/sessions/{sid}/answer", json={"item_id": task["item_id"], "answer": answer})

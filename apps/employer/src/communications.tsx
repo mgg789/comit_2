@@ -131,7 +131,7 @@ function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => vo
   useEffect(() => {
     let active = true;
     const items = list.data?.items || [];
-    const permitted = new Set(items.filter(item => mayReadCandidateName(item.state)).map(item => item.id));
+    const permitted = new Set(items.filter(item => item.kind !== "contact_only" && mayReadCandidateName(item.state)).map(item => item.id));
     setCandidateNames(current => Object.fromEntries(Object.entries(current).filter(([id]) => permitted.has(id))));
     const queue = items.filter(item => permitted.has(item.id) && !candidateNames[item.id] && !namesInFlight.current.has(item.id));
     const load = async () => {
@@ -190,7 +190,7 @@ function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => vo
     } catch (reason) { setMoreError(errorText(reason)); } finally { moreInFlight.current = false; paginationEpoch.current += 1; setLoadingMore(false); }
   }
   return <section><PageTitle title="Чаты" />
-    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: recruitmentChatTitle(item, candidateNames[item.id]), subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
+    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: recruitmentChatTitle(item, candidateNames[item.id]), subtitle: "Кандидат", state: item.kind === "contact_only" ? (item.chat_writable ? "Разговор" : "Разговор завершён") : recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
       loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
       hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
     {moreError && <p className="communication-error" role="alert">{moreError}</p>}
@@ -209,13 +209,13 @@ function RecruitmentThread({
 }) {
   const process = useResource(() => api.getRecruitment("employer", id), [id]);
   const [contacts, setContacts] = useState<ContactsView | null>(null);
-  const [command, setCommand] = useState<"reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send" | null>(null);
+  const [command, setCommand] = useState<"contact_close" | "reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send" | null>(null);
   useEffect(() => {
     let active = true;
     setContacts(null);
     if (
       process.data &&
-      ["accepted", "offer_sent", "hired", "offer_declined"].includes(
+      process.data.kind !== "contact_only" && ["accepted", "offer_sent", "hired", "offer_declined"].includes(
         process.data.state,
       )
     )
@@ -272,7 +272,7 @@ function RecruitmentThread({
           onClick={() => onProfile(p.candidate_id)}
         >
           <strong>{recruitmentChatTitle(p, contacts?.display_name)}</strong>
-          <small>{recruitmentStateNames[p.state]}</small>
+          <small>{p.kind === "contact_only" ? (p.chat_writable ? "Разговор без вакансии" : "Разговор завершён") : recruitmentStateNames[p.state]}</small>
         </button>
         <details className="process-menu">
           <summary aria-label="Действия с кандидатом">···</summary>
@@ -290,7 +290,7 @@ function RecruitmentThread({
             )}
             <p>{salary(p.terms?.salary.from_rub, p.terms?.salary.to_rub)}</p>
             {(
-              ["interview_propose", "interview_complete", "offer_send", "reject", "withdraw"] as const
+              ["interview_propose", "interview_complete", "offer_send", "reject", "withdraw", "contact_close"] as const
             )
               .filter((action) => p.allowed_actions.includes(action))
               .map((action) => (
@@ -302,6 +302,7 @@ function RecruitmentThread({
                       offer_send: "Отправить оффер",
                       reject: "Отказать кандидату",
                       withdraw: "Отозвать приглашение",
+                      contact_close: "Отклонить",
                     }[action]
                   }
                 </Action>
@@ -316,6 +317,7 @@ function RecruitmentThread({
           </div>
         </details>
       </header>
+      {p.kind === "contact_only" && p.terms && <section className="panel"><p>{p.terms.description}</p><p>{salary(p.terms.salary.from_rub, p.terms.salary.to_rub)}</p></section>}
       <RecruitmentConversation process={p} accountId={account.id} transport={employerConversationTransport} errorText={errorText} emptyText="Начните разговор с кандидатом" messageLabel="Сообщение кандидату" />
       {command && (
         <ProcessCommand
@@ -340,7 +342,7 @@ export function ProcessCommand({
   onDone,
 }: {
   process: RecruitmentView;
-  command: "reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send";
+  command: "contact_close" | "reject" | "withdraw" | "interview_propose" | "interview_complete" | "offer_send";
   onClose: () => void;
   onDone: (value: RecruitmentView) => void;
 }) {
@@ -420,13 +422,14 @@ export function ProcessCommand({
             {
               reject: "Отказ кандидату",
               withdraw: "Отзыв приглашения",
+              contact_close: "Завершить разговор?",
               interview_propose: "Назначить интервью",
               interview_complete: "Результат собеседования",
               offer_send: "Отправить оффер",
             }[command]
           }
         </h2>
-        {command === "reject" ? <RejectionFeedback reason={fields.reason || ""} setReason={reason => setFields(prior => ({ ...prior, reason }))} categories={categories} setCategories={setCategories} disabled={busy} /> : command === "withdraw" ? (
+        {command === "reject" ? <RejectionFeedback reason={fields.reason || ""} setReason={reason => setFields(prior => ({ ...prior, reason }))} categories={categories} setCategories={setCategories} disabled={busy} /> : (command === "withdraw" || command === "contact_close") ? (
           <Field label="Причина">
             <textarea name="reason" {...bind("reason")} required maxLength={4000} />
           </Field>

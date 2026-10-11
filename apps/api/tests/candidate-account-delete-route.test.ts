@@ -9,11 +9,12 @@ import type { AuthStore } from "../src/auth/store.js";
 import { loadAuthConfig } from "../src/auth/config.js";
 import { cookieName, signSession } from "../src/auth/session.js";
 import { accountRoutes } from "../src/routes/accounts.js";
+import type { PurgeChatContext } from "../src/chat/client.js";
 
 const origin = "http://localhost:38088";
 const config = loadAuthConfig({ AUTH_SECRET: "synthetic-candidate-delete-route-secret-32", AUTH_ALLOWED_ORIGINS: origin, AUTH_COOKIE_SECURE: "false" });
 
-type Scenario = { matchingStatus?: number; testingStatus?: number; testingToken?: string };
+type Scenario = { matchingStatus?: number; testingStatus?: number; testingToken?: string; chatStatus?: number };
 
 async function appFor(scenario: Scenario, candidateId: string, employerId: string) {
   const sessions = new Map<string, { role: "candidate" | "employer"; accountId: string }>();
@@ -31,7 +32,8 @@ async function appFor(scenario: Scenario, candidateId: string, employerId: strin
       const session = sessions.get(id);
       return session && session.role === role && session.accountId === accountId ? { id } : null;
     },
-    deleteCandidateAccount: async (accountId: string) => {
+    deleteCandidateAccount: async (accountId: string, purge: (context: PurgeChatContext) => Promise<void>) => {
+      await purge({ process_id: "synthetic-process", owner_id: employerId, candidate_id: accountId });
       events.push("account");
       deleted.push(accountId);
       return true;
@@ -40,6 +42,13 @@ async function appFor(scenario: Scenario, candidateId: string, employerId: strin
   const calls: Array<{ path: string; owner: string | null }> = [];
   const transport: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
+    if (url.host === "chat.internal") {
+      assert.equal(url.pathname, "/internal/chat/purge");
+      assert.deepEqual(JSON.parse(String(init?.body)), { process_id: "synthetic-process", owner_id: employerId,
+        candidate_id: candidateId, actor_id: employerId });
+      events.push("chat");
+      return Response.json({ deleted: true }, { status: scenario.chatStatus ?? 200 });
+    }
     events.push(url.host === "matching.internal" ? "matching" : "testing");
     calls.push({ path: url.pathname, owner: new Headers(init?.headers).get("x-owner-id") });
     const status = url.host === "matching.internal" ? (scenario.matchingStatus ?? 200) : (scenario.testingStatus ?? 200);
@@ -50,6 +59,7 @@ async function appFor(scenario: Scenario, candidateId: string, employerId: strin
   await app.register(accountRoutes, {
     config, store, mailConfigured: false, matchingUrl: "http://matching.internal", matchingToken: "matching-token",
     testingUrl: "http://testing.internal", testingToken: scenario.testingToken ?? "testing-token", transport,
+    chatUrl: "http://chat.internal", chatToken: "synthetic-chat",
   });
   return { app, calls, deleted, events, candidateToken: await signSession(config, "candidate", candidateId, candidateSessionId, new Date(Date.now() + 60_000).toISOString()),
     employerToken: await signSession(config, "employer", employerId, employerSessionId, new Date(Date.now() + 60_000).toISOString()) };
@@ -93,6 +103,18 @@ test("candidate account deletion enforces role/origin and fails closed before so
   } finally { await testingDown.app.close(); }
 });
 
+test("candidate deletion preserves the API account if QGramm purge fails", async () => {
+  const h = await appFor({ chatStatus: 503 }, randomUUID(), randomUUID());
+  try {
+    const response = await h.app.inject({ method: "DELETE", url: "/candidate/account", headers: {
+      cookie: `${cookieName("candidate", config)}=${h.candidateToken}`, origin,
+    } });
+    assert.equal(response.statusCode, 503);
+    assert.deepEqual(h.deleted, []);
+    assert.deepEqual(h.events, ["matching", "testing", "chat"]);
+  } finally { await h.app.close(); }
+});
+
 test("successful candidate deletion derives owner, clears cookie and disables caching", async () => {
   const candidateId = randomUUID(), employerId = randomUUID();
   const harness = await appFor({}, candidateId, employerId);
@@ -103,7 +125,7 @@ test("successful candidate deletion derives owner, clears cookie and disables ca
     assert.equal(response.statusCode, 200, response.body);
     assert.deepEqual(response.json(), { deleted: true });
     assert.deepEqual(harness.deleted, [candidateId]);
-    assert.deepEqual(harness.events, ["matching", "testing", "account"]);
+    assert.deepEqual(harness.events, ["matching", "testing", "chat", "account"]);
     assert.deepEqual(harness.calls, [
       { path: `/internal/candidates/${candidateId}`, owner: null },
       { path: `/internal/candidates/${candidateId}`, owner: null },

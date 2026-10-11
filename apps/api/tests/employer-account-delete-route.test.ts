@@ -8,6 +8,7 @@ import type { AuthStore } from "../src/auth/store.js";
 import { loadAuthConfig } from "../src/auth/config.js";
 import { cookieName, signSession } from "../src/auth/session.js";
 import { accountRoutes } from "../src/routes/accounts.js";
+import type { PurgeChatContext } from "../src/chat/client.js";
 const origin = "http://localhost:38088";
 const config = loadAuthConfig({ AUTH_SECRET: "synthetic-employer-delete-route-secret-32", AUTH_ALLOWED_ORIGINS: origin, AUTH_COOKIE_SECURE: "false" });
 async function harness(failure?: string) {
@@ -15,10 +16,21 @@ async function harness(failure?: string) {
   let live = true;
   const store = {
     session: async (role: string, id: string) => live && role === "employer" && id === accountId ? { id } : null,
-    deleteEmployerAccount: async (id: string) => { assert.equal(id, accountId); events.push("account"); live = false; return true; },
+    deleteEmployerAccount: async (id: string, purge: (context: PurgeChatContext) => Promise<void>) => {
+      assert.equal(id, accountId);
+      await purge({ process_id: "synthetic-process", owner_id: id, candidate_id: "synthetic-candidate" });
+      events.push("account"); live = false; return true;
+    },
   } as unknown as AuthStore;
   const transport: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
+    if (url.hostname === "chat.internal") {
+      assert.equal(url.pathname, "/internal/chat/purge");
+      assert.equal(init?.method, "POST");
+      assert.equal(JSON.parse(String(init?.body)).owner_id, accountId);
+      events.push(url.hostname);
+      return Response.json({ deleted: true }, { status: failure === url.hostname ? 503 : 200 });
+    }
     assert.equal(url.pathname, `/internal/employers/${accountId}`);
     assert.equal(init?.method, "DELETE");
     assert.equal(new Headers(init?.headers).get("x-owner-id"), accountId);
@@ -27,16 +39,16 @@ async function harness(failure?: string) {
   };
   const app = Fastify(); await app.register(cookie);
   await app.register(accountRoutes, { config, store, mailConfigured: false, agentsUrl: "http://agents.internal", agentsToken: "synthetic-agents",
-    matchingUrl: "http://matching.internal", matchingToken: "synthetic-matching", transport });
+    matchingUrl: "http://matching.internal", matchingToken: "synthetic-matching", chatUrl: "http://chat.internal", chatToken: "synthetic-chat", transport });
   const token = await signSession(config, "employer", accountId, sessionId, new Date(Date.now()+60000).toISOString());
   return { app, events, headers: { cookie: `${cookieName("employer", config)}=${token}`, origin } };
 }
 test("employer deletion fails closed on each downstream failure and enforces origin/session", async () => {
-  for (const failure of ["agents.internal", "matching.internal"]) {
+  for (const failure of ["agents.internal", "matching.internal", "chat.internal"]) {
     const h = await harness(failure);
     try {
       assert.equal((await h.app.inject({ method: "DELETE", url: "/employer/account", headers: h.headers })).statusCode, 503);
-      assert.deepEqual(h.events, failure === "agents.internal" ? ["agents.internal"] : ["agents.internal", "matching.internal"]);
+      assert.deepEqual(h.events, ["agents.internal", "matching.internal", "chat.internal"].slice(0, ["agents.internal", "matching.internal", "chat.internal"].indexOf(failure) + 1));
       assert.equal((await h.app.inject({ method: "DELETE", url: "/employer/account", headers: { cookie: h.headers.cookie } })).statusCode, 403);
       assert.equal((await h.app.inject({ method: "DELETE", url: "/employer/account", headers: { origin } })).statusCode, 401);
     } finally { await h.app.close(); }
@@ -48,7 +60,7 @@ test("employer deletion clears cookie only after services and account cleanup an
     const response = await h.app.inject({ method: "DELETE", url: "/employer/account", headers: h.headers });
     assert.equal(response.statusCode, 200, response.body);
     assert.deepEqual(response.json(), { deleted: true });
-    assert.deepEqual(h.events, ["agents.internal", "matching.internal", "account"]);
+    assert.deepEqual(h.events, ["agents.internal", "matching.internal", "chat.internal", "account"]);
     assert.equal(response.headers["cache-control"], "no-store");
     assert.match(String(response.headers["set-cookie"]), /comit_employer_session=.*(?:Max-Age=0|Expires=)/);
     assert.equal((await h.app.inject({ method: "DELETE", url: "/employer/account", headers: h.headers })).statusCode, 401);

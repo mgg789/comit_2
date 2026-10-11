@@ -68,9 +68,20 @@ class PublicSmokeTests(unittest.TestCase):
     def test_expected_http_error_body_checked(self):
         class Opener:
             def open(self, request, timeout):
-                raise urllib.error.HTTPError(request.full_url, 401, '', {'Content-Type': 'application/json'},
+                raise urllib.error.HTTPError(request.full_url, 401, '', {'Content-Type': 'application/json', 'Strict-Transport-Security': 'max-age=31536000'},
                                              io.BytesIO(b'{"detail":"unauthenticated"}'))
         smoke.probe_once(Opener(), 'https://comit.droidje.com', ('/me', 401, 'unauthenticated', None))
+
+    def test_help_does_not_require_react_root(self):
+        smoke.validate_response(200, 'text/html', 'Справка Comit'.encode(), ('/help/', 200, 'help', 'Справка Comit'))
+
+    def test_public_response_requires_hsts(self):
+        class Opener:
+            def open(self, request, timeout):
+                raise urllib.error.HTTPError(request.full_url, 401, '', {'Content-Type': 'application/json'},
+                                             io.BytesIO(b'{"detail":"unauthenticated"}'))
+        with self.assertRaisesRegex(ValueError, 'HSTS'):
+            smoke.probe_once(Opener(), 'https://comit.droidje.com', ('/me', 401, 'unauthenticated', None))
 
     def test_main_bounded_retries_no_body_logging(self):
         with patch('sys.argv', ['public-smoke', 'https://comit.droidje.com']), \

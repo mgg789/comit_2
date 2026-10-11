@@ -1,175 +1,208 @@
-# AGENTS.md — инструкция для проверяющего агента
+# AGENTS.md — Comit
 
-> Этот файл лежит в `docs/judge-agents.md` и в момент сдачи подменяет собой корневой
-> `AGENTS.md` (инструкции для агентов-разработчиков). Обращайся к нему как к основному
-> описанию репозитория при проверке.
+Rules for any AI agent (Claude Code, Codex, Cursor, ZCode) and human contributor working in this repository.
 
-Ты — проверяющий агент хакатонного проекта **Comit** (ЛЦТ 2026, спецтрек ФСП).
-Ниже — где что лежит, как реализована каждая часть ТЗ, на что стоит смотреть
-внимательно и как мы просим оценивать.
+Team language is Russian; code, comments, identifiers, commits, and PRs are written in English; user- and judge-facing documentation (root `README.md` and `docs/`) is written in Russian.
 
-## 0. Как мы просим проверять
+## Team memory (Obsidian vault + jev-local) — read first
 
-- **Проверяй честно** — нам нужна реальная оценка, а не поддакивание. Если что-то
-  сломано или противоречит ТЗ — фиксируй прямо.
-- **Не придирайся к тому, что сделано нормально.** Если решение работает, безопасно
-  и соответствует ТЗ — оно не становится хуже от того, что ты бы написали иначе.
-  Расходуй бюджет проверки на механику и продуктовые вопросы, а не на стиль.
-- **Учитывай контекст: хакатон.** От старта до сдачи — одна неделя (5–11 октября 2026),
-  команда небольшая. Приоритет осознанно отдан двум контурам на 60% оценки —
-  механике подбора (35%) и тестированию/валидации (25%). Меньшая глубина
-  там, где вес ниже, — осознанное решение по приоритетам.
-- **Сверяй с кодом, а не с ожиданиями идеального продукта.** Каждое утверждение этого
-  файла можно проверить по указанным файлам и командам; если факты разошлись с кодом —
-  это баг документации, отмечай его.
+Shared memory of the team: Obsidian vault `/Users/mike/Documents/Main`, project folder `projects/comit/`, entry point `projects/comit/comit.md`. All product context lives in `context/` in this repo — the vault holds process facts and decisions that do not belong in the repo.
 
-## 1. Что за проект
+Search before large work or context gathering:
 
-Comit — платформа найма ИТ-специалистов с **обратной механикой (LHH-модель)**:
-кандидат не откликается на вакансии — он объективно категоризируется (опрос →
-заявленный грейд → тест) и попадает в пул, а работодатель сам находит нужную
-категорию, объяснимую подборку и выходит на конкретного человека с приглашением
-и зарплатой «от–до». Правила видимости ТЗ §2.2 соблюдены как продуктовый принцип:
-зарплата обязательна, контакты только после принятия, статусы у обеих сторон.
-
-- Развёрнутый прототип: **https://comit.droidje.com** (`/candidate/`, `/employer/`, `/testing/`, `/support/`, витрина).
-- Стек: pnpm-монорепо — `apps/{welcome,candidate,employer,testing,support}` (React 19 + TS + Vite +
-  Tailwind 4), `apps/api` (Fastify + OpenAPI), `packages/{shared,ui-kit,api-client}`,
-  `services/*` (Python 3.12 + FastAPI), PostgreSQL 16 + pgvector, чат QGramm (Go),
-  docker-compose.
-- Быстрый подъём: `make dev-up` (dev) или `make up` (production) — см. [environments.md](environments.md).
-- Сквозной демо-сценарий: регистрация кандидата по email → опрос → грейд-тест →
-  категория → работодатель: вакансия → подборка с объяснением → свайп-лента →
-  приглашение с ЗП → кандидат принимает → контакты раскрыты → чат.
-
-## 2. Где что лежит
-
-| Путь | Что это |
-|---|---|
-| `apps/candidate`, `apps/employer`, `apps/welcome` | Кабинеты по ролям и публичная витрина |
-| `apps/testing`, `apps/support` | Браузерный грейд-тест (`/testing/`) и консоль службы поддержки (`/support/`) |
-| `apps/api` | api-core: auth, профили, вакансии, приглашения, системный чат, OpenAPI |
-| `services/matching-engine` | Весь подбор: фильтры, скоринг, top-k, реранкер, preference-обучение |
-| `services/testing-engine` | Тестирование: банк семи семейств, грейды, адаптивный контур, blueprint-реестр |
-| `services/code-judge` | Изолированная проверка кода кандидата на отдельной VM |
-| `services/verification-engine` | Проверка ФСП / Git / hh.ru |
-| `services/integration-engine` | Мок-реестр ФСП и демо-привязка |
-| `services/agents-service` | Агент работодателя: черновик вакансии, глобальный чат, бюджет |
-| `infra/` | compose (prod/dev), nginx, Dockerfiles, CD-скрипт |
-| `docs/` | Живая документация по подсистемам (RU) — точка входа `docs/architecture.md` |
-| `context/` | Канон: ТЗ (`context/tz/00-fsp-tz-2026.md`), видение, механики, решения |
-| `tests/` | Сквозной smoke-гейт (`./tests/smoke.sh`) и acceptance-сценарии |
-
-Карта репозитория и схема контура — [docs/architecture.md](architecture.md);
-как поднять каждый контур — [docs/environments.md](environments.md).
-
-## 3. Как реализована каждая часть ТЗ
-
-| Часть ТЗ | Реализация | Где смотреть |
-|---|---|---|
-| §2.1 Кабинет кандидата: профиль/резюме, PDF, опрос, грейд-тест, категория, история грейда, приглашения, настройки приватности и согласий | `apps/candidate` (экраны профиля, тестирования, приглашений, настроек), api-core `/api/candidate/*`, source profile с CAS и верификацией | `docs/candidate-ui.md`, `docs/candidate-profile.md`, `docs/testing-engine.md` |
-| §2.1 Кабинет работодателя: профиль компании, описание потребности, подборка с обоснованием, поиск по банку, приглашение с ЗП, публикация вакансий | `apps/employer` (вакансии, подборка, свайп-лента, найм, статистика), api-core `/api/employer/*`, agents draft → publish | `docs/employer-ui.md`, `docs/vacancy-crud.md`, `docs/employer-statistics.md` |
-| §2.1 Поиск и подбор: выдача по категориям, ранжирование по подтверждённому профилю, объяснимость, фильтрация без потери подборки | matching-engine: strict filter → гибридный скоринг (фичи + эмбеддинги) → top-k → реранкер R₀; structured explanation factors в каждой карточке | `docs/matching.md`, `docs/recommendations.md`, `context/50-matching-engine.md` |
-| §2.2 Правила видимости: ЗП обязательна в вакансии и приглашении; контакты после принятия; статусы у обеих сторон; регистрация по email | серверные проверки в api-core (recruitment lifecycle), ledger приглашений, email-OTP auth | `docs/recruitment.md`, `docs/auth.md`, `context/30-domain-model.md` |
-| Тестирование и категоризация: устойчивость к утечке, сопоставимая сложность, грейд с ограничением смены | testing-engine: банк семи семейств (`bank_seed.py`) с ротацией и офлайн-генерацией вариантов (`generator.py`, `rotate.py`), адаптивный выбор уровня, понижение/повышение грейда с cooldown, история тестов | `docs/testing-engine.md`, `docs/testing-design.md`, `context/60-testing-engine.md` |
-| Валидация решения (критерий №2, №1) | сквозная приёмка комбайна (200 кандидатов × 10 вакансий), golden-регрессия весов, предзарегистрированный бенчмарк реранкера, слепая разметка, синтетические сценарии | `docs/rerank-mvp-status.md`, `docs/rerank-hard-benchmark.md`, `docs/preference-convergence.md`, `data/seed/` |
-| Обогащение профиля ФСП | integration-engine: мок-реестр `/fsp/participants/*` + демо-привязка; verification-engine: `/verify/fsp`; корректная обработка отсутствия истории (404 — норма) | `docs/integration.md`, `docs/verification.md` |
-| §3.2 Стек, §3.5 нефункциональные | compose поднимает всё; 152-ФЗ согласия (обработка/публикация/обучение — раздельно), роли, шифрование чатов, лицензии MIT/Apache/BSD | `docs/legal/README.md`, `docs/data.md` |
-| §3.4 Документация | `docs/` по подсистемам + OpenAPI (`/api/docs`) + инструкция запуска | `docs/api.md`, `docs/environments.md` |
-| §5 Сдача | репозиторий + развёрнутый прототип + презентация (ссылка в README) | README |
-
-## 4. На что обратить отдельное внимание: наши фишки
-
-1. **Объяснимость каждого отбора.** Каждая карточка кандидата и каждая позиция
-   подборки несут структурированные факторы попадания, посчитанные движком.
-   Hand-written строк объяснения нет нигде — это правило зашито в ревью и тесты.
-2. **Реранкер R₀ с честной валидацией.** Предзарегистрированный «сложный» бенчмарк
-   (ΔNDCG +0.0107 к основному скорингу) и две слепые проверки разметки —
-   ассистентская 20/20 и человеческая 17/20 (на уверенных оценках 17/18).
-   Активация ручная, с артефактом, закреплённым по hash.
-3. **Обучение на реальных свайпах.** Preference-модель вакансии дообучается на
-   реакциях работодателя (сходимость до бара за ~20 реакций на синтетике),
-   переставляет только непоказанный хвост ленты и требует отдельного
-   training-consent. В ленту встроено ограниченное исследование гипотез —
-   2 research-карточки на 18 обычных.
-4. **Golden-регрессия скоринга.** Любое изменение весов или порядка выдачи ловится
-   тестом — механику невозможно незаметно сломать.
-5. **Анти-утечка заданий.** Параметризованные семейства, мораторий показанных
-   экземпляров и ротация банка снижают ценность слитого ответа. Валидация на
-   текущем банке показала частичное преимущество при утечке, поэтому расширение
-   банка — следующий этап ([testing-design.md](testing-design.md)).
-6. **Верификация профиля.** ФСП (через мок + схему будущей интеграции), публичный
-   Git-репозиторий и резюме hh.ru проверяются отдельным сервисом; подтверждённые
-   поля поднимают рейтинг кандидата (ledger очков).
-7. **Чаты на QGramm с серверным шифрованием.** Контент сообщений и файлов не лежит
-   в PostgreSQL Comit открыто; браузер не получает ключей чата; контакты
-   раскрываются только после принятия приглашения.
-8. **Агент работодателя.** Черновик вакансии из свободного описания потребности,
-   глобальный чат-ассистент с фоновыми поручениями (поиск, согласование),
-   бюджетом в микро-USD и durable-историей.
-9. **Системный чат Comit + живая служба поддержки.** Уведомления платформы и
-   диалог с поддержкой в обоих кабинетах; оператор отвечает из отдельной
-   консоли по защищённому входу.
-10. **152-ФЗ как продукт, а не галочка.** Раздельные согласия: обработка,
-    публикация в пуле, обучение моделей. Отзыв любого согласия ломает только
-    соответствующую функцию; отказ от обучения не урезает подбор.
-11. **Офлайн демо-контур.** Все внешние вызовы (LLM, ФСП, hh) кэшируются и
-    деградируют честно: `503`/«недоступно» вместо выдуманных данных.
-12. **Инженерная дисциплина.** OpenAPI на каждый endpoint, smoke-гейт на merge,
-    CI + CD с immutable releases, backup и откатом образов.
-
-## 5. Наши концептуальные идеи
-
-1. **Обратная механика — ядро, а не фича.** Весь продукт спроектирован от
-   работодателя: категоризированные пулы → объяснимая подборка → приглашение.
-   «Отклик кандидата» сознательно не является основным сценарием.
-2. **Категория вместо резюме.** Решение о категории принимает объективная
-   процедура (опрос → заявленный грейд → тест), а не самоописание; резюме —
-   подтверждающий источник, а не основание для выдачи.
-3. **Объяснимость — продуктовое доверие, не украшение.** Платформа должна уметь
-   ответить «почему этот кандидат» на каждом шаге — это же требование жюри (35%).
-4. **Тестирование как измерительный прибор.** Задания ценны не «сложностью»,
-   а сопоставимостью и устойчивостью к утечке: параметрические blueprint'ы,
-   повторные грейд-пробы с cooldown, история результатов.
-5. **Подбор, который учится у конкретного работодателя.** Глобальная модель задаёт
-   априорную выдачу, а локальная preference-модель вакансии адаптирует её к
-   реальным реакциям — с явным согласием на обучение и исследовательским бюджетом.
-6. **Достижения ФСП — первоклассные данные.** Структура профиля спроектирована под
-   будущую реальную интеграцию и корректно живёт без ФСП-истории (это норма).
-7. **Прозрачность правил = доверие.** Зарплата видна до общения, статусы симметричны,
-   контакты — только после принятия: правила ТЗ §2.2 реализованы как серверные
-   инварианты, а не UI-договорённости.
-
-## 6. Статус и следующие этапы
-
-Что уже работает и что развиваем дальше — чтобы сэкономить время проверки:
-
-- Адаптивный грейд-тест, прокторинг, публикация результатов и UI `/testing/`
-  подключены. Доступность зависит от `TESTING_ENABLED` и готовности реального
-  code-judge. Локальный `make dev-up` по умолчанию отключает тестирование;
-  запуск с judge описан в [docs/environments.md](environments.md).
-- ФСП-буст подключён к reranking: production использует `shadow`, поэтому
-  наблюдение за бустом не меняет выдачу; активный режим включается отдельно.
-- Code-judge запускает код в изолированных контейнерах; production judge
-  размещается отдельно от приложения. Compose приложения подключается к нему
-  по TLS, а не получает Docker socket. См. [docs/testing-engine.md](testing-engine.md).
-- Генератор реалистичной синтетики и измерения Precision/MRR/Recall/MAP/NDCG
-  реализованы. Это измерения на размеченной синтетике, а не доказательство
-  качества реального найма: [docs/matching.md](matching.md).
-- UI поддержки публикуется на `/support/`; доступ к данным и материалам
-  тестирования ограничен серверными ролями.
-- Реальный API ФСП организатор не предоставил; доступен демонстрационный реестр.
-- Демо-каталог: 240 резюме, 16 компаний и 48 вакансий (`data/demo`, [demo-data.md](demo-data.md)).
-
-## 7. Как проверить руками
-
-```sh
-make dev-up && SMOKE_MODE=dev make smoke   # весь стек + проверки
-open http://localhost:8088                 # витрина, /candidate/, /employer/, /testing/, /support/
+```
+POST http://127.0.0.1:12444/api/v1/memory-search
+{"query": "вопрос", "mode": "hybrid", "limit": 8}
 ```
 
-Тесты: `pnpm -r typecheck`, `pnpm --filter @comit/api test` (нужны disposable
-PostgreSQL URL, см. `docs/*`), `pytest` по engine'ам, `./tests/smoke.sh`.
-Команды и пороги — [docs/ci.md](ci.md). Канон требований —
-`context/tz/00-fsp-tz-2026.md`; где решение осознанно отклонилось от первой
-версии видения — `context/90-debates.md` и `context/80-open-questions.md`.
+Write back on every addition (decision, root cause, milestone, changed fact/plan/status): `projects/comit/tasks.md` gets one append-only line per finished task; real decisions go to `projects/comit/decisions.md` (context → decision → why → alternatives). When a fact changes, add a new entry marked `supersedes: <old fact>` — stale memory is worse than none. If the API is unreachable, fall back to `rg` over the vault and `NAV.md`; never block work on it. Secrets never go into memory or the repo.
+
+## 0. Project Overview
+
+Comit — web platform for hiring IT specialists with **inverse mechanics** (LHH model): candidates are automatically categorized by a objectively verifiable profile (mandatory survey + grade test), and the **employer** browses categorized pools and contacts a specific person with an offer and salary. Hackathon project of LCT 2026, special track by the FSP (Federacija sportivnogo programmirovanija).
+
+Strategy: not "many features" — a demo-ready product where the two judged mechanics (matching 35% + testing/validation 25%) are explainable and alive. Explainability of every selection is a core trust feature.
+
+| Link | What |
+|---|---|
+| https://github.com/mgg789/comit_2 | This repository (private, primary) |
+| `context/README.md` | Context map: TZ copy, research, product vision, mechanics, plans |
+| `context/tz/00-fsp-tz-2026.md` | Full TZ (judge canon) — never contradict it |
+| `docs/` | Project documentation (see §8) |
+| `/home/mgg/comit` on mgg-server | Deploy target (self-hosted runners deploy there, docs/deploy.md) |
+
+Stack: pnpm monorepo — `apps/{candidate,employer,testing,welcome}` (React 19 + TS + Vite + Tailwind 4 + framer-motion when it lands), `apps/api` (Fastify + TypeScript, OpenAPI), `packages/{shared,ui-kit,api-client}`, `services/{matching-engine,testing-engine,integration-engine}` (Python 3.12 + FastAPI), PostgreSQL 16 + pgvector, docker-compose.
+
+## 1. Sources of Truth (priority ladder)
+
+Safety of the system, data, repository, and the demo environment
+1. The user's direct request
+2. This file
+3. `context/` pack — do not re-open decided questions (`context/80-open-questions.md` holds the decision table; `context/90-debates.md` the accepted disputes)
+4. The kanban board, if one is added (update this file when it appears)
+5. Other project files
+
+If local standards exist for components, layout, API layer, typing, styles, animations, structure — follow them strictly; never introduce a second way of doing the same thing.
+
+## 2. Rule Priority (when in doubt)
+
+1. Safety of system, data, and project boundaries
+2. Correct execution of the actual task
+3. A complete, working result consistent with the project
+4. Adherence to architecture, contracts, and local standards
+5. Minimal invasiveness of changes
+6. Readability and maintainability
+
+## 3. Scope of Work
+
+Work only in the area your task belongs to (`apps/*`, `packages/*`, `services/*`, `infra/`, `data/`, `tests/`, `docs/`, `context/`); other areas are read-only (read them to understand contracts and integrations). Modifying other areas is forbidden without a direct command.
+
+- `packages/shared` (contracts) is changed only together with every consumer it breaks — types first, then apps/api/services in the same commit or a stacked PR.
+- `context/` is the canon: update it in the same commit when behavior deviates from it; do not duplicate its content into `docs/` — link it.
+- Server-side infrastructure (mgg-server, nginx, DNS, secrets) is off-limits without an explicit user command; deploys go through the GitHub Actions deploy workflow (docs/deploy.md), interactive server ops are the user's call.
+
+## 4. General Execution Rules
+
+Write only working, complete code — no placeholders, stubs, or fake logic unless explicitly requested (the black-box testing stub of sprint S1 is an explicitly requested, time-boxed exception; replace it in S2, context/70).
+
+Before changing anything: understand the task, affected modules, existing patterns, impact on adjacent scenarios.
+
+Reuse first — search for existing components, styles, hooks, services, API layers, design tokens; create new only when reuse is impossible. Follow existing architecture and style exactly.
+
+Minimal sufficient diff; do not touch unrelated code; no drive-by refactoring.
+
+Between a quick hack and a robust in-scope solution — choose the robust one. If a plan implies a weak/unsafe/poor solution — do not silently comply: briefly object and propose better.
+
+Stuck > ~30 minutes — stop rabbit-holing: report the blocker to the human and ask.
+
+Every external call (LLM, FSP mock registries, future connectors) must be cached and degrade gracefully — the demo contour must work fully offline.
+
+Visibility rules of TZ §2.2 are law: salary range mandatory in vacancy and invitation; candidate contacts hidden until acceptance; statuses visible to both sides; candidate sees only own records.
+
+## 5. Branch Management
+
+`dev` is the default working branch: start sessions with `git checkout dev && git pull`, branch feature work off it, merge back into it.
+
+`main` is the demo/deploy mirror: the deploy workflow runs on every push to main. Preferred path to main is a PR (`dev` → `main`) once the state is stable. main is intentionally NOT branch-protected (team decision 2026-10-05): in an emergency the team lead may push directly — this is a rescue exception, not a habit. Never force-push or rewrite history on `main` or `dev`.
+
+Naming: `feat/<area>-<slug>`, `fix/<area>-<slug>`, `chore/<slug>`, `docs/<slug>`, `ci/<slug>`, `refactor/<area>-<slug>`. Branch off `dev`.
+
+Short-lived branches (≤ 1–2 days); rebase onto `dev` before merging; merge with a green smoke gate (§11); clear merge commit or fast-forward — history is a demo artifact, do not squash away checkpoints.
+
+One branch = one logical task; no mixing unrelated work.
+
+If your branch changes `packages/shared` types — update all consumers in the same commit, or stack the PR.
+
+## 6. Commits
+
+Conventional Commits, imperative, English — `<type>(<scope>): <summary>` (+ optional body: why, what, side effects). Types: feat fix docs style refactor perf test build ci chore. Scopes: web, api, matching, testing, integration, shared, ui, infra, data, docs, context.
+
+Examples:
+- `feat(matching): add strict pre-filter with visited/pending exclusion`
+- `fix(web): keep invitation salary visible before chat starts`
+- `docs(context): record decision Q5 hybrid vectors`
+
+Commit at meaningful checkpoints — a working increment a teammate could build on — and green: never leave uncommitted work others can't build on, never commit red code to a shared branch. Push after every commit session.
+
+Messages explain why, not just what; a commit that changes validation results or scoring weights must say so.
+
+Never commit: secrets, tokens, `.env`, build artifacts, `node_modules`, `.mimosa/` state. A leaked secret is rotated immediately and reported.
+
+## 7. Working with Tasks
+
+No board is connected yet. Task source: the user's direct request, then `context/70-mvp-scope.md` (sprint plan) and `context/80-open-questions.md` (open decisions). Board empty / no task given — say so explicitly; do not invent work. If a kanban board is added, replace this section.
+
+No silent scope growth: new ideas become explicit tasks for the human to prioritize (a line in `context/80-open-questions.md`).
+
+Completed work is logged to the vault: one append-only line in `projects/comit/tasks.md` (`- YYYY-MM-DD HH:MM — what was done (scope)`).
+
+## 7.1 GitHub Issues
+
+At session start and at meaningful checkpoints, check open GitHub Issues. Confirmed, still-relevant issues are fixed within the allowed repository scope even if the user did not name the issue. Compare the issue description against current code: do not blindly touch items already fixed or unconfirmed; for anything outside the allowed scope, record the problem and report it to the owner.
+
+## 8. Documentation (mandatory, /docs)
+
+Every exported function, class, hook, module carries a doc comment (JSDoc/docstring): purpose, params, return, non-obvious constraints (units, time zones, side effects). Comments explain constraints, not mechanics.
+
+`/docs` — living per-subsystem documentation, same commit as the code: `architecture.md`, `api.md`, `matching.md`, `testing-engine.md`, `integration.md`, `data.md`, `deploy.md`, `ci.md`, `runbook.md`. Docs are part of Definition of Done: code without its docs update is incomplete.
+
+Every schema/contract change is documented in `docs/api.md` / `docs/data.md` and reflected in `packages/shared` types and OpenAPI (Fastify schemas, FastAPI pydantic models).
+
+Context pack (`context/`): `README.md` routes to the document; check INDEX first — update the existing file instead of duplicating; must not contradict the canon (`context/tz/00-fsp-tz-2026.md`, decisions in `context/80`/`90`) — divergences are fixed or explicitly status-marked.
+
+## 9. Code Style and Reuse
+
+TypeScript strict: no `any`, no unsafe casts, no suppressed errors unless truly unavoidable (with a comment why). Strictly typed DTOs, props, state, form values. Shared types live in `packages/shared`.
+
+`apps/api` (Fastify): ESM with NodeNext — relative imports carry the `.js` extension; route schemas define the OpenAPI contract (no undocumented endpoints); `PORT` from env; structured logging via the Fastify logger.
+
+Python services (FastAPI): type hints on public functions; ruff-clean; pydantic models for request/response contracts; app built via `create_app()` factory so tests use `TestClient`; service package is importable (`src/` layout, `python -m <package>` entrypoint).
+
+UI: design tokens from `@comit/ui-kit` (`tokens.css`) only; established Tailwind patterns; no inline colors or ad-hoc spacing outside the kit; interactions 120–180 ms, reveals 250–350 ms once framer-motion lands; responsive from the start; empty/error/loading states are part of the component.
+
+Matching/scoring: weights and formulas live in one place (`services/matching-engine`), never re-implemented in apps; every selection must carry structured explanation factors (context/50) — never hand-written strings.
+
+LLM never makes hiring/selection decisions; it may summarize and explain computed structures, with validation and a manual fallback.
+
+Match surrounding naming, comment density, idiom; comments state constraints the code can't show.
+
+## 10. Backend Contracts Missing / Not Ready
+
+Do not pretend the backend exists; do not fake data.
+
+Prepare the frontend fully for integration (types, API layer, integration points, all UI states) so no later rework is needed.
+
+List every missing contract in the report: endpoint, method, request/response DTO, where the frontend expects it.
+
+## 11. Testing
+
+Smoke gate: `./tests/smoke.sh` (via `make smoke`) — every service answers `/healthz`, nginx serves all four apps, demo contracts respond (blueprint list, FSP 404 semantics). Must be green before any merge; if tooling is missing, create it — never skip the gate.
+
+Every new module ships with at least one test; bug fixes ship with a regression test (red → green). A module without tests is an incomplete module.
+
+Scoring/testing mechanics: the synthetic validation suite is the arbiter (context/50 §validation, context/60 §validation) — deviations must be intentional and documented in the commit body.
+
+## 12. Verification and Honesty of Results
+
+Never claim verification that did not happen: reports distinguish verified in practice (command + result), verified logically (reasoning), not verified. A proxy signal (green CI, "should work") is not proof of user-facing correctness.
+
+Final report structure: what was done; affected files/modules; risks and limitations; missing contracts; verified / not verified.
+
+## 13. Safety and Restrictions
+
+No changes to system settings, Docker daemon, network config, CI/CD secrets, global env, production configs, or external infrastructure without a direct command.
+
+Compliance frame (TZ §3.5): 152-ФЗ — consent for profile data processing/publication, role separation, safe storage of passwords/tokens; open-source licenses (MIT/Apache-2.0/BSD) for dependencies.
+
+Containers: normal restart is the default; full rebuild (`down -v`) only when dependencies changed or explicitly requested. Do not edit compose/Dockerfiles unless it is the task.
+
+If the environment does not start — report the blocker; do not escalate to destructive system actions.
+
+Secrets live in `.env` (git-ignored) and on the server only — never in the repo, memory, or logs.
+
+Server work (mgg-server, deploy target `/home/mgg/comit`): only on an explicit user command; inspect first, explain the deploy path before executing.
+
+## 14. Agent Work Format (per session/task)
+
+First: task, affected modules, main assumptions.
+
+Then: short plan (2–5 bullets).
+
+Then: changes with green-checkpoint commits (§6) on the branch (§5).
+
+Finally: summary per §12; vault `tasks.md` line (§7).
+
+## 15. Session Checklist
+
+Start: this file → `context/README.md` (route to your zone) → `git checkout dev && git pull` → pick/update your task → branch off `dev`.
+
+End: smoke green → docs + context updated → commits pushed → branch merged into `dev`, pushed → vault `tasks.md` line → memory write-back (see "Team memory" above).
+
+## 16. Definition of Done
+
+- Task acceptance criteria met
+- Tests: smoke green + module tests + regression test for the fixed bug
+- Docs: doc comments on new public API + `docs/` updated + `context/` reconciled
+- Commits: green checkpoints, conventional messages, pushed
+- Visibility rules of TZ §2.2 intact; demo contour works offline
+- Vault `tasks.md` updated

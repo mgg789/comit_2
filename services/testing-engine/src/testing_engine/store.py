@@ -115,6 +115,17 @@ class TestingStore:
                     row["last_served_date"] = _today()
             _atomic_write(self.items_path, bank)
 
+    def claim_item(self, item_id: str) -> bool:
+        """Atomically reserve a never-served instance across threads."""
+        with self._lock:
+            bank = json.loads(self.items_path.read_text(encoding="utf-8"))
+            row = next((row for row in bank if row["item_id"] == item_id), None)
+            if row is None or row["retired"] or row.get("last_served_date") is not None:
+                return False
+            row["last_served_date"] = _today()
+            _atomic_write(self.items_path, bank)
+            return True
+
     def retire_expired(self, *, max_exposure: int = 3, max_age_days: int = 1) -> int:
         """Retire generated items past the exposure or age moratorium; seeds stay."""
         today = _today()
@@ -136,21 +147,17 @@ class TestingStore:
         """Active, not-served-today items available for new sessions."""
         with self._lock:
             bank = json.loads(self.items_path.read_text(encoding="utf-8"))
-        day = today or _today()
         return sum(1 for row in bank
                    if row["family"] == family and row["level"] == level
-                   and not row["retired"] and row.get("last_served_date") != day)
+                   and not row["retired"] and row.get("last_served_date") is None)
 
     def list_items(self, family: str, level: int, limit: int = 5, *,
                    task_types: set[str] | None = None,
                    exclude_ids: set[str] | None = None) -> list[dict]:
-        """Usable items for a new presentation; items served today rotate out.
+        """Usable items for a new presentation; shown instances never return.
 
-        When everything valid was served today, the strict filter is relaxed
-        (better a repeated variant than no session) - repeats are still ordered
-        by lowest exposure first. Type and session exclusions apply BEFORE that
-        rotation, so unused MCQs cannot hide a required previously served code
-        item. Retired items and session repeats are never fallback candidates.
+        Previously served instances are never recycled. Offline parameterized tasks
+        replenish auto-scored slots; unavailable code/text slots stay empty.
         """
         with self._lock:
             bank = json.loads(self.items_path.read_text(encoding="utf-8"))
@@ -159,8 +166,29 @@ class TestingStore:
                   and not row["retired"]
                   and (task_types is None or row["type"] in task_types)
                   and (exclude_ids is None or row["item_id"] not in exclude_ids)]
-        strict = [row for row in usable if row.get("last_served_date") != _today()]
-        chosen = strict or usable
+        strict = [row for row in usable if row.get("last_served_date") is None]
+        if not strict:
+            from testing_engine.variants import (
+                FAMILIES,
+                instantiate,
+                instantiate_checked,
+            )
+            if family in FAMILIES:
+                for _ in range(5):
+                    if task_types is None or "short_answer" in task_types:
+                        self.add_generated_item(instantiate(family, level))
+                    else:
+                        for task_type in sorted(task_types):
+                            generated = instantiate_checked(family, level, task_type)
+                            if generated:
+                                self.add_generated_item(generated)
+                with self._lock:
+                    bank = json.loads(self.items_path.read_text(encoding="utf-8"))
+                strict = [row for row in bank if row["family"] == family and row["level"] == level
+                          and not row["retired"] and row.get("last_served_date") is None
+                          and (task_types is None or row["type"] in task_types)
+                          and (exclude_ids is None or row["item_id"] not in exclude_ids)]
+        chosen = strict
         chosen.sort(key=lambda row: (row["exposure_count"], row["item_id"]))
         return [{**row["payload"], "item_id": row["item_id"], "exposure_count": row["exposure_count"]}
                 for row in chosen[:limit]]
@@ -255,3 +283,46 @@ class TestingStore:
     def write_session(self, record: dict) -> None:
         with self._lock:
             _atomic_write(self.session_path(record["session_id"]), record)
+
+    def audit_code_similarity(self, owner: str, item_id: str, code: str, correct: bool, *, function_name: str | None = None) -> dict:
+        """Record normalized token similarity; independent judge verdict keeps credit.
+
+        Short/common implementations can collide. This is review evidence only,
+        never a cheating verdict. Raw code/owner IDs are not added to the log.
+        """
+        import io
+        import tokenize
+        from difflib import SequenceMatcher
+
+        def tokens(source: str) -> list[str]:
+            try:
+                return [token.string for token in tokenize.generate_tokens(io.StringIO(source).readline)
+                        if token.type not in {tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE,
+                                              tokenize.INDENT, tokenize.DEDENT, tokenize.ENDMARKER}]
+            except (tokenize.TokenError, IndentationError):
+                return source.split()
+
+        current = tokens(code)
+        maximum = 0.0
+        comparisons = 0
+        with self._lock:
+            for path in sorted(self.sessions_dir.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)[:1000]:
+                prior = json.loads(path.read_text(encoding="utf-8"))
+                if prior.get("candidate_key") == owner:
+                    continue
+                for row in prior.get("items", []):
+                    same_problem = row.get("item_id") == item_id or (
+                        function_name is not None and row.get("payload", {}).get("type") == "code"
+                        and row.get("payload", {}).get("function_name") == function_name)
+                    if not same_problem or not isinstance(row.get("answer"), str):
+                        continue
+                    comparisons += 1
+                    maximum = max(maximum, SequenceMatcher(None, current, tokens(row["answer"]), autojunk=False).ratio())
+            evidence = {"method": "python-token-sequence-v1", "comparisons": comparisons,
+                        "maximum_similarity": round(maximum, 4), "review_flag": comparisons > 0 and maximum >= .9,
+                        "credit_policy": "independent_judge", "credited": correct,
+                        "code_hash": hashlib.sha256("\n".join(current).encode()).hexdigest()}
+            audit = self.data_dir / "code-similarity.jsonl"
+            with audit.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps({"at": _now(), "item_id": item_id, **evidence}) + "\n")
+        return evidence

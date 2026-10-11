@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
+import type { PurgeChatContext } from "../chat/client.js";
 import {
   advisoryKey,
   createOtp,
@@ -475,7 +476,7 @@ export class AuthStore {
   }
 
   /** Permanently remove one candidate account and its API-owned private graph in one transaction. */
-  public async deleteCandidateAccount(accountId: string): Promise<boolean> {
+  public async deleteCandidateAccount(accountId: string, purge?: (context: PurgeChatContext) => Promise<void>): Promise<boolean> {
     const client = await this.pool.connect();
     let committed = false;
     try {
@@ -489,6 +490,7 @@ export class AuthStore {
         committed = true;
         return false;
       }
+      await this.purgeAccountChats(client, accountId, purge);
       // Revoke first, then remove all rows whose foreign keys do not cascade.
       await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
       await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
@@ -510,13 +512,14 @@ export class AuthStore {
   }
 
   /** Delete employer-owned API records atomically after service projections are fenced. */
-  public async deleteEmployerAccount(accountId: string): Promise<boolean> {
+  public async deleteEmployerAccount(accountId: string, purge?: (context: PurgeChatContext) => Promise<void>): Promise<boolean> {
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
       const selected = await client.query<{ email: string }>(
         "SELECT email FROM accounts WHERE id=$1 AND role='employer' FOR UPDATE", [accountId]);
       if (!selected.rows[0]) { await client.query("ROLLBACK"); return false; }
+      await this.purgeAccountChats(client, accountId, purge);
       await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
       await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
       await client.query("DELETE FROM recruitment_processes WHERE owner_id=$1", [accountId]);
@@ -531,6 +534,16 @@ export class AuthStore {
       return result.rowCount === 1;
     } catch (error) { await rollback(client); throw error; }
     finally { client.release(); }
+  }
+
+  /** Hold process locks through external purge; account locks prevent concurrent process creation. */
+  private async purgeAccountChats(client: PoolClient, accountId: string,
+    purge?: (context: PurgeChatContext) => Promise<void>): Promise<void> {
+    const processes = await client.query<PurgeChatContext & QueryResultRow>(
+      `SELECT id AS process_id,owner_id,candidate_id FROM recruitment_processes
+       WHERE owner_id=$1 OR candidate_id=$1 ORDER BY id FOR UPDATE`, [accountId]);
+    if (processes.rows.length && !purge) throw new Error("chat_deletion_unavailable");
+    if (purge) for (const process of processes.rows) await purge(process);
   }
 
   /** Claim one valid mail job with a 120-second lease and recover stale workers. */

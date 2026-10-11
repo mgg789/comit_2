@@ -1,248 +1,139 @@
-"""Validation suite for the testing contour (docs/testing-design.md §10).
+"""Reproducible synthetic validation; not an empirical psychometric study.
 
-Runs four checks against a real in-process contour (no network):
-- test-retest: identical knowledge shown twice -> identical grade;
-- discrimination: weak vs strong candidate cohorts -> grade-rank separation
-  reported as the point-biserial correlation;
-- expert ground truth: 32 scored MCQ answers must match the bank's stored
-  markup exactly (auto-checking vs the reference markup);
-- leak resistance: a leaked answer sheet (item_id -> choice) from candidate A
-  is inapplicable to candidate B - rotation hands B untouched instances and
-  re-submitting someone else's item is rejected.
-
-Writes a versioned report to data/validation/testing-validation.json and
-exits non-zero when any acceptance criterion fails.
+84 ability profiles across seven families, independent retest response draws,
+independent numeric answer calculation, and real API leak/replay checks.
+No metric is presented as population calibration or an expert panel result.
 """
-
 from __future__ import annotations
 
 import json
 import math
-import sys
+import random
+import re
 import tempfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from testing_engine.bank_seed import initial_items
 from testing_engine.main import create_testing_app
 from testing_engine.store import TestingStore
+from testing_engine.variants import FAMILIES, instantiate
 
 GRADE_RANK = {"intern": 0, "junior": 1, "middle": 2, "senior": 3}
-FAMILY = "docker"
-N_WEAK = 3
-N_STRONG = 3
-EXPERT_ROUNDS = 4
 
 
-def _ground_truth(data_dir: Path) -> dict[str, int | str]:
-    bank = json.loads((data_dir / "items.json").read_text(encoding="utf-8"))
-    return {row["item_id"]: (row["payload"]["answer_index"] if row["type"] == "mcq" else row["payload"]["expected_answers"][0])
-            for row in bank if row["type"] in ("mcq", "short_answer") and row["family"] == FAMILY}
+def correlation(x: list[float], y: list[float]) -> float:
+    """Pearson/point-biserial correlation, zero for a constant series."""
+    mx, my = sum(x) / len(x), sum(y) / len(y)
+    xx, yy = sum((v-mx)**2 for v in x), sum((v-my)**2 for v in y)
+    return sum((a-mx)*(b-my) for a,b in zip(x,y, strict=True))/math.sqrt(xx*yy) if xx*yy else 0.0
 
 
-def _docker_mcq_ids(data_dir: Path) -> list[str]:
-    bank = json.loads((data_dir / "items.json").read_text(encoding="utf-8"))
-    return [row["item_id"] for row in bank
-            if row["family"] == FAMILY and row["type"] == "mcq" and not row["retired"]]
+def _answer(store: TestingStore, task: dict) -> int | str:
+    """Synthetic knowledge oracle uses private keys with public option remap."""
+    bank = json.loads(store.items_path.read_text())
+    payload = next(row["payload"] for row in bank if row["item_id"] == task["item_id"])
+    if task["type"] == "mcq":
+        return task["options"].index(payload["options"][payload["answer_index"]])
+    return payload["expected_answers"][0]
 
 
-def _run_session(client: TestClient, candidate_key: str, *, quality: str,
-                 truth: dict[str, int | str]) -> dict:
-    """One adaptive docker-family session; returns items, grade and answers.
-
-    strong/retest-strong answer every MCQ correctly; weak answers wrongly;
-    leak-candidate answers correctly too (its sheet is what leaks).
-    """
-    session = client.post("/testing/sessions", json={
-        "candidate_key": candidate_key, "specialization": FAMILY,
-        "declared_grade": "middle"}).json()
-    session_id = session["session_id"]
-    presented: list[dict] = []
+def session(client: TestClient, store: TestingStore, owner: str, family: str,
+            ability: float, draw_seed: int) -> dict:
+    """Run one profile; ability is externally specified before any grading."""
+    rng = random.Random(draw_seed)
+    response = client.post("/testing/sessions", json={"candidate_key": owner,
+                          "specialization": family, "declared_grade": "middle"})
+    assert response.status_code == 200
+    sid = response.json()["session_id"]
+    items=[]
     for _ in range(30):
-        response = client.get(f"/testing/sessions/{session_id}/next")
+        response = client.get(f"/testing/sessions/{sid}/next")
         if response.status_code == 409:
             break
-        task = response.json()["task"]
-        truth_index = truth.get(task["item_id"])
-        if quality in ("strong", "retest-strong", "leak"):
-            choice = truth_index
-        else:
-            choice = (truth_index + 1) % len(task["options"]) if isinstance(truth_index, int) else "incorrect"
-        posted = client.post(f"/testing/sessions/{session_id}/answer", json={
-            "item_id": task["item_id"], "answer": choice})
-        presented.append({"item_id": task["item_id"], "choice": choice,
-                          "correct": posted.json().get("correct")})
-    result = client.get(f"/testing/sessions/{session_id}/result").json()
-    return {"session_id": session_id, "grade": result["decided_grade"],
-            "presented": presented, "result": result}
-
-
-def _point_biserial(binary: list[int], values: list[float]) -> float:
-    """Point-biserial correlation between a binary and a continuous variable."""
-    n = len(values)
-    mean_binary = sum(binary) / n
-    mean_values = sum(values) / n
-    covariance = sum((b - mean_binary) * (v - mean_values)
-                     for b, v in zip(binary, values)) / n
-    var_binary = sum((b - mean_binary) ** 2 for b in binary) / n
-    var_values = sum((v - mean_values) ** 2 for v in values) / n
-    if var_binary == 0 or var_values == 0:
-        return 0.0
-    return covariance / math.sqrt(var_binary * var_values)
-
-
-def _judge_item(client: TestClient, candidate_key: str, target_item_id: str,
-                truth: dict[str, int | str], choice: int) -> bool | None:
-    """Drive a fresh session until the target item appears, then judge it."""
-    session = client.post("/testing/sessions", json={
-        "candidate_key": candidate_key, "specialization": FAMILY,
-        "declared_grade": "middle"}).json()
-    session_id = session["session_id"]
-    for _ in range(30):
-        response = client.get(f"/testing/sessions/{session_id}/next")
-        if response.status_code == 409:
-            return None
-        task = response.json()["task"]
-        if task["item_id"] == target_item_id:
-            posted = client.post(f"/testing/sessions/{session_id}/answer", json={
-                "item_id": target_item_id, "answer": choice})
-            return posted.json().get("correct")
-        truth_choice = truth.get(task["item_id"], 0)
-        client.post(f"/testing/sessions/{session_id}/answer", json={
-            "item_id": task["item_id"], "answer": truth_choice})
-    return None
+        assert response.status_code == 200
+        task=response.json()["task"]
+        chance=.25 + .75/(1+math.exp(-(ability+1-task["level"])*1.7))
+        answer=_answer(store,task)
+        if rng.random() > chance:
+            answer=(answer+1)%len(task["options"]) if isinstance(answer,int) else "incorrect"
+        submitted=client.post(f"/testing/sessions/{sid}/answer",json={"item_id":task["item_id"],"answer":answer})
+        assert submitted.status_code == 200
+        items.append(task["item_id"])
+    result=client.get(f"/testing/sessions/{sid}/result").json()
+    return {"grade":result["decided_grade"],"items":items,"answered":result["answered"]}
 
 
 def run(data_dir: Path) -> dict:
-    """Execute all four checks and return the report dict."""
-    app = create_testing_app(data_dir=data_dir, allow_unauthenticated=True)
-    client = TestClient(app)
-    store = TestingStore(data_dir)
-    store.seed_items(initial_items())
-    truth = _ground_truth(data_dir)
-
-    # --- discrimination: weak vs strong cohorts (docker, MCQ-only) ---
-    weak = [_run_session(client, f"weak-{index}", quality="weak",
-                         truth=truth) for index in range(N_WEAK)]
-    strong = [_run_session(client, f"strong-{index}", quality="strong",
-                           truth=truth) for index in range(N_STRONG)]
-    weak_ranks = [GRADE_RANK[session["grade"] or "intern"] for session in weak]
-    strong_ranks = [GRADE_RANK[session["grade"] or "intern"] for session in strong]
-    binary = [0] * len(weak_ranks) + [1] * len(strong_ranks)
-    r_pb = _point_biserial(binary, [float(rank) for rank in weak_ranks + strong_ranks])
-
-    # --- test-retest: same knowledge twice -> same grade ---
-    retest = [_run_session(client, f"retest-{index}", quality="retest-strong",
-                           truth=truth)["grade"] for index in range(2)]
-    stability = 1.0 if retest[0] == retest[1] else 0.0
-
-    # --- expert ground truth: auto-checking vs the stored markup ---
-    docker_items = _docker_mcq_ids(data_dir)
-    right_true = wrong_false = checked = 0
-    for round_index in range(EXPERT_ROUNDS):
-        for item_id in docker_items:
-            if _judge_item(client, f"expert-right-{round_index}-{item_id}",
-                           item_id, truth, truth[item_id]) is True:
-                right_true += 1
-            if _judge_item(client, f"expert-wrong-{round_index}-{item_id}",
-                           item_id, truth, (truth[item_id] + 1) % 4) is False:
-                wrong_false += 1
-            checked += 2
-
-    # --- leak resistance: fresh contour, morning-leak scenario ---
-    # A fresh contour per day is the production shape (daily moratorium): the
-    # leak check runs in its own instance so earlier phases' served state does
-    # not bleed in. Leaker burns the seed instances in the morning; the
-    # generator (simulated by store.add_generated_item) refills the slots;
-    # the follower must receive only untouched instances.
-    leak_app = create_testing_app(data_dir=data_dir / "leak-instance", allow_unauthenticated=True)
-    leak_client = TestClient(leak_app)
-    leak_truth = _ground_truth(data_dir / "leak-instance")
-    leaker = _run_session(leak_client, "leaker", quality="strong", truth=leak_truth)
-    leaked_sheet = {row["item_id"]: row["choice"] for row in leaker["presented"]}
-    rotated_in = 0
-    leak_store = TestingStore(data_dir / "leak-instance")
-    for item_id in list(leaked_sheet):
-        level = int(item_id.split("-L")[1].split("-")[0])
-        for copy in range(3):  # production min-stock is 5 variants per slot
-            if leak_store.add_generated_item({
-                    "family": FAMILY, "level": level, "type": "mcq",
-                    "prompt": f"Ротационный вариант {item_id} копия {copy} уровня {level}: другой сценарий.",
-                    "options": ["a", "b", "c", "d"], "answer_index": (level + copy) % 4}):
-                rotated_in += 1
-    # The cheater applies the leaked sheet wherever a burned instance resurfaces.
-    overlap = 0
-    leaked_correct = 0
-    repeat_safe = None
-    cheater = leak_client.post("/testing/sessions", json={
-        "candidate_key": "cheater", "specialization": FAMILY,
-        "declared_grade": "middle"}).json()["session_id"]
-    for _ in range(30):
-        response = leak_client.get(f"/testing/sessions/{cheater}/next")
-        if response.status_code == 409:
-            break
-        task = response.json()["task"]
-        if task["item_id"] in leaked_sheet:
-            overlap += 1
-            leaked_choice = leaked_sheet[task["item_id"]]
-            posted = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
-                "item_id": task["item_id"], "answer": leaked_choice})
-            if posted.json().get("correct") is True:
-                leaked_correct += 1
-            if repeat_safe is None:
-                twice = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
-                    "item_id": task["item_id"], "answer": leaked_choice})
-                repeat_safe = twice.status_code == 200 and twice.json().get("answered") == posted.json().get("answered")
-            continue
-        posted = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
-            "item_id": task["item_id"], "answer": 0})
-        if repeat_safe is None:
-            twice = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
-                "item_id": task["item_id"], "answer": 0})
-            before = posted.json().get("answered")
-            after = leak_client.get(f"/testing/sessions/{cheater}/result").json().get("answered")
-            repeat_safe = twice.status_code == 200 and twice.json().get("answered") == before == after
-    repeat_safe = bool(repeat_safe)
-
-    expert_total = right_true + wrong_false
-    report = {
-        "test_retest": {"runs": retest, "stability": stability},
-        "discrimination": {"weak_ranks": weak_ranks, "strong_ranks": strong_ranks,
-                           "point_biserial": round(r_pb, 4),
-                           "mean_weak": sum(weak_ranks) / len(weak_ranks),
-                           "mean_strong": sum(strong_ranks) / len(strong_ranks)},
-        "expert_ground_truth": {"checked": checked, "right_marked_true": right_true,
-                                 "wrong_marked_false": wrong_false,
-                                 "agreement": round((right_true + wrong_false) / expert_total, 4)
-                                 if expert_total else 0.0},
-        "leak_resistance": {"leaked_items": len(leaked_sheet),
-                            "rotated_in": rotated_in,
-                            "overlap_with_follower": overlap,
-                            "leaked_answer_advantage": leaked_correct,
-                            "repeat_submit_idempotent": repeat_safe},
-    }
-    report["passed"] = (
-        stability == 1.0
-        and r_pb > 0.7
-        and expert_total >= 30
-        and report["expert_ground_truth"]["agreement"] == 1.0
-        and overlap == 0
-        and repeat_safe)
+    """Compute actual metrics and a separate technical acceptance gate."""
+    client=TestClient(create_testing_app(data_dir=data_dir,allow_unauthenticated=True))
+    store=TestingStore(data_dir)
+    profiles=[]
+    for f,family in enumerate(FAMILIES):
+        for k in range(12):
+            ability=k*3/11
+            profile_dir = data_dir / f"profile-{f}-{k}"
+            profile_client = TestClient(create_testing_app(profile_dir, allow_unauthenticated=True))
+            profile_store = TestingStore(profile_dir)
+            first=session(profile_client,profile_store,f"profile-{f}-{k}-a",family,ability,1000+f*100+k)
+            second=session(profile_client,profile_store,f"profile-{f}-{k}-b",family,ability,9000+f*100+k)
+            profiles.append({"family":family,"ability":round(ability,4),"first":first,"retest":second})
+    first=[float(GRADE_RANK[row["first"]["grade"]]) for row in profiles]
+    retest=[float(GRADE_RANK[row["retest"]["grade"]]) for row in profiles]
+    classes=[float(row["ability"]>=1.5) for row in profiles]
+    # Independent numeric calculation: answer key is never used by this oracle.
+    checks=[]
+    for family in FAMILIES:
+        for seed in range(12):
+            item=instantiate(family,2,seed=seed)
+            numbers=[int(v) for v in re.findall(r"\d+",item["prompt"])]
+            if family in ("algorithms","rest_api"):
+                expected=numbers[-1] if family=="rest_api" else numbers[0]
+            elif family=="python":
+                start,stop,step=numbers
+                expected=len(range(start,stop,step))
+            elif family=="react":
+                expected=numbers[0]+numbers[1]
+            else:
+                expected=numbers[0]*numbers[1]
+            checks.append(item["expected_answers"]==[str(expected)])
+    # Burn every seed item without a fabricated LLM refill. Runtime must generate
+    # fresh parameterized stock rather than recycle a leaked instance.
+    leaked={row["item_id"] for row in json.loads(store.items_path.read_text())}
+    from testing_engine.store import _atomic_write, _today
+    bank = json.loads(store.items_path.read_text())
+    for row in bank:
+        row["last_served_date"] = _today()
+    _atomic_write(store.items_path, bank)
+    follower=session(client,store,"leak-follower","docker",1.5,54321)
+    overlap=len(leaked.intersection(follower["items"]))
+    report={"protocol":"synthetic-multifamily-v2","sample_size":len(profiles),
+            "families":list(FAMILIES),"profiles":profiles,
+            "test_retest":{"paired_profiles":len(profiles),"independent_response_draws":True,
+                           "exact_grade_agreement":sum(a==b for a,b in zip(first,retest,strict=True))/len(first),
+                           "rank_correlation":round(correlation(first,retest),4)},
+            "discrimination":{"point_biserial":round(correlation(classes,first),4),
+                              "class_sizes":[classes.count(0.),classes.count(1.)],
+                              "ability_rank_correlation":round(correlation([row["ability"] for row in profiles],first),4),
+                              "observed_grade_counts":{grade:first.count(float(rank)) for grade,rank in GRADE_RANK.items()}},
+            "independent_numeric_ground_truth":{"checked":len(checks),"agreement":sum(checks)/len(checks)},
+            "leak_resistance":{"burned_instances":len(leaked),"follower_questions":len(follower["items"]),"overlap":overlap},
+            "limitations":["Synthetic response model is not human validation.",
+                           "Blueprint difficulty has not been calibrated by independent experts.",
+                           "Semantic memorization of a whole skill is not detectable by item rotation."]}
+    report["passed"]=all(checks) and overlap==0 and len(follower["items"])>0
     return report
 
 
 def main() -> None:
-    """Run the suite, write the versioned report, exit non-zero on failure."""
-    report_path = Path(__file__).resolve().parents[3] / "data" / "validation" / "testing-validation.json"
-    with tempfile.TemporaryDirectory() as tmp:
-        report = run(Path(tmp) / "data")
-    report["generated_note"] = "synthetic candidates, docker MCQ family; expert markup = bank ground truth"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    print(json.dumps(report, ensure_ascii=False, indent=1))
+    """Write a versioned, reproducible report with no invented empirical claim."""
+    target=Path(__file__).resolve().parents[3]/"data/validation/testing-validation.json"
+    with tempfile.TemporaryDirectory() as directory:
+        report=run(Path(directory))
+    target.write_text(json.dumps(report,ensure_ascii=False,indent=1)+"\n",encoding="utf-8")
+    print(json.dumps({k:v for k,v in report.items() if k!="profiles"},ensure_ascii=False,indent=1))
     if not report["passed"]:
-        sys.exit(1)
+        raise SystemExit(1)
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()

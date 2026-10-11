@@ -25,6 +25,8 @@ jobs:
         run: pnpm -r typecheck
       - name: Build
         run: pnpm -r build
+      - name: API reference matches all registered operations
+        run: pnpm --filter @comit/api exec tsx scripts/generate-api-reference.ts --check
       - name: Shared package production runtime
         run: node --test apps/api/tests/runtime-shared.test.mjs
       - name: Existing frontend regression tests

@@ -1,0 +1,68 @@
+# Published images preserve dev configuration; use after the dev/local Compose files.
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-api:${COMIT_IMAGE_TAG:-dev}
+  matching-engine:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  testing-engine:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-testing:${COMIT_IMAGE_TAG:-dev}
+  integration-engine:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-integration:${COMIT_IMAGE_TAG:-dev}
+  web:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-web:${COMIT_IMAGE_TAG:-dev}
+  candidate-migrate:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  candidate-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  vacancy-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  combine-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  rerank-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  feed-refill-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  preference-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-matching:${COMIT_IMAGE_TAG:-dev}
+  agents-service:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-agents:${COMIT_IMAGE_TAG:-dev}
+  agents-migrate:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-agents:${COMIT_IMAGE_TAG:-dev}
+  agents-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-agents:${COMIT_IMAGE_TAG:-dev}
+  organization-agent-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-agents:${COMIT_IMAGE_TAG:-dev}
+  auth-migrate:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-api:${COMIT_IMAGE_TAG:-dev}
+  auth-mail-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-api:${COMIT_IMAGE_TAG:-dev}
+  qgramm-chat:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-qgramm:${COMIT_IMAGE_TAG:-dev}
+  candidate-profile-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-api:${COMIT_IMAGE_TAG:-dev}
+  recommendation-worker:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-api:${COMIT_IMAGE_TAG:-dev}
+  verification-engine:
+    build: !reset null
+    image: ghcr.io/mgg789/comit-verification:${COMIT_IMAGE_TAG:-dev}

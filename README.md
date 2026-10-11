@@ -42,7 +42,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 
 ## Презентация и дизайн
 
-- **Презентация**: [PDF в репозитории](demo/comit-presentation.pdf) · [Google Slides](https://docs.google.com/presentation/d/1csFfRs20WJFlEqlPujfLhpAnB1E3YNWOK_Y3tGc3UOM/edit?usp=sharing)
+- **Презентация**: [PDF в репозитории](demo/comit-presentation.pdf) · [Демо-видео, часть 1](demo/comit-demo-part-01.mp4) · [часть 2](demo/comit-demo-part-02.mp4) · [Google Slides](https://docs.google.com/presentation/d/1csFfRs20WJFlEqlPujfLhpAnB1E3YNWOK_Y3tGc3UOM/edit?usp=sharing)
 - **Дизайн**: [Figma — LCT core \| ЛЦТ 2026 ФСП](https://www.figma.com/design/gPFLCJKXEoRwRP3YLyMsX4/LCT-core-%7C-%D0%9B%D0%A6%D0%A2-2026-%D0%A4%D0%A1%D0%9F?node-id=0-1&t=LPk0C0vv17PMQCYn-1)
 - **Схемы и архитектура (FigJam)**: [LCT core \| Схемы проекта](https://www.figma.com/board/HSYre3JOQlCaPQxQp9gj6R/LCT-core-%7C-%D0%A1%D1%85%D0%B5%D0%BC%D1%8B-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%D0%B0?node-id=0-1&t=gKnYZlsk3evyWJNZ-1)
 - **PDF документация и демо-видео**: [Google Drive](https://drive.google.com/drive/folders/1w5vVd7tjaDT8-EnzcIRqwQ3oF1BklijG?usp=sharing)
@@ -75,7 +75,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 
 1. **Лента работодателя, которая учится.** Свайпы обучают vacancy-local preference-модель: сходимость за ~20 реакций на синтетических работодателях, исследовательские карточки гипотез, добор из резерва того же run — подбор становится точнее от каждого действия ([preference-convergence](docs/preference-convergence.md), [feed-refill](docs/feed-refill.md)).
 2. **AI-агент работодателя** (Jev/DeepSeek): черновик вакансии из свободного описания и глобальный чат-ассистент с фоновыми поручениями и явным бюджетом токенов ([agents.md](docs/agents.md)).
-3. **Честное тестирование под наблюдением.** Код кандидата исполняется только в одноразовых Docker-песочницах на отдельной VM (fail-closed без judge), а прокторинг считает агрегаты детекции лица локально в браузере — кадры не покидают устройство ([judge-agents](docs/judge-agents.md), [testing-design](docs/testing-design.md)).
+3. **Честное тестирование под наблюдением.** Код кандидата исполняется только в одноразовых Docker-песочницах на отдельной VM (fail-closed без judge), а прокторинг считает агрегаты детекции лица локально в браузере — кадры не покидают устройство ([инструкция проверяющего](AGENTS.md), [testing-design](docs/testing-design.md)).
 4. **Верификация фактов из внешних источников:** история ФСП (мок-реестр), публичный Git-репозиторий (clone --bare, без запуска кода) и резюме hh.ru — с ledger очков подтверждённых полей ([verification.md](docs/verification.md)).
 5. **Чаты найма с серверным шифрованием** на [QGramm](https://github.com/mgg789/QGramm) в изолированной сети плюс системный чат Comit с живой службой поддержки в обоих кабинетах ([chat.md](docs/chat.md), [support-console.md](docs/support-console.md)).
 6. **Экономика найма под учётом:** воронка delivered → … → hired со сравнением периодов и durable журнал расходов — публикации, приглашения, неустойки за просрочки, бюджет ИИ ([employer-statistics.md](docs/employer-statistics.md)).
@@ -153,7 +153,7 @@ GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, л
 - **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо и frontend-тесты, pytest с unit coverage для matching/testing/integration/agents/verification/code-judge, API-тесты с coverage на disposable PostgreSQL, полный Python-набор с PostgreSQL на раннере `regression`, smoke в изолированном compose-проекте и отдельная реальная проверка code-judge на одноразовом GitHub-hosted runner;
 - **Deploy** — после успешного CI на push в `main` (или вручную): только текущий SHA `main`, immutable release в `/home/mgg/comit/releases/<SHA>`, backup БД, smoke и откат образов при ошибке; затем публичный smoke с GitHub-hosted runner ([deploy.md](docs/deploy.md)).
 
-Ветки: работа в `dev`, стабильные состояния — PR в `main` (подробности и правила — `AGENTS.md`).
+Ветки: работа в `dev`, стабильные состояния — PR в `main` (правила разработчиков — `docs/judge-agents.md`).
 
 ## GitHub Issues
 
@@ -180,7 +180,7 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 | [docs/services.md](docs/services.md) | Карточки сервисов: назначение, порты, маршруты, переменные, данные |
 | [docs/architecture-diagrams.md](docs/architecture-diagrams.md) | Диаграммы Mermaid: контейнеры, старт, подбор, тест, CI/CD |
 | [docs/user-flows.md](docs/user-flows.md) | Сценарии кандидата, работодателя, AI-агента и оператора с маршрутами API |
-| [docs/api-reference.md](docs/api-reference.md) | Все 249 операций api-core по группам с типом доступа |
+| [docs/api-reference.md](docs/api-reference.md) | Полный генерируемый перечень операций api-core с типом доступа |
 | [docs/glossary.md](docs/glossary.md), [docs/faq.md](docs/faq.md) | Термины и частые вопросы |
 | [docs/environments.md](docs/environments.md) | Поднять dev или production, чем они отличаются |
 | [docs/architecture.md](docs/architecture.md) | Сервисы, потоки, карта репозитория |
@@ -195,7 +195,7 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 ### Указатель документации
 
 - **Старт и обзор:** [quickstart](docs/quickstart.md), [environments](docs/environments.md), [services](docs/services.md), [architecture](docs/architecture.md), [architecture-diagrams](docs/architecture-diagrams.md), [user-flows](docs/user-flows.md), [glossary](docs/glossary.md), [faq](docs/faq.md), [team](docs/team.md), [packages](docs/packages.md).
-- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [152-fz-compliance](docs/152-fz-compliance.md), [inverse-concept](docs/inverse-concept.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
+- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [152-fz-compliance](docs/152-fz-compliance.md), [inverse-concept](docs/inverse-concept.md), [инструкция проверяющего](AGENTS.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
 - **API и данные:** [api](docs/api.md), [api-reference](docs/api-reference.md), [api-operations](docs/api-operations.md), [cursor-pagination](docs/cursor-pagination.md), [data](docs/data.md), [auth](docs/auth.md).
 - **Кандидат:** [candidate-ui](docs/candidate-ui.md), [candidate-profile](docs/candidate-profile.md), [resume-import](docs/resume-import.md), [verification](docs/verification.md), [integration](docs/integration.md), [fsp-link](docs/fsp-link.md), [weekly-challenges](docs/weekly-challenges.md), [recommendations](docs/recommendations.md), [candidate-backend-audit](docs/candidate-backend-audit.md).
 - **Тестирование:** [testing-engine](docs/testing-engine.md), [testing-design](docs/testing-design.md).
@@ -221,3 +221,5 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 
 [Ответственность и CODEOWNERS](docs/team.md), [Apache-2.0](LICENSE),
 [компоненты и версии](docs/packages.md), [правила безопасности](SECURITY.md).
+
+Консоль `/support/` требует оператора: задайте `SUPPORT_EMAIL` и приватный `SUPPORT_ACCESS_KEY` в отдельном dev env-файле и запустите `COMIT_LOCAL_PROJECT=comit-dev ./infra/local-dev.sh --env-file /путь/dev.env`. Production `.env` для локального dev не используется.

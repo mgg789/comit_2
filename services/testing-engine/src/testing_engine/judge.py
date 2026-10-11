@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import ssl
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -69,6 +70,12 @@ class CodeJudgeClient:
             if record.get("status") != "judged" or type(record.get("correct")) is not bool:
                 return None, "code_judge_unavailable"
             return record["correct"], "code_judge:" + str(record.get("verdict_kind", "unknown"))
+        except urllib.error.HTTPError as error:
+            try:
+                response = json.loads(error.read(65537))
+            except (ValueError, OSError):
+                response = {}
+            return None, "runner_busy" if error.code == 503 and response.get("detail") == "runner_busy" else "code_judge_unavailable"
         except (OSError, ValueError, KeyError, TypeError):
             return None, "code_judge_unavailable"
 

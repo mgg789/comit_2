@@ -62,7 +62,7 @@ Project name `comit`, volumes `pgdata`, `harrier_cache`, `chat-data` и `testing
 
 ```bash
 make dev-up
-SMOKE_MODE=dev make smoke
+make dev-smoke
 make dev-down
 ```
 
@@ -420,3 +420,14 @@ OpenRouter upstream configuration этой интеграцией не изме�
 Проверка 11.10.2026: Timeweb `/models` вернул требуемую модель; существующее зеркало
 вернуло корректный synthetic decision и receipt. Это не проверка пользовательского
 найма после rollout; она выполняется отдельно на развёрнутом релизе.
+
+## Образы GitHub Packages для dev
+
+Workflow `Publish development containers` запускается вручную **только на dev**.
+Он публикует восемь сервисных образов `ghcr.io/mgg789/comit-{api,web,agents,matching,testing,integration,verification,qgramm}`
+с тегами `dev` и `dev-<полный commit SHA>`. В образах `APP_ENV=development` и
+`NODE_ENV=development`; секреты и данные не включаются. Для готовых образов добавьте
+`-f infra/docker-compose.packages.yml` после dev/local Compose-файлов, используйте
+приватный env-файл и `docker compose ... --profile dev up -d --no-build`.
+`COMIT_IMAGE_TAG` позволяет закрепить конкретный immutable тег. Production deploy
+по-прежнему собирает production-конфигурацию из main.

@@ -301,6 +301,7 @@ export function Showcase({
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<string[]>([]);
   const [choosing, setChoosing] = useState<PublicCandidateCard | null>(null);
+  const [contactCandidate, setContactCandidate] = useState<PublicCandidateCard | null>(null);
   const saveLock = useRef(false);
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -466,7 +467,7 @@ export function Showcase({
                     busy === candidate.candidate_id ||
                     saved.includes(`${draftId}:${candidate.candidate_id}`)
                   }
-                  onClick={() => void save(candidate, draftId)}
+                  onClick={() => { setChoosing(candidate); setNotice(""); }}
                 >
                   <Icon name={saved.includes(`${draftId}:${candidate.candidate_id}`) ? "heart-filled" : "plus"} />
                 </button>
@@ -482,14 +483,16 @@ export function Showcase({
           )}
         </div>
       )}
+      {contactCandidate && <DirectContactInvitation candidate={contactCandidate} navigate={navigate} onClose={() => setContactCandidate(null)} onDone={() => { setContactCandidate(null); setNotice("Чат создан. Откройте его в разделе «Чаты»."); }} />}
       <AnimatePresence>
         {choosing && (
           <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <section className="modal discovery-confirm" role="dialog" aria-modal="true" aria-label="Выберите вакансию">
               <h2>Добавить в вакансию</h2>
+              <Action disabled={busy !== null} onClick={() => { setContactCandidate(choosing); setChoosing(null); }}>Без вакансии</Action>
               <p>{candidateName(choosing.display_name)} будет добавлен независимо от требований вакансии.</p>
               {vacancies.loading || vacancies.error ? <State {...vacancies} retry={vacancies.refresh} /> : !open.length ? (
-                <p>Сначала опубликуйте вакансию, чтобы добавлять кандидатов.</p>
+                <p>Открытых вакансий пока нет. Можно начать разговор без вакансии.</p>
               ) : <div className="discovery-targets">
                 {open.map(item => <Action key={item.draft_id} disabled={busy !== null}
                   onClick={() => void save(choosing, item.draft_id)}>{item.fields.title || "Без названия"}</Action>)}
@@ -1682,3 +1685,28 @@ function SavedCandidateInvitation({ candidateId, draftId, onClose, onDone, navig
 
 /** Format integer RUB kopeks without mixing provider USD units into the UI. */
 function formatExpense(kopeks: number): string { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 }).format(kopeks / 100); }
+
+/** Start a contact-only chat with explicit salary terms, charging only the sending tariff. */
+function DirectContactInvitation({candidate, navigate, onClose, onDone}: Navigation & {candidate: PublicCandidateCard; onClose: () => void; onDone: () => void}) {
+  const organization = useResource(() => api.getEmployerProfile());
+  const [description, setDescription] = useState("");
+  const [minimum, setMinimum] = useState("");
+  const [maximum, setMaximum] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const key = useRef(crypto.randomUUID());
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const from = Number(minimum), to = Number(maximum);
+    if (!description.trim() || !minimum || !maximum || !Number.isSafeInteger(from) || from < 0 || !Number.isSafeInteger(to) || to < from) { setError("Укажите описание и корректную вилку зарплаты в рублях."); return; }
+    setBusy(true); setError("");
+    try {
+      await api.startDirectContact({candidate_id: candidate.candidate_id, profile_revision: candidate.profile_revision, description: description.trim(), salary: {from_rub: from, to_rub: to}, idempotency_key: key.current});
+      onDone();
+    } catch (failure) { setError(errorText(failure)); }
+    finally { setBusy(false); }
+  }
+  const company = organization.data?.company_name;
+  return <Dialog title="Без вакансии" close={() => {if (!busy) onClose();}}><form className="form-grid" onSubmit={event => void submit(event)} onChange={() => {key.current = crypto.randomUUID();}}><p>Начните разговор с кандидатом. Стоимость — 49 ₽. Собеседование и оффер в этом чате недоступны.</p><fieldset disabled={busy}><Field label="Компания"><p>{company || "Укажите название компании в настройках"}</p></Field>{!company && <Action type="button" onClick={() => navigate("/settings")}>Настройки компании</Action>}<Field label="Сообщение кандидату"><textarea required maxLength={10000} value={description} onChange={event => setDescription(event.target.value)} /></Field><Field label="Зарплата от, ₽"><input required type="number" min="0" step="1" value={minimum} onChange={event => setMinimum(event.target.value)} /></Field><Field label="Зарплата до, ₽"><input required type="number" min={minimum || "0"} step="1" value={maximum} onChange={event => setMaximum(event.target.value)} /></Field></fieldset>{organization.error && <p role="alert" className="form-error">{organization.error}</p>}{error && <p role="alert" className="form-error">{error}</p>}<div className="form-actions"><Action type="button" disabled={busy} onClick={onClose}>Отмена</Action><Action type="submit" variant="primary" disabled={busy || !company || organization.loading}>{busy ? "Создаём…" : "Начать чат за 49 ₽"}</Action></div></form></Dialog>;
+}

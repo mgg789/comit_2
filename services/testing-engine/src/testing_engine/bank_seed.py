@@ -41,7 +41,7 @@ def _ext(family: str, level: int, prompt: str, rubric: list[str]) -> dict:
 
 
 def initial_items() -> list[dict]:
-    """28 items: every family at every level, honest minimal content."""
+    """44 seed items across task families and levels; generated variants extend this bank."""
     items: list[dict] = []
     a = "algorithms"
     items += [

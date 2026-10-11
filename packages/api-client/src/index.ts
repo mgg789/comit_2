@@ -15,7 +15,7 @@ import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutat
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
   EmployerStatisticsQuery, EmployerStatistics, SalaryMarketQuery, SalaryMarketAggregate,
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
-  InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
+  DirectContactRequest, InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
   AgentsJobView, AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
@@ -239,6 +239,7 @@ export interface ApiClient {
   /** Invalidate prior hypothesis evidence and reset its budget using a CAS command. */
   resetHypotheses(draftId: string, body: PreferenceCommand): Promise<HypothesisStatus>;
   /** Invite an eligible candidate using immutable vacancy terms and a UUID retry key. */
+  startDirectContact(body: DirectContactRequest): Promise<RecruitmentView>;
   inviteCandidate(draftId: string, body: InviteRequest): Promise<RecruitmentView>;
   /** Close a saved shortlist entry before inviting; this decision is employer-only. */
   rejectSavedCandidate(draftId: string, body: RejectSavedRequest): Promise<RecruitmentView>;
@@ -464,6 +465,7 @@ export function createApiClient({
     pauseHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/pause`, body),
     resumeHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/resume`, body),
     resetHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/reset`, body),
+    startDirectContact: body => request("POST", "/employer/contacts", body),
     inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),
     rejectSavedCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment/reject`, body),
     getEmployerRecruitment: (draftId, limit = 50, offset = 0, cursor) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment?limit=${limit}&offset=${offset}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),

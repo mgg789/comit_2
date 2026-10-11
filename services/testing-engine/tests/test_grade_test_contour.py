@@ -60,7 +60,7 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path, monkeypatch) -
             "item_id": task_payload["item_id"],
             **({"code": f"def {function_name}(*args):\n    return None"}
                if task_payload["type"] == "code"
-               else {"answer": _correct_index(task_payload["prompt"])
+               else {"answer": _presented_answer(tmp_path, task_payload)
                      if task_payload["type"] in ("mcq", "short_answer") else "развернутый ответ"})})
         body = answer.json()
         if task_payload["type"] == "code":
@@ -97,3 +97,11 @@ def test_unknown_session_is_404(tmp_path: Path) -> None:
     """Missing sessions give a clean 404."""
     client = _client(tmp_path)
     assert client.get("/testing/sessions/missing/result").status_code == 404
+
+
+def _presented_answer(tmp_path, task):
+    """Resolve private markup in tests after presentation permutation."""
+    import json
+    bank = json.loads((tmp_path / "testing-data" / "items.json").read_text())
+    payload = next(row["payload"] for row in bank if row["item_id"] == task["item_id"])
+    return task["options"].index(payload["options"][payload["answer_index"]]) if task["type"] == "mcq" else payload["expected_answers"][0]

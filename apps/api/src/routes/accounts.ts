@@ -11,6 +11,8 @@ import { publicShowcaseRoutes } from "./public-showcase.js";
 import { correlatedFetch } from "../operations/index.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 import { RecruitmentError } from "../recruitment/store.js";
+import { chatConfiguration } from "./chat.js";
+import { purgeChat } from "../chat/client.js";
 
 type Schema = string | number | boolean | null | undefined | Schema[] | { [key: string]: Schema };
 
@@ -37,6 +39,8 @@ export interface AccountGatewayOptions extends AuthOptions {
   matchingToken?: string;
   testingUrl?: string;
   testingToken?: string;
+  chatUrl?: string;
+  chatToken?: string;
   transport?: typeof fetch;
   profiles?: ProfileStore;
   vacancyLifecycle?: VacancyLifecycle;
@@ -127,6 +131,9 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   const matchingToken = options.matchingToken ?? process.env.CANDIDATE_PIPELINE_TOKEN;
   const testingUrl = options.testingUrl ?? process.env.TESTING_ENGINE_URL ?? "http://testing-engine:8102";
   const testingToken = options.testingToken ?? process.env.TESTING_ENGINE_TOKEN;
+  const chatConfig = chatConfiguration();
+  const purge = (context: Parameters<typeof purgeChat>[0]) => purgeChat(context, transport,
+    options.chatUrl ?? chatConfig?.url, options.chatToken ?? chatConfig?.token);
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
   for (const [namespace, spec] of [["agents", agentsSpec], ["matching", engineSpec]] as const) {
     for (const [name, value] of Object.entries(spec.components.schemas)) {
@@ -244,7 +251,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
         });
         if (!result.ok) return reply.code(503).send({ detail: "account_deletion_unavailable" });
       }
-      if (!await store.deleteEmployerAccount(identity.accountId)) return reply.code(401).send({ detail: "unauthenticated" });
+      if (!await store.deleteEmployerAccount(identity.accountId, purge)) return reply.code(401).send({ detail: "unauthenticated" });
       reply.clearCookie(cookieName("employer", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
       return reply.header("cache-control", "no-store").send({ deleted: true });
     } catch { return reply.code(503).send({ detail: "account_deletion_unavailable" }); }
@@ -268,7 +275,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
         signal: AbortSignal.timeout(10000), redirect: "error",
       });
       if (!testingResult.ok) return reply.code(503).send({ detail: "testing_deletion_unavailable" });
-      if (!await store.deleteCandidateAccount(identity.accountId)) return reply.code(401).send({ detail: "unauthenticated" });
+      if (!await store.deleteCandidateAccount(identity.accountId, purge)) return reply.code(401).send({ detail: "unauthenticated" });
       reply.clearCookie(cookieName("candidate", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
       return reply.header("cache-control", "no-store").send({ deleted: true });
     } catch {

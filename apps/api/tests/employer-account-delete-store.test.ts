@@ -26,7 +26,16 @@ test("employer deletion removes API graph and preserves candidate and other-role
     await pool.query(`INSERT INTO employer_expense_ai_days(owner_id,moscow_date) VALUES ($1,current_date)`, [owner]);
     for (const role of ["candidate","employer"]) await pool.query(`INSERT INTO auth_challenges(id,email,role,ip_hmac,expires_at)
       VALUES ($1,$2,$3,$4,now()+interval '1 hour')`, [randomUUID(),email,role,Buffer.from("synthetic-ip")]);
-    assert.equal(await store.deleteEmployerAccount(owner), true);
+    await assert.rejects(store.deleteEmployerAccount(owner), /chat_deletion_unavailable/);
+    await assert.rejects(store.deleteEmployerAccount(owner, async () => { throw new Error("QGramm unavailable"); }), /QGramm unavailable/);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [owner])).rowCount, 1);
+    assert.equal((await pool.query("SELECT 1 FROM recruitment_processes WHERE id=$1", [process])).rowCount, 1);
+    const purged: string[] = [];
+    assert.equal(await store.deleteEmployerAccount(owner, async context => {
+      assert.deepEqual(context, { process_id: process, owner_id: owner, candidate_id: candidate });
+      purged.push(context.process_id);
+    }), true);
+    assert.deepEqual(purged, [process]);
     for (const [table,column] of [["accounts","id"],["sessions","account_id"],["recruitment_processes","owner_id"],["recruitment_receipts","actor_id"],
       ["vacancy_lifecycle_commands","owner_id"],["employer_expenses","owner_id"],["employer_expense_ai_days","owner_id"]]) {
       assert.equal((await pool.query(`SELECT 1 FROM ${table} WHERE ${column}=$1`, [owner])).rowCount, 0, table);

@@ -150,7 +150,12 @@ test("candidate account deletion removes source graph, recruitment references an
       VALUES ($1,$2,'candidate',$3,now()+interval '10 minutes')`, [randomUUID(), `delete-${candidateId}@example.test`, Buffer.from("ip")]);
     await pool.query(`INSERT INTO auth_issue_events(email,ip_hmac) VALUES ($1,$2)`, [`delete-${candidateId}@example.test`, Buffer.from("ip")]);
 
-    assert.equal(await store.deleteCandidateAccount(candidateId), true);
+    await assert.rejects(store.deleteCandidateAccount(candidateId, async () => { throw new Error("QGramm unavailable"); }), /QGramm unavailable/);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [candidateId])).rowCount, 1);
+    assert.equal((await pool.query("SELECT 1 FROM recruitment_processes WHERE id=$1", [processId])).rowCount, 1);
+    assert.equal(await store.deleteCandidateAccount(candidateId, async context => {
+      assert.deepEqual(context, { process_id: processId, owner_id: employerId, candidate_id: candidateId });
+    }), true);
     assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [candidateId])).rowCount, 0);
     assert.equal((await pool.query("SELECT 1 FROM sessions WHERE account_id=$1", [candidateId])).rowCount, 0);
     assert.equal((await pool.query("SELECT 1 FROM candidate_profiles WHERE candidate_id=$1", [candidateId])).rowCount, 0);

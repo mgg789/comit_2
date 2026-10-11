@@ -103,4 +103,4 @@ def test_store_counts_active_excluding_served_today(tmp_path: Path) -> None:
     assert store.count_active("sql", 2) == 1
     store.mark_served(item_id)
     assert store.count_active("sql", 2) == 0
-    assert store.list_items("sql", 2), "relaxed fallback still serves something"
+    assert all(row["item_id"] != item_id for row in store.list_items("sql", 2)), "burned instance must not return"

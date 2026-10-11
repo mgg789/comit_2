@@ -15,6 +15,10 @@ down:
 dev-up:
 	$(DEV_COMPOSE)
 
+## Verify the single-port dev stack through its internal network
+dev-smoke:
+	python3 infra/local-smoke.py --project comit-dev
+
 ## Download the exact pinned public model into the isolated dev cache, then verify it
 dev-models:
 	$(DEV_COMPOSE) run --rm --build --no-deps model-cache-init
