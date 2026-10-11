@@ -50,9 +50,10 @@ Migration jobs сериализованы: PostgreSQL healthy → candidate-migr
 для уже существующих agents tables. HTTP runtime и workers ждут необходимых migrations;
 API дополнительно ждёт готовые engines/chat, web ждёт API readiness.
 Работают auth/notification mail worker, candidate profile и recommendation workers,
-candidate/vacancy/combine/rerank/feed-refill/preference workers и оба agents workers.
+candidate/vacancy/combine/rerank/feed-refill/preference workers и оба agents workers
+(`agents-worker`, `organization-agent-worker`). `services/code-judge` в compose не входит.
 
-Project name `comit`, volumes `pgdata`, `harrier_cache`, `chat-data` сохранены.
+Project name `comit`, volumes `pgdata`, `harrier_cache`, `chat-data` и `testing-data` сохранены.
 `make down` сохраняет volumes. `down -v` запрещён без отдельного разрешения пользователя.
 
 ## Явный dev-режим
@@ -245,3 +246,27 @@ bootstrap cleanup проверен отдельно в образе `:3`.
 после перезапуска VM. Основной стек приложения и SMTP не перезапускались.
 Следующий CD должен подхватить три judge env и пройти smoke до переключения
 release; эти проверки подключения сами по себе не подтверждают deployment UI.
+
+## Необязательные настройки окружения
+
+Кроме обязательных секретов выше, код читает следующие переменные (значения по
+умолчанию — из кода; compose задаёт часть из них явно):
+
+| Переменная | Где | По умолчанию | Назначение |
+|---|---|---|---|
+| `WEB_PORT`, `API_PORT`, `MATCHING_PORT`, `TESTING_PORT`, `INTEGRATION_PORT`, `AGENTS_PORT`, `VERIFICATION_PORT` | compose | 8088, 28080, 28101, 8102, 8103, 28104, 28105 | host-порты; все, кроме web, только на `127.0.0.1` |
+| `API_RATE_LIMIT`, `API_RATE_WINDOW_SECONDS`, `API_RATE_FALLBACK_KEYS` | api | 240, 60, 10000 | квота запросов ([api-operations.md](api-operations.md)) |
+| `PIPELINE_MAX_ATTEMPTS`, `PIPELINE_LEASE_SECONDS`, `PIPELINE_RETRY_BASE_SECONDS`, `PIPELINE_POLL_SECONDS` | matching workers | 5, 300, 30, 2 | попытки, lease, backoff и опрос очередей (compose задаёт 5/300) |
+| `AGENTS_LEASE_SECONDS`, `AGENTS_POLL_SECONDS` | agents workers | 300, 2 | lease и опрос очередей агентов |
+| `AGENT_MAX_ROUNDS`, `AGENT_MAX_OUTPUT_TOKENS`, `AGENT_MAX_INPUT_TOKENS`, `AGENT_CONTEXT_COMPACTION_BYTES` | organization-worker | 8, 1024, 128000, 90000 | лимиты глобального агента работодателя |
+| `AGENT_INPUT_USD_PER_MILLION`, `AGENT_OUTPUT_USD_PER_MILLION`, `AGENT_CACHED_INPUT_USD_PER_MILLION` | agents | 0.2, 0.7, 0.2 (compose) | тарифы DeepSeek для учёта расходов |
+| `JEV_API_URL`, `JEV_MODEL`, `JEV_PROVIDER`, `JEV_MAX_OUTPUT_TOKENS`, `JEV_PRICING_VERSION`, `JEV_INPUT_USD_PER_MILLION`, `JEV_OUTPUT_USD_PER_MILLION` | agents | `https://ai.sverk.tech/v1/systemone`, `kev-latest`, `systemone`, 0, `user-2026-10-07`, 0.042, 0 | необязательный провайдер Jev/SystemOne для свайпов агента |
+| `JEV_LOCAL_URL` | agents | production compose — пусто, dev — `http://host.docker.internal:12444`, вне compose — `http://127.0.0.1:12444` | Laya; пустое значение отключает обогащение (`laya_not_configured`), непустое допускает только `localhost`, `127.0.0.1`, `host.docker.internal` |
+| `ORGANIZATION_API_URL` | agents | `http://api:8080` (compose) | API bridge инструментов агента |
+| `CHAT_SERVICE_URL` | api | `http://qgramm-chat:8080` (compose) | приватный адрес QGramm bridge |
+| `FSP_DEMO_ENABLED`, `FSP_DEMO_INTERNAL_TOKEN`, `FSP_DEMO_CALLBACK_URL`, `FSP_DEMO_PUBLIC_URL`, `APP_ENV` | api, integration, verification | выключено; dev-файл включает | демо-привязка ФСП работает только при `NODE_ENV=development`/`APP_ENV=development` и `FSP_DEMO_ENABLED=true`; интерфейс маркирует demo |
+| `HH_API_TOKEN`, `HH_USER_AGENT` | verification | пусто, `comit-verification/0.1` (compose) | HH-проверка; без токена — `hh_token_unavailable`, без user agent — `hh_user_agent_unavailable` |
+| `BLUEPRINT_DIR`, `TESTING_DATA_DIR`, `TESTING_API_URL` | testing | `/app/blueprints`, `/data/testing`, `http://api:8080` (compose) | blueprint-каталог, хранилище и адрес publisher адаптивного контура |
+| `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`, `CODE_JUDGE_CA_PEM` | testing | `off`; judge задаётся оператором | режим записи, адрес изолированного judge, отдельный token и optional частный CA ([testing-engine.md](testing-engine.md)) |
+| `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106, `/data`, GID socket задаётся оператором | отдельный judge compose на disposable VM |
+| `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |

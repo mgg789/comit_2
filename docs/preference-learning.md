@@ -121,8 +121,8 @@ NDCG@10 0.654070→0.970931. Эти цифры характеризуют зар
 Миграция `010_preference_event_clock.sql` фиксирует время события и постановки
 задания после получения транзакционных блокировок; lease использует фактические
 часы, а не время начала fit-транзакции. Исходные миграции сохранены.
-`preference-worker` запускается вместе с worker
-конвейера из `infra/docker-compose.candidate-pipeline.yml` после миграции;
+`preference-worker` запускается вместе с остальными matching worker основного
+compose (`infra/docker-compose.yml`) после `candidate-migrate`;
 вручную: `python -m matching_engine preference-worker` с `DATABASE_URL`.
 Ни обучение, ни применение поправки не требуют LLM, Harrier inference или
 внешнего API. Worker использует уже зафиксированные признаки.

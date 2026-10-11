@@ -84,9 +84,9 @@ semantic vectors, PDF или pool-ready.
 
 ## Миграции
 
-- api-core: явный Node/pg runner с checksum/advisory lock; файлы в `apps/api/migrations/`.
-- matching-engine: `python -m matching_engine migrate` (advisory lock, checksum в `candidate_pipeline.migrations`); SQL 001–006 в схемах `candidate_pipeline`, `vacancy_pipeline`, `matching_pipeline`, `rerank_pipeline`; 006 добавляет `pool.grade_status` (approved|self_reported).
-- agents-service: `python -m agents_service migrate`, схема `agents_service` (см. ниже).
+- api-core: явный Node/pg runner с checksum/advisory lock (`pnpm --filter @comit/api auth:migrate`, в compose — `auth-migrate`); файлы `apps/api/migrations/001_accounts.sql` … `020_training_consent_not_null.sql` применяются в лексикографическом порядке. Номер 011 занят дважды (`011_testing_grades.sql`, `011_vacancy_lifecycle.sql`); `011_testing_grades.sql` побайтно совпадает с `019_testing_grades.sql` и использует `IF NOT EXISTS`, поэтому повторное применение безвредно. API `/ready` требует применённой `020_training_consent_not_null.sql`.
+- matching-engine: `python -m matching_engine migrate` (в compose — `candidate-migrate`; advisory lock, checksum в `candidate_pipeline.migrations`); SQL 001–017 в схемах `candidate_pipeline`, `vacancy_pipeline`, `matching_pipeline`, `rerank_pipeline` (005), `feed_pipeline` (007), `learning_pipeline` (008), `preference_pipeline` (009), `hypothesis_pipeline` (012), `recommendation_evidence` (017); 006 добавляет `pool.grade_status` (approved|self_reported). Историческое переименование 012 — [matching-migrations.md](matching-migrations.md).
+- agents-service: `python -m agents_service migrate` (в compose — `agents-migrate`), схема `agents_service`, SQL 001–011 (последние: `010_vacancy_lifecycle.sql`, `011_employer_expense_hooks.sql`; см. ниже).
 
 ## Синтетика
 
@@ -352,7 +352,7 @@ training_consent и не используют прежнее согласие к
 
 Новые learning samples фиксируют именно training-v1 и training_accepted_at в
 consent_version/consent_accepted_at, а не подменяют их временем profile consent.
-# Внешняя верификация и документы
+## Внешняя верификация и документы
 
 `candidate_profile_evidence` хранит canonical input SHA-256, provider status, verified value и provenance. `candidate_verification_ledger` append-only записывает каждый provider result до замены latest evidence. Каждое подтверждение поднимает source revision и создаёт новый immutable outbox snapshot; профильная правка с изменённым input сбрасывает старый status. `candidate_fsp_demo_auth_states` хранит только hash short-lived state, выбранный fixture, revision и одноразовую отметку consumption. Imported facts несут immutable `provider_version` и server `imported_at`. `candidate_verification_documents` хранит только AES-256-GCM ciphertext и metadata со статусом `pending`; загрузка не является подтверждением.
 
@@ -416,7 +416,7 @@ API-миграция `018_employer_expenses.sql` добавляет `employer_ex
 
 ### Подтверждённые результаты тестирования
 
-Миграция `019_testing_grades.sql` добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
+Миграция `019_testing_grades.sql` (дубликат с тем же содержимым — `011_testing_grades.sql`) добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
 
 Миграция `020_training_consent_not_null.sql` закрывает SQL NULL-обход CHECK: включённое согласие требует явную версию v1/v2 и дату. Недопустимые старые строки не получают выдуманное согласие: миграция отклоняется до ручного исправления.
 

@@ -15,9 +15,9 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
-| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
+| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` → `runtime-shared.test.mjs` → тесты ui-kit/employer/candidate/testing |
 | `api` | python:3.12-bookworm + Node 22 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
-| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip |
+| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification/code-judge `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip; реальный Docker acceptance вынесен в отдельный ephemeral job |
 | `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов с disposable PostgreSQL → line/branch gates каждого пакета |
 | `smoke` | хост (нужен docker) | explicit `docker-compose.dev.yml --profile dev`, проект `comit-ci`, порты 38xxx, real pinned Harrier cache → `SMOKE_MODE=dev ./tests/smoke.sh` → `down -v` |
 
@@ -146,9 +146,13 @@ JUnit, публикуются CI как artifacts даже после паден
 не доказывает тестовое покрытие. GitHub Actions workflow описан и синтаксически
 проверен локально; успешный запуск remote CI отдельно подтверждается результатом Actions.
 
-## deploy.yml — push в main (и workflow_dispatch)
+## deploy.yml — после успешного CI на push в main (и workflow_dispatch)
 
-Сборка prod-стека (`infra/docker-compose.prod.yml`) прямо на сервере и health-проверка — `docs/deploy.md`.
+Триггер — `workflow_run` workflow CI на ветке `main` с `conclusion == success` и
+событием `push`, либо ручной `workflow_dispatch` (параметр `adopt_legacy` для
+первого перехода со старого стека). `infra/deploy.py` собирает
+`infra/docker-compose.prod.yml` на сервере в immutable release, делает backup БД,
+smoke и откат образов при ошибке — подробности в [deploy.md](deploy.md).
 
 ## Секреты
 
@@ -181,3 +185,11 @@ CI также запускает unit-контракт demo-каталога, fr
 строк и 60% ветвей. Реальный Docker sandbox — отдельный явный acceptance-контур;
 общий Python job без Docker не выдаёт его за пройденный. Job `Code judge isolation` запускает эти проверки на одноразовом GitHub-hosted runner без production-секретов и доступа к серверу приложения. Команда и граница VM
 описаны в [deploy.md](deploy.md#изолированная-проверка-кода).
+
+Реальная проверка `Code judge isolation (disposable runner)` выполняется отдельно
+на GitHub-hosted Ubuntu: pinned Python image, Docker isolation и HTTP broker
+acceptance. Generic compose smoke использует явно недоступный judge endpoint и
+проверяет отказ начала code-теста без создания попытки; выполнение кода он не
+подтверждает. Актуальные результаты нового тестирования —
+[package-validation.md](package-validation.md); таблица выше описывает прежний
+checkpoint и не заменяет проверки текущего SHA.

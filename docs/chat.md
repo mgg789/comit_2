@@ -49,7 +49,7 @@ proxy URL нет. Внешний доступ идёт через существ
 не виден собеседнику: публикация происходит атомарно с сообщением, содержащим
 его метаданные. Чужой, неопубликованный или относящийся к другой комнате файл
 нельзя скачать/прикрепить. Имена и media type не являются гарантией безопасности
-содержимого; будущий UI должен скачивать вложения, а не вставлять HTML в страницу.
+содержимого; UI кабинетов скачивает вложения, а не вставляет HTML в страницу.
 
 UUID `idempotency_key` следует сохранять на время повторов одного запроса.
 Изменённый payload с тем же ключом возвращает конфликт. История работает через
@@ -122,10 +122,9 @@ GET процесса. Недоступность чата не откатыва�
 
 ## Ключи и локальный запуск
 
-Overlay `infra/docker-compose.chat.yml` добавляет приватную сеть и persistent
-volume `chat-data`, не публикует порт QGramm и не меняет SMTP. Применяется вместе
-с базовым compose и accounts overlay; accounts и profile migrations нужны
-из предыдущих проходов. Секреты перечислены в `.env.example`, значения остаются
+Сервис `qgramm-chat` входит в основной compose: приватная сеть `chat-private`,
+persistent volume `chat-data`, порт QGramm не публикуется, SMTP не меняется
+(legacy overlay `infra/docker-compose.chat.yml` больше не нужен). Секреты перечислены в `.env.example`, значения остаются
 только в игнорируемом `.env`/secret store. `CHAT_SERVICE_TOKEN` — случайный
 токен минимум 32 символа. `CHAT_DEVICE_SECRET`, `CHAT_SIGNING_KEY`,
 `QGRAMM_MASTER_KEY`, `QGRAMM_HPKE_KEY` — независимые base64-ключи по 32 байта;
@@ -141,10 +140,8 @@ secret не является ротацией: публичные ключи у�
 генерации новых секретов поверх существующей БД.
 
 ```sh
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.auth.yml \
-  -f infra/docker-compose.chat.yml build qgramm-chat api
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.auth.yml \
-  -f infra/docker-compose.chat.yml up -d qgramm-chat api
+docker compose --env-file .env -f infra/docker-compose.yml build qgramm-chat api
+docker compose --env-file .env -f infra/docker-compose.yml up -d qgramm-chat api
 ```
 
 Во время эксплуатации внешние API/LLM не требуются. Первичная сборка образа
@@ -179,7 +176,7 @@ Dockerfile также выполняет тесты адаптера перед 
 Этот тест разрешён только для отдельного `comit-qgramm-chat-*` контейнера.
 Проверены authenticated history через приватную Docker-сеть и readiness.
 Для HTTP-тестов с хоста добавлена отдельная тестовая сеть и loopback-port;
-production overlay порт не публикует.
+production compose порт не публикует.
 
 `WEB_PORT=39788 API_PORT=39780 MATCHING_PORT=39781 TESTING_PORT=39782
 INTEGRATION_PORT=39783 SMOKE_TRIES=1 ./tests/smoke.sh` — все 12 проверок прошли.

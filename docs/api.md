@@ -43,10 +43,17 @@ rerank доступен через `GET .../rerank` (`RerankStatus`), явное
 
 | Сервис | Спецификация |
 |---|---|
-| api-core | http://localhost:8080/openapi.json, UI: http://localhost:8080/docs (через nginx: `/api/docs`) |
-| matching-engine | http://localhost:8101/docs |
+| api-core | http://localhost:28080/docs/json (OpenAPI JSON), UI: http://localhost:28080/docs (через nginx: `/api/docs`) |
+| matching-engine | http://localhost:28101/docs |
 | testing-engine | http://localhost:8102/docs |
 | integration-engine | http://localhost:8103/docs |
+| agents-service | http://localhost:28104/docs |
+| verification-engine | http://localhost:28105/docs |
+
+Порты — host-порты по умолчанию (`API_PORT`, `MATCHING_PORT`, `TESTING_PORT`,
+`INTEGRATION_PORT`, `AGENTS_PORT`, `VERIFICATION_PORT`, только loopback); внутри
+compose сервисы слушают 8080/8101/8102/8103/8104/8105. Полный граф api-core —
+220 операций (147 публичных и 73 `/internal/*`, без `/docs`).
 
 ## Текущие эндпоинты
 
@@ -55,7 +62,8 @@ rerank доступен через `GET .../rerank` (`RerankStatus`), явное
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/healthz` | liveness: `{status, service, version}` |
-| GET | `/ready` | пока статический ответ `{status, service, version}` без проверки БД |
+| GET | `/ready` | `{status:"ok", service, version}` только при валидной auth-конфигурации, доступной БД и применённой миграции `020_training_consent_not_null.sql`; иначе 503 `{status:"unavailable"}` |
+| GET | `/metrics` | Prometheus-метрики процесса ([api-operations.md](api-operations.md)) |
 
 Аутентификация уже подключена в `apps/api`: пароль не используется. Код на email
 ставится в PostgreSQL outbox, а после успешной проверки создаются собственный HS256
@@ -131,8 +139,13 @@ contribution. Pending/rejected grade остаются блокирующими.
 
 | Метод | Путь | Назначение |
 |---|---|---|
+| GET | `/healthz`, `/ready` | liveness/readiness |
 | GET | `/blueprints` | список blueprint'ов (шаблонов заданий) |
 | GET | `/blueprints/{id}` | один blueprint; 404 если нет |
+
+Entry point запускает `create_testing_app` с авторизацией внутренних маршрутов
+`/testing/sessions/*`; браузер работает через API proxy ниже. Контракт и граница
+изолированного judge — [testing-engine.md](testing-engine.md).
 
 ### integration-engine
 
@@ -209,8 +222,9 @@ Private owner PDF существует только во внутреннем ma
 
 Регистрация/подтверждение email, candidate JWT/ownership и source-profile CRUD
 разделены с matching projection. Проведение теста остаётся trusted upstream
-контуром; API не принимает от браузера `grade_result` или evidence и не делает
-самоотчёт подтверждённым.
+контуром (testing-engine через `/internal/testing/session-result`); API не
+принимает от браузера `grade_result` или evidence и не делает самоотчёт
+подтверждённым.
 
 ## Подготовка вакансии к комбайну (цикл 1)
 
@@ -381,9 +395,9 @@ multi-select группы объединяет выбранные неперес
 401 — нет доверенного токена; 400/422 — неверный контракт; 404 — нет записи данного
 владельца; 409 — CAS/state/hash/schema конфликт; 503 — недоступная зависимость.
 Технические ошибки inference передаются через job state и безопасный error code.
-Auth/JWT/accounts и owner-scoped draft gateway реализованы. UI, public matching
-gateway routes and CRUD опубликованной вакансии остаются отдельными этапами;
-описанные выше employer selection routes уже owner-scoped и проверяют актуальность
+Auth/JWT/accounts, owner-scoped draft gateway, employer UI и CRUD опубликованной
+вакансии (`/employer/vacancies*`, [vacancy-crud.md](vacancy-crud.md)) реализованы;
+описанные выше employer selection routes owner-scoped и проверяют актуальность
 источников.
 Подробности: [agents.md](agents.md).
 
@@ -443,11 +457,12 @@ gateway routes and CRUD опубликованной вакансии остаю
 | POST `/employer/vacancy-drafts/{draft_id}/invitations` | InviteRequest → RecruitmentView |
 | POST `/employer/vacancy-drafts/{draft_id}/recruitment/reject` | RejectSavedRequest → employer-only RecruitmentView |
 | GET `/employer/vacancy-drafts/{draft_id}/recruitment` | limit/offset → RecruitmentPage |
-| GET `/candidate/recruitment` | limit/offset → own RecruitmentPage |
+| GET `/candidate/recruitment`, `/employer/recruitment` | limit + offset или opaque cursor → own RecruitmentPage ([cursor-pagination.md](cursor-pagination.md)) |
 | GET `/{role}/recruitment/{id}` | own RecruitmentView |
 | POST `/{role}/recruitment/{id}/actions` | RecruitmentAction → RecruitmentView |
 | GET `/employer/recruitment/{id}/contacts` | accepted/current consent → ContactsView |
 | GET `/{role}/recruitment-events` | after_sequence/limit → RecruitmentEventPage |
+| GET `/{role}/recruitment-events/stream` | SSE-поток тех же событий ([chat-events.md](chat-events.md)) |
 
 Action union: view/accept/decline/withdraw/reject, interview_propose/accept/decline/
 cancel/complete, offer_send/accept/decline. CAS expected_revision и UUID key
@@ -458,7 +473,7 @@ Saved-членство для invitation/rejection читается через �
 `GET /internal/vacancies/{vacancy_id}/saved/{candidate_id}` с token+serverowner;
 он возвращает SavedCard, при stale источнике card:null, без удаления истории.
 Без настройки чата chat_available:false. Схемы всех маршрутов включены в Fastify
-OpenAPI; DTO живут в packages/shared/recruitment.ts и используются api-client.
+OpenAPI; DTO живут в `packages/shared/src/recruitment.ts` и используются api-client.
 
 ## QGramm chat backend
 
@@ -468,7 +483,8 @@ OpenAPI; DTO живут в packages/shared/recruitment.ts и использую�
 ChatReadStatus) описаны в Fastify OpenAPI. GET recruitment одного процесса и
 списков дополняется текущим participant-scoped `chat_unread_count`: число
 входящих сообщений или `null`, если метадата недоступна.
-DTO в `packages/shared/chat.ts`, типизированные методы в api-client.
+DTO в `packages/shared/src/chat.ts`, типизированные методы в api-client.
+SSE `GET /{role}/recruitment/{id}/chat/events` — [chat-events.md](chat-events.md).
 Участники и комната определяются API из приглашения, не из body/header клиента.
 Чат доступен до accept, контакты — по прежнему правилу после accept.
 [Лимиты, ошибки, курсор и протокол публикации файлов](chat.md).
@@ -519,7 +535,8 @@ training_accepted_at/null. Internal Consent содержит эти же пол�
 [Документы для тестового контура](legal/README.md).
 
 [Проверка кандидатского backend и воспроизведение результатов](candidate-backend-audit.md).
-# Внешняя верификация
+
+## Внешняя верификация
 
 Кандидатские `POST /candidate/profile/verifications/fsp`, `/repository` и `/hh` требуют authenticated candidate session и CAS `expected_revision`; account id не передаётся provider-сервису. Demo FSP flow: `POST /candidate/profile/fsp/demo/authorize` → GET/POST integration `/fsp/demo/authorize` → `POST /candidate/profile/fsp/demo/callback`; state candidate-bound, 120 секунд, callback allowlist и code одноразовые. Callback bulk-upsert-ит fixture achievements и binding `fsp_id`/`fsp_claim_id`. Account identity и ownership не выводятся из demo registry. Facts возвращаются в private profile view и доставляются matching через source outbox. Контракт провайдеров и деградация HH описаны в [verification.md](verification.md).
 
@@ -652,7 +669,7 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 Доверенный producer `POST /internal/testing/session-result` принимает `X-Internal-Token`, сверяемый с `TESTING_ENGINE_TOKEN`, и поля `candidate_id`, `session_id`, `specialization`, `decided_grade`, `tasks_answered`, необязательный `supervision_badge`. Browser JWT не даёт права отправлять результаты. Запись результата, подтверждённое свидетельство `grade:trusted`, revision профиля и outbox проекции изменяются одной транзакцией. Повтор идентичного результата возвращает прежний результат без повторного начисления активности; повтор session_id с другим владельцем или содержимым — 409. Повторный тест разрешён через 7 дней, повышение оценки — через 30 дней.
 
-Этот контракт совместим с адаптивным publisher основного checkout. В данной ветке testing-engine предоставляет только blueprints и не содержит адаптивного publisher: автоматическая публикация требует подключения настоящего доверенного testing contour с `TESTING_API_URL` и `TESTING_ENGINE_TOKEN`. Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
+Ответ 200: `{recorded:true, grade, decided_at}`; без `TESTING_ENGINE_TOKEN` — 503 `testing_not_configured`, неверный токен — 401, cooldown — 409 `retake_cooldown`/`grade_upgrade_cooldown`. Publisher адаптивного контура (`services/testing-engine/src/testing_engine/publisher.py`) отправляет именно этот контракт и берёт `tasks_given` (число оценённых адаптивных ответов) для wire `tasks_answered`. Compose передаёт testing-engine `TESTING_API_URL` и токен; entrypoint запускает адаптивный контур и trusted publisher ([testing-engine.md](testing-engine.md)). Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
 
 `/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.
 
