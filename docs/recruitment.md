@@ -4,7 +4,7 @@
 соискателю → принятие → контакты, собеседования, оффер или отказ**.
 Внутренний чат разрешён уже на стадии приглашения, до раскрытия контактов.
 Отдельный backend-проход реализует [чаты и файлы на QGramm](chat.md).
-UI отсутствует; без настройки QGramm API возвращает `chat_available:false`.
+Кабинеты кандидата и работодателя показывают процессы и чат ([candidate-ui.md](candidate-ui.md), [employer-ui.md](employer-ui.md)); без настройки QGramm API возвращает `chat_available:false`.
 
 ## Владелец данных и границы
 
@@ -99,9 +99,10 @@ receipt даже после смены источника или недосту�
 нет контактов, условий, причин, meeting URL или model output. Participant polling
 возвращает only-own events, `next_sequence` и `has_more`; потребитель дедуплицирует
 event_id. Вставки сериализованы до commit, чтобы курсор не пропустил lower
-uncommitted sequence. События не удаляются автоматически. Внешняя email-доставка,
-consumer leases, WebSocket, чат и система персональных предпочтений — будущие
-потребители, в этом проходе их успешная доставка не заявляется.
+uncommitted sequence. События не удаляются автоматически. Email о собеседованиях
+([email-notifications.md](email-notifications.md)) и чат ([chat.md](chat.md))
+реализованы отдельными контурами и этот журнал не потребляют; consumer leases и
+WebSocket для него не реализованы.
 
 Запуск API SQL: `pnpm --filter @comit/api auth:migrate`; сервер не мигрирует сам.
 Тесты API: `pnpm exec tsx --test --test-concurrency=1 tests/*.test.ts` из apps/api

@@ -61,11 +61,13 @@ Profile consent отдельный от account consent и использует 
 draft.
 
 `declared_grade` — пользовательская декларация. Browser contour выдаёт
-`self_reported`: UUID сессии не придумывается. Контракт предусматривает будущий
-trusted testing source, который сможет заменить его на legacy `approved` с
-настоящими `test_session_id` и `approved_at`; этот producer пока не интегрирован.
-Он должен сначала обновить authoritative evidence в API и поставить новый exact
-snapshot в outbox: передача approved напрямую в matching не заменяет source.
+`self_reported`: UUID сессии не придумывается. Trusted testing source
+(`POST /internal/testing/session-result`, [api.md](api.md)) реализован в API: он
+обновляет authoritative evidence, ставит новый exact snapshot в outbox и даёт
+legacy `approved` с настоящими `test_session_id` и `approved_at`, только если
+подтверждённый грейд совпадает с `declared_grade`. Publisher testing-engine есть в
+коде, но развёрнутый сервис его не запускает ([testing-engine.md](testing-engine.md)).
+Передача approved напрямую в matching не заменяет source.
 Оба состояния могут получить категорию и попасть в пул при наличии остальных
 обязательных полей; `pending`/`rejected` остаются заблокированными.
 
