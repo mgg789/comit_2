@@ -65,7 +65,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 - Системный чат Comit в обоих кабинетах: уведомления платформы и живая служба поддержки.
 - Агент работодателя (DeepSeek/Jev): черновик вакансии из свободного описания, глобальный чат-ассистент с фоновыми поручениями и учётом бюджета.
 - Статистика найма у работодателя, публичная витрина вакансий и согласившихся соискателей с обязательными зарплатными вилками, email-уведомления о событиях.
-- 152-ФЗ: раздельные согласия на обработку, публикацию в пуле и обучение моделей; отказ от обучения не ломает обычный подбор.
+- 152-ФЗ: раздельные согласия на обработку, публикацию в пуле и обучение моделей; отказ от обучения не ломает обычный подбор. Локализация данных в РФ и исчерпывающая карта трансграничных передач — [152-fz-compliance.md](docs/152-fz-compliance.md).
 - Внешние вызовы кэшируются; недоступность провайдера явно отражается в интерфейсе. Проверка кода требует доступного изолированного judge, развёрнутого ответа — Jev/DeepSeek; сбой сохраняет ответ для повтора и не превращается в неверный результат.
 
 ## Особенно интересно
@@ -190,7 +190,7 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 ### Указатель документации
 
 - **Старт и обзор:** [quickstart](docs/quickstart.md), [environments](docs/environments.md), [services](docs/services.md), [architecture](docs/architecture.md), [architecture-diagrams](docs/architecture-diagrams.md), [user-flows](docs/user-flows.md), [glossary](docs/glossary.md), [faq](docs/faq.md), [team](docs/team.md), [packages](docs/packages.md).
-- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
+- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [152-fz-compliance](docs/152-fz-compliance.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
 - **API и данные:** [api](docs/api.md), [api-reference](docs/api-reference.md), [api-operations](docs/api-operations.md), [cursor-pagination](docs/cursor-pagination.md), [data](docs/data.md), [auth](docs/auth.md).
 - **Кандидат:** [candidate-ui](docs/candidate-ui.md), [candidate-profile](docs/candidate-profile.md), [resume-import](docs/resume-import.md), [verification](docs/verification.md), [integration](docs/integration.md), [fsp-link](docs/fsp-link.md), [weekly-challenges](docs/weekly-challenges.md), [recommendations](docs/recommendations.md), [candidate-backend-audit](docs/candidate-backend-audit.md).
 - **Тестирование:** [testing-engine](docs/testing-engine.md), [testing-design](docs/testing-design.md).
