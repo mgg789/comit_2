@@ -58,3 +58,13 @@ export const candidateProfileViewSchema = object({
     error_code: nullable(text(100)) }, ["state", "source_revision", "projected_revision", "attempts", "error_code"]),
   updated_at: { type: "string", format: "date-time" },
 }, ["candidate_id", "revision", "fields", "evidence", "consents", "projection", "updated_at"]);
+
+/** Active canonical skill choices and account-owned accepted test cooldowns. */
+export const candidateSkillCatalogSchema = object({
+  version: { type: "integer", minimum: 1 }, schema_hash: text(128),
+  skills: array(object({ group: { enum: ["domains", "stacks", "soft_skills"] }, key, label: text(300),
+    test_subject: nullable({ enum: ["algorithms", "sql", "rest_api", "python", "react", "docker", "teamwork"] }),
+    confirmed_level: nullable({ type: "integer", minimum: 1, maximum: 7 }),
+    next_attempt_at: nullable({ type: "string", format: "date-time" }), upgrade_at: nullable({ type: "string", format: "date-time" }),
+  }, ["group", "key", "label", "test_subject", "confirmed_level", "next_attempt_at", "upgrade_at"]), 1000),
+}, ["version", "schema_hash", "skills"]);

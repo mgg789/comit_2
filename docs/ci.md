@@ -166,3 +166,9 @@ PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, пуб
 ## Проверки пакета завершения
 
 CI также запускает unit-контракт demo-каталога, frontend merge-resume regression и все `apps/api/tests/*.test.ts`, включая FSP/weekly/import. API coverage runner автоматически создаёт отдельные временные БД для новых `*_TEST_DATABASE_URL`. Полный результат текущего пакета — [package-validation.md](package-validation.md).
+
+
+Пакет `code-judge` входит в Python unit/regression coverage gate: минимум 80%
+строк и 60% ветвей. Реальный Docker sandbox — отдельный явный acceptance-контур;
+общий Python job без Docker не выдаёт его за пройденный. Job `Code judge isolation` запускает эти проверки на одноразовом GitHub-hosted runner без production-секретов и доступа к серверу приложения. Команда и граница VM
+описаны в [deploy.md](deploy.md#изолированная-проверка-кода).

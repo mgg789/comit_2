@@ -141,6 +141,14 @@ services:
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       TESTING_DATA_DIR: /data/testing
       TESTING_RECORDING_MODE: "${TESTING_RECORDING_MODE:-off}"
+      CODE_JUDGE_URL: "${CODE_JUDGE_URL:?Set URL of the isolated code judge}"
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set the isolated judge token}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
     ports:
     - 127.0.0.1:${TESTING_PORT:-8102}:8102
     volumes:

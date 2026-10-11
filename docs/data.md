@@ -438,3 +438,13 @@ Testing-engine хранит попытку, ответы, checkpoint и прин
 ## Недельная практика и демо-каталог
 
 Миграция `021_weekly_challenges.sql` хранит единственную попытку кандидата за UTC-неделю. Серверная отметка `external:weekly_challenge:current` и outbox обновляются атомарно. Импорт резюме не хранит исходный файл и не меняет профиль без его обычного сохранения. [Демо-каталог](demo-data.md) импортируется отдельной командой, без уведомлений и подтверждённых доказательств.
+
+### Предметное подтверждение навыков
+
+Accepted `candidate_grade_results.specialization` сопоставляется ровно одной
+канонической координате (`domains`/`stacks`/`soft_skills`); mapping и уровни 1/2/4/6
+описаны в [candidate-profile.md](candidate-profile.md). Coordinate evidence содержит
+hash декларации, измеренный level, session id, серверное время и provenance.
+Старый `grade:<subject>` сохранён как совместимый независимый результат;
+общая `declared_grade` не меняется предметным тестом. Ограниченное восстановление
+проекций использует marker `external:testing_mapping:v1` в evidence, без новой таблицы.

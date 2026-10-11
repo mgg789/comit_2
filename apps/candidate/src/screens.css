@@ -190,3 +190,17 @@
 .candidate-testing-calendar-range { display: flex; justify-content: space-between; max-width: 225rem; font-size: 14rem; color: var(--comit-text-muted); }
 .candidate-testing-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 7rem; font-size: 14rem; color: var(--comit-text-muted); }
 .candidate-testing-legend .candidate-testing-cell { width: 16rem; height: 16rem; }
+
+/* Grid tracks must shrink to the viewport instead of inheriting card min-content widths. */
+.candidate-profile-page, .candidate-profile-body, .candidate-profile-section,
+.candidate-profile-row, .candidate-weekly-task > div { min-width: 0; }
+.candidate-profile-body, .candidate-profile-section, .candidate-profile-row { grid-template-columns: minmax(0, 1fr); }
+.candidate-profile-body { width: 100%; }
+.candidate-profile-section > header { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .candidate-profile-body { overflow-wrap: anywhere; }
+  .candidate-skill-assessment { align-items: flex-start; gap: 14rem; }
+  .candidate-skill-assessment > strong { flex-basis: 100%; min-width: 0; }
+  .candidate-skill-assessment .candidate-skill-test { margin-left: 0; max-width: 100%; }
+  .candidate-profile-section .primary { max-width: 100%; padding-inline: 24rem; }
+}

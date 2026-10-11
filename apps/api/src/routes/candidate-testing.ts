@@ -24,7 +24,11 @@ const successSchemas: Record<string, object> = {
   sessions: sessionResponse, abandon: sessionResponse, result: resultResponse, finish: resultResponse,
   preflight: { type: "object", additionalProperties: false,
     required: ["specialization", "supported_specializations", "eligible", "next_attempt_at", "upgrade_at", "active_session_id", "active_session_consents", "active_supervision", "next_sequence", "recording_enabled", "active_recording_enabled", "max_questions", "supported_question_types", "active_session_status"],
-    properties: { supported_question_types: { type: "array", items: { enum: ["mcq", "short_answer"] } },
+    properties: { supported_question_types: { type: "array", items: { enum: ["mcq", "short_answer", "code", "extended"] } },
+      unavailable_reason: { anyOf: [{ const: "code_judge_unavailable" }, { type: "null" }] },
+      judges: { type: "object", additionalProperties: false, required: ["code_required", "code_ready", "text_configured", "types"], properties: {
+        code_required: { type: "boolean" }, code_ready: { type: "boolean" }, text_configured: { type: "boolean" },
+        types: { type: "array", items: { enum: ["mcq", "short_answer", "code", "extended"] } } } },
       active_session_status: { anyOf: [{ enum: ["active", "finished"] }, { type: "null" }] }, specialization: subject, supported_specializations: { type: "array", items: subject }, eligible: { type: "boolean" },
       next_attempt_at: nullableDate, upgrade_at: nullableDate, active_session_id: { anyOf: [{ type: "string" }, { type: "null" }] },
       active_supervision: { anyOf: [{ type: "object", additionalProperties: false,
@@ -33,6 +37,7 @@ const successSchemas: Record<string, object> = {
           multi_face_events: { type: "integer" }, camera: { enum: ["granted", "denied", "unavailable"] } } }, { type: "null" }] },
       active_session_consents: { anyOf: [consent, { type: "null" }] }, next_sequence: { type: "integer", minimum: 0 }, recording_enabled: { type: "boolean" }, active_recording_enabled: { type: "boolean" }, max_questions: { const: 30 } } },
   next: { type: "object", additionalProperties: false, required: ["session_id", "answered", "decided_grade", "task"], properties: {
+    pending_answer: { anyOf: [{ type: "string", maxLength: 20000 }, { type: "null" }] },
     session_id: { type: "string" }, answered: { type: "integer", minimum: 0 }, decided_grade: grade,
     task: { type: "object", additionalProperties: false, required: ["item_id", "family", "level", "type", "prompt"], properties: {
       item_id: { type: "string" }, family: subject, level: { type: "integer", minimum: 1, maximum: 4 },
@@ -116,7 +121,7 @@ export async function candidateTestingRoutes(app: FastifyInstance,
         }
         const path = isStart ? "/testing/sessions" : isPreflight ? `/testing/preflight?specialization=${encodeURIComponent(String(specialization))}`
           : `/testing/sessions/${encodeURIComponent(request.params.sessionId!)}/${spec.suffix}`;
-        const response = await transport(base + path, { method: spec.method, signal: AbortSignal.timeout(25000),
+        const response = await transport(base + path, { method: spec.method, signal: AbortSignal.timeout(spec.suffix === "answer" ? 65000 : 25000),
           headers: { "content-type": "application/json", "x-internal-token": token, "x-candidate-id": identity.accountId },
           ...(spec.method === "POST" ? { body: JSON.stringify({ ...request.body, ...(isStart ? { candidate_key: identity.accountId } : {}) }) } : {}) });
         const result = await response.json() as Record<string, unknown>;

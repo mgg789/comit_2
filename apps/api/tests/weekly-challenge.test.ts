@@ -27,7 +27,7 @@ test("weekly reward is owner-bound, durable, one-per-week and projected atomical
  const app=Fastify();
  try{
   await admin.query(`CREATE SCHEMA ${schema}`);
-  for(const migration of ["001_accounts","002_candidate_profiles","005_training_consent","021_weekly_challenges"])await pool.query(await readFile(new URL(`../migrations/${migration}.sql`,import.meta.url),"utf8"));
+  for(const migration of ["001_accounts","002_candidate_profiles","005_training_consent","019_testing_grades","021_weekly_challenges"])await pool.query(await readFile(new URL(`../migrations/${migration}.sql`,import.meta.url),"utf8"));
   const owner=randomUUID(),other=randomUUID();
   for(const id of [owner,other])await pool.query("INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)VALUES($1,$2,'candidate',true,'v1',now())",[id,`${id}@example.invalid`]);
   const profiles=new ProfileStore(pool),consent={processing:true,pool:false,version:"profile-v1"};

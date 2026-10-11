@@ -847,6 +847,8 @@ textarea::placeholder {
   }
 }
 
+.modal.modal-wide { width: min(920rem, 100%); max-width: 920rem; }
+
 /* Original employer skill tags, shared across both cabinets. */
 .tags {
   display: flex;

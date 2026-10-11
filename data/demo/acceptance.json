@@ -1,7 +1,7 @@
 {
-  "recorded_at": "2026-10-11T01:23:12.170310+00:00",
+  "recorded_at": "2026-10-11T02:07:57.189905+00:00",
   "catalog": "comit-demo-2026-v1",
-  "scope": "isolated local PostgreSQL and real Harrier CPU workers",
+  "scope": "isolated local PostgreSQL and real pinned Harrier CPU workers on host",
   "source_candidates": 240,
   "source_employers": 16,
   "source_vacancies": 48,
@@ -10,19 +10,57 @@
   "mail_jobs": 0,
   "confirmed_evidence": 0,
   "real_public_showcase": {
-    "candidates": 3,
-    "vacancies": 1
+    "candidates": 240,
+    "vacancies": 48
   },
+  "public_api_checked_at": "2026-10-11T02:06:53.290Z",
+  "public_api_pagination": "all pages, 50 items per page, no duplicate IDs",
   "candidate_states": {
-    "ready": 3,
-    "processing": 1,
-    "queued": 236
+    "ready": 240
   },
   "vacancy_states": {
-    "ready": 1,
-    "queued": 47
+    "ready": 48
   },
+  "candidate_jobs": {
+    "completed": 240
+  },
+  "vacancy_jobs": {
+    "completed": 48
+  },
+  "job_errors": 0,
   "synthetic_vectors": false,
   "production_writes": false,
-  "limitation": "Only a bounded sample was published. Initial 3 GiB worker exceeded its container memory limit; bounded passes succeeded with 5 GiB. Interrupted lease is recoverable by the normal worker; remaining records were not claimed ready."
+  "processing_status": "complete",
+  "host_run": {
+    "runtime": "isolated temporary venv, declared matching-engine[embeddings] dependencies",
+    "pinned_model": "microsoft/harrier-oss-v1-270m@31de22b673913c7d658c0f03f792d77c2dcf8ebd",
+    "offline_model_cache": true,
+    "threads": 2,
+    "sample_candidates": 3,
+    "sample_seconds": 8.3,
+    "remaining_candidate_jobs": 226,
+    "candidate_stage_seconds": 305.37,
+    "remaining_vacancy_jobs": 47,
+    "vacancy_stage_seconds": 39.63,
+    "finished_at": "2026-10-11T02:06:38.120786+00:00",
+    "global_packages_changed": false
+  },
+  "previous_docker_attempt": {
+    "container_memory_limit_bytes": 5368709120,
+    "cgroup_peak_bytes": 933609472,
+    "cgroup_limit_hits": 0,
+    "cgroup_oom": 0,
+    "cgroup_oom_kill": 5,
+    "container_restarts": 0,
+    "last_run_stop": "repeated_child_failure_after_three_SIGKILL",
+    "resolution": "Completed on host after PostgreSQL recovered; container memory peak was below 1 GiB with a 5 GiB limit, not its own cgroup limit exhaustion"
+  },
+  "cleanup": {
+    "demo_matching_container": "stopped, retained",
+    "host_matching_read_service_41886": "stopped",
+    "agents_read_service_41887": "stopped",
+    "demo_database_35437": "retained",
+    "host_worker": "completed and exited"
+  },
+  "limitation": "Verified only in the explicitly isolated local demo database. Production filling was not performed. Synthetic catalogue content is not independent evidence of matching quality."
 }

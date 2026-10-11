@@ -68,6 +68,13 @@ class TestingStore:
             for index, item in enumerate(items, 1):
                 item_id = f'{item["family"]}-L{item["level"]}-{index}'
                 if item_id in known:
+                    # Repair the historical flatten fixture's positional-args bug
+                    # only for the exact immutable seed, never generated content.
+                    for row in bank:
+                        if (row["item_id"] == item_id and row.get("origin") == "seed"
+                                and row["payload"].get("function_name") == "flatten"
+                                and row["payload"].get("tests", [{}])[0].get("args") == [[1, 2], [3]]):
+                            row["payload"]["tests"] = item["tests"]
                     continue
                 bank.append({"item_id": item_id, "family": item["family"], "level": item["level"],
                              "type": item["type"], "payload": item, "exposure_count": 0, "retired": False,

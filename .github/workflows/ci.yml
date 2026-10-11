@@ -50,14 +50,15 @@ jobs:
             -e "./services/testing-engine[dev]" \
             -e "./services/integration-engine[dev]" \
             -e "./services/agents-service[dev]" \
-            -e "./services/verification-engine[dev]"
+            -e "./services/verification-engine[dev]" \
+            -e "./services/code-judge[dev]"
       - name: Demo catalog contracts
         run: python -m pytest tests/fixtures/test_demo_catalog.py -q
       - name: Coverage gate regression tests
         run: python -m unittest discover -s tests/coverage-gates -p "test_*.py"
       - name: Unit coverage (database skips are reported, no full coverage claim)
         run: |
-          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine code-judge; do
             python tests/coverage-gates/python.py "$service" --unit || exit $?
           done
       - uses: actions/upload-artifact@v4
@@ -66,6 +67,45 @@ jobs:
           name: python-unit-coverage
           path: coverage/unit/
 
+
+  code-judge-isolation:
+    name: Code judge isolation (disposable runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CODE_JUDGE_IMAGE: python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+      CODE_JUDGE_DOCKER_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install isolated judge tests
+        run: pip install -e './services/code-judge[dev]'
+      - name: Preload immutable sandbox image
+        run: docker pull "$CODE_JUDGE_IMAGE"
+      - name: Verify real sandbox constraints and hostile synthetic submissions
+        run: python -m pytest services/code-judge/tests/test_docker_acceptance.py -q
+      - name: Build and verify authenticated broker image
+        env:
+          CODE_JUDGE_TOKEN: synthetic-ephemeral-ci-judge-token
+          CODE_JUDGE_URL: http://127.0.0.1:8106
+        run: |
+          docker build -t comit-code-judge-ci -f infra/code-judge.Dockerfile .
+          docker run -d --name comit-judge-ci --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            -e CODE_JUDGE_TOKEN -e CODE_JUDGE_IMAGE \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -p 127.0.0.1:8106:8106 comit-code-judge-ci
+          trap 'docker rm -f comit-judge-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$CODE_JUDGE_URL/healthz" >/dev/null; then break; fi
+            sleep 1
+          done
+          python services/code-judge/scripts/acceptance.py
 
   regression:
     name: Python regression suite (PostgreSQL)
@@ -100,10 +140,11 @@ jobs:
             -e "./services/testing-engine[dev]" \
             -e "./services/integration-engine[dev]" \
             -e "./services/agents-service[dev]" \
-            -e "./services/verification-engine[dev]"
+            -e "./services/verification-engine[dev]" \
+            -e "./services/code-judge[dev]"
       - name: Full backend tests and per-package coverage gates
         run: |
-          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine code-judge; do
             python tests/coverage-gates/python.py "$service" || exit $?
           done
       - uses: actions/upload-artifact@v4

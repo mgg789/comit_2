@@ -12,6 +12,7 @@ export function answerReady(task: TestingTask | null, answer: string | number | 
 /** Explain failures without displaying internal engine output or credentials. */
 export function testingError(error: unknown): string {
   if (error instanceof ApiError) {
+    if (error.status === 503) return "Проверка временно недоступна. Повторите отправку: ответ не засчитан и остаётся на экране.";
     if (error.status === 401) return "Войдите как кандидат, чтобы пройти тест.";
     if (error.status === 403) return "Эта попытка принадлежит другому аккаунту.";
     if (error.status === 409) return "Состояние попытки изменилось или срок повторного прохождения ещё не наступил. Обновите данные.";

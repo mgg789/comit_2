@@ -10,4 +10,3 @@ export function mergeResumeSuggestions(current: CandidateProfileFields, imported
   (["display_name", "city", "phone", "description", "primary_direction", "declared_grade", "work_types", "experience", "projects", "achievements"] as const).forEach(assign);
   return result;
 }
-

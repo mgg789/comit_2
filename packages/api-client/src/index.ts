@@ -1,3 +1,4 @@
+import type { CandidateSkillCatalog } from "@comit/shared";
 import type { TestingPreflight, TestingSpecialization, TestingStartRequest, TestingSession, TestingNextTask, TestingAnswerRequest, TestingAnswerReceipt, TestingSupervision, TestingMediaRequest, TestingResult } from "@comit/shared";
 /**
  * Minimal typed HTTP client for Comit services.
@@ -115,6 +116,7 @@ export interface ApiClient {
   /** Revoke this session, or all account sessions when all is true. */
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
+  getCandidateSkillCatalog(): Promise<CandidateSkillCatalog>;
   getCandidateProfile(): Promise<CandidateProfileView>;
   /** Read the last 30 Moscow calendar days of own confirmed test results. */
   getCandidateTestingHistory(): Promise<CandidateTestingHistory>;
@@ -346,6 +348,7 @@ export function createApiClient({
     verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
+    getCandidateSkillCatalog: () => request("GET", "/candidate/skills/catalog"),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
     testingPreflight: (specialization, mode = "retake") => request("GET", `/candidate/testing/preflight?specialization=${encodeURIComponent(specialization)}&mode=${mode}`),
     startTestingSession: body => request("POST", "/candidate/testing/sessions", body),

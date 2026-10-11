@@ -103,12 +103,24 @@ Editable narrative claims получают стабильный UUID на сер
 `GET /candidate/resume.pdf` используют account ID из сессии. `GET /candidate/taxonomy`
 отдаёт кандидату текущую strict-schema (`StrictSchema`) из matching-engine.
 
-Browser profile projection выдаёт `self_reported` без выдуманного UUID тестовой
-сессии. Контракт предусматривает будущий trusted producer, который заменит его на
-legacy `approved` с реальными `test_session_id` и `approved_at`; этот producer и
-его replacement contour текущим browser/API проходом не реализованы. Будущий
-producer обязан обновить authoritative evidence API и enqueue новый exact snapshot;
-прямой approved intake в matching не заменяет source. Self reported
+`GET /candidate/skills/catalog` возвращает `{version, schema_hash, skills}`.
+Каждый элемент `skills`: `{group, key, label, test_subject, confirmed_level,
+next_attempt_at, upgrade_at}`; даты — UTC ISO8601 или null, группа — `domains`,
+`stacks`, `soft_skills`. Registry берётся из `/internal/strict-schema` с cache
+30 секунд, результаты и cooldown — только текущего аккаунта из accepted ledger;
+ответ `no-store`. `401` — нет кандидатской сессии, `503` — каталог недоступен.
+Нет отдельного запроса preflight для каждого навыка: он вызывается перед запуском
+выбранного теста. Новый unknown coordinate → `400 unknown_skill_coordinate`;
+старые неизменённые значения допускают сохранение остальных полей.
+Подробности уровней, восстановления evidence и точного соответствия предметов —
+[candidate-profile.md](candidate-profile.md).
+
+Общая категория `declared_grade` остаётся `self_reported`, пока отдельный trusted
+результат направления не подтвердит её; browser не передаёт UUID тестовой сессии.
+Внутренний `/internal/testing/session-result` обновляет evidence и exact outbox
+атомарно. Семь предметных тестов подтверждают только собственную skill-координату,
+не общую профессию; legacy trusted результаты направлений читаются совместимо.
+Прямой approved intake в matching не заменяет source. Self reported
 grade допускается в пул при выполнении остальных требований, получает badge в
 public PDF, а в policy `main-v2` confidence `0.6` уменьшает только его rating
 contribution. Pending/rejected grade остаются блокирующими.

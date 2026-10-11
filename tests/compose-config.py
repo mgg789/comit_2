@@ -26,7 +26,12 @@ for n in ['api','auth-mail-worker']:
  assert s[n]['environment']['SMTP_HOST']=='host.docker.internal'
  assert s[n]['environment']['SMTP_PORT']=='2525'
  assert s[n]['environment']['SMTP_TLS_SERVERNAME']=='mail.droidje.com'
-d=cfg('infra/docker-compose.dev.yml',True,{'PATH':os.environ['PATH'],'HOME':os.environ['HOME']})
+dev_values={'PATH':os.environ['PATH'],'HOME':os.environ['HOME'],'CODE_JUDGE_URL':'http://isolated-judge.test:8106','CODE_JUDGE_TOKEN':'synthetic-config-only-judge-token'}
+d=cfg('infra/docker-compose.dev.yml',True,dev_values)
+assert d['services']['testing-engine']['environment']['CODE_JUDGE_URL']=='http://isolated-judge.test:8106'
+assert all('/var/run/docker.sock' not in str(v.get('volumes', [])) for v in d['services'].values())
+missing_judge=subprocess.run(['docker','compose','--env-file','/dev/null','-f','infra/docker-compose.dev.yml','--profile','dev','config','--quiet'],env={'PATH':os.environ['PATH'],'HOME':os.environ['HOME']},cwd=r,capture_output=True)
+assert missing_judge.returncode!=0
 assert d['services']['integration-engine']['environment']['APP_ENV']=='development'
 assert d['name']=='comit-dev';assert d['services']['api']['environment']['DEV_AUTH_EXPOSE_CODE']=='true'
 assert d['services']['api']['environment']['NODE_ENV']=='development'

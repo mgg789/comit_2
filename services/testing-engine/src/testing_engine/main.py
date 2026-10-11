@@ -4,14 +4,16 @@ import asyncio
 import json
 import os
 import secrets
+import weakref
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from testing_engine.blueprints import DEFAULT_BLUEPRINT_DIR, load_blueprints
-from testing_engine.judge import judge_answer
+from testing_engine.judge import CodeJudgeClient, judge_answer
 from testing_engine.publisher import TrustedGradePublisher
+from testing_engine.rubric import RubricJudge
 from testing_engine.supervision import (
     CAMERA_GRANTED,
     MEDIA_RETENTION_DAYS,
@@ -71,10 +73,8 @@ def create_app(blueprint_dir: Path | None = None) -> FastAPI:
 def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: bool = False) -> FastAPI:
     """Adaptive grade-test contour: sessions, next-task selection, scoring.
 
-    Skeleton pass (docs/testing-design.md P1): MCQ answers are scored inline;
-    code and extended answers are recorded and deferred to the code-judge
-    service (judging lands with the judge modules). The bank is seeded from
-    bank_seed.initial_items() on first start.
+    Code runs only in the isolated broker. Extended answers use a typed rubric
+    provider. Unavailable judges never consume an answer or update the grade.
     """
     import uuid
 
@@ -91,6 +91,16 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         os.environ.get("TESTING_DATA_DIR", Path.cwd() / "data" / "testing"))
     store = TestingStore(resolved_data)
     store.seed_items(initial_items())
+    owner_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
+
+    async def capabilities(specialization: str) -> dict:
+        code_required = specialization in ("algorithms", "python")
+        code_ready = await asyncio.to_thread(CodeJudgeClient().ready) if code_required else False
+        text_configured = RubricJudge().configured()
+        return {"code_required": code_required, "code_ready": code_ready,
+                "text_configured": text_configured,
+                "types": ["mcq", "short_answer"] + (["code"] if code_ready else []) +
+                         (["extended"] if text_configured else [])}
 
     @app.on_event("startup")
     async def start_retention():
@@ -127,6 +137,11 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             request.state.candidate_key = request.headers.get("x-candidate-id")
             if token and not request.state.candidate_key:
                 return JSONResponse({"detail": "candidate_required"}, status_code=403)
+            # Serialize the owner's file-backed session mutations across awaits:
+            # answer retries, media, supervision and next-task cannot lose writes.
+            lock = owner_locks.setdefault(request.state.candidate_key or "offline", asyncio.Lock())
+            async with lock:
+                return await call_next(request)
         return await call_next(request)
 
 
@@ -141,6 +156,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         supported = [row["family"] for row in FAMILIES]
         if specialization not in supported:
             raise HTTPException(status_code=422, detail="unsupported_specialization")
+        judges = await capabilities(specialization)
         attempts = [json.loads(path.read_text()) for path in store.sessions_dir.glob("*.json")]
         own = [row for row in attempts if row["candidate_key"] == request.state.candidate_key
                and row["specialization"] == specialization]
@@ -155,7 +171,10 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         last = max(own, key=lambda row: row["created_at"], default=None)
         eligible_at = datetime.fromisoformat(last["created_at"]) + timedelta(days=7) if last else None
         return {"specialization": specialization, "supported_specializations": supported,
-                "eligible": not active and (eligible_at is None or datetime.now(UTC) >= eligible_at),
+                "eligible": not active and (eligible_at is None or datetime.now(UTC) >= eligible_at)
+                    and (not judges["code_required"] or judges["code_ready"]),
+                "judges": judges,
+                "unavailable_reason": "code_judge_unavailable" if judges["code_required"] and not judges["code_ready"] else None,
                 "next_attempt_at": eligible_at.isoformat() if eligible_at else None,
                 "active_session_id": active["session_id"] if active else None,
                 "active_session_consents": active.get("consents") if active else None,
@@ -165,7 +184,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                 "next_sequence": max(media_sequences, default=-1) + 1,
                 "recording_enabled": os.environ.get("TESTING_RECORDING_MODE", "off") == "full",
                 "active_recording_enabled": bool(active and active.get("recording_mode") == "full"),
-                "max_questions": 30, "supported_question_types": ["mcq", "short_answer"],
+                "max_questions": 30, "supported_question_types": judges["types"],
                 "active_session_status": active["status"] if active else None}
 
     @app.post("/testing/sessions", tags=["sessions"])
@@ -192,6 +211,8 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                 eligible = datetime.fromisoformat(previous["created_at"]) + timedelta(days=7)
                 if datetime.now(UTC) < eligible:
                     raise HTTPException(status_code=409, detail="retake_cooldown")
+            if specialization in ("algorithms", "python") and not await asyncio.to_thread(CodeJudgeClient().ready):
+                raise HTTPException(status_code=503, detail="code_judge_unavailable")
         session_id = store.create_session(candidate_key, specialization,
                                           declared_grade if isinstance(declared_grade, str) else None)
         session = store.read_session(session_id)
@@ -230,18 +251,35 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         if pending:
             record = {key: value for key, value in pending["payload"].items()
                       if key not in ("answer_index", "tests", "rubric", "expected_answers", "exposure_count")}
-            return {"session_id": session_id, "answered": state.answered, "decided_grade": None, "task": record}
-        candidates = store.list_items(_family_for(session["specialization"]), state.next_level)
-        if request.state.candidate_key:
-            candidates = [row for row in candidates if row["type"] in ("mcq", "short_answer")]
+            return {"session_id": session_id, "answered": state.answered, "decided_grade": None,
+                    "task": record, "pending_answer": pending.get("pending_answer")}
+        family = _family_for(session["specialization"])
+        forced_code = bool(request.state.candidate_key and family in ("algorithms", "python") and len(session["items"]) == 1)
+        code_ready = await asyncio.to_thread(CodeJudgeClient().ready) if forced_code else False
+        if forced_code and not code_ready:
+            raise HTTPException(status_code=503, detail="code_judge_unavailable")
+        allowed = {"mcq", "short_answer"}
+        text_configured = RubricJudge().configured()
+        if text_configured and session["items"]:
+            allowed.add("extended")
+        if code_ready:
+            allowed.add("code")
+        extended_slot = 2 if family in ("algorithms", "python") else 1
+        forced_extended = bool(text_configured and len(session["items"]) == extended_slot and any(
+            row["type"] == "extended" for level in LEVELS for row in store.list_items(family, level, limit=100)))
+        def usable(row: dict) -> bool:
+            if forced_code:
+                return row["type"] == "code"
+            return row["type"] == "extended" if forced_extended else row["type"] in allowed
+        candidates = [row for row in store.list_items(family, state.next_level, limit=100) if usable(row)]
         presented = {row["item_id"] for row in session["items"]}
         item = next((row for row in candidates if row["item_id"] not in presented), None)
         if item is None:
             for level in LEVELS:
                 if level == state.next_level:
                     continue
-                for row in store.list_items(_family_for(session["specialization"]), level):
-                    if request.state.candidate_key and row["type"] not in ("mcq", "short_answer"):
+                for row in store.list_items(family, level, limit=100):
+                    if not usable(row):
                         continue
                     if row["item_id"] not in presented:
                         item = row
@@ -251,7 +289,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         if item is None or len(session["items"]) >= 30:
             # Bank exhausted for this family: finish with the posterior leader
             # when at least one auto-scored answer exists, else stay unclear.
-            answered_mcq = sum(1 for row in session["items"] if row["judge_status"] == "auto")
+            answered_mcq = sum(1 for row in session["items"] if type(row["correct"]) is bool)
             grade = adaptive.decided_grade(state) if answered_mcq else None
             if grade is None and answered_mcq:
                 grade = adaptive.GRADES[max(range(len(state.posterior)),
@@ -276,7 +314,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                                  "judge_status": "presented", "answered_at": None})
         store.write_session(session)
         return {"session_id": session_id, "answered": state.answered,
-                "decided_grade": adaptive.decided_grade(state), "task": record}
+                "decided_grade": adaptive.decided_grade(state), "task": record, "pending_answer": None}
 
     @app.post("/testing/sessions/{session_id}/answer", tags=["sessions"])
     async def submit_answer(session_id: str, body: dict, request: Request) -> dict:
@@ -302,10 +340,17 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             raise HTTPException(status_code=422, detail="invalid_answer")
         if len(answer_text) > 20000:
             raise HTTPException(status_code=422, detail="answer_too_large")
+        if "pending_answer" in presented and presented["pending_answer"] != answer_text:
+            raise HTTPException(status_code=409, detail="answer_conflict")
         if payload["type"] == "mcq":
             correct, judge_status = (presented.get("presented_answer") == answer), "auto"
         else:
-            correct, judge_status = judge_answer(payload, answer_text)
+            presented["pending_answer"] = answer_text
+            store.write_session(session)
+            correct, judge_status = await asyncio.to_thread(judge_answer, payload, answer_text, owner=session["candidate_key"],
+                key=session_id + ":" + item_id, cache_dir=resolved_data / "rubric-cache")
+        if correct is None:
+            raise HTTPException(status_code=503, detail=judge_status)
         if correct is not None:
             adaptive.update(state, payload["level"], correct)
         store.bump_exposure(item_id)

@@ -21,6 +21,7 @@
 .testing-consents { margin-top: 42rem; padding: 22rem 28rem; border-radius: 20rem; background: var(--employer-paint-2f2f2d); display: grid; gap: 18rem; font-size: 20rem; }
 .testing-consents label { display: flex; align-items: start; gap: 14rem; cursor: pointer; }
 .testing-legal { border: 0; background: transparent; color: var(--employer-blue); text-align: left; cursor: pointer; font: inherit; text-decoration: underline; }
+.testing-fullscreen-action { display: flex; justify-content: center; }
 .testing-safe-exit { font-size: 18rem; color: var(--comit-text-muted); margin: 20rem 0; text-align: center; }
 .testing-footer, .testing-dialog-actions { display: flex; gap: 24rem; justify-content: center; margin-top: 28rem; flex-wrap: wrap; }
 .testing-footer .action { min-width: 250rem; }

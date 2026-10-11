@@ -1,33 +1,43 @@
 import { useState } from "react";
-import type { CandidateClaimEvidence, TestingSpecialization } from "@comit/shared";
+import { type CandidateSkillCatalogItem, type TestingPreflight, skillLevelLabel } from "@comit/shared";
 import { Dialog } from "@comit/ui-kit/app-shell";
-import { Action, Checkbox, Select } from "@comit/ui-kit/design";
+import { Action } from "@comit/ui-kit/design";
+import { api, errorText } from "./runtime";
 
-/** Exact question-bank subjects; a subject grade never stands in for a whole profession. */
-export const testingSubjects: Record<TestingSpecialization, string> = { algorithms: "Алгоритмы", sql: "SQL", rest_api: "REST API", python: "Python", react: "React", docker: "Docker", teamwork: "Работа в команде" };
-/** Only known skill aliases receive direct test actions; unsupported claims stay self-reported. */
-export function skillTestSubject(key: string): TestingSpecialization | null {
-  const normalized = key.toLowerCase().replace(/[\s._-]/g, "");
-  const aliases: Record<string, TestingSpecialization> = { algorithms: "algorithms", алгоритмы: "algorithms", sql: "sql", restapi: "rest_api", rest: "rest_api", python: "python", react: "react", reactjs: "react", docker: "docker", teamwork: "teamwork", работавкоманде: "teamwork" };
-  return aliases[normalized] ?? null;
-}
-/** Render only a known server-confirmed grade, never session IDs or raw evidence. */
-export function confirmedTestGrade(evidence: CandidateClaimEvidence | undefined): string | null {
-  const value = evidence?.verified_value;
-  if (evidence?.status !== "confirmed" || !value || typeof value !== "object" || Array.isArray(value)) return null;
-  const names: Record<string, string> = { intern: "Стажёр", junior: "Junior", middle: "Middle", senior: "Senior" };
-  return typeof value.grade === "string" ? names[value.grade] ?? null : null;
+/** Conservative action uses the accepted result and server-owned upgrade cooldown. */
+export function skillTestAction(skill: CandidateSkillCatalogItem, now = Date.now()): { label: string; disabled: boolean; mode: "retake" | "upgrade" } {
+  const mode = skill.confirmed_level === null ? "retake" : "upgrade";
+  if (!skill.test_subject) return { label: "Пока нет теста", disabled: true, mode };
+  const availableAt = mode === "upgrade" ? skill.upgrade_at : skill.next_attempt_at;
+  const days = availableAt ? Math.ceil((Date.parse(availableAt) - now) / 86400000) : 0;
+  return { label: days > 0 ? `Тест через ${days} дн.` : mode === "upgrade" ? "Улучшить" : "Подтвердить", disabled: days > 0, mode };
 }
 
-/** Confirm the subject before navigating to preparation; this action does not consume an attempt. */
-export function TestingLaunch({ subject, compact = false }: { subject?: TestingSpecialization; compact?: boolean }) {
-  const [upgrade, setUpgrade] = useState(false);
-  const [open, setOpen] = useState(false), [selected, setSelected] = useState<TestingSpecialization>(subject ?? "algorithms");
+/** Fixed-coordinate launch, revalidated with the authoritative engine before navigation. */
+export function TestingLaunch({ skill }: { skill: CandidateSkillCatalogItem }) {
+  const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
+  const [preflight, setPreflight] = useState<TestingPreflight | null>(null), [error, setError] = useState<string | null>(null);
+  const action = skillTestAction(skill);
+  async function prepare() {
+    if (!skill.test_subject) return;
+    setOpen(true); setBusy(true); setError(null); setPreflight(null);
+    try { setPreflight(await api.testingPreflight(skill.test_subject, action.mode)); }
+    catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+  }
   function launch() {
+    if (!skill.test_subject || !preflight?.eligible) return;
     const target = new URL("/testing/", window.location.origin);
     if (import.meta.env.DEV && window.location.port === "5173") target.port = "5175";
-    target.searchParams.set("mode", upgrade ? "upgrade" : "retake"); target.searchParams.set("subject", selected); target.searchParams.set("ready", "1");
+    target.searchParams.set("mode", action.mode); target.searchParams.set("subject", skill.test_subject); target.searchParams.set("ready", "1");
     window.location.assign(target.href);
   }
-  return <><Action className={compact ? "candidate-skill-test" : ""} variant="light" onClick={() => setOpen(true)}>Подтвердить грейд</Action>{open && <Dialog title="Готовы пройти тест?" close={() => setOpen(false)}>{!subject && <Select aria-label="Что проверяем" value={selected} onChange={event => { const value = event.target.value; if (Object.hasOwn(testingSubjects,value)) setSelected(value as TestingSpecialization); }}>{Object.entries(testingSubjects).map(([key,label]) => <option key={key} value={key}>{label}</option>)}</Select>}<p>Тест по направлению «{testingSubjects[selected]}»: меньше 36 вопросов с выбором и вводом ответа. Результат подтвердит уровень именно по этому направлению.</p><label className="candidate-test-upgrade"><Checkbox checked={upgrade} onChange={event => setUpgrade(event.target.checked)} /> Хочу повысить ранее подтверждённый грейд</label><p>Повторная проверка доступна через 7 дней, повышение грейда — через 30 дней после предыдущего результата.</p><p>На следующем экране подключите показ всего экрана и, по желанию, камеру. До нажатия «Начать» можно уйти без потери попытки.</p><div className="form-actions"><Action onClick={() => setOpen(false)}>Не сейчас</Action><Action variant="primary" onClick={launch}>Готов, продолжить</Action></div></Dialog>}</>;
+  return <><Action className="candidate-skill-test" variant="light" disabled={action.disabled} onClick={() => void prepare()}>{action.label}</Action>{open && <Dialog size="wide" title={`Проверка навыка: ${skill.label}`} close={() => setOpen(false)}>
+    <p>Результат подтвердит уровень именно навыка «{skill.label}». Тест определяет Intern, Junior, Middle или Senior.</p>
+    {skill.confirmed_level !== null && <p>Подтверждённый уровень: {skillLevelLabel(skill.confirmed_level)}.</p>}
+    <p>До 30 вопросов. Для прохождения нужен показ всего экрана; камеру можно подключить по желанию. До нажатия «Начать» можно уйти без потери попытки.</p>
+    <p>Повторная проверка доступна через 7 дней, повышение — через 30 дней после принятого результата.</p>
+    {busy && <p role="status">Проверяем доступность теста…</p>}{error && <p role="alert">{error}</p>}
+    {preflight && !preflight.eligible && <p role="status">{preflight.unavailable_reason ? "Проверка кода временно недоступна. Попробуйте позже — попытка ещё не начата." : `Тест пока недоступен${preflight.next_attempt_at ? ` до ${new Date(preflight.next_attempt_at).toLocaleDateString("ru-RU")}` : ""}.`}</p>}
+    <div className="form-actions"><Action onClick={() => setOpen(false)}>Не сейчас</Action>{error ? <Action onClick={() => void prepare()}>Повторить</Action> : <Action variant="primary" disabled={busy || !preflight?.eligible} onClick={launch}>Готов, продолжить</Action>}</div>
+  </Dialog>}</>;
 }

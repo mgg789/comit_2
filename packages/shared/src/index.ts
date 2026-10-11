@@ -130,3 +130,5 @@ export type { ResumeImportRequest, ResumeImportResult } from "./resume-import.js
 export type { WeeklyQuestion, WeeklyChallengeView, WeeklyChallengeAnswer } from "./weekly-challenge.js";
 
 export type { FspLinkStatus, FspDemoAuthorization, FspDemoApproval } from "./fsp-link.js";
+
+export * from "./skill-catalog.js";

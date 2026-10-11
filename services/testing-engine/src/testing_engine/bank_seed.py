@@ -110,7 +110,7 @@ def initial_items() -> list[dict]:
              ["4", "1", "0", "Ошибку"], 0),
         _code(p, 2, "Реализуйте flatten(nested): плоский список из списка списков.",
               "flatten",
-              [{"args": [[1, 2], [3]], "expected": [1, 2, 3]},
+              [{"args": [[[1, 2], [3]]], "expected": [1, 2, 3]},
                {"args": [[]], "expected": []}]),
         _code(p, 3, "Реализуйте word_counts(text): словарь частот слов в нижнем регистре.",
               "word_counts",

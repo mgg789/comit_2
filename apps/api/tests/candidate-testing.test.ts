@@ -26,10 +26,16 @@ test("proxy derives candidate owner, blocks missing consent and never forwards l
   const calls: Array<{ url: string; options?: RequestInit }> = [];
   const transport: typeof fetch = async (url, options) => {
     calls.push({ url: String(url), options });
+    if (String(url).endsWith("/next")) return Response.json({
+      session_id: "s-20261011120000123456", answered: 1, decided_grade: null,
+      pending_answer: "def solve(n): return n * 2",
+      task: { item_id: "code-1", family: "python", level: 2, type: "code", prompt: "Double n", function_name: "solve" },
+    });
     if (String(url).includes("/testing/preflight")) return Response.json({
       specialization: "react", supported_specializations: ["react"], eligible: false, next_attempt_at: null,
       active_session_id: "s-20261011120000123456", active_session_status: "active", next_sequence: 4,
-      recording_enabled: true, active_recording_enabled: true, max_questions: 30, supported_question_types: ["mcq", "short_answer"],
+      recording_enabled: true, active_recording_enabled: true, max_questions: 30, supported_question_types: ["mcq", "short_answer", "code", "extended"],
+      judges: { code_required: false, code_ready: true, text_configured: true, types: ["mcq", "short_answer", "code", "extended"] }, unavailable_reason: null,
       active_session_consents: { version: "testing-media-v1", processing: true, screen_recording: true, video_analysis: false,
         accepted_at: new Date().toISOString(), retention_days: 90 },
       active_supervision: { total_seconds: 20, in_frame_seconds: 0, focus_lost_seconds: 2,
@@ -59,6 +65,13 @@ test("proxy derives candidate owner, blocks missing consent and never forwards l
     const resumed = await app.inject({ url: "/candidate/testing/preflight?specialization=react", headers });
     assert.equal(resumed.statusCode, 200);
     assert.equal(resumed.json().next_sequence, 4);
+    assert.deepEqual(resumed.json().supported_question_types, ["mcq", "short_answer", "code", "extended"]);
+    assert.equal(resumed.json().judges.code_ready, true);
+    assert.equal(resumed.json().unavailable_reason, null);
+    const pending = await app.inject({ url: "/candidate/testing/sessions/s-20261011120000123456/next", headers });
+    assert.equal(pending.statusCode, 200);
+    assert.equal(pending.json().pending_answer, "def solve(n): return n * 2");
+    assert.equal(pending.json().task.type, "code");
     assert.deepEqual(resumed.json().active_supervision, { total_seconds: 20, in_frame_seconds: 0,
       focus_lost_seconds: 2, multi_face_events: 0, camera: "denied" });
     assert.equal((await app.inject({ method: "POST", url: "/candidate/testing/sessions", headers: { ...headers, origin: "https://evil.example" },

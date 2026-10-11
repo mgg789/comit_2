@@ -18,7 +18,7 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-from testing_engine.judge import LocalPythonJudge
+from testing_engine.judge import CodeJudgeClient
 
 MIN_STOCK_PER_SLOT = 5
 FAMILY_BLUEPRINTS = {
@@ -136,7 +136,7 @@ def validate_item(item: dict, existing_prompts: set[str]) -> list[str]:
         if not isinstance(reference, str) or not reference:
             problems.append("code_needs_reference_solution")
         else:
-            correct, verdict = LocalPythonJudge().judge(item, reference)
+            correct, verdict = CodeJudgeClient().judge(item, reference)
             if correct is not True:
                 problems.append(f"reference_solution_failed:{verdict}")
     elif task_type == "extended":

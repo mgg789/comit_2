@@ -10,6 +10,7 @@ import cookie from "@fastify/cookie";
 import { Pool } from "pg";
 import { loadAuthConfig } from "../../src/auth/config.js";
 import { AuthStore } from "../../src/auth/store.js";
+import { fixtureSkillCatalog } from "./skill-catalog.js";
 import { ProfileStore } from "../../src/profiles/store.js";
 import { authRoutes } from "../../src/routes/auth.js";
 import { candidateProfileRoutes } from "../../src/routes/candidate-profile.js";
@@ -42,8 +43,8 @@ export async function startTestingBrowserFixture(databaseUrl: string, ports?: { 
   const candidateId = randomUUID();
   await pool.query(`INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)
     VALUES($1,'selftest@example.invalid','candidate',true,'account-v1',now())`, [candidateId]);
-  const profiles = new ProfileStore(pool);
-  await profiles.save(candidateId, { expected_revision: 0, fields: { display_name: "Демо Кандидат", primary_direction: "frontend", declared_grade: "middle" }, consent: {processing:true,pool:false,version:"profile-v1"} });
+  const profiles = new ProfileStore(pool, fixtureSkillCatalog);
+  await profiles.save(candidateId, { expected_revision: 0, fields: { display_name: "Демо Кандидат", primary_direction: "frontend", declared_grade: "middle", stacks: [{ key: "react", level: 4 }] }, consent: {processing:true,pool:false,version:"profile-v1"} });
   const root = resolve(new URL("../../../../", import.meta.url).pathname);
   mediaDir = await mkdtemp(join(tmpdir(), "comit-testing-fixture-"));
   const enginePort = ports?.engine ?? await freePort();

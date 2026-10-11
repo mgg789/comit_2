@@ -2,7 +2,9 @@
 export type TestingSpecialization = "algorithms" | "sql" | "rest_api" | "python" | "react" | "docker" | "teamwork";
 export type TestingGrade = "intern" | "junior" | "middle" | "senior";
 export interface TestingPreflight {
-  supported_question_types: Array<"mcq" | "short_answer">; active_session_status: "active" | "finished" | null;
+  supported_question_types: Array<TestingTask["type"]>; active_session_status: "active" | "finished" | null;
+  judges?: { code_required: boolean; code_ready: boolean; text_configured: boolean; types: Array<TestingTask["type"]> };
+  unavailable_reason?: "code_judge_unavailable" | null;
   specialization: TestingSpecialization; supported_specializations: TestingSpecialization[];
   eligible: boolean; next_attempt_at: string | null; upgrade_at: string | null;
   active_supervision: TestingSupervision | null;
@@ -18,7 +20,7 @@ export interface TestingTask {
   item_id: string; family: string; level: number; type: "mcq" | "short_answer" | "code" | "extended";
   prompt: string; options?: string[]; function_name?: string;
 }
-export interface TestingNextTask { session_id: string; answered: number; decided_grade: TestingGrade | null; task: TestingTask }
+export interface TestingNextTask { pending_answer?: string | null; session_id: string; answered: number; decided_grade: TestingGrade | null; task: TestingTask }
 export interface TestingAnswerRequest { item_id: string; answer: string | number }
 export interface TestingAnswerReceipt extends TestingSession { answered: number; correct: boolean | null; judge_status: string; decided_grade: TestingGrade | null }
 export interface TestingSupervision {
