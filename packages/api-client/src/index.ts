@@ -15,7 +15,7 @@ import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutat
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
-  AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
+  AgentsJobView, AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -134,6 +134,12 @@ export interface ApiClient {
   listVacancies(limit?: number, cursor?: string, offset?: number): Promise<AgentsDraftPage>;
   /** Create an editable source draft without approving or publishing it. */
   createVacancy(body: AgentsDraftCreate): Promise<AgentsDraftView>;
+  /** Queue cached requirement suggestions for the exact owned draft revision. */
+  enrichVacancy(draftId: string, expectedRevision: number): Promise<AgentsJobView>;
+  /** Read the state of an owner-scoped durable agent job. */
+  getAgentJob(jobId: string): Promise<AgentsJobView>;
+  /** Retry an owner-scoped failed job using the server retry policy. */
+  retryAgentJob(jobId: string): Promise<AgentsJobView>;
   /** Read a managed vacancy, including archived audit status. */
   getVacancy(draftId: string): Promise<AgentsDraftView>;
   /** Stage a revision-checked edit; publishing requires a new approved summary. */
@@ -359,6 +365,9 @@ export function createApiClient({
     getAgentCapabilities: () => request("GET", "/employer/agents/capabilities"),
     listVacancies: (limit = 50, cursor, offset = 0) => request("GET", `/employer/vacancies?limit=${limit}&offset=${offset}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
     createVacancy: body => request("POST", "/employer/vacancies", body),
+    enrichVacancy: (id, revision) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(id)}/enrich`, { expected_revision: revision }),
+    getAgentJob: id => request("GET", `/employer/agents/jobs/${encodeURIComponent(id)}`),
+    retryAgentJob: id => request("POST", `/employer/agents/jobs/${encodeURIComponent(id)}/retry`, {}),
     getVacancy: draftId => request("GET", `/employer/vacancies/${encodeURIComponent(draftId)}`),
     patchVacancy: (draftId, body) => request("PATCH", `/employer/vacancies/${encodeURIComponent(draftId)}`, body),
     approveVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/approve`, { expected_revision: expectedRevision }),

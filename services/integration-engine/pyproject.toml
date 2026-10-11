@@ -1,4 +1,5 @@
 [project]
+license = { text = "Apache-2.0" }
 name = "integration-engine"
 version = "0.1.0"
 description = "Comit integration engine: external data verification (FSP registry etc.) + demo mock registries"

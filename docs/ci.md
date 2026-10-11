@@ -162,3 +162,7 @@ PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, пуб
 Локальное измерение 11.10.2026: 34 теста testing-engine, 79,74% строк / 69,80%
 ветвей; штатный gate 75% / 60% пройден. Это покрытие этого сервиса, не всего UI
 и не проверка физических устройств пользователя.
+
+## Проверки пакета завершения
+
+CI также запускает unit-контракт demo-каталога, frontend merge-resume regression и все `apps/api/tests/*.test.ts`, включая FSP/weekly/import. API coverage runner автоматически создаёт отдельные временные БД для новых `*_TEST_DATABASE_URL`. Полный результат текущего пакета — [package-validation.md](package-validation.md).

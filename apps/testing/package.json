@@ -26,5 +26,10 @@
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mgg789/comit_2.git"
   }
 }

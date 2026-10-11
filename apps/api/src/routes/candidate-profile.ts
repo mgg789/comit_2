@@ -5,6 +5,7 @@ import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { ProfileStore } from "../profiles/store.js";
 import { candidateProfileMutationSchema, candidateProfileViewSchema } from "../profiles/schemas.js";
+import { candidateResumeImportRoutes } from "./candidate-resume-import.js";
 import { candidateVerificationRoutes } from "./candidate-verification.js";
 
 /** Shared auth and database boundaries are injected; the browser cannot choose a profile owner. */
@@ -62,6 +63,7 @@ export async function candidateProfileRoutes(app: FastifyInstance, options: Cand
     catch (error) { return failure(reply, error); }
   });
   await candidateVerificationRoutes(app, options);
+  await candidateResumeImportRoutes(app, options);
 }
 
 function failure(reply: FastifyReply, error: unknown): FastifyReply {

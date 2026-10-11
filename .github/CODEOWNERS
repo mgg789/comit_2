@@ -1,0 +1,12 @@
+# Last matching rule wins. GitHub usernames only; roles are in docs/team.md.
+* @mgg789
+/apps/candidate/ @Raipus
+/apps/employer/ @Raipus
+/apps/testing/ @Raipus
+/apps/welcome/ @Raipus
+/packages/ui-kit/ @Raipus
+/docs/design/ @mgg789 @IlyaPum
+/context/20-product-vision.md @mgg789 @IlyaPum
+/context/95-beyond-mvp.md @mgg789 @IlyaPum
+/docs/economics.md @mgg789 @IlyaPum
+/.github/CODEOWNERS @mgg789

@@ -150,7 +150,7 @@ class NarrativeClaim(Contract):
 class ExternalEvidence(Contract):
     """Safe provider fact copied from API source projection; no account ownership claim."""
 
-    kind: Literal["fsp", "repository", "hh"]
+    kind: Literal["fsp", "repository", "hh", "weekly_challenge"]
     subject: str = Field(min_length=1, max_length=2000)
     status: ClaimStatus
     verified_value: JsonValue | None = None

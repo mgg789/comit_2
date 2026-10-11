@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-10-11T01:23:12.170310+00:00",
+  "catalog": "comit-demo-2026-v1",
+  "scope": "isolated local PostgreSQL and real Harrier CPU workers",
+  "source_candidates": 240,
+  "source_employers": 16,
+  "source_vacancies": 48,
+  "rerun_candidates_created": 0,
+  "source_profile_max_revision": 1,
+  "mail_jobs": 0,
+  "confirmed_evidence": 0,
+  "real_public_showcase": {
+    "candidates": 3,
+    "vacancies": 1
+  },
+  "candidate_states": {
+    "ready": 3,
+    "processing": 1,
+    "queued": 236
+  },
+  "vacancy_states": {
+    "ready": 1,
+    "queued": 47
+  },
+  "synthetic_vectors": false,
+  "production_writes": false,
+  "limitation": "Only a bounded sample was published. Initial 3 GiB worker exceeded its container memory limit; bounded passes succeeded with 5 GiB. Interrupted lease is recoverable by the normal worker; remaining records were not claimed ready."
+}

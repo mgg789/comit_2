@@ -13,6 +13,7 @@ import type {
   InvitationTerms,
   JsonValue,
   PublicTestingResult,
+  WeeklyChallengeView, WeeklyChallengeAnswer,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
 import {
@@ -23,6 +24,8 @@ import {
   type ProjectionAccount,
   type ProjectionConsent,
 } from "./projection.js";
+
+import { weeklyWindow, weeklyTasks, weeklyView, type WeeklyTask } from "./weekly-challenge.js";
 
 const PROFILE_CONSENT_VERSION = "profile-v1";
 const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
@@ -319,7 +322,7 @@ function externalEvidenceRows(fields: CandidateProfileFields, previous: Map<stri
       const subject = row.evidence_key.slice("external:fsp:".length).split(":");
       return subject[0] === fields.fsp_id && (!subject[1] || subject[1] === fields.fsp_claim_id);
     }
-    if (row.evidence_key.startsWith("external:hh:")) return true;
+    if (row.evidence_key.startsWith("external:hh:") || row.evidence_key === "external:weekly_challenge:current") return true;
     const subject = row.evidence_key.slice("external:repository:".length);
     const parts = subject.split(":");
     if (parts.length !== 2 || !NARRATIVE_GROUPS.includes(parts[0] as typeof NARRATIVE_GROUPS[number])) return false;
@@ -913,6 +916,37 @@ export class CandidateProfileStore {
     );
     if (result.rowCount !== 1) throw new Error("projection lease is no longer valid");
   }
+  /** Start/read/submit weekly practice under the account+profile locks; one reward per UTC week. */
+  public async weeklyChallenge(accountId: string, operation: "read" | "start" | "submit", input?: WeeklyChallengeAnswer, now = new Date()): Promise<WeeklyChallengeView> {
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, accountId, true);
+      const profile = await profileRow(client, accountId, true);
+      if (!profile) throw new ProfileError(404, "profile_not_found");
+      if (!profile.processing_consent) throw new ProfileError(409, "processing_consent_required");
+      const { week, expires } = weeklyWindow(now);
+      if (operation === "submit" && input?.week !== week) throw new ProfileError(409, "weekly_task_expired");
+      if (operation === "start") await client.query(`INSERT INTO candidate_weekly_challenges(candidate_id,week,expires_at,questions)
+        VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING`, [accountId,week,expires,JSON.stringify(weeklyTasks(accountId,week))]);
+      const row = (await client.query<{ questions: WeeklyTask[]; correct: number | null; completed_at: Date | null }>(
+        "SELECT questions,correct,completed_at FROM candidate_weekly_challenges WHERE candidate_id=$1 AND week=$2 FOR UPDATE",[accountId,week])).rows[0];
+      if (operation !== "submit" || row?.completed_at) return weeklyView(week,expires,row);
+      if (!row || !input) throw new ProfileError(409,"weekly_task_not_started");
+      if (Object.keys(input.answers).length !== row.questions.length || row.questions.some(q => !q.choices.includes(input.answers[q.id] ?? ""))) throw new ProfileError(400,"weekly_answers_invalid");
+      const correct = row.questions.filter(q => q.answer === input.answers[q.id]).length;
+      await client.query("UPDATE candidate_weekly_challenges SET answers=$3::jsonb,correct=$4,completed_at=$5 WHERE candidate_id=$1 AND week=$2",[accountId,week,JSON.stringify(input.answers),correct,now]);
+      if (correct >= 2) {
+        const value = { completed_at: now.toISOString(), expires_at: expires.toISOString(), provider: "comit_weekly_challenge:v1" };
+        await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+          VALUES($1,'external:weekly_challenge:current',$2,'confirmed',$3::jsonb,'["comit_weekly_challenge:v1"]'::jsonb,$4)
+          ON CONFLICT(candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+          [accountId,createHash("sha256").update(week).digest("hex"),JSON.stringify(value),now]);
+        const refreshed = (await client.query<ProfileRow>("UPDATE candidate_profiles SET revision=revision+1,updated_at=now() WHERE candidate_id=$1 RETURNING *",[accountId])).rows[0]!;
+        await enqueue(client,account,refreshed,await evidenceFor(client,accountId));
+      }
+      return weeklyView(week,expires,{...row,correct,completed_at:now});
+    });
+  }
+
   /** Accept a trusted finished session atomically with evidence and matching projection.
    * Identical publisher retries never add another activity; cross-owner/session reuse fails closed.
    */

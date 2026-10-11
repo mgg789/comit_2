@@ -177,12 +177,12 @@ export function projectCandidateIntake(
   const map = evidenceMap(evidenceRows);
   const declaredGrade = fields.declared_grade ?? null;
   const externalEvidence = evidenceRows.flatMap(row => {
-    const match = /^(external:(?:fsp|repository|hh)):(.+)$/.exec(row.evidence_key);
+    const match = /^(external:(?:fsp|repository|hh|weekly_challenge)):(.+)$/.exec(row.evidence_key);
     if (!match) return [];
     const subject = match[2];
     const prefix = match[1];
     if (!subject || !prefix) return [];
-    return [{ kind: prefix.slice("external:".length) as "fsp" | "repository" | "hh", subject,
+    return [{ kind: prefix.slice("external:".length) as "fsp" | "repository" | "hh" | "weekly_challenge", subject,
       // External input is kept in the evidence hash, while the provider result is already server-bound.
       status: row.status, verified_value: row.verified_value }];
   });

@@ -236,4 +236,6 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     register_organization_routes(app, owner, database, capability_check=require_optional)
     from agents_service.organization_documents import register_document_routes
     register_document_routes(app, owner, database)
+    from agents_service.resume_import import register_resume_routes
+    register_resume_routes(app, owner)
     return app

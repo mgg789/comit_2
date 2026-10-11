@@ -32,7 +32,7 @@ jobs:
           pnpm --filter @comit/web-testing test
           pnpm --filter @comit/ui-kit test
           pnpm --filter @comit/web-employer test
-          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts ../candidate/tests/testing-launch.test.ts
+          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts ../candidate/tests/testing-launch.test.ts ../candidate/tests/resume-import-model.test.ts
 
   python:
     name: Python services tests
@@ -41,6 +41,8 @@ jobs:
       image: python:3.12-bookworm
     steps:
       - uses: actions/checkout@v5
+      - name: Install local OCR runtime
+        run: apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-rus
       - name: Install services with dev deps
         run: |
           pip install --no-cache-dir \
@@ -49,6 +51,8 @@ jobs:
             -e "./services/integration-engine[dev]" \
             -e "./services/agents-service[dev]" \
             -e "./services/verification-engine[dev]"
+      - name: Demo catalog contracts
+        run: python -m pytest tests/fixtures/test_demo_catalog.py -q
       - name: Coverage gate regression tests
         run: python -m unittest discover -s tests/coverage-gates -p "test_*.py"
       - name: Unit coverage (database skips are reported, no full coverage claim)
@@ -87,6 +91,8 @@ jobs:
       COVERAGE_TEST_DATABASE_URL: postgresql://comit:comit-regression@postgres:5432/coverage_test
     steps:
       - uses: actions/checkout@v5
+      - name: Install local OCR runtime
+        run: apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-rus
       - name: Install services with dev deps
         run: |
           pip install --no-cache-dir \
@@ -138,7 +144,7 @@ jobs:
       - name: Install agents schema migration dependency
         run: |
           python -m venv /tmp/coverage-schema
-          /tmp/coverage-schema/bin/pip install -e ./services/agents-service -e ./services/testing-engine
+          /tmp/coverage-schema/bin/pip install -e ./services/agents-service -e ./services/testing-engine -e ./services/integration-engine
       - name: Run API tests and coverage gate
         env:
           COVERAGE_SCHEMA_PYTHON: /tmp/coverage-schema/bin/python

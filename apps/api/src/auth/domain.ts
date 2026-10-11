@@ -1,3 +1,4 @@
+import { candidateWeeklyChallengeRoutes } from "../routes/candidate-weekly-challenge.js";
 /** Configure the auth domain while leaving internal/offline services usable when secrets are absent. */
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -73,6 +74,7 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   app.addHook("onClose", async () => { clearInterval(interval); });
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
+  await app.register(candidateWeeklyChallengeRoutes, options);
   await app.register(candidateTestingHistoryRoutes, { ...options, testingHistory: new CandidateTestingHistoryStore(pool) });
   await app.register(candidateTestingRoutes, { ...options, pool });
   await app.register(accountRoutes, options);

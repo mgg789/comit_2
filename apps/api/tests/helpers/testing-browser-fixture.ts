@@ -13,6 +13,7 @@ import { AuthStore } from "../../src/auth/store.js";
 import { ProfileStore } from "../../src/profiles/store.js";
 import { authRoutes } from "../../src/routes/auth.js";
 import { candidateProfileRoutes } from "../../src/routes/candidate-profile.js";
+import { candidateWeeklyChallengeRoutes } from "../../src/routes/candidate-weekly-challenge.js";
 import { candidateTestingRoutes } from "../../src/routes/candidate-testing.js";
 import { testingIntegrationRoutes } from "../../src/routes/testing-integration.js";
 
@@ -35,14 +36,14 @@ export async function startTestingBrowserFixture(databaseUrl: string, ports?: { 
   let mediaDir: string | null = null;
   try {
   await admin.query(`CREATE SCHEMA ${schema}`);
-  for (const name of ["001_accounts", "002_candidate_profiles", "005_training_consent", "019_testing_grades"]) {
+  for (const name of ["001_accounts", "002_candidate_profiles", "005_training_consent", "007_candidate_verification", "019_testing_grades", "021_weekly_challenges"]) {
     await pool.query(await readFile(new URL(`../../migrations/${name}.sql`, import.meta.url), "utf8"));
   }
   const candidateId = randomUUID();
   await pool.query(`INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)
     VALUES($1,'selftest@example.invalid','candidate',true,'account-v1',now())`, [candidateId]);
   const profiles = new ProfileStore(pool);
-  await profiles.save(candidateId, { expected_revision: 0, fields: { primary_direction: "frontend", declared_grade: "middle" } });
+  await profiles.save(candidateId, { expected_revision: 0, fields: { display_name: "Демо Кандидат", primary_direction: "frontend", declared_grade: "middle" }, consent: {processing:true,pool:false,version:"profile-v1"} });
   const root = resolve(new URL("../../../../", import.meta.url).pathname);
   mediaDir = await mkdtemp(join(tmpdir(), "comit-testing-fixture-"));
   const enginePort = ports?.engine ?? await freePort();
@@ -59,6 +60,7 @@ export async function startTestingBrowserFixture(databaseUrl: string, ports?: { 
   const options = { config, store, profiles, mailConfigured: false };
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
+  await app.register(candidateWeeklyChallengeRoutes, options);
   await app.register(candidateTestingRoutes, { ...options, pool });
   await app.register(testingIntegrationRoutes, { profiles, token: serviceToken });
   await app.listen({ port: ports?.api ?? 0, host: "127.0.0.1" });
