@@ -110,7 +110,7 @@ test("HTTP auth enforces one email/one role, consent, cookies, revocation and ga
       cookie: String(deleteResult.headers["set-cookie"]).split(";")[0], origin,
     } });
     assert.equal(deletion.statusCode, 200, deletion.body);
-    assert.equal(deletion.json(), { deleted: true });
+    assert.deepEqual(deletion.json(), { deleted: true });
     assert.deepEqual(forwarded.slice(-2).map(item => item.pathname), [
       `/internal/candidates/${deleteSession.account.id}`, `/internal/candidates/${deleteSession.account.id}`,
     ]);
