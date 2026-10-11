@@ -32,7 +32,11 @@ import { ChatComposer } from "@comit/ui-kit/chat-composer";
 import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
 
-const employerInboxTransport: SystemInboxTransport = { getPage: (after, limit) => api.getSystemChat("employer", after, limit), markRead: read_sequence => api.markSystemChatRead("employer", { read_sequence }) };
+const employerInboxTransport: SystemInboxTransport = {
+  getPage: (after, limit) => api.getSystemChat("employer", after, limit),
+  markRead: read_sequence => api.markSystemChatRead("employer", { read_sequence }),
+  sendMessage: text => api.sendSystemChatMessage("employer", { idempotency_key: crypto.randomUUID(), text }),
+};
 
 const employerConversationTransport: ConversationTransport = {
   markRead: (id, through_sequence) => api.acknowledgeChatRead("employer", id, { through_sequence }),

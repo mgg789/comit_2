@@ -55,6 +55,8 @@ services:
       VERIFICATION_ENGINE_TOKEN: "${VERIFICATION_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       VERIFICATION_DOCUMENT_KEY: "${VERIFICATION_DOCUMENT_KEY:-Y29taXQtZGV2LW9ubHktbm90LWEtc2VjcmV0LTEyMzQ=}"
       FSP_DEMO_ENABLED: 'true'
+      SUPPORT_EMAIL: "${SUPPORT_EMAIL:-}"
+      SUPPORT_ACCESS_KEY: "${SUPPORT_ACCESS_KEY:-}"
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       PUBLIC_SITE_URL: "${PUBLIC_SITE_URL:-http://localhost:8088}"
       FSP_DEMO_INTERNAL_TOKEN: "${FSP_DEMO_INTERNAL_TOKEN:-comit-dev-fsp-nonsecret-token}"

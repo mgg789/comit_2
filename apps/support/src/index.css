@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@comit/ui-kit/design.css";
+@import "@comit/ui-kit/auth.css";
+@import "./support.css";
