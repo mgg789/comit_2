@@ -7,6 +7,7 @@ import type {
   AgentsDraftView,
   FeedCard,
   FeedPage,
+  Grade,
   SavedCard,
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
@@ -17,7 +18,7 @@ import { domainChoices, featureLabel, softChoices, specializationLabel, stackCho
 import "./vacancies.css";
 import "./vacancy-suggestions.css";
 import { changedRequirements, descriptionLength, suggestVacancyRequirements } from "./vacancy-suggestions";
-import { estimateSalaryMarket, salaryMarketSource } from "./salary-market";
+import { estimatePlatformSalaryMarket, estimateSalaryMarket, salaryMarketSource } from "./salary-market";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
@@ -34,6 +35,7 @@ const classes = [
   "qa",
   "ml",
 ] as const;
+const marketGrades: Grade[] = ["intern", "junior", "middle", "senior"];
 const status = (draft: AgentsDraftView) =>
   draft.archived
     ? "В архиве"
@@ -240,7 +242,19 @@ export function VacancyEditor({
   const [to, setTo] = usePersistentState(`${formKey}to`,
     draft?.fields.zp_max == null ? "" : String(draft.fields.zp_max / 1000),
   );
-  const marketSalary = estimateSalaryMarket(specialization, skills, from, to);
+  const storedGrade = draft?.fields.metadata?.grade;
+  const [marketGrade, setMarketGrade] = usePersistentState<Grade | "">(`${formKey}marketGrade`,
+    typeof storedGrade === "string" && marketGrades.includes(storedGrade as Grade) ? storedGrade as Grade : "",
+    (value): value is Grade | "" => value === "" || marketGrades.includes(value as Grade),
+  );
+  const marketStacks = Object.keys(skills).filter(key => (skills[key] ?? 0) > 0).sort();
+  const marketStacksKey = marketStacks.join(",");
+  const marketData = useResource(() => marketGrade
+    ? api.getSalaryMarket({ specialization, grade: marketGrade, stacks: marketStacks })
+    : Promise.resolve(null), [specialization, marketGrade, marketStacksKey]);
+  const platformSalary = estimatePlatformSalaryMarket(marketData.data, from, to);
+  const externalSalary = estimateSalaryMarket(specialization, skills, from, to);
+  const marketSalary = platformSalary ?? externalSalary;
   const [city, setCity] = usePersistentState(`${formKey}city`, draft?.fields.city || "");
   const [work, setWork] = usePersistentState<"onsite" | "remote" | "hybrid">(`${formKey}work`,
     draft?.fields.type || "hybrid",
@@ -283,7 +297,7 @@ export function VacancyEditor({
       title: title.trim(), class: specialization,
       ...changedRequirements(current, { stacks: skills, domens: domains, soft_skills: softSkills }, manuallyEditedRequirements.current),
       zp_min: min, zp_max: max, city: city.trim(), daily: daily.trim(),
-      type: work, bio: bio.trim(),
+      type: work, bio: bio.trim(), metadata: { ...(current?.fields.metadata ?? {}), grade: marketGrade || null },
     };
     let saved: AgentsDraftView;
     if (current) {
@@ -589,6 +603,18 @@ export function VacancyEditor({
                     <Icon name="chevron" />
                   </Action>
                 </div>
+                <Field label="Грейд для сравнения зарплаты">
+                  <Select aria-label="Грейд для сравнения зарплаты" value={marketGrade} onChange={event => {
+                    const value = event.target.value;
+                    if (value === "" || marketGrades.includes(value as Grade)) setMarketGrade(value as Grade | "");
+                  }}>
+                    <option value="">Выберите грейд</option>
+                    <option value="intern">Стажёр</option>
+                    <option value="junior">Junior</option>
+                    <option value="middle">Middle</option>
+                    <option value="senior">Senior</option>
+                  </Select>
+                </Field>
                 <AnimatePresence initial={false}>
                 {skillsOpen && (
                   <motion.div className="vacancy-skill-section" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
@@ -687,10 +713,17 @@ export function VacancyEditor({
                     />
                   </Field>
                 </div>
-                {marketSalary && <div className="vacancy-salary-hint" role="status">
-                  <div><strong>{marketSalary.label}</strong> · середина вилки {marketSalary.deviationPercent > 0 ? "+" : ""}{marketSalary.deviationPercent}% к ориентиру</div>
-                  <small>Ориентир ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес; близко к рынку: ±20%. {marketSalary.basis === "direction_and_language" ? "Направление и язык" : "Направление"}, все грейды и регионы. Приблизительно, по медианам <a href={salaryMarketSource} target="_blank" rel="noopener noreferrer">Хабр Карьеры, I полугодие 2026</a>.</small>
-                </div>}
+                {marketGrade && marketData.loading && <p className="vacancy-salary-hint" role="status">Считаем среднее по активным опубликованным вакансиям Comit…</p>}
+                {(!marketGrade || !marketData.loading) && marketSalary && <div className="vacancy-salary-hint" role="status">
+                    <div><strong>{marketSalary.label}</strong> · середина вилки {marketSalary.deviationPercent > 0 ? "+" : ""}{marketSalary.deviationPercent}% к среднему</div>
+                    {platformSalary
+                      ? <small>Среднее ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес по {marketData.data?.sample_count} активным опубликованным вакансиям Comit с тем же направлением и грейдом{marketStacks.length ? " и всеми выбранными технологиями" : ""}. Сравнение ведётся по серединам вилок; «средняя по рынку» — ±20% от среднего.</small>
+                      : <small>Среднее ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес — внешний ориентир Хабр Карьеры, I полугодие 2026. {marketGrade
+                        ? `На платформе пока недостаточно сопоставимых вакансий${marketData.error ? " или сервис временно недоступен" : ` (${marketData.data?.sample_count ?? 0} из 3 минимум)`}.`
+                        : "Выберите грейд, чтобы получить среднее Comit; этот ориентир учитывает все грейды."} Внешняя оценка учитывает направление и отдельные языки, но не совместное сочетание стека и не регион. <a href={salaryMarketSource} target="_blank" rel="noopener noreferrer">Источник</a>. Сравнение — по серединам вилок, окно «средняя по рынку» ±20%.</small>}
+                  </div>}
+                {marketGrade && !marketData.loading && !marketSalary && <p className="vacancy-salary-hint" role="status">Нет сопоставимых вакансий на платформе и внешнего ориентира для этого направления.</p>}
+                {!marketGrade && !externalSalary && <p className="vacancy-salary-hint" role="status">Выберите грейд для среднего Comit; для этого направления нет внешнего ориентира.</p>}
                 <input
                   aria-label="Город"
                   placeholder="Город"
