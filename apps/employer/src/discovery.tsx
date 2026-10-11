@@ -341,7 +341,14 @@ export function Showcase({
       setSaved(previous => [...previous, `${target}:${candidate.candidate_id}`]);
       setChoosing(null);
       setNotice("Кандидат добавлен в избранное вакансии.");
-    } catch (reason) { setNotice(errorText(reason)); }
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409 && reason.body &&
+          typeof reason.body === "object" && "detail" in reason.body &&
+          reason.body.detail === "showcase_candidate_already_saved") {
+        setChoosing(null);
+        navigate(`/resume/${candidate.candidate_id}?draft=${target}`);
+      } else setNotice(errorText(reason));
+    }
     finally { saveLock.current = false; setBusy(null); }
   }
   const visible = orderCandidates(

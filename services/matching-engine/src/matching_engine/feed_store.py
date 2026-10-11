@@ -773,8 +773,15 @@ class FeedStore:
                 return prior
             vacancy = self._owner_vacancy(connection, owner_id, vacancy_id)
             self._showcase_authority(connection, request.candidate_id, request.profile_revision)
-            if not self._candidate_ready(connection, vacancy, request.candidate_id, request.profile_revision):
-                raise ConflictError("showcase candidate is stale, withdrawn or already blocked for this vacancy")
+            if not self._candidate_ready(connection, vacancy, request.candidate_id, request.profile_revision,
+                                         allow_blocked=True):
+                raise ConflictError("showcase_source_obsolete")
+            selection = connection.execute("""SELECT state FROM matching_pipeline.selection_states
+                WHERE vacancy_id=%s AND candidate_id=%s""", (vacancy_id, request.candidate_id)).fetchone()
+            if selection and selection["state"] not in {"eligible", "visited_updated"}:
+                conflicts = {"attractive": "showcase_candidate_already_saved",
+                             "pending": "showcase_candidate_invitation_pending"}
+                raise ConflictError(conflicts.get(selection["state"], "showcase_candidate_already_visited"))
             self._profile_snapshot(connection, request.candidate_id, request.profile_revision)
             ready = CombineStore._vacancy(connection, vacancy_id)
             candidates = CombineStore._candidates(connection, request.candidate_id)

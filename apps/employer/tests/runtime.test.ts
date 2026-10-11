@@ -21,6 +21,10 @@ test("maps known API failures to user text without leaking upstream payloads", (
   assert.equal(errorText(new ApiError(401, "/employer/x", { detail: "x" })), "Сессия закончилась. Войдите снова.");
   assert.equal(errorText(new ApiError(403, "/employer/x", {})), "Нет доступа к этим данным.");
   assert.match(errorText(new ApiError(409, "/employer/x", { detail: "vacancy_lifecycle_pending" })), /завершается в сервисах/);
+  assert.match(errorText(new ApiError(409, "/employer/x", { detail: "showcase_candidate_already_saved" })), /уже добавлен/);
+  assert.match(errorText(new ApiError(409, "/employer/x", { detail: "showcase_candidate_invitation_pending" })), /уже отправлено/);
+  assert.match(errorText(new ApiError(409, "/employer/x", { detail: "showcase_candidate_already_visited" })), /уже отклонили/);
+  assert.match(errorText(new ApiError(409, "/employer/x", { detail: "showcase_source_obsolete" })), /обновилось или больше недоступно/);
   const unknown = errorText(new ApiError(500, "/employer/x", { detail: "SELECT * FROM secrets" }));
   assert.doesNotMatch(unknown, /secrets/);
   assert.equal(errorText(new Error("boom")), unknown);
