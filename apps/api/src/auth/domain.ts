@@ -16,6 +16,8 @@ import { registerTestingIntegration } from "../routes/testing-integration.js";
 import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore } from "../statistics/store.js";
 import { statisticsRoutes } from "../routes/statistics.js";
+import { SalaryMarketStore } from "../salary-market/store.js";
+import { salaryMarketRoutes } from "../routes/salary-market.js";
 import { organizationAgentToolsRoutes } from "../routes/organization-agent-tools.js";
 import { EmployerProfileStore } from "../employers/store.js";
 import { employerProfileRoutes } from "../routes/employer-profile.js";
@@ -44,6 +46,9 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
         response: { 503: { type: "object", required: ["detail"], properties: { detail: { type: "string" } } } } } },
       async (_request, reply) => reply.header("cache-control", "no-store").code(503).send({ detail: "showcase_unavailable" }));
     }
+    app.get("/public/salary-market", { schema: { tags: ["public-showcase"], security: [],
+      response: { 503: { type: "object", required: ["detail"], properties: { detail: { type: "string" } } } } } },
+    async (_request, reply) => reply.header("cache-control", "no-store").code(503).send({ detail: "salary_market_unavailable" }));
     for (const role of ["candidate", "employer"]) {
       for (const path of ["code", "verify", "logout", "logout-all"]) {
         app.post(`/auth/${role}/${path}`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
@@ -83,6 +88,7 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   await app.register(candidateTestingHistoryRoutes, { ...options, testingHistory: new CandidateTestingHistoryStore(pool) });
   await app.register(candidateTestingRoutes, { ...options, pool });
   await app.register(accountRoutes, options);
+  await app.register(salaryMarketRoutes, { market: new SalaryMarketStore(pool) });
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
     (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client),
     { initialWorkingDays: 4, reminderWorkingDays: 3, hireOn: "offer_accept" }, notifications);

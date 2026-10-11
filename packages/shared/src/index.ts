@@ -5,6 +5,7 @@
  */
 
 export type { EmployerStatisticsQuery, EmployerStatistics, EmployerExpenses, EmployerExpenseCategory, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
+export type { SalaryMarketQuery, SalaryMarketAggregate } from "./salary-market.js";
 
 export type {
   CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,

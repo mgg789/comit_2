@@ -669,6 +669,14 @@ Internal gateway сохраняет проверенный заголовок, b
 read-only списки без сессии и без detail/PDF/contact-доступа. Краткие карточки,
 фильтры, opaque cursor и fences описаны в [контракте витрины](public-showcase.md).
 
+`GET /api/public/salary-market?specialization=backend&grade=middle&stacks=python,postgresql`
+возвращает среднюю середину зарплатных вилок активных опубликованных вакансий
+Comit с точным направлением и грейдом и со всеми переданными технологиями.
+Ответ содержит `sample_count`, `minimum_sample_count: 3` и
+`average_salary_rub`; при выборке меньше трёх значение равно `null`. API не
+возвращает отдельные вакансии, названия компаний или владельцев. Ошибка источника
+возвращается как `503 salary_market_unavailable`.
+
 
 ## Профиль компании, сроки и уведомления
 

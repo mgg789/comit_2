@@ -13,7 +13,7 @@ import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutat
   AgentsOrganizationContext, AgentsOrganizationMemory, AgentsOrganizationMemoryPatch,
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
-  EmployerStatisticsQuery, EmployerStatistics,
+  EmployerStatisticsQuery, EmployerStatistics, SalaryMarketQuery, SalaryMarketAggregate,
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
@@ -132,6 +132,8 @@ export interface ApiClient {
   downloadOrganizationDocument(documentId: string): Promise<AgentsDocumentDownload>;
   /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
   getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
+  /** Read the mean midpoint of comparable active published Comit vacancy ranges. */
+  getSalaryMarket(query: SalaryMarketQuery): Promise<SalaryMarketAggregate>;
   /** Request a role-bound code; explicit development delivery may return dev_code. */
   requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
   /** Verify a code, including account consent only for first registration. */
@@ -380,6 +382,11 @@ export function createApiClient({
       const params = new URLSearchParams();
       for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);
       return request("GET", `/employer/statistics${params.size ? `?${params}` : ""}`);
+    },
+    getSalaryMarket: query => {
+      const params = new URLSearchParams({ specialization: query.specialization, grade: query.grade });
+      if (query.stacks.length) params.set("stacks", query.stacks.join(","));
+      return request("GET", `/public/salary-market?${params}`);
     },
     get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
