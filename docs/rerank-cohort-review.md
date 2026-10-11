@@ -87,7 +87,7 @@ decisive_vs_insufficient и tie_vs_insufficient, причины и число н
 не менялись; disagreements остаются в отчёте как расхождение человека с учителем.
 
 Это закрывает человеческую leg валидации разметки repair-v4. Численные
-activation gates (ΔNDCG ≥ 0.02 и положительные bootstrap-границы) по-прежнему
-не выполнены — артефакт `c18f4bc1` продолжает sort-only rollout;
+activation gates (ΔNDCG ≥ 0.02 и положительные bootstrap-границы) остаются
+целью следующих циклов — артефакт `c18f4bc1` продолжает sort-only rollout;
 [дополнительный сложный бенчмарк](rerank-hard-benchmark.md) показывает, что
 сама калибровка NDCG-порога требует решения оператора.

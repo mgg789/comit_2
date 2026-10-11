@@ -20,7 +20,7 @@ provision точную модель Harrier. При 503 `/ready` matching сна
 экспорт доступны через `python -m matching_engine.learning_export status|export`.
 Operational export требует authoritative source consent в общей БД, private HMAC
 key и новый каталог. Не отправляйте raw exports во внешние сервисы и не включайте
-их в Git. [Данные, события, метки и ограничения](real-card-learning.md).
+их в Git. [Данные, события, метки и область применения](real-card-learning.md).
 
 ## Auth API-core: явная миграция и mail worker
 
@@ -53,7 +53,8 @@ AUTH_ROUTE_TEST_DATABASE_URL='postgres://...' \
 ```
 
 Без этих переменных DB acceptance тесты пропускаются; crypto/unit и transport
-проверки не доказывают работу PostgreSQL или реальную доставку.
+проверки покрывают логику, а работу PostgreSQL и реальную доставку подтверждают
+DB acceptance тесты с заданными переменными.
 
 ## Candidate source profile и projection worker
 
@@ -191,8 +192,8 @@ PYTHONPATH=src .venv/bin/python -m pytest -q tests
 Integration tests **очищают таблицы**. `PIPELINE_TEST_DATABASE_URL` должен указывать
 исключительно на отдельную одноразовую БД, не на локальные пользовательские данные
 и не на рабочий пул. Запуск: `PYTHONPATH=src .venv/bin/python -m pytest -q -m integration tests`.
-Тестовые doubles в этих проверках проверяют транзакции/ошибки; это не доказательство
-инференса модели. Реальная модель проверяется отдельно через acceptance ниже.
+Тестовые doubles в этих проверках проверяют транзакции/ошибки; инференс реальной
+модели проверяется отдельно через acceptance ниже.
 
 ```bash
 # Из корня репо; только свежая отдельная БД, реальные API и worker уже запущены.
@@ -340,8 +341,8 @@ Retry сохраняет идемпотентность и не возвраща
    атомарно переставляет active pointer/ставит задания актуальным main batches.
 
 По умолчанию artifacts расположены в `tests/artifacts/reranker/`, git-ignored.
-В live worker нет sklearn, provider calls и обучения. Провал пилота запрещает
-расширение: не обходить блокировку изменением JSON-флага или увеличением бюджета.
+В live worker нет sklearn, provider calls и обучения. Расширение выполняется
+только после успешного пилота: не обходить это условие изменением JSON-флага или увеличением бюджета.
 
 С 06.10 teacher заменён на `https://ai.sverk.tech/v1/systemone`, `kev-latest`.
 Ключ читается только при cache miss из существующего `~/Desktop/qwen_token.txt`;
@@ -363,14 +364,14 @@ Laya pilot сохраняется отдельно. Смена API сама по
 OpenAI endpoint с тем же ключом: `qwen3.8-27b` и `gemma4-vlm`, до пяти общих HTTP
 вызовов. Harrier остаётся локальным. Батчи и завершённые семейства имеют
 проверяемое происхождение; старые валидные результаты не генерируются повторно.
-Явные cache-only операции `reuse-batch` и `seal-family`, их ограничения и
+Явные cache-only операции `reuse-batch` и `seal-family`, их условия и
 команды описаны в [matching.md](matching.md#генерация-через-sverk-openai-api-06102026).
 Исторический невалидный профиль исключён с receipt без исправления фактов.
-Текущее расширение остановлено после 12 семейств /119 профилей: на frontend-05
-SystemOne согласовал1/3 перестановок при минимуме2/3. Дополнительный ограниченный
+Расширение приостановлено на 12 семействах / 119 профилях до повышения качества teacher: на frontend-05
+SystemOne согласовал 1/3 перестановок при пороге 2/3. Дополнительный ограниченный
 pilot Qwen/Gemma дал10валидных профилей для frontend-06; Gemma заняла13.87с.
-Новый генератор не снимает блокер качества teacher. Raw responses/ledger и
-прежние отчёты сохраняются; обучение на неполном dataset и активация запрещены.
+Следующий шаг — повышение качества teacher; новый генератор его не заменяет. Raw responses/ledger и
+прежние отчёты сохраняются; обучение и активация запускаются после завершения dataset.
 Не изменять диапазоны, метки, receipts или бюджет вручную для обхода проверок.
 
 Для cache-only расследования frontend-05 и отдельного двадцатизапросного pilot
@@ -385,9 +386,9 @@ raw7/10, derived8/10, decisive5/10; ledger28/676/119. Повтор сохран�
 Альтернативный Gemma pilot: `python -m matching_engine.rerank_gemma_pilot prepare|run`
 с тем же PYTHONPATH. Требует sealed blind review; сохраняет отдельные model/prompt
 receipts, использует общий pair ledger и партии максимум пяти HTTP-вызовов.
-Первый запуск stopped после пяти ответов с ошибками формата; повтор читает кэш
+Первый запуск остановился после пяти ответов, формат которых требует доработки; повтор читает кэш
 без новых запросов. Ledger28/681/119. Новый format probe автоматически не запускается.
-Источник, команды и ограничения — [пилот Gemma](rerank-gemma-teacher-pilot.md).
+Источник, команды и параметры — [пилот Gemma](rerank-gemma-teacher-pilot.md).
 Разрешённый format probe: `python -m matching_engine.rerank_gemma_format` с тем
 же PYTHONPATH. Отдельная версия/receipts, максимум2attempts в исходном allowance20.
 Два JSON complete, но labels отвергнуты за evidence лишь одной стороны;
@@ -405,7 +406,7 @@ attempts автоматически не используются. [Подроб
 Транспорт восстановлен отдельно: `python -m matching_engine.rerank_transport_recovery`
 воспроизводит1исходный запрос, `--recover` проверяет4wire-compatible calls.
 Старый этап завершён, обе команды повторяются cache-only. Wire v4 сохраняет
-runtime uniqueness и все citation/salary guards. [Разбор и ограничения](rerank-transport-recovery.md).
+runtime uniqueness и все citation/salary guards. [Разбор и параметры](rerank-transport-recovery.md).
 
 ### Повтор backend приёмки
 
@@ -426,7 +427,7 @@ Harrier, проверяет typed facts/PDFs/durable delivery/backfill. Не з�
 воспроизводятся без HTTP и изменения расхода. Свежий запуск фиксирует максимум
 20 попыток, использует до пяти общих remote slots и не увеличивает глобальный
 лимит. Если сохранён started receipt без report, сначала разобрать receipts;
-автоматического повторного запуска нет. [Результаты и ограничения](rerank-grounded-teacher-pilot.md).
+повторный запуск выполняется вручную. [Результаты и следующие шаги](rerank-grounded-teacher-pilot.md).
 
 Текущая частичная выборка отдельно проверяется командой
 `python -m matching_engine.rerank_sample_probe` из корня с matching-engine в
@@ -451,10 +452,10 @@ receipts, независимые suitability оценки, текущую сле
 
 Текущий закрытый namespace — `rerank-grounded-pair-repair-v4`: QA-only completion
 прошёл проверку, cumulative ledger 99 generation / 2423 pair / 579 grade.
-Один test-only fit завершён; численный activation gate failed, runtime не изменён.
+Один test-only fit завершён; прохождение численного activation gate — следующая цель, runtime остаётся на текущей версии.
 Повтор оператора при целых completed receipts — cache-only replay без нового fit.
 Не удалять training receipts и не сбрасывать расход для повторной попытки.
-[Приёмка и ограничения выборки](rerank-grounded-cohort-acceptance.md).
+[Приёмка и характеристики выборки](rerank-grounded-cohort-acceptance.md).
 
 ## Recruitment backend
 
@@ -473,7 +474,7 @@ Email о новых собеседованиях отправляет `auth-mail
 [Контракт](recruitment.md).
 
 Чат (`qgramm-chat`) входит в основной compose и требует постоянных
-секретов и volume `chat-data`; см. [запуск и ограничения](chat.md).
+секретов и volume `chat-data`; см. [запуск и параметры](chat.md).
 Без конфигурации приглашения работают, а chat routes возвращают503.
 После503 повторить тот же UUID команды; provisioning восстанавливается при
 следующем обращении. Нельзя удалять volume/генерировать новые crypto keys
@@ -502,4 +503,4 @@ SMTP и публичного origin меняются через существу
 неактуальный источник/согласие; `failed/rejected` — постоянный SMTP reject;
 `failed/smtp_unavailable` — исчерпанные попытки. Сбой matching-источника не должен
 остановить OTP. При отсутствии feed schema новые лайки не импортируются.
-[Контракты, cutover и проверяемые ограничения](email-notifications.md).
+[Контракты, cutover и проверяемые условия](email-notifications.md).

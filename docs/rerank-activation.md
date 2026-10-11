@@ -1,6 +1,6 @@
 # Ручное включение исследовательского R₀
 
-Оператор явно разрешил использовать текущий R₀ для сортировки основного top-k, несмотря на failed quality gate. Это отдельное решение о rollout: исходный артефакт, quality gate, `training.test_only=true` и сведения о review остаются неизменными. Обычный `RerankStore.promote()` по-прежнему требует прохождения всех gates.
+Оператор явно разрешил использовать текущий R₀ для сортировки основного top-k, до прохождения quality gate. Это отдельное решение о rollout: исходный артефакт, quality gate, `training.test_only=true` и сведения о review остаются неизменными. Обычный `RerankStore.promote()` по-прежнему требует прохождения всех gates.
 
 Упакованный артефакт: `services/matching-engine/src/matching_engine/artifacts/r0-c18f4bc1.json`, точный canonical content hash:
 
@@ -51,4 +51,4 @@ python -m matching_engine.rerank_activation deactivate \
 
 ## Проверки
 
-`tests/test_rerank_activation.py` проверяет сохранность sealed gate/reviews, отказ при injected dict и подмене receipt, обязательные protocol/label/factual/tail ограничения, runtime compatibility, immutable DB receipts, atomic queue, stale publish, повторное включение того же hash, feed freshness и деактивацию. PostgreSQL tests требуют отдельного `PIPELINE_TEST_DATABASE_URL`; они очищают только изолированный тестовый контур. Fit, генерация профилей, model API и production DB в этих тестах не вызываются.
+`services/matching-engine/tests/test_rerank_activation.py` проверяет сохранность sealed gate/reviews, отказ при injected dict и подмене receipt, обязательные protocol/label/factual/tail ограничения, runtime compatibility, immutable DB receipts, atomic queue, stale publish, повторное включение того же hash, feed freshness и деактивацию. PostgreSQL tests требуют отдельного `PIPELINE_TEST_DATABASE_URL`; они очищают только изолированный тестовый контур. Fit, генерация профилей, model API и production DB в этих тестах не вызываются.

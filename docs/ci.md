@@ -1,4 +1,4 @@
-# CI — GitHub Actions на self-hosted раннерах
+# CI — GitHub Actions на self-hosted и GitHub-hosted раннерах
 
 ## Инфраструктура
 
@@ -6,8 +6,9 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Раннер | Лейблы | Роль |
 |---|---|---|
-| mgg-ci-1/2/3 | `ci, mgg-server` | все CI-джобы и деплой |
+| mgg-ci-1/2/3 | `ci, mgg-server` | джобы `js`, `python`, `api`, `smoke` и серверный deploy |
 | mgg-regression-1 | `regression, full, mgg-server` | джоба `regression`: полный Python-набор с PostgreSQL |
+| GitHub-hosted `ubuntu-latest` | — | `code-judge-isolation` (CI) и `public-smoke` (после deploy): без production-секретов и доступа к серверу |
 
 Управление (без sudo): `systemctl --user status|restart github-runner@mgg-ci-1`; логи: `journalctl --user -u github-runner@<имя>`.
 
@@ -19,6 +20,7 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 | `api` | python:3.12-bookworm + Node 22 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
 | `python` | python:3.12-bookworm | matching/testing/integration/agents/verification/code-judge `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip; реальный Docker acceptance вынесен в отдельный ephemeral job |
 | `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов с disposable PostgreSQL → line/branch gates каждого пакета |
+| `code-judge-isolation` | GitHub-hosted Ubuntu | установка judge-тестов → `tests/compose-config.py` (prod/dev/smoke env) → `tests/public-smoke.py` и `tests/deploy-config.py` → pinned sandbox image → реальная Docker-изоляция и враждебные синтетические сабмиты → сборка и HTTP-приёмка broker |
 | `smoke` | хост (нужен docker) | explicit `docker-compose.dev.yml --profile dev`, проект `comit-ci`, порты 38xxx, real pinned Harrier cache → `SMOKE_MODE=dev ./tests/smoke.sh` → `down -v` |
 
 - Джобы `js`, `python`, `api` и `regression` выполняются в контейнерах — хосту не нужны node/python. API использует официальный Python 3.12 image и `setup-node` для Node 22: `setup-python` не поддерживает Debian 12 образ Node и не используется.
@@ -42,14 +44,14 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
   внутри matching image. ID/revision берутся из actual `embeddings.py`; отсутствие
   exact cache ломает CI. Runtime matching остаётся offline. Только isolated CI
   volumes удаляются при teardown; production cache не изменяется.
-- Этот smoke workflow синтаксически проверен; live self-hosted build/provision/smoke
-  проверяется фактическим запуском Actions, не локальным config render.
+- Результат live self-hosted build/provision/smoke подтверждается фактическим
+  запуском Actions.
 
 ## Джоба regression — полный Python-набор с PostgreSQL
 
 Регулярная джоба `python` идёт без базы, поэтому все PostgreSQL-тесты matching-engine
-(durable pipeline, combine-хранилище, гонки публикаций) в ней молча пропускаются.
-Джоба `regression` на `mgg-regression-1` закрывает этот пробел:
+(durable pipeline, combine-хранилище, гонки публикаций) в ней пропускаются.
+Джоба `regression` на `mgg-regression-1` покрывает их полностью:
 
 - Поднимает disposable Postgres 16 с pgvector (`pgvector/pgvector:pg16`, нужен миграциям matching) как GitHub Actions service container; база
   `coverage_test` живёт только внутри джобы, учётка тестовая (`comit`/`comit-regression`).
@@ -84,10 +86,10 @@ consent-таблицы. Runner запускает этот fixture послед�
 `tests/coverage-gates/thresholds.json` хранит нижние пороги **для всего source-пакета**,
 по строкам и ветвям отдельно. Неисполненные модули включены (`c8 --all`,
 `pytest --cov=<package> --cov-branch`); фильтров для искусственного повышения процентов нет.
-Это защита от регрессии покрытия, а не заявление о достаточной полноте тестов.
+Это защита от регрессии покрытия, которая дополняет функциональные проверки.
 Первичные пороги округлены вниз до пяти процентных пунктов от наблюдённой базы;
-новые тесты не понижают эти floors автоматически. Низкое
-покрытие verification остаётся явным техническим долгом. Unit matching отдельно дал
+новые тесты не понижают эти floors автоматически. Рост
+покрытия verification-engine — приоритет следующего этапа. Unit matching отдельно дал
 68.75 / 57.48%, 1098 passed, 142 skipped; unit не заменяет PG gate.
 
 | Пакет | Наблюдённые строки / ветви, 2026-10-11 | Floor строки / ветви | Контур |
@@ -127,8 +129,8 @@ Runner выставляет `COMIT_DISPOSABLE_DATABASE_TESTS=1`; deadline fixtur
 (`invitation chat: two authenticated participants, files, polling, retries, consent and closure`)
 и три matching consent acceptance-теста с отдельно засеиваемыми operational cards
 (`LEARNING_ACCEPTANCE_DATABASE_URL`). Любой новый неожиданный skip ломает gate.
-Эти исключения не являются проверенным покрытием внешнего chat или operational consent:
-для них нужны отдельные acceptance-контуры. Обычная unit-джоба выводит все skips и
+Внешний chat и operational consent проверяются собственными acceptance-контурами,
+вне этого gate. Обычная unit-джоба выводит все skips и
 **не** выдаёт PG acceptance или полный coverage gate.
 
 Локальные команды после установки dev dependencies:
@@ -142,9 +144,9 @@ COVERAGE_TEST_DATABASE_URL=... python tests/coverage-gates/python.py matching-en
 ```
 
 Отчёты: `coverage/unit/` и `coverage/backend/` (git-ignored), JSON + LCOV/XML и
-JUnit, публикуются CI как artifacts даже после падения. Обычный `pnpm -r build`
-не доказывает тестовое покрытие. GitHub Actions workflow описан и синтаксически
-проверен локально; успешный запуск remote CI отдельно подтверждается результатом Actions.
+JUnit, публикуются CI как artifacts даже после падения. Покрытие измеряют
+тестовые джобы, а не `pnpm -r build`. Успешный запуск remote CI подтверждается
+результатом Actions.
 
 ## deploy.yml — после успешного CI на push в main (и workflow_dispatch)
 
@@ -159,10 +161,10 @@ smoke и откат образов при ошибке — подробност�
 - Секретов в репозитории нет; на сервере — `/home/mgg/comit/.env` (git-ignored).
 - Если появятся секреты Actions — только GitHub Environment secrets, никогда в коде/логах/памяти.
 
-## Известные упрощения каркаса
+## Следующие шаги CI
 
-- Нет кэша pnpm/pip между прогонами (первое время ок; добавить `actions/cache` или registry при замедлении).
-- Образы не публикуются в registry — сборка на месте; при росте времени сборки перейти на GHCR.
+- Кэш pnpm/pip между прогонами (`actions/cache` или registry) — при росте времени прогонов.
+- Публикация образов в GHCR вместо сборки на месте — при росте времени сборки.
 
 ## Приёмка браузерного тестирования
 
@@ -173,8 +175,8 @@ PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, пуб
 `TESTING_ENGINE_TEST_PYTHON` указывает Python с установленным testing-engine;
 `TESTING_BROWSER_TEST_DATABASE_URL` — только disposable PostgreSQL.
 Локальное измерение 11.10.2026: 34 теста testing-engine, 79,74% строк / 69,80%
-ветвей; штатный gate 75% / 60% пройден. Это покрытие этого сервиса, не всего UI
-и не проверка физических устройств пользователя.
+ветвей; штатный gate 75% / 60% пройден. Это покрытие сервиса; UI проверяется
+своими тестами, проверка на физических устройствах — следующий этап.
 
 ## Проверки пакета завершения
 
@@ -189,10 +191,10 @@ CI также запускает unit-контракт demo-каталога, fr
 Реальная проверка `Code judge isolation (disposable runner)` выполняется отдельно
 на GitHub-hosted Ubuntu: pinned Python image, Docker isolation и HTTP broker
 acceptance. Generic compose smoke использует явно недоступный judge endpoint и
-проверяет отказ начала code-теста без создания попытки; выполнение кода он не
-подтверждает. Актуальные результаты нового тестирования —
-[package-validation.md](package-validation.md); таблица выше описывает прежний
-checkpoint и не заменяет проверки текущего SHA.
+проверяет отказ начала code-теста без создания попытки; выполнение кода
+подтверждает отдельная джоба выше. Актуальные результаты нового тестирования —
+[package-validation.md](package-validation.md); таблица выше фиксирует
+checkpoint 2026-10-11, а текущий SHA проверяет собственный прогон CI.
 
 После deploy добавлен отдельный job `public-smoke` на GitHub-hosted runner:
 реальный домен/TLS, health/readiness, JSON API, HTML/SVG и auth/privacy boundaries.
@@ -202,5 +204,5 @@ checkpoint и не заменяет проверки текущего SHA.
 API Python HTTP fixtures имеют общий monotonic startup deadline 45 секунд,
 раннее обнаружение exit/signal/spawn error и bounded cleanup TERM 2 с → KILL 2 с.
 Регрессия задержки 16 секунд воспроизвела прежний 15-секундный timeout; проверка
-реального PDF сохранена. Конкретная причина медленного старта в прежнем CI
-не установлена, CPU contention не объявляется доказанным.
+реального PDF сохранена. Причина медленного старта в прежнем CI
+уточняется; гипотеза CPU contention пока не подтверждена.

@@ -25,8 +25,8 @@
 > API-core хранит source profile и durable projection outbox, а matching-engine
 > принимает только exact trusted snapshot. Auth имеет собственную PostgreSQL
 > migration/outbox/session границу; тестовые сессии остаются trusted upstream
-> контуром (`POST /internal/testing/session-result`). Production acceptance этим
-> документом не подтверждается.
+> контуром (`POST /internal/testing/session-result`). Production acceptance
+> выполняется отдельно от этого документа.
 
 ## Контур
 
@@ -69,7 +69,7 @@ services/agents-service      services/verification-engine qgramm-chat (Go bridge
 сессии и операторские квитанции чтения хранятся в PostgreSQL API. Отсутствующая или
 некорректная конфигурация отключает API поддержки; HTML-приложение остаётся в
 web-образе. Чтение оператором не меняет пользовательские квитанции.
-[Контракт и ограничения](support-console.md).
+[Контракт и правила доступа](support-console.md).
 
 ## Карта репозитория
 
@@ -113,14 +113,14 @@ Public employer draft/agent, candidate profile и candidate pipeline/PDF paths
 Актуальная серверная реализация: candidate worker → dual-vector pool/PDF;
 vacancy worker → ready; combine worker → main top-k; rerank worker → sort-only
 порядок активного R₀ либо явный main_fallback (упакованный hash-pinned артефакт
-активирован ручным решением оператора, quality gate остаётся failed, хвост не
-отсекается). Preference-worker автоматически обучает vacancy-local поправку по
+активирован ручным решением оператора; прохождение quality gate — следующая цель,
+хвост не отсекается). Preference-worker автоматически обучает vacancy-local поправку по
 реакциям ленты и переставляет только непоказанный суффикс; каждый участник
 обучения требует отдельного training-v1 consent. Research-показы гипотез
 (2 карточки на 18 обычных доставок) добавляются после preference refresh;
 feed-refill-worker добирает ленту immutable batch-ами ([feed-refill.md](feed-refill.md)).
 Runtime использует JSON linear artifacts без sklearn/LLM; operator-обучение
-реранкера — отдельный workflow, численный activation gate не пройден.
+реранкера — отдельный workflow; прохождение численного activation gate — следующий этап.
 Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
 Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 

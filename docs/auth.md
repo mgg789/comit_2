@@ -128,7 +128,8 @@ pnpm --filter @comit/api auth:mail-worker
 нового SMTP сервера; legacy overlay `infra/docker-compose.auth.yml` не нужен. DATABASE_URL указывает только на Comit PostgreSQL.
 
 Env: AUTH_SECRET (либо JWT_SECRET), AUTH_ALLOWED_ORIGINS, AUTH_COOKIE_SECURE,
-AUTH_KEY_ID, ACCOUNT_CONSENT_VERSION, SMTP_HOST/PORT/USER/PASSWORD/FROM/TLS_SERVERNAME.
+AUTH_KEY_ID (по умолчанию `v1`), ACCOUNT_CONSENT_VERSION (`account-v1`), AUTH_ISSUER
+(`comit`), AUTH_AUDIENCE (`comit-api`), SMTP_HOST/PORT/USER/PASSWORD/FROM/TLS_SERVERNAME.
 Без auth-конфигурации login endpoints возвращают 503; остальные internal контуры
 продолжают работать. Без SMTP-конфигурации code возвращает 503.
 

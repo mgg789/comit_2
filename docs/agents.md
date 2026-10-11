@@ -28,7 +28,7 @@
 `agent_temporarily_unavailable`, HTTP401/403 — non-retryable `agent_provider_rejected`.
 Проверка отправки не зависит от доступности enrichment. Локальная проверка 2026-10-08:
 отдельный synthetic DeepSeek turn принят HTTP202, завершился succeeded, сохранён один
-ответ. Это не проверка бизнес-инструментов или production.
+ответ. Проверка бизнес-инструментов и production-контура — следующий этап.
 
 `GET /employer/organization-agent/chat` идемпотентно создаёт один чат;
 `POST /messages` ставит turn в очередь, `GET /turns/{id}` показывает результат.
@@ -46,7 +46,7 @@ DeepSeek получает thinking disabled для `off`, enabled с `reasoning_
 turn после перезапуска и не возвращается в публичном receipt или истории сообщений.
 Старые редакционные сессии и фоновые поручения используют `off`.
 Требуется миграция `008_organization_reasoning.sql`; реальный provider smoke
-для включённого thinking в этом проходе не выполнялся.
+для включённого thinking — следующий шаг проверки.
 
 Каталог инструментов доступен полностью. Модель сначала читает краткие названия,
 затем раскрывает выбранные JSON-схемы через `discover_tools` и вызывает `call_tool`.
@@ -116,8 +116,8 @@ scope агента; `vacancy` — отдельный редакторский wo
 
 Глобальный registry предоставляет list/get/create/edit/approve/publish вакансии.
 Снятие, закрытие и удаление доступны в UI/API через координированный lifecycle,
-но `vacancy_withdraw`, `vacancy_close`, `vacancy_delete` пока отсутствуют в registry.
-Агент объясняет ручной путь и не объявляет эти действия выполненными. Прямая
+а регистрация `vacancy_withdraw`, `vacancy_close`, `vacancy_delete` как инструментов
+ассистента — следующий шаг. Агент объясняет ручной путь и не объявляет эти действия выполненными. Прямая
 архивация Store не заменяет lifecycle API с matching/recruitment последствиями.
 
 Доверенный bridge API-core — `POST /internal/organization-agent/tools/{tool}`,
@@ -250,7 +250,8 @@ pnpm -r typecheck
 
 PG-тесты требуют `AGENTS_TEST_DATABASE_URL` с **отдельной одноразовой** БД: тесты
 очищают только схему agents_service. Реальные модели проверяются отдельно от
-unit-тестов; `/healthz` не доказывает корректность provider workflow.
+unit-тестов; `/healthz` сообщает liveness, а корректность provider workflow подтверждают
+отдельные проверки реальных моделей.
 
 См. также: [API](api.md), [данные](data.md), [архитектура](architecture.md),
 [продуктовый контекст](../context/40-architecture.md).
@@ -258,30 +259,30 @@ unit-тестов; `/healthz` не доказывает корректность
 
 ### Сверка 16 требований организации (2026-10-08)
 
-Это сверка исходников и доступных тестов, не подтверждение полного живого сценария.
+Это сверка исходников и доступных тестов; полный живой сценарий — следующий этап приёмки.
 
 | № | Контур | Текущий статус |
 |---|---|---|
-| 1 | Создание/редактирование вакансии | Есть list/get/create/edit/approve/publish. Withdraw/close/delete отсутствуют в registry, хотя есть в UI/API. |
+| 1 | Создание/редактирование вакансии | Есть list/get/create/edit/approve/publish. Withdraw/close/delete доступны в UI/API; их регистрация как tools ассистента — следующий шаг. |
 | 2 | Статистика вакансии/организации | Есть owner-scoped tools. |
-| 3 | Переговоры об интервью | Есть availability-first task, несколько процессов, предложения, ожидание принятия кандидатом и отчёт/эскалация владельцу. PG integration не запущены. |
+| 3 | Переговоры об интервью | Есть availability-first task, несколько процессов, предложения, ожидание принятия кандидатом и отчёт/эскалация владельцу. Запуск PG integration — следующий шаг проверки. |
 | 4 | Офлайн-дублёр | Есть явный stand-in task, lease и свежий offline heartbeat; возвращение владельца прекращает отправку. |
-| 5 | Опрос кандидата и отчёт | Есть inquiry task, процессные отчёты и завершение/эскалация. Живые переговоры не проверены. |
+| 5 | Опрос кандидата и отчёт | Есть inquiry task, процессные отчёты и завершение/эскалация. Живые переговоры — следующий этап приёмки. |
 | 6 | Контекст кандидатов/вакансий | Есть scoped read/search/detail. |
 | 7 | Jev свайпы | Есть count 1..50 + comment, vacancy/cards context, guarded decisions и учёт usage. |
 | 8 | Общая витрина | Есть search/detail и работа с vacancy feed; scope и фильтры проверяет API. |
-| 9 | Документы | TXT/MD/PDF сохраняются приватно; create_md есть. Созданный MD не прикрепляется автоматически к видимому ответу: метаданные на tool message, UI скрывает tool rows. |
-| 10 | Context/memory | Есть compaction и отдельная revision-controlled memory; memory_write доступен, автоматического обновления memory при compaction нет. |
+| 9 | Документы | TXT/MD/PDF сохраняются приватно; create_md есть. Созданный MD хранится с метаданными на tool message (UI скрывает tool rows); автоматическое прикрепление к видимому ответу — возможное улучшение. |
+| 10 | Context/memory | Есть compaction и отдельная revision-controlled memory; memory обновляется явным memory_write, независимо от compaction. |
 | 11 | Справка по UI | Добавлена packaged employer-ui + безопасный knowledge_pages_list; runtime читает справку перед UI-ответами. Справка поддерживается вручную. |
 | 12 | Фон | Есть durable очередь, worker, tasks и leases; inquiry/schedule не зависят от открытой вкладки. |
-| 13 | $1 / rolling 7 days | Реализованы measured LLM/Jev usage, ledger/reservations и окно now()-7days; бесплатные локальные/cached actions сами по себе не создают расход LLM. Полное живое billing не проверено. |
-| 14 | Нет интернета у клиента | Нет отдельного navigator.onLine/online/offline UI gate; сетевой запрос завершается ошибкой. Provider unavailable обрабатывается отдельно. |
+| 13 | $1 / rolling 7 days | Реализованы measured LLM/Jev usage, ledger/reservations и окно now()-7days; бесплатные локальные/cached actions сами по себе не создают расход LLM. Полная живая проверка billing — следующий этап. |
+| 14 | Нет интернета у клиента | Офлайн-состояние клиента проявляется как ошибка сетевого запроса; отдельный navigator.onLine-индикатор — возможное улучшение. Provider unavailable обрабатывается отдельно. |
 | 15 | Постепенное раскрытие | Сначала discover_tools/call_tool, затем каталог/выбранные схемы; документы читаются порциями. |
 | 16 | Все tools доступны | Каталог содержит base+workflow tools. Выполнение сохраняет owner ACL, явную delegation, lease и candidate-owned acceptance. |
 
-Проверки: Python `pytest` tools/runtime/workflows/jev/billing/documents/availability с `-m 'not integration'`: 35 passed, 5 skipped, 9 deselected. API bridge `pnpm --filter @comit/api exec tsx --test tests/organization-agent-tools.test.ts`: 9 passed. PG integration, реальные кандидатские переговоры и production-контур не проверены.
+Проверки: Python `pytest` tools/runtime/workflows/jev/billing/documents/availability с `-m 'not integration'`: 35 passed, 5 skipped, 9 deselected. API bridge `pnpm --filter @comit/api exec tsx --test tests/organization-agent-tools.test.ts`: 9 passed. PG integration, реальные кандидатские переговоры и production-контур — следующие этапы проверки.
 
 Для нетехнических вопросов system prompt просит отвечать простым русским языком. Внутренние имена инструментов и переменных, UUID, номера задач и ревизий не следует показывать, пока работодатель прямо не попросит технические подробности. В provider-контекст включается авторитетная ревизия context, в том числе после compaction: очистка истории меняет hash нового запроса и не позволяет воскресить старый кэшированный ответ.
 
 
-Локальная диагностика 2026-10-09: воркеры AI завершались при разрыве PostgreSQL-соединения в polling/claim. Оба долгоживущих режима теперь повторяют подключение с задержкой 1–30 секунд и прекращают ожидание при shutdown; режим `--once` сохраняет диагностическое завершение с ошибкой. Тесты проверяют восстановление, остановку и отсутствие retry для ошибок программирования. Matching worker отдельно был завершён OOM (exit137); это подтверждает нехватку памяти Docker VM, но исторический пик и конкретный потребитель не восстановлены. Локальный worker запущен повторно; настройки Docker и production не менялись.
+Локальная диагностика 2026-10-09: воркеры AI завершались при разрыве PostgreSQL-соединения в polling/claim. Оба долгоживущих режима теперь повторяют подключение с задержкой 1–30 секунд и прекращают ожидание при shutdown; режим `--once` сохраняет диагностическое завершение с ошибкой. Тесты проверяют восстановление, остановку и отсутствие retry для ошибок программирования. Matching worker отдельно был завершён OOM (exit137); это указывает на нехватку памяти Docker VM; исторический пик и конкретный потребитель остаются предметом дальнейшей диагностики. Локальный worker запущен повторно; настройки Docker и production не менялись.

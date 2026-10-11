@@ -1,8 +1,8 @@
 # Пилот Gemma как учителя, 06.10.2026
 
 Пилот **остановлен на формате ответа**, до проверки качества разметки.
-Отправлены пять из максимум двадцати запросов; остальные пятнадцать не запускались.
-Обучение, смена учителя основного датасета и активация R₀ не выполнялись.
+Отправлены пять из максимум двадцати запросов; остальные пятнадцать остаются в резерве.
+Обучение, смена учителя основного датасета и активация R₀ — следующие этапы.
 Исходные факты, prompts, raw responses, blind review, hashes и расход сохранены в
 [отчёте](../data/validation/rerank-gemma-teacher-pilot.json).
 
@@ -83,7 +83,7 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 Сначала отдельная проверка двух фиксированных direct/reverse запросов с новой
 версией промпта и простой схемой, без смешанных типов внутри evidence.
 Потратить можно часть оставшихся пятнадцати диагностических запросов; старая
-разметка и расход сохраняются. Это предложение, запуск не выполнен.
+разметка и расход сохраняются. Это предложение для следующего запуска.
 Даже успешный format probe не заменяет полный quality pilot и ручные проверки.
 
 Полная единая переразметка 599 профилей новым учителем по старому протоколу
@@ -107,7 +107,7 @@ API: `pnpm --filter @comit/api test` —22passed/2skipped, отдельные au
 тесты требуют `AUTH_TEST_DATABASE_URL`, этот контур не запускался.
 Smoke: `WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
 INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` —12проверок зелёные.
-Production, remote CI и реальная learned R₀ acceptance не проверялись.
+Production, remote CI и реальная learned R₀ acceptance — следующие этапы проверки.
 
 ## Разрешённая проверка простой схемы
 
@@ -152,11 +152,11 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 matching-engine `.venv/bin/ruff check src tests/test_rerank_gemma_format.py`
 зелёный. `pnpm typecheck`, `pnpm build` и прежняя команда `make smoke` с ports38xxx
 зелёные. Публичные API/shared контракты в format-пробе не менялись; отдельные
-API/auth tests до rebase не повторялись. Production/remote CI не проверялись.
+API/auth tests до rebase не повторялись. Production/remote CI — следующие этапы проверки.
 
 После переноса checkpoint на параллельный dev `c742bf3` повторены полные checks:
 436Python/PGtests passed, Ruff/typecheck/build/smoke12 зелёные.
 `pnpm --filter @comit/api test` —27passed/4skipped: отдельные auth/profile HTTP/PG
-tests требуют своих test database переменных и не выполнялись в этом контуре.
+tests требуют своих test database переменных и запускаются в отдельном контуре.
 Изменения профилей кандидата и freshness сохранены; matching format-probe
 не использует scores/main-v2 и не меняет исходные frozen synthetic факты.

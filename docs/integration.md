@@ -61,7 +61,7 @@
 
 Скоринговый буст за верифицированные достижения реализован отдельным модулем
 `services/matching-engine/src/matching_engine/fsp_boost.py`
-(`POLICY_VERSION = "fsp-boost-draft-v1"`) с unit-тестами `tests/test_fsp_boost.py`:
+(`POLICY_VERSION = "fsp-boost-draft-v1"`) с unit-тестами `services/matching-engine/tests/test_fsp_boost.py`:
 
 ```
 normalized = clamp(rating / 2000, 0, 1)

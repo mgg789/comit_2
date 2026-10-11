@@ -13,7 +13,7 @@ Feed поддерживает `POST /api/employer/vacancy-drafts/{draft_id}/feed
 видимости, отдельно от серверной выдачи. Rerank/Feed cards и RerankStatus добавляют
 activation_revision, approval_receipt_hash и activation_kind; `manual_override`
 явно обозначает исследовательский rollout при сохранённом failed gate.
-Публичной активации, dataset export и обучения нет.
+Активация, dataset export и обучение выполняются операторскими CLI-процессами, отдельно от публичного API.
 [Сбор карточек](real-card-learning.md), [активация](rerank-activation.md).
 
 > Правило (ТЗ §3.5): все методы описаны через OpenAPI; эндпоинты документированы — запросы, ответы, коды ошибок.
@@ -53,7 +53,9 @@ rerank доступен через `GET .../rerank` (`RerankStatus`), явное
 Порты — host-порты по умолчанию (`API_PORT`, `MATCHING_PORT`, `TESTING_PORT`,
 `INTEGRATION_PORT`, `AGENTS_PORT`, `VERIFICATION_PORT`, только loopback); внутри
 compose сервисы слушают 8080/8101/8102/8103/8104/8105. Полный граф api-core —
-220 операций (147 публичных и 73 `/internal/*`, без `/docs`).
+249 операций (174 публичных и 75 `/internal/*`, без `/docs`) при настроенной
+консоли поддержки; без `SUPPORT_EMAIL`/`SUPPORT_ACCESS_KEY` маршрутов `/support/*`
+нет и операций на 7 меньше. Полный перечень — [api-reference.md](api-reference.md).
 
 ## Текущие эндпоинты
 
@@ -142,6 +144,10 @@ contribution. Pending/rejected grade остаются блокирующими.
 | GET | `/healthz`, `/ready` | liveness/readiness |
 | GET | `/blueprints` | список blueprint'ов (шаблонов заданий) |
 | GET | `/blueprints/{id}` | один blueprint; 404 если нет |
+| GET | `/testing/preflight` | доступность попытки, cooldown, согласия и готовность судей (внутренний токен + владелец) |
+| POST | `/testing/sessions` | создать попытку |
+| GET | `/testing/sessions/{id}/next`, `/result` | следующее задание, итог |
+| POST | `/testing/sessions/{id}/answer`, `/supervision`, `/media`, `/finish`, `/abandon` | ответ, агрегаты наблюдения, запись, завершение, прерывание |
 
 Entry point запускает `create_testing_app` с авторизацией внутренних маршрутов
 `/testing/sessions/*`; браузер работает через API proxy ниже. Контракт и граница
@@ -153,6 +159,10 @@ Entry point запускает `create_testing_app` с авторизацией 
 |---|---|---|
 | GET | `/fsp/participants/{fsp_id}` | профиль участника ФСП из мок-реестра; **404** = истории нет (обязательный случай по ТЗ — не ошибка платформы) |
 | POST | `/fsp/verify` | сверка заявленного рейтинга с реестром: `{fsp_id, claimed_rating}` → `{fsp_id, verified, actual_rating}`; нет в реестре → `verified=false`, `actual_rating=null` |
+| GET | `/fsp/participants` | список учебных аккаунтов демо-реестра |
+| GET | `/fsp/participants/{fsp_id}/achievements/{claim_id}` | одно достижение участника |
+| GET, POST | `/fsp/demo/authorize`; POST `/fsp/demo/token` | демо-привязка: страница согласия, одноразовый код и его обмен ([fsp-link.md](fsp-link.md)) |
+| GET | `/healthz`, `/ready` | liveness/readiness |
 
 ## Правила контрактов
 
@@ -660,7 +670,7 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 Начальные ставки `expense-v1`: первая публикация вакансии 199 ₽; отправленное приглашение 49 ₽; просроченный дедлайн работодателя 199 ₽; ИИ — фактическая стоимость провайдера сверх 10 ₽ за московский календарный день, перевод по зафиксированному курсу 100 ₽/USD. Дневная сумма округляется вверх до копейки один раз на накопленном превышении, а не для каждого вызова. Изменение тарифов требует новой версии политики, исторические начисления не пересчитываются.
 
-Некачественная ОС не определяется автоматически. Начисление 199 ₽ появляется исключительно после ручного решения поддержки через закрытую DB-функцию `record_support_feedback_expense(owner,vacancy,decision,explanation)`: идентификатор решения обязателен, повтор идемпотентен, функция отозвана у PUBLIC. Endpoint работодателя для этого не существует.
+Качество ОС оценивает человек, а не автоматика. Начисление 199 ₽ появляется исключительно после ручного решения поддержки через закрытую DB-функцию `record_support_feedback_expense(owner,vacancy,decision,explanation)`: идентификатор решения обязателен, повтор идемпотентен, функция отозвана у PUBLIC. Endpoint работодателя для этого не существует.
 
 
 ### История подтверждённых тестов кандидата
@@ -671,7 +681,7 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 Ответ 200: `{recorded:true, grade, decided_at}`; без `TESTING_ENGINE_TOKEN` — 503 `testing_not_configured`, неверный токен — 401, cooldown — 409 `retake_cooldown`/`grade_upgrade_cooldown`. Publisher адаптивного контура (`services/testing-engine/src/testing_engine/publisher.py`) отправляет именно этот контракт и берёт `tasks_given` (число оценённых адаптивных ответов) для wire `tasks_answered`. Compose передаёт testing-engine `TESTING_API_URL` и токен; entrypoint запускает адаптивный контур и trusted publisher ([testing-engine.md](testing-engine.md)). Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
 
-`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.
+`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённых миграциях `021_support_console.sql` и `021_weekly_challenges.sql`; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.
 
 ## Кандидатский тест: браузерный API
 
@@ -681,7 +691,7 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 В подтверждённом внутреннем результате optional `camera_status` передаётся как granted/denied/unavailable и сохраняется в grade-evidence. Старые результаты без явного выбора камеры получают unknown, а не «отказ». Защищённый detail работодателя `/employer/candidates/:id` добавляет только `testing_results` (subject, grade, supervision_badge, camera_status), после проверки актуальности публичной проекции; запись, внутренние идентификаторы и сырые счётчики не раскрываются. Preflight возобновления содержит active_session_consents, active_supervision, next_sequence и active_session_status. Накопительные supervision checkpoints не могут уменьшаться, а отказ камеры сохраняется при возобновлении. Capture_finalized делает повтор завершения после потерянного ответа безопасным.
 
-Согласие processing обязательно для новых попыток. screen_recording соответствует режиму на старте: true для full, false для off. Режим фиксируется в попытке; active_recording_enabled возвращает его при возобновлении, а recording_enabled — текущую настройку для новых попыток. Старые попытки без сохранённого режима не принимают запись; legacy processing в preflight может отсутствовать и не восстанавливается задним числом. Сервер ограничивает total_seconds фактическим временем с начала попытки + 5 секунд; без сохранённого video_analysis всегда принудительно camera=denied. Эти клиентские показатели не являются доказательством честности.
+Согласие processing обязательно для новых попыток. screen_recording соответствует режиму на старте: true для full, false для off. Режим фиксируется в попытке; active_recording_enabled возвращает его при возобновлении, а recording_enabled — текущую настройку для новых попыток. Старые попытки без сохранённого режима не принимают запись; legacy processing в preflight может отсутствовать и не восстанавливается задним числом. Сервер ограничивает total_seconds фактическим временем с начала попытки + 5 секунд; без сохранённого video_analysis всегда принудительно camera=denied. Эти клиентские показатели — вспомогательный сигнал присутствия; решение о добросовестности остаётся за человеком.
 
 ## Дополнения: импорт, ФСП и практика
 
