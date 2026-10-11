@@ -56,7 +56,7 @@ def validate(config, public_url):
 
 
 LEGACY_SERVICES = frozenset({'web', 'api', 'matching-engine', 'postgres', 'testing-engine', 'integration-engine'})
-PUBLIC_SMOKE_ROUTES = [('/', '200'), ('/candidate/', '200'), ('/employer/', '200'), ('/testing/', '200'), ('/api/candidate/testing/preflight?specialization=sql', '401'), ('/api/auth/candidate/me', '401'), ('/api/auth/employer/me', '401'), ('/api/public/showcase/candidates', '200'), ('/api/public/showcase/vacancies', '200'), ('/api/ready', '200')]
+PUBLIC_SMOKE_ROUTES = [('/', '200'), ('/candidate/', '200'), ('/employer/', '200'), ('/testing/', '200'), ('/support/', '200'), ('/api/candidate/testing/preflight?specialization=sql', '401'), ('/api/auth/candidate/me', '401'), ('/api/auth/employer/me', '401'), ('/api/public/showcase/candidates', '200'), ('/api/public/showcase/vacancies', '200'), ('/api/ready', '200')]
 
 
 def snapshot_plan(config, live, adopt_legacy=False):

@@ -21,6 +21,9 @@ import { EmployerProfileStore } from "../employers/store.js";
 import { employerProfileRoutes } from "../routes/employer-profile.js";
 import { SystemNotificationsStore } from "../notifications/system-store.js";
 import { notificationRoutes } from "../routes/notifications.js";
+import { loadSupportConfig, type SupportConfig } from "../support/config.js";
+import { SupportConsoleStore } from "../support/store.js";
+import { supportRoutes } from "../routes/support.js";
 import { CandidateRecommendationsStore } from "../recommendations/store.js";
 import { recommendationsRoutes } from "../recommendations/routes.js";
 import { WeeklyRecommendationWorker } from "../recommendations/worker.js";
@@ -83,6 +86,10 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
     { initialWorkingDays: 4, reminderWorkingDays: 3, hireOn: "offer_accept" }, notifications);
   await app.register(employerProfileRoutes, { ...options, employerProfiles });
   await app.register(notificationRoutes, { ...options, notifications });
+  let supportConfig: SupportConfig | null = null;
+  try { supportConfig = loadSupportConfig(); } catch { app.log.warn({ code: "support_config_invalid" }, "Support console disabled: invalid configuration"); }
+  if (supportConfig) await app.register(supportRoutes, { config, support: supportConfig,
+    sessions: new SupportConsoleStore(pool), notifications });
   const recommendations = new CandidateRecommendationsStore(pool, { notifyInTransaction: async (client, candidateId, item) => {
     await notifications.append(client, candidateId, `recommendation:${item.recommendation_id}`, "recommendation.weekly",
       item.state === "ready" ? "Новые рекомендации от платформы готовы. Посмотрите их в статистике." : "Обновлены рекомендации от платформы. Посмотрите их в статистике.",

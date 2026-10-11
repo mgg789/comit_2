@@ -13,6 +13,7 @@ PROBES = (
     ('/candidate/', 200, 'html', 'кабинет кандидата'),
     ('/employer/', 200, 'html', 'кабинет работодателя'),
     ('/testing/', 200, 'html', 'сервис тестирования'),
+    ('/support/', 200, 'html', 'служба поддержки'),
     ('/design/comit-mark.svg', 200, 'svg', None),
     ('/design/showcase-icon.svg', 200, 'svg', None),
     ('/api/healthz', 200, 'health', None),

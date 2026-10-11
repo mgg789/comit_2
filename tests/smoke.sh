@@ -70,6 +70,7 @@ check "welcome showcase asset" "http://localhost:${WEB_PORT}/design/showcase-ico
 check "web candidate" "http://localhost:${WEB_PORT}/candidate/"       "кабинет кандидата" || failures=$((failures + 1))
 check "web employer"  "http://localhost:${WEB_PORT}/employer/"        "кабинет работодателя" || failures=$((failures + 1))
 check "web testing" "http://localhost:${WEB_PORT}/testing/" "сервис тестирования" || failures=$((failures + 1))
+check "web support"   "http://localhost:${WEB_PORT}/support/"         "служба поддержки" || failures=$((failures + 1))
 check_status "internal API hidden" "http://localhost:${WEB_PORT}/api/internal/strict-schema" 404 || failures=$((failures + 1))
 check "api via nginx" "http://localhost:${WEB_PORT}/api/healthz"      '"service":"api-core"' || failures=$((failures + 1))
 check "blueprints"    "http://localhost:${TESTING_PORT}/blueprints"   "algo-hash-lookup" || failures=$((failures + 1))

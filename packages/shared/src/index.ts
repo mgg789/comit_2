@@ -120,6 +120,7 @@ export * from "./business-time.js";
 export * from "./recommendations.js";
 export type * from "./notifications.js";
 export type * from "./employer-profile.js";
+export type * from "./support.js";
 
 export type * from "./testing-history.js";
 

@@ -2,7 +2,7 @@
 
 `infra/docker-compose.yml` содержит полный production runtime. `docker-compose.prod.yml`
 сохраняет совместимость существующего deploy workflow и содержит тот же стек.
-Наружу публикуется один web: `/`, `/candidate/`, `/employer/`, `/testing/`, `/api/`.
+Наружу публикуется один web: `/`, `/candidate/`, `/employer/`, `/testing/`, `/support/`, `/api/`.
 Testing UI обращается к API от имени кандидата; testing-engine остаётся внутренним backend. Его порт, как и
 порты API/engines, опубликован только на loopback для smoke и диагностики.
 
@@ -163,7 +163,7 @@ SMTP использует существующий host relay Navix на пор�
 
 После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Laya: он не мешает запуску worker публикации/DeepSeek, а обогащение остаётся недоступным с ручным редактированием.
 
-Статические файлы всех четырёх приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
+Статические файлы всех пяти приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
 
 ## Запись тестирования
 
@@ -270,6 +270,7 @@ release; эти проверки подключения сами по себе �
 | `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`, `CODE_JUDGE_CA_PEM` | testing | `off`; judge задаётся оператором | режим записи, адрес изолированного judge, отдельный token и optional частный CA ([testing-engine.md](testing-engine.md)) |
 | `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106, `/data`, GID socket задаётся оператором | отдельный judge compose на disposable VM |
 | `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |
+| `SUPPORT_EMAIL`, `SUPPORT_ACCESS_KEY` | api | пусто — консоль отключена | оператор службы поддержки ([support-console.md](support-console.md)); пара не задана — маршруты отсутствуют, задана наполовину — предупреждение при старте |
 
 ### Отдельная внешняя проверка после CD
 
@@ -278,7 +279,7 @@ Ubuntu, вне mgg. Адрес берётся из repository variable `PUBLIC_S
 умолчанию `https://comit.droidje.com`. Он использует системные CA и проверку
 hostname, не следует redirects и не передаёт cookies или секреты.
 
-`infra/public-smoke.py` проверяет четыре HTML-приложения, SVG assets, публичные
+`infra/public-smoke.py` проверяет пять HTML-приложений, SVG assets, публичные
 `/api/healthz` и `/api/ready` (JSON service/status), обе витрины (pagination
 contract), три границы входа (401 + JSON unauthenticated), скрытый internal
 маршрут (404). Ответы ограничены 2 MiB и 15 секундами; до трёх попыток.

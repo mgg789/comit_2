@@ -56,6 +56,8 @@ services:
       FSP_DEMO_ENABLED: 'false'
       TESTING_ENGINE_URL: http://testing-engine:8102
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
+      SUPPORT_EMAIL: "${SUPPORT_EMAIL:-}"
+      SUPPORT_ACCESS_KEY: "${SUPPORT_ACCESS_KEY:-}"
       PUBLIC_SITE_URL: "${PUBLIC_SITE_URL:?Set HTTPS public site URL}"
     depends_on:
       postgres:

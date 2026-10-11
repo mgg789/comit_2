@@ -116,6 +116,10 @@ No silent scope growth: new ideas become explicit tasks for the human to priorit
 
 Completed work is logged to the vault: one append-only line in `projects/comit/tasks.md` (`- YYYY-MM-DD HH:MM — what was done (scope)`).
 
+## 7.1 GitHub Issues
+
+At session start and at meaningful checkpoints, check open GitHub Issues. Confirmed, still-relevant issues are fixed within the allowed repository scope even if the user did not name the issue. Compare the issue description against current code: do not blindly touch items already fixed or unconfirmed; for anything outside the allowed scope, record the problem and report it to the owner.
+
 ## 8. Documentation (mandatory, /docs)
 
 Every exported function, class, hook, module carries a doc comment (JSDoc/docstring): purpose, params, return, non-obvious constraints (units, time zones, side effects). Comments explain constraints, not mechanics.

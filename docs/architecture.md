@@ -31,7 +31,7 @@
 ## Контур
 
 ```
-web (nginx, один контейнер: welcome / , /candidate/, /employer/, /testing/)
+web (nginx, один контейнер: welcome / , /candidate/, /employer/, /testing/, /support/)
         │ /api/*  (/api/internal/* → 404)
         ▼
 api-core (Fastify, :8080)  ────────────  PostgreSQL 16 + pgvector
@@ -58,11 +58,39 @@ services/agents-service      services/verification-engine qgramm-chat (Go bridge
 | `services/integration-engine` | FastAPI | Мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`, достижения) и демо-привязка (`/fsp/demo/authorize`, `/fsp/demo/token`) | Внешние источники меняются независимо от ядра |
 | `services/verification-engine` | FastAPI | Внутренние `/verify/fsp`, `/verify/repository`, `/verify/hh` под сервисным токеном; без candidate id ([verification.md](verification.md)) | Сетевые проверки внешних провайдеров изолированы от ядра |
 | `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
-| `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям, общая витрина и тестирование | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
+| `apps/{candidate,employer,testing,welcome,support}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям, общая витрина, тестирование и консоль поддержки | Один nginx, 5 сборок (`infra/web.Dockerfile`) |
 
 Публичная стартовая страница `apps/welcome` и её переходы описаны в [welcome-ui.md](welcome-ui.md); кабинеты — в [employer-ui.md](employer-ui.md) и [candidate-ui.md](candidate-ui.md).
 
 Чаты на QGramm интегрированы в кабинеты обеих ролей: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию, доступ по приглашению и текущее согласие под DB-locks. Системный чат Comit доставляет уведомления платформы.
+
+Консоль поддержки (`apps/support`, `/support/`) использует тот же API и системный
+чат Comit. Её оператор входит по отдельной паре `SUPPORT_EMAIL`/`SUPPORT_ACCESS_KEY`;
+сессии и операторские квитанции чтения хранятся в PostgreSQL API. Отсутствующая или
+некорректная конфигурация отключает API поддержки; HTML-приложение остаётся в
+web-образе. Чтение оператором не меняет пользовательские квитанции.
+[Контракт и ограничения](support-console.md).
+
+## Карта репозитория
+
+| Путь | Содержание |
+|---|---|
+| `apps/candidate`, `apps/employer`, `apps/testing`, `apps/welcome`, `apps/support` | React 19 + TS + Vite + Tailwind 4; все пять входят в web-образ, testing доступен на `/testing/`, консоль поддержки — на `/support/` |
+| `apps/api` | api-core (Fastify + OpenAPI) |
+| `packages/shared` | домен-типы и контракты (источник истины по типам) |
+| `packages/ui-kit` | дизайн-токены и базовые компоненты (гамма ФСП) |
+| `packages/api-client` | типизированный HTTP-клиент |
+| `services/matching-engine` | Python/FastAPI: подбор и объяснимость |
+| `services/testing-engine` | Python/FastAPI: тестирование (blueprints/, адаптивный контур) |
+| `services/code-judge` | Python/FastAPI: authenticated broker, ресурсно ограниченные Docker задания на отдельной VM |
+| `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
+| `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
+| `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
+| `infra/` | docker-compose (production по умолчанию, dev, legacy overlays), Dockerfiles, nginx, QGramm bridge, postgres init, `deploy.py` |
+| `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
+| `tests/` | сквозной smoke-гейт и acceptance-сценарии |
+| `docs/` | живая документация (RU) |
+| `context/` | канон-контекст: ТЗ, исследование hh.ru, видение, механики, план |
 
 ## Auth и ownership
 
