@@ -89,3 +89,43 @@ def test_unavailable_code_prevents_start_without_consuming_attempt(tmp_path, mon
     response = client.post("/testing/sessions", json={"specialization": "python", "consents": {
         "processing": True, "version": "testing-media-v1", "screen_recording": False}})
     assert response.status_code == 503 and not list((tmp_path / "sessions").glob("*.json"))
+
+
+def test_code_judge_private_ca_keeps_certificate_validation(monkeypatch, tmp_path):
+    """Private trust is additive and never disables certificate or hostname checks."""
+    import ssl
+    import subprocess
+    import urllib.request
+
+    certificate = tmp_path / "ca.pem"
+    subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                    "-subj", "/CN=synthetic-judge-test", "-keyout", str(tmp_path / "key.pem"),
+                    "-out", str(certificate)], check=True, capture_output=True)
+    pem = certificate.read_text()
+    monkeypatch.setenv("CODE_JUDGE_URL", "https://judge.invalid")
+    monkeypatch.setenv("CODE_JUDGE_TOKEN", "synthetic-judge-token")
+    monkeypatch.setenv("CODE_JUDGE_CA_PEM", pem.replace("\n", "\\n"))
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self, limit):
+            return b'{"runner":"docker-isolated"}'
+
+    def open_request(request, *, timeout, context):
+        assert request.full_url == "https://judge.invalid/ready"
+        assert timeout == 12
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname
+        assert len(context.get_ca_certs()) > 1
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", open_request)
+    assert CodeJudgeClient().ready()
+    monkeypatch.setenv("CODE_JUDGE_CA_PEM", "malformed certificate")
+    assert not CodeJudgeClient().ready()
+    assert CodeJudgeClient().judge({"function_name": "solve", "tests": []}, "code")[0] is None

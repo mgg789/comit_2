@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate Compose modes using only synthetic values; never read project .env secrets."""
-import json,os,subprocess,base64
+import json,os,subprocess,base64,re
 from pathlib import Path
 r=Path(__file__).resolve().parents[1]
 env={'PATH':os.environ['PATH'],'HOME':os.environ['HOME']}
@@ -32,10 +32,33 @@ assert d['services']['testing-engine']['environment']['CODE_JUDGE_URL']=='http:/
 assert all('/var/run/docker.sock' not in str(v.get('volumes', [])) for v in d['services'].values())
 missing_judge=subprocess.run(['docker','compose','--env-file','/dev/null','-f','infra/docker-compose.dev.yml','--profile','dev','config','--quiet'],env={'PATH':os.environ['PATH'],'HOME':os.environ['HOME']},cwd=r,capture_output=True)
 assert missing_judge.returncode!=0
+# Render with the actual scalar smoke-job environment, not a second hand-built
+# fixture: this catches newly required Compose variables omitted by CI.
+workflow=(r/'.github/workflows/ci.yml').read_text()
+smoke_block=workflow.split('\n  smoke:\n',1)[1]
+smoke_env_block=smoke_block.split('\n    env:\n',1)[1].split('\n    steps:\n',1)[0]
+smoke_env={'PATH':os.environ['PATH'],'HOME':os.environ['HOME']}
+for line in smoke_env_block.splitlines():
+ match=re.fullmatch(r'      ([A-Z][A-Z0-9_]*): (.+)',line)
+ if match:
+  value=match[2].strip()
+  if value[:1] in ('"',"'") and value[-1:]==value[:1]:value=value[1:-1]
+  assert '${{' not in value,'Smoke config regression requires literal synthetic env values'
+  smoke_env[match[1]]=value
+assert smoke_env.get('CODE_JUDGE_URL')=='http://127.0.0.1:1','Generic smoke must explicitly use its unreachable local judge endpoint'
+assert smoke_env.get('CODE_JUDGE_TOKEN')=='synthetic-ci-unavailable-judge-token'
+ci=cfg('infra/docker-compose.dev.yml',True,smoke_env)
+ci_testing=ci['services']['testing-engine']['environment']
+assert ci_testing['CODE_JUDGE_URL']==smoke_env['CODE_JUDGE_URL']
+assert ci_testing['CODE_JUDGE_TOKEN']==smoke_env['CODE_JUDGE_TOKEN']
+assert ci_testing['TESTING_ENGINE_TOKEN']==smoke_env['TESTING_ENGINE_TOKEN']
+assert 'Verify unavailable code judge stays fail-closed' in smoke_block
+assert 'Code judge isolation (disposable runner)' in workflow
+assert 'tests/test_docker_acceptance.py' in workflow
 assert d['services']['integration-engine']['environment']['APP_ENV']=='development'
 assert d['name']=='comit-dev';assert d['services']['api']['environment']['DEV_AUTH_EXPOSE_CODE']=='true'
 assert d['services']['api']['environment']['NODE_ENV']=='development'
 assert all(v['profiles']==(['prod'] if n=='auth-mail-worker' else ['dev']) for n,v in d['services'].items())
 fail=subprocess.run(['docker','compose','--env-file','/dev/null','-f','infra/docker-compose.yml','config','--quiet'],env={'PATH':os.environ['PATH'],'HOME':os.environ['HOME']},cwd=r,capture_output=True)
 assert fail.returncode!=0
-print('PASS: production/dev config, migration order, workers, isolation, required secrets, prod compatibility')
+print('PASS: production/dev/actual CI smoke config, unavailable judge boundary, migration order, workers, isolation, required secrets, prod compatibility')

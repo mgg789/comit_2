@@ -143,6 +143,7 @@ services:
       TESTING_RECORDING_MODE: "${TESTING_RECORDING_MODE:-off}"
       CODE_JUDGE_URL: "${CODE_JUDGE_URL:?Set URL of the isolated code judge}"
       CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set the isolated judge token}"
+      CODE_JUDGE_CA_PEM: "${CODE_JUDGE_CA_PEM:-}"
       JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
       JEV_API_KEY: "${JEV_API_KEY:-}"
       JEV_MODEL: "${JEV_MODEL:-kev-latest}"

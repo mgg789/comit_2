@@ -86,8 +86,13 @@ Production проверяющий VM этим проходом не развор
 идентичный повтор.
 
 Локальная сборка нового broker Dockerfile остановилась на сетевом EOF
-`auth.docker.io` до сборки слоёв; это не подтверждение готовности образа.
-Отдельный CI job собирает образ и выполняет HTTP acceptance на одноразовой VM.
+`auth.docker.io` до сборки слоёв. На checkpoint `3af2b3a` отдельный CI job
+`Code judge isolation (disposable runner)` успешно собрал образ и выполнил
+Docker isolation и HTTP acceptance (run 38104676570). Generic compose smoke
+того прогона выявил отсутствующие обязательные judge env; исправление передаёт
+явный недоступный endpoint и проверяет HTTP-отказ без расхода попытки.
+Приватный TLS CA покрыт регрессией: стандартные корни и hostname verification
+сохраняются, malformed CA блокирует judge; focused suite — 6 passed.
 
 
 Браузер: desktop 1280×720 — добавление Python через закрытый каталог, именованные

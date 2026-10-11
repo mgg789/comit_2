@@ -26,6 +26,15 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 - Smoke использует `--env-file /dev/null`: defaults только явного dev compose, без `.env` продакшена.
   Все семь опубликованных API/service портов, включая agents/verification, находятся в 38xxx.
+- Generic smoke явно задаёт `CODE_JUDGE_URL=http://127.0.0.1:1` внутри testing-engine
+  и синтетические сервисные токены: этот endpoint недоступен. После обычного smoke
+  отдельный HTTP-шаг проверяет `code_ready=false`, отсутствие типа `code`, отказ
+  старта Python/Algorithms с 503 и отсутствие израсходованной попытки. Это не
+  подтверждение готовности судьи: реальный Docker и HTTP broker проверяет отдельная
+  джоба `Code judge isolation`. `python3 tests/compose-config.py` рендерит dev compose
+  также с фактическими значениями `smoke.env` из workflow, чтобы обязательная новая
+  переменная не могла отсутствовать только в CI. Эта регрессия выполняется в
+  disposable isolation job, где уже доступны Python и Docker Compose.
 - До запуска smoke cache `comit-ci_harrier_cache` получает реальные model files из
   `comit_harrier_cache` через read-only mount, если он существует; копируется только
   `hub/models--microsoft--harrier-oss-v1-270m`, без HF credentials. При отсутствии

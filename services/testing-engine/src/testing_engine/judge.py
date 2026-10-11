@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import ssl
 import urllib.request
 from pathlib import Path
 
@@ -40,7 +41,11 @@ class CodeJudgeClient:
         request = urllib.request.Request(self.base_url + route,
             data=json.dumps(body).encode() if body is not None else None,
             headers={"content-type": "application/json", "x-internal-token": self.token})
-        with urllib.request.urlopen(request, timeout=55 if body else 12) as response:
+        context = ssl.create_default_context()
+        private_ca = os.getenv("CODE_JUDGE_CA_PEM", "").replace("\\n", "\n")
+        if private_ca:
+            context.load_verify_locations(cadata=private_ca)
+        with urllib.request.urlopen(request, timeout=55 if body else 12, context=context) as response:
             record = json.loads(response.read(65537))
         if not isinstance(record, dict):
             raise TypeError("invalid_judge_response")
