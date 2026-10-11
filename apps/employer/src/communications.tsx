@@ -35,7 +35,9 @@ import { useEmployerPreferences } from "./preferences";
 const employerInboxTransport: SystemInboxTransport = {
   getPage: (after, limit) => api.getSystemChat("employer", after, limit),
   markRead: read_sequence => api.markSystemChatRead("employer", { read_sequence }),
-  sendMessage: text => api.sendSystemChatMessage("employer", { idempotency_key: crypto.randomUUID(), text }),
+  sendMessage: (text, files) => api.sendSystemChatMessage("employer", { idempotency_key: crypto.randomUUID(), text, files }),
+  uploadFile: async file => api.uploadSystemChatFile("employer", { idempotency_key: crypto.randomUUID(), name: file.name, media_type: file.type || ({ pdf: "application/pdf", txt: "text/plain", md: "text/markdown", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" } as Record<string, string>)[file.name.split(".").pop()?.toLowerCase() ?? ""] || "application/octet-stream", data_base64: await fileBase64(file) }),
+  downloadFile: (fileId) => api.downloadSystemChatFile("employer", fileId),
 };
 
 const employerConversationTransport: ConversationTransport = {

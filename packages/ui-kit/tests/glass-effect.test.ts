@@ -26,12 +26,19 @@ test("public candidate salary does not invent an upper cap", () => {
   assert.equal(showcaseSalary({ from_rub: 120000, to_rub: 180000 }), "120–180к ₽");
 });
 
-// Both rendering paths must preserve the contrast-bearing selected tab and composer.
-test("experimental glass excludes foreground contrast surfaces in normal and fallback rules", () => {
+// The glass renderer must not replace privacy/contrast-bearing overlay backgrounds.
+test("experimental glass keeps composer, danger actions and popup backplates out of both render paths", () => {
   const css = readFileSync(new URL("../src/design.css", import.meta.url), "utf8");
-  const selectors = css.split("\n").filter(line => line.includes(":root[data-comit-glass]:not"));
+  const selectors = css.split("\n").filter(line => line.includes(":is(.glass:not(.glass-surface)"));
   assert.equal(selectors.length, 2);
   for (const selector of selectors) {
-    assert.ok(selector.includes(".glass:not(.glass-surface):not(.nav-item.selected):not(.communication-composer)"));
+    for (const exclusion of [":not(.communication-composer)", ":not(.action-danger)", ".modal", '[role="dialog"]', ".account-menu", ".notifications-menu", ".communication-modal > .panel"]) assert.ok(selector.includes(exclusion));
+    assert.ok(!selector.includes(".candidate-testing-tooltip"));
   }
+  assert.match(css, /\.nav-item\.selected \.icon \{ color: var\(--comit-text\); \}/);
+});
+
+test("multiline login consent centers the checkbox rather than inheriting top alignment", () => {
+  const css = readFileSync(new URL("../src/auth.css", import.meta.url), "utf8");
+  assert.match(css, /\.login-consent \.comit-checkbox\[type="checkbox"\] \{ align-self: center; \}/);
 });

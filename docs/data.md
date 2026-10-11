@@ -452,3 +452,14 @@ hash декларации, измеренный level, session id, сервер�
 ## Идентичности Яндекс OAuth
 
 Миграция `022_yandex_oauth.sql`: `auth_oauth_states` хранит только hash случайного browser-bound состояния, роль, версию принятого согласия и expiry (10 минут); DELETE…RETURNING обеспечивает одноразовое потребление между репликами. `auth_oauth_identities` связывает пару `(provider,subject)` с account UUID с каскадным удалением. Один provider identity не создаёт второй аккаунт; существующий email не связывается автоматически. OAuth-токены и client secret в БД не сохраняются. Просроченные состояния очищаются при новом старте входа.
+# System inbox attachments
+
+Миграция `023_system_chat_attachments.sql` хранит вложения поддержки в
+`system_chat_files` (owner `accounts`, ограниченный `bytea`, SHA-256 и UUID
+retry key) и связывает опубликованные файлы с `system_notifications` через
+`system_notification_files`. Обе таблицы используют `ON DELETE CASCADE`, поэтому
+удаление аккаунта или уведомления удаляет байты. Непривязанные файлы ограничены
+64 MiB на аккаунт; опубликованные и непривязанные вместе ограничены 256 MiB.
+Обе квоты проверяются под account inbox lock. Orphan-файлы старше суток
+очищаются при следующей загрузке и никогда не выдаются endpoint скачивания до
+публикации в сообщении.

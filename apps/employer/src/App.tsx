@@ -326,7 +326,7 @@ export default function App() {
               })} secondaryUnreadCount={unread?.total_unread_count} secondaryLabel="Переписка и приглашения" onSecondary={() => leaveAgent(() => navigate("/chat"))}
               toolsContent={<NotificationsButton unseen={notifications.unseen} open={notificationsOpen} onClick={() => { setMenu(false); if (!notificationsOpen) setNotificationsSeenBefore(notifications.markSeen()); setNotificationsOpen(!notificationsOpen); }} />}
               overlayContent={<AnimatePresence>{notificationsOpen && <NotificationsPanel ref={notificationsRef} events={notifications.events} seenBefore={notificationsSeenBefore} onSelect={processId => { setNotificationsOpen(false); leaveAgent(() => navigate(`/chat/${processId}`)); }} />}</AnimatePresence>}
-              menuContent={<><Action onClick={() => leaveAgent(() => navigate("/chat"))}>Мои чаты</Action><Action onClick={() => confirmAccountAction("logout")}>Выйти</Action><Action onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action></>}
+              menuContent={<><Action onClick={() => leaveAgent(() => navigate("/chat"))}>Мои чаты</Action><Action onClick={() => confirmAccountAction("logout")}>Выйти</Action><Action className="action-danger" onClick={() => confirmAccountAction("delete")}>Удалить аккаунт</Action></>}
             />
             <AnimatePresence>
               {accountAction && (

@@ -7,6 +7,16 @@ export const api = createApiClient();
 /** Explain known HTTP states without showing upstream internals or personal data. */
 export function errorText(reason: unknown): string {
   if (reason instanceof ApiError) {
+    const detail = reason.body && typeof reason.body === "object" && "detail" in reason.body ? reason.body.detail : null;
+    const fileMessages: Record<string, string> = {
+      invalid_system_file: "Поддерживаются PDF, TXT, MD, PNG, JPEG, GIF и WebP размером до 8 МБ; проверьте тип и содержимое файла.",
+      invalid_system_files: "В одном сообщении можно отправить не более 8 вложений.",
+      system_file_storage_limit: "Достигнут лимит неотправленных вложений 64 МБ. Отправьте подготовленные файлы или повторите загрузку через 24 часа.",
+      system_file_account_limit: "Достигнут общий лимит вложений 256 МБ. Продолжите переписку текстом.",
+      system_file_idempotency_conflict: "Повторная загрузка содержит изменённый файл. Выберите файл заново.",
+      system_file_not_found: "Вложение больше недоступно.",
+    };
+    if (typeof detail === "string" && Object.hasOwn(fileMessages, detail)) return fileMessages[detail]!;
     if (reason.status === 401)
       return "Сессия закончилась. Войдите снова.";
     if (reason.status === 403)
@@ -15,6 +25,8 @@ export function errorText(reason: unknown): string {
       return "Данные изменились. Обновите страницу перед повторной попыткой.";
     if (reason.status === 429)
       return "Слишком много запросов. Попробуйте позже.";
+    if (reason.status === 413)
+      return "Вложение слишком большое. Один файл — до 8 МБ, общий объём диалога — до 256 МБ.";
     if (reason.status === 400 || reason.status === 422)
       return "Проверьте заполненные поля.";
     if (reason.status === 404)

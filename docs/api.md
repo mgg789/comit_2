@@ -62,7 +62,7 @@ compose сервисы слушают 8080/8101/8102/8103/8104/8105. Полны�
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/healthz` | liveness: `{status, service, version}` |
-| GET | `/ready` | `{status:"ok", service, version}` только при валидной auth-конфигурации, доступной БД и применённых миграциях `021_support_console.sql` и `021_weekly_challenges.sql`; иначе 503 `{status:"unavailable"}` |
+| GET | `/ready` | `{status:"ok", service, version}` только при валидной auth-конфигурации, доступной БД и применённых миграциях `021_support_console.sql`, `021_weekly_challenges.sql`, `022_yandex_oauth.sql` и `023_system_chat_attachments.sql`; иначе 503 `{status:"unavailable"}` |
 | GET | `/metrics` | Prometheus-метрики процесса ([api-operations.md](api-operations.md)) |
 
 Аутентификация уже подключена в `apps/api`: пароль не используется. Код на email
@@ -653,7 +653,7 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 ## Профиль компании, сроки и уведомления
 
-`GET/PATCH /api/employer/profile`, `GET /api/{candidate|employer}/system-chat`, `POST /api/{role}/system-chat/read`, `POST /api/{role}/system-chat/messages` и `GET /api/{role}/chat-unread` используют владельца из сессии. DTO, CAS, пагинация, отправка сообщений в чат Comit, read receipts и fallback счётчика описаны в [system-inbox.md](system-inbox.md). Живая служба поддержки оператора — [support-console.md](support-console.md). API client использует те же контракты.
+`GET/PATCH /api/employer/profile`, `GET /api/{candidate|employer}/system-chat`, `POST /api/{role}/system-chat/read`, `POST /api/{role}/system-chat/messages`, `POST/GET /api/{role}/system-chat/files` и `GET /api/{role}/chat-unread` используют владельца из сессии. DTO, CAS, пагинация, вложения, read receipts и fallback счётчика описаны в [system-inbox.md](system-inbox.md). Живая служба поддержки оператора — [support-console.md](support-console.md). API client использует те же контракты.
 
 `RecruitmentView` дополнен `deadline` и terminal состоянием `expired`; closure допускает `actor=system`, категории feedback. `company_name` в InviteRequest стал необязательным совместимым полем: авторитетное название берётся из employer profile; несовпадение отклоняется. Причины отказа требуют содержательного текста и категорий. Полная таблица переходов — [recruitment.md](recruitment.md).
 

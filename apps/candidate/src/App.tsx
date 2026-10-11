@@ -12,7 +12,9 @@ import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen
 const candidateInboxTransport: SystemInboxTransport = {
   getPage: (after, limit) => api.getSystemChat("candidate", after, limit),
   markRead: read_sequence => api.markSystemChatRead("candidate", { read_sequence }),
-  sendMessage: text => api.sendSystemChatMessage("candidate", { idempotency_key: crypto.randomUUID(), text }),
+  sendMessage: (text, files) => api.sendSystemChatMessage("candidate", { idempotency_key: crypto.randomUUID(), text, files }),
+  uploadFile: async file => new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => { if (typeof reader.result !== "string") return reject(new Error("file_read")); const types: Record<string, string> = { pdf: "application/pdf", txt: "text/plain", md: "text/markdown", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }; void api.uploadSystemChatFile("candidate", { idempotency_key: crypto.randomUUID(), name: file.name, media_type: file.type || types[file.name.split(".").pop()?.toLowerCase() ?? ""] || "application/octet-stream", data_base64: reader.result.split(",")[1] || "" }).then(resolve, reject); }; reader.onerror = reject; reader.readAsDataURL(file); }),
+  downloadFile: (fileId) => api.downloadSystemChatFile("candidate", fileId),
 };
 const candidateUnread = () => api.getChatUnread("candidate");
 const navigation = [

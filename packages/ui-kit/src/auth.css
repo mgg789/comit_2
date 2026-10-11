@@ -461,3 +461,6 @@
   .yandex { font-size: 32rem; height: 48rem; }
   .login-card .checkbox { gap: 12rem; }
 }
+
+/* The consent can wrap to multiple lines; override the reusable top-aligned checkbox. */
+.login-consent .comit-checkbox[type="checkbox"] { align-self: center; }

@@ -1,7 +1,7 @@
 /** Durable operator sessions and read cursors for the support console; content stays in system_notifications. */
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Pool, QueryResultRow } from "pg";
-import type { AccountRole, SupportConversationPage, SupportMessagePage, SupportReadStatus } from "@comit/shared";
+import type { AccountRole, SupportConversationPage, SupportMessagePage, SupportReadStatus, SystemChatFile } from "@comit/shared";
 import { hashSessionId, createSessionId } from "../auth/crypto.js";
 import { SystemNotificationsError } from "../notifications/system-store.js";
 
@@ -17,7 +17,7 @@ interface ConversationRow extends QueryResultRow {
 }
 interface MessageRow extends QueryResultRow {
   id: string; sequence: string; type: string; text: string; created_at: Date;
-  target: import("@comit/shared").SystemNotificationTarget | null;
+  target: import("@comit/shared").SystemNotificationTarget | null; files: SystemChatFile[];
 }
 
 const validSequence = (value: number) => Number.isSafeInteger(value) && value >= 0;
@@ -86,9 +86,12 @@ export class SupportConsoleStore {
     if (!validSequence(after) || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
       throw new SystemNotificationsError(422, "invalid_support_cursor");
     }
-    const rows = (await this.pool.query<MessageRow>(`SELECT id,sequence,type,text,target,created_at FROM system_notifications
-      WHERE account_id=$1 AND sequence>$2 ORDER BY sequence LIMIT $3`, [accountId, after, limit + 1])).rows;
-    const items = rows.slice(0, limit).map(row => ({ ...row, sequence: Number(row.sequence), created_at: row.created_at.toISOString() }));
+    const rows = (await this.pool.query<MessageRow>(`SELECT n.id,n.sequence,n.type,n.text,n.target,n.created_at,
+        (SELECT COALESCE(json_agg(json_build_object('id',f.id,'name',f.name,'media_type',f.media_type,'size',f.size_bytes,'sha256',f.sha256) ORDER BY nf.ordinal),'[]'::json)
+          FROM system_notification_files nf JOIN system_chat_files f ON f.id=nf.file_id WHERE nf.notification_id=n.id) AS files
+      FROM system_notifications n WHERE n.account_id=$1 AND n.sequence>$2 ORDER BY n.sequence LIMIT $3`, [accountId, after, limit + 1])).rows;
+    const items = rows.slice(0, limit).map(row => ({ id: row.id, sequence: Number(row.sequence), type: row.type, text: row.text,
+      target: row.target, files: row.files ?? [], created_at: row.created_at.toISOString() }));
     return { items, next_sequence: items.at(-1)?.sequence ?? after, has_more: rows.length > limit };
   }
 

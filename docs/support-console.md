@@ -36,7 +36,9 @@ rate limit действует per-IP троттлинг неудачных вх�
 | `POST /api/support/logout` | Отзыв сессии и очистка cookie |
 | `GET /api/support/conversations?offset&limit` | Страница диалогов: `{items:[{account_id,email,role,last_sequence,last_text,last_created_at,unread_count}], has_more}`, сортировка по свежей активности |
 | `GET /api/support/conversations/{account_id}/messages?after_sequence&limit` | Возрастающая страница сообщений диалога (без чужих read-квитанций) |
-| `POST /api/support/conversations/{account_id}/messages` | `{idempotency_key, text}` → ответ от имени Comit (`support.reply`) |
+| `POST /api/support/conversations/{account_id}/messages` | `{idempotency_key, text?: 0..2000, files?: SystemChatFile[]}` (текст или файл обязателен) → ответ от имени Comit (`support.reply`) |
+| `POST /api/support/conversations/{account_id}/files` | `{idempotency_key, name, media_type, data_base64}` → метаданные файла; лимит 8 MiB на файл, 64 MiB неподтверждённых и 256 MiB общего объёма файлов аккаунта |
+| `GET /api/support/conversations/{account_id}/files/{file_id}` | Base64-байты опубликованного файла; доступен авторизованному оператору только в указанном диалоге |
 | `POST /api/support/conversations/{account_id}/read` | `{read_sequence}` → `{read_sequence, unread_count}` операторская квитанция |
 
 Мутации требуют разрешённый Origin (`AUTH_ALLOWED_ORIGINS`), ответы идут с
@@ -51,6 +53,13 @@ UUID аккаунта — тот же `404`, что и несуществующ�
 пользователь не получает ложных «прочитано». Диалог можно открыть и для
 аккаунта, который ещё ничего не писал: ответ создаст inbox, пользователь
 увидит его при следующем входе.
+
+Поддерживаются PDF, TXT/MD, PNG, JPEG, GIF и WebP. API проверяет media type и
+магическую сигнатуру байтов, поэтому HTML/SVG и файл с подменённым расширением
+не принимаются. Квоты считаются под блокировкой inbox и одинаково применяются к владельцу диалога и оператору; при превышении API возвращает `413` с кодом `system_file_storage_limit` или `system_file_account_limit`. Скачивание остаётся JSON/Base64 с `nosniff` и `private, no-store`;
+браузер сохраняет байты как файл и не открывает их inline. Вложения лежат в
+`system_chat_files` и связываются с сообщением через `system_notification_files`;
+удаление аккаунта удаляет их по FK CASCADE.
 
 ## Экраны
 
