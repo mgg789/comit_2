@@ -48,7 +48,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 - Чаты найма на [QGramm](https://github.com/mgg789/QGramm): серверное шифрование сообщений и вложений.
 - Системный чат Comit в обоих кабинетах: уведомления платформы и живая служба поддержки.
 - Агент работодателя (DeepSeek/Laya): черновик вакансии из свободного описания, глобальный чат-ассистент с фоновыми поручениями и учётом бюджета.
-- Статистика найма у работодателя, публичная витрина только из согласившихся кандидатов, email-уведомления о событиях.
+- Статистика найма у работодателя, публичная витрина вакансий и согласившихся соискателей с обязательными зарплатными вилками, email-уведомления о событиях.
 - 152-ФЗ: раздельные согласия на обработку, публикацию в пуле и обучение моделей; отказ от обучения не ломает обычный подбор.
 - Внешние вызовы кэшируются; недоступность провайдера явно отражается в интерфейсе. Проверка кода требует доступного изолированного judge, развёрнутого ответа — Jev/DeepSeek; сбой сохраняет ответ для повтора и не превращается в неверный результат.
 
@@ -154,12 +154,13 @@ issue с текущим кодом: уже исправленные и непо�
 | [docs/recruitment.md](docs/recruitment.md), [docs/chat.md](docs/chat.md) | Приглашения, правила видимости, чаты найма |
 | [docs/system-inbox.md](docs/system-inbox.md), [docs/support-console.md](docs/support-console.md) | Системный чат Comit и служба поддержки |
 | [docs/api.md](docs/api.md), [docs/data.md](docs/data.md) | Контракты API и данные |
+| [docs/anti-fraud-and-ats.md](docs/anti-fraud-and-ats.md) | Концепция: защита от фиктивных вакансий (плата за публикацию, карма работодателя, AI-guard) и интеграция с ATS |
 | [docs/deploy.md](docs/deploy.md), [docs/ci.md](docs/ci.md), [docs/runbook.md](docs/runbook.md) | Деплой, CI/CD, эксплуатация |
 
 ### Указатель документации
 
 - **Старт и обзор:** [quickstart](docs/quickstart.md), [environments](docs/environments.md), [services](docs/services.md), [architecture](docs/architecture.md), [architecture-diagrams](docs/architecture-diagrams.md), [user-flows](docs/user-flows.md), [glossary](docs/glossary.md), [faq](docs/faq.md), [team](docs/team.md), [packages](docs/packages.md).
-- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
+- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
 - **API и данные:** [api](docs/api.md), [api-reference](docs/api-reference.md), [api-operations](docs/api-operations.md), [cursor-pagination](docs/cursor-pagination.md), [data](docs/data.md), [auth](docs/auth.md).
 - **Кандидат:** [candidate-ui](docs/candidate-ui.md), [candidate-profile](docs/candidate-profile.md), [resume-import](docs/resume-import.md), [verification](docs/verification.md), [integration](docs/integration.md), [fsp-link](docs/fsp-link.md), [weekly-challenges](docs/weekly-challenges.md), [recommendations](docs/recommendations.md), [candidate-backend-audit](docs/candidate-backend-audit.md).
 - **Тестирование:** [testing-engine](docs/testing-engine.md), [testing-design](docs/testing-design.md).
