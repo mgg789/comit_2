@@ -24,7 +24,6 @@ test("real HTTP grade workflow stores scoped evidence and leaves the global grad
       version: "testing-media-v1", processing: true, screen_recording: true, video_analysis: false } }, token)).json();
     const sid: string = created.session_id; assert.ok(sid);
     assert.equal((await fetch(fixture.engineUrl + `/testing/sessions/${sid}/result`)).status, 401);
-    const bank = JSON.parse(await readFile(join(fixture.mediaDir, "items.json"), "utf8"));
     let typed = false;
     for (let step = 0; step < 30; step++) {
       const response = await get(`/candidate/testing/sessions/${sid}/next`);
@@ -32,8 +31,12 @@ test("real HTTP grade workflow stores scoped evidence and leaves the global grad
       assert.equal(response.status, 200);
       const question = (await response.json()).task;
       assert.equal(question.tests, undefined); assert.equal(question.expected_answers, undefined); assert.equal(question.answer_index, undefined);
+      const bank = JSON.parse(await readFile(join(fixture.mediaDir, "items.json"), "utf8"));
       const row = bank.find((item: { item_id: string }) => item.item_id === question.item_id);
-      const answer = question.type === "mcq" ? row.payload.answer_index : row.payload.expected_answers[0];
+      const answer = question.type === "mcq"
+        ? question.options.indexOf(row.payload.options[row.payload.answer_index])
+        : row.payload.expected_answers[0];
+      if (question.type === "mcq") assert.ok(answer >= 0, "Correct option must survive the visible permutation");
       typed ||= question.type === "short_answer";
       const answered = await post(`/candidate/testing/sessions/${sid}/answer`, { item_id: question.item_id, answer }, token);
       assert.equal(answered.status, 200);
