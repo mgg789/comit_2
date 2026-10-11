@@ -75,11 +75,12 @@ Production-контур, отличия dev/prod и запуск без Docker �
 - **api-core** — транзакционное ядро: auth, профили, вакансии, приглашения/статусы, рейтинговый ledger, правила видимости ТЗ §2.2.
 - **matching-engine** — «комбайн»: строгий фильтр → гибридный скоринг (фичи + эмбеддинг) → top-k → реранкер; реакции ленты обучают vacancy-local preference-модель (отдельный training-consent обязателен).
 - **testing-engine** — адаптивный грейд-тест с банком семи семейств, ротацией, прокторинг-агрегатами и trusted publisher в api-core. Код проверяет отдельный `services/code-judge` на изолированной VM; развёрнутые ответы — Jev/DeepSeek ([проверки](docs/package-validation.md)).
-- **integration-engine** — хостит мок-реестр ФСП и демо-привязку ФСП-профиля (реального API на хакатоне нет).
+- **integration-engine** — хостит учебный реестр ФСП и демо-привязку ФСП-профиля; на хакатоне он выступает источником данных ФСП вместо внешнего API.
+- **code-judge** — изолированная проверка кода на отдельной VM: каждый testcase в собственном Docker-контейнере (128 MiB, 0.5 CPU, 16 pids, UID 65534); testing-engine обращается к нему по `CODE_JUDGE_URL` ([services.md](docs/services.md)).
 - **verification-engine** — проверка внешних фактов профиля: ФСП (через мок integration-engine), публичный Git-репозиторий, резюме hh.ru; порт 8105, на хосте только loopback `VERIFICATION_PORT` (28105).
 - **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek) и глобальный агент работодателя (один чат на аккаунт, фоновые поручения через `organization-worker`); входит в основной compose вместе с `agents-worker` и `organization-agent-worker`.
 
-Подробности: `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`, `docs/verification.md`.
+Подробности: [обзор сервисов](docs/services.md), [диаграммы](docs/architecture-diagrams.md), `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`, `docs/verification.md`.
 
 В цикле 1 реализован серверный поток: подтверждённые/заявленные профили → пул
 с двумя векторами и PDF; вакансии с необязательными группами требований → ready;
@@ -112,7 +113,7 @@ rerank-run. Запуск шести matching worker и настоящие лок
 | `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
 | `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
 | `infra/` | docker-compose (production по умолчанию, dev, legacy overlays), Dockerfiles, nginx, QGramm bridge, postgres init, `deploy.py` |
-| `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
+| `data/` | синтетика и сиды: по ТЗ данные для подбора генерируются самостоятельно |
 | `tests/` | сквозной smoke-гейт и acceptance-сценарии |
 | `docs/` | живая документация (RU) |
 | `context/` | канон-контекст: ТЗ, исследование hh.ru, видение, механики, план |
@@ -121,7 +122,7 @@ rerank-run. Запуск шести matching worker и настоящие лок
 
 GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, лейбл `ci`):
 - **CI** — на PR и push в `dev`/`main`: typecheck+build JS-монорепо и frontend-тесты, pytest с unit coverage для matching/testing/integration/agents/verification/code-judge, API-тесты с coverage на disposable PostgreSQL, полный Python-набор с PostgreSQL на раннере `regression`, smoke в изолированном compose-проекте и отдельная реальная проверка code-judge на одноразовом GitHub-hosted runner;
-- **Deploy** — после успешного CI на push в `main` (или вручную): только текущий SHA `main`, immutable release в `/home/mgg/comit/releases/<SHA>`, backup БД, smoke и откат образов при ошибке ([deploy.md](docs/deploy.md)).
+- **Deploy** — после успешного CI на push в `main` (или вручную): только текущий SHA `main`, immutable release в `/home/mgg/comit/releases/<SHA>`, backup БД, smoke и откат образов при ошибке; затем публичный smoke с GitHub-hosted runner ([deploy.md](docs/deploy.md)).
 
 Ветки: работа в `dev`, стабильные состояния — PR в `main` (подробности и правила — `AGENTS.md`).
 
@@ -140,6 +141,12 @@ issue с текущим кодом: уже исправленные и непо�
 
 | Файл | О чём |
 |---|---|
+| [docs/quickstart.md](docs/quickstart.md) | Быстрый старт: от клонирования до первого сценария и проверок перед PR |
+| [docs/services.md](docs/services.md) | Карточки сервисов: назначение, порты, маршруты, переменные, данные |
+| [docs/architecture-diagrams.md](docs/architecture-diagrams.md) | Диаграммы Mermaid: контейнеры, старт, подбор, тест, CI/CD |
+| [docs/user-flows.md](docs/user-flows.md) | Сценарии кандидата, работодателя, AI-агента и оператора с маршрутами API |
+| [docs/api-reference.md](docs/api-reference.md) | Все 249 операций api-core по группам с типом доступа |
+| [docs/glossary.md](docs/glossary.md), [docs/faq.md](docs/faq.md) | Термины и частые вопросы |
 | [docs/environments.md](docs/environments.md) | Поднять dev или production, чем они отличаются |
 | [docs/architecture.md](docs/architecture.md) | Сервисы, потоки, карта репозитория |
 | [docs/matching.md](docs/matching.md) | Механика подбора, веса, объяснимость, валидация |
@@ -149,7 +156,22 @@ issue с текущим кодом: уже исправленные и непо�
 | [docs/api.md](docs/api.md), [docs/data.md](docs/data.md) | Контракты API и данные |
 | [docs/deploy.md](docs/deploy.md), [docs/ci.md](docs/ci.md), [docs/runbook.md](docs/runbook.md) | Деплой, CI/CD, эксплуатация |
 
-Полный перечень — в [docs/](docs/); вход для агентов — [`AGENTS.md`](AGENTS.md).
+### Указатель документации
+
+- **Старт и обзор:** [quickstart](docs/quickstart.md), [environments](docs/environments.md), [services](docs/services.md), [architecture](docs/architecture.md), [architecture-diagrams](docs/architecture-diagrams.md), [user-flows](docs/user-flows.md), [glossary](docs/glossary.md), [faq](docs/faq.md), [team](docs/team.md), [packages](docs/packages.md).
+- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
+- **API и данные:** [api](docs/api.md), [api-reference](docs/api-reference.md), [api-operations](docs/api-operations.md), [cursor-pagination](docs/cursor-pagination.md), [data](docs/data.md), [auth](docs/auth.md).
+- **Кандидат:** [candidate-ui](docs/candidate-ui.md), [candidate-profile](docs/candidate-profile.md), [resume-import](docs/resume-import.md), [verification](docs/verification.md), [integration](docs/integration.md), [fsp-link](docs/fsp-link.md), [weekly-challenges](docs/weekly-challenges.md), [recommendations](docs/recommendations.md), [candidate-backend-audit](docs/candidate-backend-audit.md).
+- **Тестирование:** [testing-engine](docs/testing-engine.md), [testing-design](docs/testing-design.md).
+- **Работодатель и агенты:** [employer-ui](docs/employer-ui.md), [vacancy-crud](docs/vacancy-crud.md), [vacancy-suggestions](docs/vacancy-suggestions.md), [employer-statistics](docs/employer-statistics.md), [agents](docs/agents.md), [agents-offline](docs/agents-offline.md), [organization-agent-acceptance](docs/organization-agent-acceptance.md).
+- **Найм и коммуникации:** [recruitment](docs/recruitment.md), [hiring-live-acceptance](docs/hiring-live-acceptance.md), [chat](docs/chat.md), [chat-events](docs/chat-events.md), [system-inbox](docs/system-inbox.md), [support-console](docs/support-console.md), [email-notifications](docs/email-notifications.md).
+- **Витрины и интерфейс:** [welcome-ui](docs/welcome-ui.md), [public-showcase](docs/public-showcase.md), [candidate-showcase](docs/candidate-showcase.md), [candidate-showcase-verification](docs/candidate-showcase-verification.md), [search-index](docs/search-index.md), [ui-kit](docs/ui-kit.md).
+- **Подбор и лента:** [matching](docs/matching.md), [matching-migrations](docs/matching-migrations.md), [feed-refill](docs/feed-refill.md), [feed-change-policy](docs/feed-change-policy.md), [preference-learning](docs/preference-learning.md), [preference-convergence](docs/preference-convergence.md), [hypothesis-learning](docs/hypothesis-learning.md), [hypothesis-validation](docs/hypothesis-validation.md), [real-card-learning](docs/real-card-learning.md).
+- **Реранкер R₀ (исследовательский журнал):** [rerank-mvp-status](docs/rerank-mvp-status.md), [rerank-activation](docs/rerank-activation.md), [rerank-hard-benchmark](docs/rerank-hard-benchmark.md), [rerank-grounded-cohort](docs/rerank-grounded-cohort.md), [rerank-grounded-cohort-acceptance](docs/rerank-grounded-cohort-acceptance.md), [rerank-cohort-training](docs/rerank-cohort-training.md), [rerank-cohort-review](docs/rerank-cohort-review.md), [rerank-cohort-pair-repair](docs/rerank-cohort-pair-repair.md), [rerank-cohort-pair-completion](docs/rerank-cohort-pair-completion.md), [rerank-class-only-oracle](docs/rerank-class-only-oracle.md), [rerank-current-sample-probe](docs/rerank-current-sample-probe.md), [rerank-grounded-teacher-pilot](docs/rerank-grounded-teacher-pilot.md), [rerank-gemma-teacher-pilot](docs/rerank-gemma-teacher-pilot.md), [rerank-teacher-comparison](docs/rerank-teacher-comparison.md), [rerank-transport-recovery](docs/rerank-transport-recovery.md), [rerank-frontend05-diagnosis](docs/rerank-frontend05-diagnosis.md).
+- **Эксплуатация:** [deploy](docs/deploy.md), [ci](docs/ci.md), [runbook](docs/runbook.md).
+- **Правовые тексты (тестовые):** [legal/README](docs/legal/README.md).
+
+Вход для агентов — [`AGENTS.md`](AGENTS.md).
 
 ## Лицензия
 
