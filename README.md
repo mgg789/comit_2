@@ -51,6 +51,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 
 **Обратная механика найма (ядро конкурса)**
 - Работодатель описывает потребность → получает подборку с объяснением «почему эти кандидаты» → смотрит свайп-ленту → приглашает с зарплатой «от–до». Кандидат не откликается — работа настигает его сама.
+- Без кнопки «откликнуться» — сознательно: массовые отклики вернут сервис к проблемам hh — спам заявкам и отсечению неадаптивными фильтрами. Вместо отклика кандидат управляет заметностью и конкурентной силой профиля: ИИ-рекомендации «что улучшить», ФСП-буст и недельные задания ([inverse-concept.md](docs/inverse-concept.md)).
 - Кандидат проходит опрос и предметные тесты по банку заданий с ограничением частоты. Результат подтверждает конкретный навык и его измеренный уровень; общий заявленный грейд профиля автоматически не переписывается ([testing-engine.md](docs/testing-engine.md)).
 - Профиль подтверждается внешними источниками: история ФСП, публичный Git-репозиторий, резюме hh.ru — с рейтингом подтверждённых полей и очками.
 
@@ -193,7 +194,7 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 ### Указатель документации
 
 - **Старт и обзор:** [quickstart](docs/quickstart.md), [environments](docs/environments.md), [services](docs/services.md), [architecture](docs/architecture.md), [architecture-diagrams](docs/architecture-diagrams.md), [user-flows](docs/user-flows.md), [glossary](docs/glossary.md), [faq](docs/faq.md), [team](docs/team.md), [packages](docs/packages.md).
-- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [152-fz-compliance](docs/152-fz-compliance.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
+- **Требования хакатона:** [core](docs/core.md), [additional](docs/additional.md), [anti-fraud-and-ats](docs/anti-fraud-and-ats.md), [152-fz-compliance](docs/152-fz-compliance.md), [inverse-concept](docs/inverse-concept.md), [judge-agents](docs/judge-agents.md), [package-validation](docs/package-validation.md), [demo-data](docs/demo-data.md).
 - **API и данные:** [api](docs/api.md), [api-reference](docs/api-reference.md), [api-operations](docs/api-operations.md), [cursor-pagination](docs/cursor-pagination.md), [data](docs/data.md), [auth](docs/auth.md).
 - **Кандидат:** [candidate-ui](docs/candidate-ui.md), [candidate-profile](docs/candidate-profile.md), [resume-import](docs/resume-import.md), [verification](docs/verification.md), [integration](docs/integration.md), [fsp-link](docs/fsp-link.md), [weekly-challenges](docs/weekly-challenges.md), [recommendations](docs/recommendations.md), [candidate-backend-audit](docs/candidate-backend-audit.md).
 - **Тестирование:** [testing-engine](docs/testing-engine.md), [testing-design](docs/testing-design.md).
