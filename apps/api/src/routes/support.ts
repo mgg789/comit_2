@@ -1,10 +1,10 @@
 /** Operator-only support console: reads every Comit conversation, replies as Comit. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { SupportLoginRequest, SystemChatMessageRequest } from "@comit/shared";
+import type { SupportLoginRequest, SystemChatFileUpload, SystemChatMessageRequest } from "@comit/shared";
 import type { AuthConfig } from "../auth/config.js";
 import { cookieName, originAllowed } from "../auth/session.js";
 import { SystemNotificationsError, type SystemNotificationsStore } from "../notifications/system-store.js";
-import { systemNotificationSchema, systemChatMessageSchema } from "../notifications/schemas.js";
+import { systemNotificationSchema, systemChatFileDownloadSchema, systemChatFileSchema, systemChatFileUploadSchema, systemChatMessageSchema } from "../notifications/schemas.js";
 import type { SupportConfig } from "../support/config.js";
 import type { SupportConsoleStore } from "../support/store.js";
 import { supportLoginRequestSchema, supportSessionSchema, supportOperatorSchema, supportConversationPageSchema,
@@ -116,9 +116,31 @@ export async function supportRoutes(app: FastifyInstance, options: SupportOption
     if (!accountId) return fail(reply, 404, "account_not_found");
     try {
       // Account-scoped idempotency: the prefixed key cannot collide with domain producers.
-      const item = await options.notifications.publish(accountId, `support-reply:${request.body.idempotency_key}`, "support.reply", request.body.text);
+      const item = await options.notifications.publish(accountId, `support-reply:${request.body.idempotency_key}`, "support.reply", request.body.text || " ", null, request.body.files ?? []);
       return reply.send(item);
     } catch (error) { return error instanceof SystemNotificationsError ? fail(reply, error.status, error.code) : fail(reply, 503, "support_unavailable"); }
+  });
+
+  app.post<{ Params: { account_id?: string }; Body: SystemChatFileUpload }>("/support/conversations/:account_id/files", {
+    bodyLimit: 12 * 1024 * 1024,
+    schema: { tags: ["support"], security: [{ supportSession: [] }], params: { type: "object", additionalProperties: false,
+      required: ["account_id"], properties: { account_id: { type: "string", format: "uuid" } } }, body: systemChatFileUploadSchema,
+      response: { 200: systemChatFileSchema } }, onRequest: guard,
+  }, async (request, reply) => {
+    const accountId = conversationId(request);
+    if (!accountId) return fail(reply, 404, "account_not_found");
+    try { return reply.send(await options.notifications.uploadFile(accountId, request.body)); }
+    catch (error) { return error instanceof SystemNotificationsError ? fail(reply, error.status, error.code) : fail(reply, 503, "support_unavailable"); }
+  });
+
+  app.get<{ Params: { account_id?: string; file_id?: string } }>("/support/conversations/:account_id/files/:file_id", {
+    schema: { tags: ["support"], security: [{ supportSession: [] }], params: { type: "object", additionalProperties: false,
+      required: ["account_id", "file_id"], properties: { account_id: { type: "string", format: "uuid" }, file_id: { type: "string", format: "uuid" } } }, response: { 200: systemChatFileDownloadSchema } }, onRequest: guard,
+  }, async (request, reply) => {
+    const accountId = conversationId(request);
+    if (!accountId) return fail(reply, 404, "account_not_found");
+    try { reply.header("x-content-type-options", "nosniff").header("cache-control", "private, no-store").header("content-disposition", "attachment; filename=\"support-attachment.json\""); return reply.send(await options.notifications.downloadFile(accountId, request.params.file_id!)); }
+    catch (error) { return error instanceof SystemNotificationsError ? fail(reply, error.status, error.code) : fail(reply, 503, "support_unavailable"); }
   });
 
   app.post<{ Params: { account_id?: string }; Body: { read_sequence: number } }>("/support/conversations/:account_id/read", {

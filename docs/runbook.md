@@ -67,6 +67,11 @@ DB acceptance тесты с заданными переменными.
 DATABASE_URL='postgres://...' pnpm --filter @comit/api auth:migrate
 ```
 
+Миграция `023_system_chat_attachments.sql` добавляет owner-scoped bytea-файлы,
+связанные с системными сообщениями. Она применяется тем же migration runner;
+ручное удаление данных не требуется. При проверке orphan cleanup запрашивайте
+только метаданные `system_chat_files`, не выводя колонку `content`.
+
 Основной compose (`make up` / `make dev-up`) уже включает `candidate-profile-worker`:
 он запускает собранный `dist/profiles/worker.js` с `MATCHING_ENGINE_URL` и
 `CANDIDATE_PIPELINE_TOKEN` после API и engine миграций и не получает SMTP

@@ -8,6 +8,8 @@ export function Login({ onLogin }: { onLogin: (account: AccountView) => void }) 
   return (
     <EmailLogin
       homeHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)}
+      oauthRole="employer"
+      oauthEnabled={import.meta.env.PROD}
       requestCode={(email) => api.requestLoginCode("employer", email)}
       verifyCode={async (request) => (await api.verifyLoginCode("employer", request)).account}
       onLogin={onLogin}

@@ -32,7 +32,7 @@ export function proxyTrustConfig(value: string | undefined): false | string[] {
   return addresses;
 }
 
-const requiredApiMigrations = ["021_support_console.sql", "021_weekly_challenges.sql"] as const;
+const requiredApiMigrations = ["021_support_console.sql", "021_weekly_challenges.sql", "022_yandex_oauth.sql", "023_system_chat_attachments.sql"] as const;
 
 /** Admit traffic only when every current API schema branch has been migrated. */
 export function requiredApiMigrationsApplied(names: readonly string[]): boolean {

@@ -93,10 +93,14 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
     store.seed_items(initial_items())
     owner_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = weakref.WeakValueDictionary()
 
+    def testing_enabled() -> bool:
+        """Disable every testing operation explicitly without substituting judgments."""
+        return os.environ.get("TESTING_ENABLED", "true").lower() == "true"
+
     async def capabilities(specialization: str) -> dict:
         code_required = specialization in ("algorithms", "python")
-        code_ready = await asyncio.to_thread(CodeJudgeClient().ready) if code_required else False
-        text_configured = RubricJudge().configured()
+        code_ready = await asyncio.to_thread(CodeJudgeClient().ready) if code_required and testing_enabled() else False
+        text_configured = testing_enabled() and RubricJudge().configured()
         return {"code_required": code_required, "code_ready": code_ready,
                 "text_configured": text_configured,
                 "types": ["mcq", "short_answer"] + (["code"] if code_ready else []) +
@@ -137,12 +141,36 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             request.state.candidate_key = request.headers.get("x-candidate-id")
             if token and not request.state.candidate_key:
                 return JSONResponse({"detail": "candidate_required"}, status_code=403)
+            if request.state.candidate_key and store.is_deleted(request.state.candidate_key):
+                return JSONResponse({"detail": "candidate_deleted"}, status_code=410)
+            if not testing_enabled() and request.url.path != "/testing/preflight":
+                return JSONResponse({"detail": "testing_disabled"}, status_code=503)
             # Serialize the owner's file-backed session mutations across awaits:
             # answer retries, media, supervision and next-task cannot lose writes.
             lock = owner_locks.setdefault(request.state.candidate_key or "offline", asyncio.Lock())
             async with lock:
+                # The request may have waited behind account deletion after
+                # the first marker check; fence it again after acquiring lock.
+                if request.state.candidate_key and store.is_deleted(request.state.candidate_key):
+                    return JSONResponse({"detail": "candidate_deleted"}, status_code=410)
                 return await call_next(request)
         return await call_next(request)
+
+    @app.delete("/internal/candidates/{candidate_id}", tags=["internal"])
+    async def delete_candidate(candidate_id: str, request: Request) -> dict[str, object]:
+        """Delete all testing sessions/media for a candidate and fence retries.
+
+        This endpoint is service-to-service only. The owner key is hashed for
+        the durable tombstone, while the lock serializes deletion with an
+        in-flight answer or media write.
+        """
+        token = os.environ.get("TESTING_ENGINE_TOKEN", "")
+        if not token or not secrets.compare_digest(request.headers.get("x-internal-token", ""), token):
+            raise HTTPException(status_code=401, detail="invalid_internal_token")
+        lock = owner_locks.setdefault(candidate_id, asyncio.Lock())
+        async with lock:
+            removed = await asyncio.to_thread(store.delete_candidate, candidate_id)
+        return {"candidate_id": candidate_id, "deleted": True, "sessions_removed": removed}
 
 
     @app.get("/healthz", tags=["health"])
@@ -168,13 +196,16 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                     media_sequences.append(int(chunk.name.split("-")[1]))
                 except (ValueError, IndexError):
                     continue
-        last = max(own, key=lambda row: row["created_at"], default=None)
+        # Provider outages cannot consume a candidate's retake cooldown.
+        last = max((row for row in own if row.get("failure_reason") != "judge_unavailable"),
+                   key=lambda row: row["created_at"], default=None)
         eligible_at = datetime.fromisoformat(last["created_at"]) + timedelta(days=7) if last else None
         return {"specialization": specialization, "supported_specializations": supported,
-                "eligible": not active and (eligible_at is None or datetime.now(UTC) >= eligible_at)
+                "eligible": testing_enabled() and not active and (eligible_at is None or datetime.now(UTC) >= eligible_at)
                     and (not judges["code_required"] or judges["code_ready"]),
                 "judges": judges,
-                "unavailable_reason": "code_judge_unavailable" if judges["code_required"] and not judges["code_ready"] else None,
+                "unavailable_reason": "testing_disabled" if not testing_enabled() else
+                    "code_judge_unavailable" if judges["code_required"] and not judges["code_ready"] else None,
                 "next_attempt_at": eligible_at.isoformat() if eligible_at else None,
                 "active_session_id": active["session_id"] if active else None,
                 "active_session_consents": active.get("consents") if active else None,
@@ -186,6 +217,27 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                 "active_recording_enabled": bool(active and active.get("recording_mode") == "full"),
                 "max_questions": 30, "supported_question_types": judges["types"],
                 "active_session_status": active["status"] if active else None}
+
+    async def publish_result(session: dict) -> None:
+        """Bound retries, preserve API rejection categories, and keep HTTP I/O off the event loop."""
+        from datetime import UTC, datetime, timedelta
+        previous = session.get("grade_publication") or {}
+        attempts = int(previous.get("attempts", 0))
+        if previous.get("published") or previous.get("retryable") is False or attempts >= 3:
+            return
+        retry_at = previous.get("next_retry_at")
+        if retry_at and datetime.now(UTC) < datetime.fromisoformat(retry_at):
+            return
+        publisher = TrustedGradePublisher()
+        published, status = await asyncio.to_thread(publisher.publish, session)
+        attempts += 1
+        code = int(status.split(":")[1]) if status.startswith("api_status:") else None
+        retryable = not published and attempts < 3 and (status == "api_unreachable" or (code is not None and (code >= 500 or code in (408, 429))))
+        session["grade_publication"] = {"published": published, "status": status,
+            "attempts": attempts, "retryable": retryable,
+            "detail": publisher.failure_detail, "retry_at": publisher.retry_at,
+            "next_retry_at": (datetime.now(UTC) + timedelta(seconds=5 * attempts)).isoformat() if retryable else None}
+        store.write_session(session)
 
     @app.post("/testing/sessions", tags=["sessions"])
     async def create_session(body: dict, request: Request) -> dict:
@@ -208,6 +260,8 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                     continue
                 if previous["status"] == "active":
                     raise HTTPException(status_code=409, detail="attempt_active")
+                if previous.get("failure_reason") == "judge_unavailable":
+                    continue
                 eligible = datetime.fromisoformat(previous["created_at"]) + timedelta(days=7)
                 if datetime.now(UTC) < eligible:
                     raise HTTPException(status_code=409, detail="retake_cooldown")
@@ -259,7 +313,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         if forced_code and not code_ready:
             raise HTTPException(status_code=503, detail="code_judge_unavailable")
         allowed = {"mcq", "short_answer"}
-        text_configured = RubricJudge().configured()
+        text_configured = testing_enabled() and RubricJudge().configured()
         if text_configured and session["items"]:
             allowed.add("extended")
         if code_ready:
@@ -293,9 +347,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             session.update(status="finished", decided_grade=grade)
             store.write_session(session)
             if grade and not request.state.candidate_key:
-                published, publish_status = TrustedGradePublisher().publish(session)
-                session["grade_publication"] = {"published": published, "status": publish_status}
-                store.write_session(session)
+                await publish_result(session)
             raise HTTPException(status_code=409, detail="bank_exhausted")
         record = dict(item)
         presented_answer = record.pop("answer_index", None)
@@ -346,6 +398,19 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             correct, judge_status = await asyncio.to_thread(judge_answer, payload, answer_text, owner=session["candidate_key"],
                 key=session_id + ":" + item_id, cache_dir=resolved_data / "rubric-cache")
         if correct is None:
+            attempts = int(presented.get("judge_attempts", 0)) + 1
+            presented.update(judge_attempts=attempts, last_judge_status=judge_status)
+            if attempts >= 3:
+                # No posterior update, false score or cooldown for an unjudgeable response.
+                presented.update(answer=answer_text, correct=None, judge_status="unjudged:" + judge_status,
+                                 answered_at=_now())
+                presented.pop("pending_answer", None)
+                session.update(status="abandoned", ended_at=_now(), decided_grade=None,
+                               grade_publication=None, failure_reason="judge_unavailable")
+                store.write_session(session)
+                return {"session_id": session_id, "correct": None, "judge_status": presented["judge_status"],
+                        "answered": state.answered, "decided_grade": None, "status": "abandoned"}
+            store.write_session(session)
             raise HTTPException(status_code=503, detail=judge_status)
         if correct is not None:
             adaptive.update(state, payload["level"], correct)
@@ -360,9 +425,7 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
                        status="finished" if done else "active", decided_grade=grade)
         store.write_session(session)
         if done and grade and not request.state.candidate_key:
-            published, publish_status = TrustedGradePublisher().publish(session)
-            session["grade_publication"] = {"published": published, "status": publish_status}
-            store.write_session(session)
+            await publish_result(session)
         return {"session_id": session_id, "correct": correct, "judge_status": judge_status,
                 "answered": state.answered, "decided_grade": grade,
                 "status": "finished" if done else "active"}
@@ -439,7 +502,8 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         if not manifest.exists():
             from testing_engine.store import _atomic_write
             _atomic_write(manifest, {"created_at": session["created_at"], "retention_days": 90,
-                                     "session_id": session_id, "consents": session["consents"]})
+                                     "session_id": session_id, "candidate_key": session["candidate_key"],
+                                     "consents": session["consents"]})
         seq = body.get("sequence", len(list(media_dir.glob("chunk-*"))))
         if type(seq) is not int or not 0 <= seq <= 10000:
             raise HTTPException(status_code=422, detail="invalid_sequence")
@@ -457,12 +521,10 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         session = _session_or_404(session_id, request)
         state = adaptive.AdaptiveState.from_dict(session["state"])
         if session["status"] == "finished" and session.get("decided_grade") and session.get("capture_finalized", not request.state.candidate_key) and not session.get("grade_publication", {}).get("published"):
-            published, publish_status = TrustedGradePublisher().publish(session)
-            session["grade_publication"] = {"published": published, "status": publish_status}
-            store.write_session(session)
+            await publish_result(session)
         from datetime import datetime, timedelta
-        next_attempt = (datetime.fromisoformat(session["created_at"]) + timedelta(days=7)).isoformat()
-        return {"capture_finalized": bool(session.get("capture_finalized")), "next_attempt_at": next_attempt, "grade_publication": session.get("grade_publication"),
+        next_attempt = None if session.get("failure_reason") == "judge_unavailable" else (datetime.fromisoformat(session["created_at"]) + timedelta(days=7)).isoformat()
+        return {"failure_reason": session.get("failure_reason"), "capture_finalized": bool(session.get("capture_finalized")), "next_attempt_at": next_attempt, "grade_publication": session.get("grade_publication"),
                 "session_id": session_id, "status": session["status"],
                 "decided_grade": session["decided_grade"], "answered": state.answered,
                 "correct": state.correct, "tasks_given": session["tasks_given"],
@@ -490,6 +552,9 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         """Persist a voluntary interruption; never publish an incomplete grade."""
         session = _session_or_404(session_id, request)
         if session["status"] == "active":
+            if any(row.get("judge_attempts", 0) > 0 and row.get("answer") is None for row in session["items"]):
+                # Leaving an unresolved judge failure must not turn that outage into a penalty.
+                session["failure_reason"] = "judge_unavailable"
             session.update(status="abandoned", ended_at=_now(), decided_grade=None, grade_publication=None)
             store.write_session(session)
         return {"session_id": session_id, "status": session["status"]}

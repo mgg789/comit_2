@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [dev, main]
+    branches: [dev, main, fix/pre-release]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -32,7 +32,7 @@ jobs:
           pnpm --filter @comit/web-testing test
           pnpm --filter @comit/ui-kit test
           pnpm --filter @comit/web-employer test
-          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts ../candidate/tests/testing-launch.test.ts ../candidate/tests/resume-import-model.test.ts
+          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts ../candidate/tests/testing-launch.test.ts ../candidate/tests/resume-import-model.test.ts ../candidate/tests/github-verification.test.ts ../candidate/tests/plural.test.ts
 
   python:
     name: Python services tests

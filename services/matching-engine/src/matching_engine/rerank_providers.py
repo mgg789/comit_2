@@ -20,9 +20,8 @@ from matching_engine.rerank_hash import digest
 QWEN = "mlx-community/Qwen3.5-4B-MLX-4bit"
 LAYA = "aac6fef/laya-multilingual-mlx"
 PROMPT_VERSION = "rerank-synthetic-v1"
-# The shared experiment ceiling stays at the original 600: the cohort budget
-# is derived from it, and widening it silently relaxed the cohort invariants
-# (issue #12). The hard benchmark keeps its own separate allowance instead.
+# The production/cohort ceiling stays fixed; the authorized hard benchmark
+# extension is scoped separately by rerank_hard_benchmark.BENCHMARK_LIMITS.
 LIMITS = {"generation": 120, "pair": 3000, "grade": 600}
 ENDPOINTS = {"generation": "/api/v1/chat/completions", "pair": "/v1/choice", "grade": "/v1/score"}
 SYSTEMONE_URL = "https://ai.sverk.tech/v1/systemone"
@@ -194,11 +193,15 @@ class LocalProviders:
             fcntl.flock(lock, fcntl.LOCK_EX)
             ledger_path = self.directory / "usage.json"
             ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
-            if ledger.get(kind, 0) >= LIMITS[kind]:
+            if ledger.get(kind, 0) >= self._budget_limit(kind):
                 raise BudgetExceeded(f"{kind} budget exhausted")
             ledger[kind] = ledger.get(kind, 0) + 1
             _atomic_write(ledger_path, ledger)
             return ledger[kind]
+
+    def _budget_limit(self, kind: str) -> int:
+        """Use the fixed default ceiling; request payloads cannot override budgets."""
+        return LIMITS[kind]
 
     @contextmanager
     def _inference_lock(self) -> Iterator[None]:

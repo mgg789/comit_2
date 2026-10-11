@@ -244,7 +244,7 @@ export function RecruitmentConversation({ process, accountId, transport, errorTe
             </motion.article>
           ))}
         </AnimatePresence>
-        <div ref={end} className="chat-read-edge" />
+        <div ref={end} className="chat-read-edge chat-tail-space" aria-hidden="true" />
       </div></div>
       <div ref={composer} className="communication-composer-wrap">
         {error && (

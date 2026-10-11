@@ -22,6 +22,12 @@ export function errorText(error: unknown): string {
       vacancy_lifecycle_conflict: "Вакансия изменилась до подтверждения. Обновите страницу и выберите действие заново.",
       vacancy_not_published: "Действие доступно только для опубликованной вакансии.",
       chat_read_only: "Этот чат доступен только для чтения.",
+      invalid_system_file: "Поддерживаются PDF, TXT, MD, PNG, JPEG, GIF и WebP размером до 8 МБ; проверьте тип и содержимое файла.",
+      invalid_system_files: "В одном сообщении можно отправить не более 8 вложений.",
+      system_file_storage_limit: "Достигнут лимит неотправленных вложений 64 МБ. Отправьте подготовленные файлы или повторите загрузку через 24 часа.",
+      system_file_account_limit: "Достигнут общий лимит вложений 256 МБ. Продолжите переписку текстом.",
+      system_file_idempotency_conflict: "Повторная загрузка содержит изменённый файл. Выберите файл заново.",
+      system_file_not_found: "Вложение больше недоступно.",
     };
     if (typeof detail === "string" && Object.hasOwn(lifecycleMessages, detail)) return lifecycleMessages[detail]!;
     if (
@@ -37,6 +43,8 @@ export function errorText(error: unknown): string {
       return "Данные изменились. Обновите страницу и повторите действие.";
     if (error.status === 422 || error.status === 400)
       return "Проверьте заполненные поля и обязательные требования.";
+    if (error.status === 413)
+      return "Вложение слишком большое. Один файл — до 8 МБ, общий объём диалога — до 256 МБ.";
     if (error.status === 429)
       return "Слишком много запросов. Попробуйте немного позже.";
     if (error.status === 503)
@@ -107,12 +115,12 @@ export function useResource<T>(
 
 /** Whole-RUB salary interval; figures are always supplied by the backend. */
 export function salary(from?: number | null, to?: number | null): string {
-  if (from == null || to == null) return "Зарплата не указана";
+  if (from == null) return "Зарплата не указана";
   const format = (value: number) =>
     new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
       value / 1000,
     );
-  return `${format(from)}–${format(to)}к ₽`;
+  return to == null ? `от ${format(from)}к ₽` : `${format(from)}–${format(to)}к ₽`;
 }
 
 /** Read SPA state from a hash so deep links work under the existing nginx base. */

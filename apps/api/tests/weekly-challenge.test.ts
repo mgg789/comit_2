@@ -4,7 +4,7 @@ import {randomUUID} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import {Pool} from "pg";
 import {ProfileStore} from "../src/profiles/store.js";
-import {weeklyTasks,weeklyWindow,weeklyView} from "../src/profiles/weekly-challenge.js";
+import {countNoun,weeklyTasks,weeklyWindow,weeklyView} from "../src/profiles/weekly-challenge.js";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import {candidateWeeklyChallengeRoutes} from "../src/routes/candidate-weekly-challenge.js";
@@ -57,4 +57,14 @@ test("weekly reward is owner-bound, durable, one-per-week and projected atomical
   assert.ok(!(await profiles.get(other))?.evidence["external:weekly_challenge:current"]);
   await assert.rejects(()=>profiles.weeklyChallenge(other,"submit",{week:"2026-11-02",answers:wrong},new Date("2026-11-09T00:00:00Z")),/weekly_task_expired/);
  }finally{await app.close();await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();}
+});
+
+test("weekly prompts agree nouns with numbers", () => {
+  assert.equal(countNoun(1, "строку", "строки", "строк"), "1 строку");
+  assert.equal(countNoun(3, "строку", "строки", "строк"), "3 строки");
+  assert.equal(countNoun(21, "событие", "события", "событий"), "21 событие");
+  for (let i = 0; i < 200; i++) {
+    const prompt = weeklyTasks(`account-${i}`, "2026-10-05")[0]!.prompt;
+    assert.doesNotMatch(prompt, /(?:^|\D)1 строки|(?:^|\D)[234] строк(?!и)/, prompt);
+  }
 });

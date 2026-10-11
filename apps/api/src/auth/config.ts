@@ -8,6 +8,8 @@ export interface AuthConfig {
   audience: string;
   keyId: string;
   consentVersion: string;
+  /** Production-only provider configuration; absent means email login remains available. */
+  yandex?: { clientId: string; clientSecret: string; siteOrigin: string };
 }
 
 /** Load process configuration without exposing secret values or silently enabling insecure production. */
@@ -30,7 +32,15 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     return url.origin;
   }));
   if (!origins.size) throw new Error("auth_origins_missing");
-  return { secret, developmentCodeDelivery, origins, secureCookies, issuer: env.AUTH_ISSUER ?? "comit",
+  let yandex: AuthConfig["yandex"];
+  if (env.NODE_ENV === "production" && env.YANDEX_OAUTH_ENABLED === "true") {
+    const clientId = env.YANDEX_OAUTH_CLIENT_ID?.trim();
+    const clientSecret = env.YANDEX_OAUTH_CLIENT_SECRET?.trim();
+    const siteOrigin = env.YANDEX_OAUTH_SITE_ORIGIN?.trim();
+    if (clientId && clientSecret && siteOrigin && origins.has(siteOrigin)
+      && new URL(siteOrigin).protocol === "https:") yandex = { clientId, clientSecret, siteOrigin };
+  }
+  return { ...(yandex ? { yandex } : {}), secret, developmentCodeDelivery, origins, secureCookies, issuer: env.AUTH_ISSUER ?? "comit",
     audience: env.AUTH_AUDIENCE ?? "comit-api", keyId: env.AUTH_KEY_ID ?? "v1",
     consentVersion: env.ACCOUNT_CONSENT_VERSION ?? "account-v1" };
 }

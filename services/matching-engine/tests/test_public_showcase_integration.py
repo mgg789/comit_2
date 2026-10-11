@@ -93,3 +93,5 @@ def test_anonymous_search_cannot_probe_hidden_profile_text(store):
     catalogue = PublicShowcaseStore(store.database_url)
     assert len(catalogue.page(CatalogueQuery(q="python"), candidates=True).items) == 1
     assert not catalogue.page(CatalogueQuery(q="SecretBiographProbe"), candidates=True).items
+    assert not catalogue.page(CatalogueQuery(q=str(identity)), candidates=True).items
+    assert not catalogue.page(CatalogueQuery(q="Candidate"), candidates=True).items

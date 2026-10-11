@@ -4,7 +4,7 @@ export type TestingGrade = "intern" | "junior" | "middle" | "senior";
 export interface TestingPreflight {
   supported_question_types: Array<TestingTask["type"]>; active_session_status: "active" | "finished" | null;
   judges?: { code_required: boolean; code_ready: boolean; text_configured: boolean; types: Array<TestingTask["type"]> };
-  unavailable_reason?: "code_judge_unavailable" | null;
+  unavailable_reason?: "code_judge_unavailable" | "testing_disabled" | null;
   specialization: TestingSpecialization; supported_specializations: TestingSpecialization[];
   eligible: boolean; next_attempt_at: string | null; upgrade_at: string | null;
   active_supervision: TestingSupervision | null;
@@ -29,6 +29,7 @@ export interface TestingSupervision {
 }
 export interface TestingMediaRequest { kind: "screen" | "webcam"; data_base64: string; sequence: number; mime_type?: string }
 export interface TestingResult extends TestingSession {
-  capture_finalized: boolean; decided_grade: TestingGrade | null; answered: number; correct: number; next_attempt_at: string;
-  grade_publication: { published: boolean; status: string } | null; supervision: string | null;
+  capture_finalized: boolean; decided_grade: TestingGrade | null; answered: number; correct: number; next_attempt_at: string | null;
+  failure_reason?: "judge_unavailable" | null;
+  grade_publication: { published: boolean; status: string; retryable?: boolean; attempts?: number; detail?: string | null; retry_at?: string | null; next_retry_at?: string | null } | null; supervision: string | null;
 }

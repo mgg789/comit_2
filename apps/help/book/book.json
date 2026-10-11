@@ -1,0 +1,18 @@
+{
+  "title": "Справка Comit",
+  "description": "Как пользоваться Comit: руководство для кандидатов и работодателей",
+  "author": "Команда Comit",
+  "language": "ru",
+  "plugins": [
+    "-sharing"
+  ],
+  "styles": {
+    "website": "styles/website.css"
+  },
+  "links": {
+    "sidebar": {
+      "Вернуться в Comit": "/",
+      "Поддержка @droidje": "https://t.me/droidje"
+    }
+  }
+}

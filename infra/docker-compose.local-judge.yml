@@ -1,0 +1,7 @@
+# Explicit real external judge mode. No code executor or Docker socket locally.
+services:
+  testing-engine:
+    environment:
+      TESTING_ENABLED: "true"
+      CODE_JUDGE_URL: "${CODE_JUDGE_URL:?Set URL of the isolated code judge}"
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set the isolated judge token}"

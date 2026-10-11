@@ -155,8 +155,8 @@ small {
   border: 1px solid transparent;
   border-radius: 30rem;
   background-clip: padding-box;
-  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   box-shadow:
     inset 0 1px 0 var(--employer-paint-ffffff38),
     inset 1px 0 0 var(--employer-paint-ffffff14),
@@ -168,8 +168,8 @@ small {
   position: relative;
   isolation: isolate;
   background: transparent;
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   box-shadow: none;
 }
 .glass.glass-surface::before {
@@ -180,8 +180,8 @@ small {
   pointer-events: none;
   border-radius: inherit;
   background: var(--employer-glass);
-  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   box-shadow:
     inset 0 1px 0 var(--employer-paint-ffffff38),
     inset 1px 0 0 var(--employer-paint-ffffff14),
@@ -701,6 +701,8 @@ textarea::placeholder {
     padding: 6rem 12rem;
     gap: 12rem;
   }
+  .account-tools .plain-icon { position: relative; }
+  .account-tools .plain-icon::before { content: ""; position: absolute; inset: -11px -6px; }
   .account-avatar {
     width: 30rem;
     height: 30rem;
@@ -1160,6 +1162,7 @@ textarea::placeholder {
     max-width: 100%;
     flex: 1;
   }
+  .page-heading > .discovery-search { flex: 1 0 100%; }
   .discovery-search input {
     height: 40rem;
     font-size: 14rem;
@@ -1179,9 +1182,39 @@ textarea::placeholder {
 .rejection-feedback legend { font-size: 20rem; margin-bottom: 14rem; }
 .rejection-categories { display: flex; flex-wrap: wrap; gap: 16rem 24rem; }
 .rejection-categories label { display: flex; gap: 10rem; align-items: center; font-size: 18rem; }
-.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-181816); color: var(--comit-text); margin: 20rem 0; }
+.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-2f2f2d); color: var(--comit-text); margin: 20rem 0; }
 .recruitment-deadline p { margin: 8rem 0; font-size: 18rem; }
 .recruitment-deadline small { color: var(--comit-text-muted); }
 
 /* Loading is ongoing progress feedback even when decorative motion is reduced. */
 :is(.employer-app, .candidate-app) .spinner { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }
+
+/* Shared experiment: foreground stays sharp; one static filter serves every surface. */
+:root[data-comit-glass="frosted"], :root[data-comit-glass="refractive"] {
+  --comit-glass-backdrop: blur(12rem) saturate(1.4) brightness(1.04);
+}
+:root[data-comit-glass="refractive"] { --comit-glass-backdrop: url("#glass-refraction") saturate(1.4); }
+:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel, .candidate-process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe:not(.glass-classic), .testing-question) {
+  background: var(--comit-glass-frost);
+  -webkit-backdrop-filter: var(--comit-glass-backdrop);
+  backdrop-filter: var(--comit-glass-backdrop);
+  box-shadow: var(--comit-glass-shadow);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel, .candidate-process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe:not(.glass-classic), .testing-question) { background: var(--comit-glass-fallback); }
+}
+
+.legal-text { display: grid; gap: 24rem; }
+.legal-text p { white-space: pre-line; }
+.legal-text a { color: var(--employer-blue); text-decoration: underline; }
+.legal-text .legal-table { overflow-x: auto; }
+.legal-text th, .legal-text td { padding: 12rem; border: 1px solid var(--employer-border); text-align: left; vertical-align: top; }
+
+/* Glass selection keeps its translucent surface but must never inherit black foreground. */
+:root[data-comit-glass]:not([data-comit-glass="classic"]) .nav-item.selected,
+:root[data-comit-glass]:not([data-comit-glass="classic"]) .nav-item.selected .icon { color: var(--comit-text); }
+:root[data-comit-glass]:not([data-comit-glass="classic"]) .nav-item.selected { border: 1px solid var(--employer-blue); }
+.action.action-danger { background: var(--employer-danger); color: var(--employer-ink); }
+
+/* Leave breathing room before confirmation actions at the foot of dialogs. */
+[role="dialog"] :is(.form-actions, .candidate-offer-actions) { margin-top: 40rem; }

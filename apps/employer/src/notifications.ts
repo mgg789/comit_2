@@ -59,3 +59,28 @@ export function recentEvents(events: readonly RecruitmentEvent[]): RecruitmentEv
 export function badgeText(count: number): string {
   return count > 99 ? "99+" : String(count);
 }
+
+/** What happened, by event type; the process state alone repeats «Приглашение принято» for every later step. */
+const EVENT_LABELS: Record<string, string> = {
+  "invitation.sent": "Приглашение отправлено",
+  view: "Кандидат открыл приглашение",
+  accept: "Кандидат принял приглашение",
+  decline: "Кандидат отклонил приглашение",
+  withdraw: "Приглашение отозвано",
+  reject: "Кандидату отказано",
+  "interview.propose": "Предложено время собеседования",
+  "interview.accept": "Кандидат подтвердил собеседование",
+  "interview.decline": "Кандидат отклонил время собеседования",
+  "interview.cancel": "Собеседование отменено",
+  "interview.complete": "Собеседование проведено",
+  "offer.send": "Оффер отправлен",
+  "offer.accept": "Кандидат принял оффер",
+  "offer.decline": "Кандидат отклонил оффер",
+  "chat.first_employer_message": "Первое сообщение в чате",
+  "vacancy.inactive": "Вакансия больше не активна",
+};
+
+/** Menu label for one event; unknown future types fall back to the resulting state label. */
+export function eventLabel(event: Pick<RecruitmentEvent, "type" | "state">, stateLabels: Record<RecruitmentEvent["state"], string>): string {
+  return EVENT_LABELS[event.type] ?? stateLabels[event.state];
+}

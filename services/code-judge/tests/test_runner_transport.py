@@ -11,7 +11,8 @@ from code_judge.runner import DockerRunner, RunnerUnavailable
 @pytest.mark.parametrize("output,exit_code,expected", [
     (b"6", 0, (6, "ok")), (b"broken", 0, (None, "invalid_output")),
     (b"NaN", 0, (None, "invalid_output")),
-    (b"error", 1, (None, "runtime_error")), (b"123456789", 0, (None, "output_limit")),
+    (b"error", 1, (None, "runtime_error")),
+    (b"", 125, (None, "runtime_error")), (b"", 126, (None, "runtime_error")), (b"", 127, (None, "runtime_error")), (b"123456789", 0, (None, "output_limit")),
 ])
 def test_bounded_transport(monkeypatch, output, exit_code, expected):
     resources = []

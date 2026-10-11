@@ -12,6 +12,7 @@ from matching_engine.models import (
     Grade,
     NarrativeRole,
     SalaryRange,
+    CandidateSalary,
     WorkType,
 )
 
@@ -107,7 +108,7 @@ class PublicProfile(Contract):
     projection_version: Literal[1] = 1
     display_name: str
     city: str
-    salary: SalaryRange
+    salary: CandidateSalary
     description: str = ""
     work_types: list[WorkType] | None = None
     relocation_ready: bool | None = None
@@ -135,7 +136,7 @@ class PublicCandidateCard(Contract):
     profile_revision: int
     display_name: str
     city: str
-    salary: SalaryRange
+    salary: CandidateSalary
     category: Category
     rank: int
     confirmed_strength: int

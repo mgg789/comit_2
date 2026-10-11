@@ -28,9 +28,17 @@ def fingerprint(value: object) -> str:
                                      separators=(",", ":")).encode()).hexdigest()
 
 
-def _request(client: httpx.Client, method: str, url: str, **kwargs: Any) -> dict:
+def _request(client: httpx.Client, method: str, url: str, *, connect_retries: int = 0, **kwargs: Any) -> dict:
     try:
-        response = client.request(method, url, **kwargs)
+        for attempt in range(connect_retries + 1):
+            try:
+                response = client.request(method, url, **kwargs)
+                break
+            except (httpx.ConnectError, httpx.ConnectTimeout):
+                # No HTTP request has been sent yet. Read/write errors and HTTP
+                # responses never authorize replay of a potentially paid call.
+                if attempt == connect_retries:
+                    raise
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
@@ -180,6 +188,7 @@ class DeepSeekClient:
         reasoning = ({"reasoning_effort": "high" if reasoning_effort == "medium" else "max"}
                      if reasoning_effort != "off" else {})
         result = _request(self.client, "POST", self.base_url + "/chat/completions",
+                          connect_retries=1,
                           headers={"Authorization": "Bearer " + self.token}, json={"model": self.model,
                           "messages": messages, "tools": tools, "max_tokens": max_tokens,
                           "thinking": {"type": "disabled" if reasoning_effort == "off" else "enabled"},

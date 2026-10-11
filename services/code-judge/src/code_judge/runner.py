@@ -103,11 +103,12 @@ class DockerRunner:
                 "--log-driver=none", "--interactive", self.image,
                 "python", "-I", "-B", "-c", HARNESS]
 
-    def _case(self, code: str, name: str, args: list) -> tuple[object, str]:
+    def _case(self, code: str, name: str, args: list, execution_budget: list[float] | None = None, total_deadline: float | None = None) -> tuple[object, str]:
         container = "comit-judge-" + uuid.uuid4().hex
         process = None
         selector = selectors.DefaultSelector()
         output = bytearray()
+        execution_started = None
         try:
             process = subprocess.Popen(self.command(container), stdin=subprocess.PIPE,
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -118,11 +119,13 @@ class DockerRunner:
             selector.register(process.stdin, selectors.EVENT_WRITE)
             selector.register(process.stdout, selectors.EVENT_READ)
             started = False
-            deadline = time.monotonic() + self.startup_timeout
+            deadline = min(time.monotonic() + self.startup_timeout, total_deadline or float("inf"))
             while selector.get_map():
                 if time.monotonic() >= deadline:
                     if not started:
                         raise RunnerUnavailable("container_start_timeout")
+                    if total_deadline is not None and deadline == total_deadline:
+                        raise RunnerUnavailable("submission_infrastructure_timeout")
                     return None, "timeout"
                 for key, _ in selector.select(timeout=0.05):
                     if key.fileobj is process.stdin:
@@ -144,11 +147,13 @@ class DockerRunner:
                             raise RunnerUnavailable("container_start_failed")
                         del output[:len(READY_MARKER)]
                         started = True
-                        deadline = time.monotonic() + self.timeout
+                        execution_started = time.monotonic()
+                        available = min(self.timeout, execution_budget[0]) if execution_budget is not None else self.timeout
+                        deadline = min(execution_started + available, total_deadline or float("inf"))
                     if len(output) > OUTPUT_LIMIT:
                         return None, "output_limit"
             result = process.wait(timeout=1)
-            if not started or result in (125, 126, 127):
+            if not started:
                 raise RunnerUnavailable("container_start_failed")
             if result:
                 return None, "runtime_error"
@@ -159,6 +164,8 @@ class DockerRunner:
         except (OSError, subprocess.SubprocessError) as error:
             raise RunnerUnavailable("container_unavailable") from error
         finally:
+            if execution_budget is not None and execution_started is not None:
+                execution_budget[0] -= max(0, time.monotonic() - execution_started)
             selector.close()
             if process and process.poll() is None:
                 process.kill()
@@ -180,11 +187,15 @@ class DockerRunner:
 
     def judge(self, payload: dict, code: str) -> tuple[bool, str]:
         """Compare strict JSON outside the sandbox, never candidate-defined equality."""
-        deadline = time.monotonic() + 25
+        # Candidate runtime is graded; slow container setup/cleanup is infrastructure.
+        deadline = time.monotonic() + 45
+        execution_budget = [25.0]
         for case in payload["tests"]:
+            if execution_budget[0] <= 0:
+                return False, "timeout"
             if time.monotonic() >= deadline:
-                raise RunnerUnavailable("submission_total_timeout")
-            value, status = self._case(code, payload["function_name"], case["args"])
+                raise RunnerUnavailable("submission_infrastructure_timeout")
+            value, status = self._case(code, payload["function_name"], case["args"], execution_budget, deadline)
             if status != "ok":
                 return False, status
             if json.dumps(value, sort_keys=True, ensure_ascii=False) != json.dumps(

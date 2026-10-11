@@ -12,6 +12,7 @@ from verification_engine.connectors import (
     HhResume,
     ProviderRejected,
     RepositoryProbe,
+    canonical_repository_url,
     fetch_hh_resume,
     fetch_json,
     probe_public_repository,
@@ -115,7 +116,15 @@ class VerificationService:
     async def repository(self, request: RepositoryVerificationRequest) -> VerificationResult:
         """Confirm only a real public Git tree and non-empty file content."""
 
-        probe = await probe_public_repository(str(request.url), fetcher=self.repository_fetcher)
+        canonical, _host, _owner, _repository = canonical_repository_url(str(request.url))
+        key = f"repository:{canonical}"
+        cached = self._cached(key)
+        if cached is not None:
+            value = cached.verified_value
+            return cached.model_copy(update={"verified_value": {
+                **value, "contribution_narrative": request.contribution_narrative,
+            } if isinstance(value, dict) else value})
+        probe = await probe_public_repository(canonical, fetcher=self.repository_fetcher)
         host = (request.url.host or "").lower()
         provenance = [f"repo:{host}:public_git_tree"]
         if probe.status_code == 404:
@@ -124,12 +133,14 @@ class VerificationService:
             return VerificationResult(kind="repository", status="pending", error_code="repository_provider_unavailable", provenance=provenance)
         if not probe.nonempty or probe.tree_entries < 1 or probe.content_bytes < 1:
             return VerificationResult(kind="repository", status="rejected", error_code="repository_empty", provenance=provenance)
-        return VerificationResult(kind="repository", status="partial", verified_value={
+        facts = self._put(key, VerificationResult(kind="repository", status="partial", verified_value={
             "url": probe.canonical_url or str(request.url), "repository_nonempty": True,
             "tree_entries": probe.tree_entries, "content_bytes": probe.content_bytes,
-            "contribution_narrative": request.contribution_narrative,
             "authorship_proven": False,
-        }, provenance=provenance)
+        }, provenance=provenance))
+        return facts.model_copy(update={"verified_value": {
+            **(facts.verified_value or {}), "contribution_narrative": request.contribution_narrative,
+        }})
 
     async def hh(self, request: HhVerificationRequest) -> VerificationResult:
         """Read a real HH resume; provider data is partial and never ownership proof."""

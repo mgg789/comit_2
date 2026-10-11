@@ -29,13 +29,17 @@ import { api, asset, documentErrorText, errorText, salary, useResource } from ".
 import { Action, Field, Icon, PageTitle, State } from "./ui";
 import "./communications.css";
 import { ChatComposer } from "@comit/ui-kit/chat-composer";
+import { mayReadCandidateName, recruitmentChatTitle } from "./recruitment-title";
 import { budgetRemainingPercent } from "./budget";
 import { useEmployerPreferences } from "./preferences";
+import { asksForAvailability, organizationQuestionAnswer, type InterviewAvailabilityDraft } from "./agent-answers";
 
 const employerInboxTransport: SystemInboxTransport = {
   getPage: (after, limit) => api.getSystemChat("employer", after, limit),
   markRead: read_sequence => api.markSystemChatRead("employer", { read_sequence }),
-  sendMessage: text => api.sendSystemChatMessage("employer", { idempotency_key: crypto.randomUUID(), text }),
+  sendMessage: (text, files) => api.sendSystemChatMessage("employer", { idempotency_key: crypto.randomUUID(), text, files }),
+  uploadFile: async file => api.uploadSystemChatFile("employer", { idempotency_key: crypto.randomUUID(), name: file.name, media_type: file.type || ({ pdf: "application/pdf", txt: "text/plain", md: "text/markdown", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" } as Record<string, string>)[file.name.split(".").pop()?.toLowerCase() ?? ""] || "application/octet-stream", data_base64: await fileBase64(file) }),
+  downloadFile: (fileId) => api.downloadSystemChatFile("employer", fileId),
 };
 
 const employerConversationTransport: ConversationTransport = {
@@ -44,6 +48,15 @@ const employerConversationTransport: ConversationTransport = {
   sendMessage: (id, body) => api.sendChatMessage("employer", id, body),
   uploadFile: (id, body) => api.uploadChatFile("employer", id, body),
   downloadFile: (id, fileId) => api.downloadChatFile("employer", id, fileId),
+};
+
+/** Russian labels for interview states shown to the employer. */
+export const interviewStateNames: Record<RecruitmentView["interviews"][number]["state"], string> = {
+  proposed: "ждёт подтверждения кандидата",
+  scheduled: "подтверждено",
+  declined: "кандидат отклонил время",
+  cancelled: "отменено",
+  completed: "проведено",
 };
 
 /** Process states shared with the notifications bell. */
@@ -113,6 +126,29 @@ export function RecruitmentChat({ account, initialProcessId, onProfile, onBack, 
 /** Fetch only list snapshots here; selecting a tile opens a separate message route. */
 function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => void; systemUnread?: number }) {
   const list = useResource(() => api.getRecruitmentList("employer", 100));
+  const [candidateNames, setCandidateNames] = useState<Record<string, string>>({});
+  const namesInFlight = useRef(new Set<string>());
+  useEffect(() => {
+    let active = true;
+    const items = list.data?.items || [];
+    const permitted = new Set(items.filter(item => mayReadCandidateName(item.state)).map(item => item.id));
+    setCandidateNames(current => Object.fromEntries(Object.entries(current).filter(([id]) => permitted.has(id))));
+    const queue = items.filter(item => permitted.has(item.id) && !candidateNames[item.id] && !namesInFlight.current.has(item.id));
+    const load = async () => {
+      let item;
+      while (active && (item = queue.shift())) {
+        const id = item.id;
+        namesInFlight.current.add(id);
+        try {
+          const contacts = await api.getRecruitmentContacts(id);
+          if (active) setCandidateNames(current => ({ ...current, [id]: contacts.display_name }));
+        } catch { /* Names remain hidden when the server contact gate refuses access. */ }
+        finally { namesInFlight.current.delete(id); }
+      }
+    };
+    for (let index = 0; index < Math.min(4, queue.length); index += 1) void load();
+    return () => { active = false; };
+  }, [list.data]);
   const loaded = useRef(list.data?.items || []);
   loaded.current = list.data?.items || [];
   const paginationEpoch = useRef(0);
@@ -154,7 +190,7 @@ function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => vo
     } catch (reason) { setMoreError(errorText(reason)); } finally { moreInFlight.current = false; paginationEpoch.current += 1; setLoadingMore(false); }
   }
   return <section><PageTitle title="Чаты" />
-    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
+    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: recruitmentChatTitle(item, candidateNames[item.id]), subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
       loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
       hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
     {moreError && <p className="communication-error" role="alert">{moreError}</p>}
@@ -235,7 +271,7 @@ function RecruitmentThread({
           className="participant-name"
           onClick={() => onProfile(p.candidate_id)}
         >
-          <strong>{contacts?.display_name || "Кандидат"}</strong>
+          <strong>{recruitmentChatTitle(p, contacts?.display_name)}</strong>
           <small>{recruitmentStateNames[p.state]}</small>
         </button>
         <details className="process-menu">
@@ -273,8 +309,8 @@ function RecruitmentThread({
             {p.interviews.map((interview) => (
               <p key={interview.id}>
                 Интервью:{" "}
-                {new Date(interview.starts_at).toLocaleString("ru-RU")} ·{" "}
-                {interview.state}
+                {new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} ·{" "}
+                {interviewStateNames[interview.state]}
               </p>
             ))}
           </div>
@@ -438,12 +474,14 @@ export function ProcessCommand({
           </>
         )}
         {error && <p role="alert">{error}</p>}
+        <div className="form-actions">
         <Action type="button" disabled={busy} onClick={onClose}>
           Отмена
         </Action>
         <Action variant="primary" disabled={busy} type="submit">
           {busy ? "Сохраняем…" : "Подтвердить"}
         </Action>
+        </div>
       </form>
     </div>
   );
@@ -824,7 +862,11 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
                 animate={{ opacity: 1, scale: 1 }} transition={{ duration: reducedMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}><AssistantAvatar /></motion.div>}
               <div className="organization-message-body">
                 {group ? <AgentReply group={row} active={thinking && row.id === currentId} now={now}
-                  reducedMotion={!!reducedMotion} failed={row.id === turn?.turn_id && turn.status === "failed"} /> : <>
+                  reducedMotion={!!reducedMotion} failed={row.id === turn?.turn_id && turn.status === "failed"}
+                  onDownload={async documentId => {
+                    try { const value = await api.downloadOrganizationDocument(documentId); saveFile(value.document.name, value.content_base64); }
+                    catch (reason) { setError(errorText(reason)); }
+                  }} /> : <>
                   <p>{row.content}</p>
                   {row.attachments?.map((file) => <button className="message-file" key={file.document_id}
                     onClick={async () => {
@@ -845,10 +887,10 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               onError={reason => setError(errorText(reason))} />)}
           </div>
         )}
-        <div ref={end} />
+        <div ref={end} className="chat-tail-space" aria-hidden="true" />
         </div>
       </div>
-      {!loading && !visible.length && (
+      {!loading && !visible.length && !questions.length && (
         <div className="assistant-welcome">
           <AssistantAvatar />
           <h2>Чем могу помочь?</h2>
@@ -1090,10 +1132,34 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
 /** A pending assistant answer is a browser draft until its authorized API acknowledgement succeeds. */
 function PendingQuestion({ question, onDone, onError }: { question: AgentsPendingAnswer; onDone: () => void; onError: (reason: unknown) => void }) {
   const [answer, setAnswer] = usePersistentState(`assistant:question:${question.answer_id}`, "");
+  const [slot, setSlot] = usePersistentState<InterviewAvailabilityDraft>(`assistant:availability:${question.answer_id}`,
+    { starts_at: "", ends_at: "", duration_minutes: "60", format: "remote", kind: "technical", location: "" });
+  const availability = asksForAvailability(question);
+  const [validationError, setValidationError] = useState("");
   const [busy, setBusy] = useState(false);
   return <form onSubmit={async event => {
-    event.preventDefault(); if (busy) return; setBusy(true);
-    try { await api.answerOrganizationQuestion(question.answer_id, { answer }); setAnswer(""); onDone(); }
-    catch (reason) { onError(reason); } finally { setBusy(false); }
-  }}><Field label={question.prompt}><input name="answer" required value={answer} disabled={busy} onChange={event => setAnswer(event.target.value)} /></Field><Action type="submit" disabled={busy}>Ответить</Action></form>;
+    event.preventDefault(); if (busy) return;
+    const form = event.currentTarget;
+    const showRetry = () => requestAnimationFrame(() => form.querySelector<HTMLButtonElement>('button[type="submit"]')?.scrollIntoView({ block: "center" }));
+    let payload;
+    try { payload = organizationQuestionAnswer(question, answer, slot); }
+    catch (reason) { setValidationError(reason instanceof Error ? reason.message : "Проверьте ответ."); showRetry(); return; }
+    setBusy(true); setValidationError("");
+    try { await api.answerOrganizationQuestion(question.answer_id, { answer: payload }); setAnswer("");
+      setSlot({ starts_at: "", ends_at: "", duration_minutes: "60", format: "remote", kind: "technical", location: "" }); onDone(); }
+    catch (reason) { onError(reason); showRetry(); } finally { setBusy(false); }
+  }}>
+    {availability ? <>
+      <p>{question.prompt}</p>
+      <p>Время в часовом поясе вашего браузера: {Intl.DateTimeFormat().resolvedOptions().timeZone}</p>
+      <Field label="Начало свободного интервала"><input type="datetime-local" required disabled={busy} value={slot.starts_at} onChange={event => setSlot(previous => ({ ...previous, starts_at: event.target.value }))} /></Field>
+      <Field label="Конец свободного интервала"><input type="datetime-local" required disabled={busy} value={slot.ends_at} onChange={event => setSlot(previous => ({ ...previous, ends_at: event.target.value }))} /></Field>
+      <Field label="Длительность собеседования, минут"><input type="number" min={5} max={240} step={1} required disabled={busy} value={slot.duration_minutes} onChange={event => setSlot(previous => ({ ...previous, duration_minutes: event.target.value }))} /></Field>
+      <Field label="Вид собеседования"><select disabled={busy} value={slot.kind} onChange={event => { const kind = event.target.value; if (kind === "technical" || kind === "general") setSlot(previous => ({ ...previous, kind })); }}><option value="technical">Техническое</option><option value="general">Общее</option></select></Field>
+      <Field label="Формат встречи"><select disabled={busy} value={slot.format} onChange={event => { const format = event.target.value; if (format === "remote" || format === "onsite") setSlot(previous => ({ ...previous, format })); }}><option value="remote">Онлайн</option><option value="onsite">Очно</option></select></Field>
+      <Field label="Ссылка или адрес встречи"><input required maxLength={2000} disabled={busy} value={slot.location} onChange={event => setSlot(previous => ({ ...previous, location: event.target.value }))} /></Field>
+    </> : <Field label={question.prompt}><input name="answer" required maxLength={8000} value={answer} disabled={busy} onChange={event => setAnswer(event.target.value)} /></Field>}
+    {validationError && <p role="alert">{validationError}</p>}
+    <Action type="submit" disabled={busy}>{busy ? "Сохраняем…" : "Ответить"}</Action>
+  </form>;
 }

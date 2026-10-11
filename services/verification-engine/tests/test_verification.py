@@ -1,8 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
+
 from verification_engine import connectors
 from verification_engine.connectors import RepositoryProbe
 from verification_engine.main import create_app
+from verification_engine.models import RepositoryVerificationRequest
 from verification_engine.service import VerificationService
 
 
@@ -102,3 +104,49 @@ def test_gitlab_group_paths_are_canonicalized_without_broadening_other_hosts() -
     assert repository == "project"
     with pytest.raises(connectors.ProviderRejected):
         connectors.canonical_repository_url("https://github.com/group/subgroup/project")
+
+
+def test_repository_cache_keeps_public_facts_but_not_another_candidates_narrative() -> None:
+    import asyncio
+
+    calls = []
+
+    def fetch(url: str) -> RepositoryProbe:
+        calls.append(url)
+        return repository_fetcher(url)
+
+    service = VerificationService(repository_fetcher=fetch)
+    first = asyncio.run(service.repository(RepositoryVerificationRequest(url="https://github.com/acme/project.git/", contribution_narrative="First contribution")))
+    second = asyncio.run(service.repository(RepositoryVerificationRequest(url="https://github.com/acme/project", contribution_narrative="Second contribution")))
+    assert calls == ["https://github.com/acme/project"]
+    assert first.verified_value["contribution_narrative"] == "First contribution"
+    assert second.verified_value["contribution_narrative"] == "Second contribution"
+    assert second.verified_value["authorship_proven"] is False
+    assert "contribution_narrative" not in service._cache["repository:https://github.com/acme/project"][1].verified_value
+
+
+def test_repository_pending_is_retryable_and_ttl_cache_is_bounded(monkeypatch) -> None:
+    import asyncio
+
+    clock = [100.0]
+    monkeypatch.setattr("verification_engine.service.time.monotonic", lambda: clock[0])
+    calls = []
+
+    def fetch(url: str) -> RepositoryProbe:
+        calls.append(url)
+        if len(calls) == 1:
+            return RepositoryProbe(url=url, status_code=503, nonempty=False, bytes_observed=0)
+        return RepositoryProbe(url=url, status_code=200, nonempty=True, bytes_observed=42, canonical_url=url, tree_entries=1, content_bytes=42)
+
+    service = VerificationService(repository_fetcher=fetch, cache_ttl_seconds=1, max_cache_entries=1)
+    request = RepositoryVerificationRequest(url="https://github.com/acme/project", contribution_narrative="Contribution")
+    assert asyncio.run(service.repository(request)).status == "pending"
+    assert asyncio.run(service.repository(request)).status == "partial"
+    assert len(calls) == 2
+    asyncio.run(service.repository(request))
+    assert len(calls) == 2
+    clock[0] += 2
+    asyncio.run(service.repository(request))
+    assert len(calls) == 3
+    asyncio.run(service.repository(RepositoryVerificationRequest(url="https://github.com/acme/other", contribution_narrative="Other")))
+    assert len(service._cache) == 1

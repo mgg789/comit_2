@@ -409,7 +409,7 @@ worker. Вставка `recruitment_interviews` и обе записи outbox т
 
 API-миграция `018_employer_expenses.sql` добавляет `employer_expenses` (source key, owner, optional vacancy, category, integer kopeks, source time, frozen policy, reason) и `employer_expense_ai_days` (owner/Moscow date, cumulative provider micro-USD and billed kopeks). Категории: publication, invitation, ai, penalty. Данные не содержат контактов кандидатов и текста ОС. Владение в HTTP всегда берётся из сессии.
 
-Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
+Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `accept`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Миграция 019 применяет `expense-v2` только к новым источникам: 398 ₽ за публикацию, 49 ₽ при отправке приглашения и ещё 147 ₽ при его принятии, 398 ₽ за просрочку и ручное решение поддержки. Снимок тарифа хранится в исходной строке отправки приглашения; доплата при `accept` создаётся только для приглашения с этим снимком. Старые приглашения остаются по `expense-v1` и не получают ретроспективную доплату. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
 
 Миграция backfill использует только известные даты публикаций и durable события/settlements, сохраняет исходные timestamps и маркирует исторические записи; неизвестные даты не синтезируются. API/agents migrations допускают оба порядка через deployment-only `install_employer_expense_sources()`; agents migration 011 устанавливает hooks, когда API-схема уже существует. Миграции выполняет владелец общих схем; функции не доступны PUBLIC. Функция поддержки сохраняет ссылку на ручное решение, не публикуя пояснение в статистике. Ни HTTP GET, ни агрегирование рекомендаций не создают расходов.
 
@@ -448,3 +448,29 @@ hash декларации, измеренный level, session id, сервер�
 Старый `grade:<subject>` сохранён как совместимый независимый результат;
 общая `declared_grade` не меняется предметным тестом. Ограниченное восстановление
 проекций использует marker `external:testing_mapping:v1` в evidence, без новой таблицы.
+
+## Идентичности Яндекс OAuth
+
+Миграция `022_yandex_oauth.sql`: `auth_oauth_states` хранит только hash случайного browser-bound состояния, роль, версию принятого согласия и expiry (10 минут); DELETE…RETURNING обеспечивает одноразовое потребление между репликами. `auth_oauth_identities` связывает пару `(provider,subject)` с account UUID с каскадным удалением. Один provider identity не создаёт второй аккаунт; существующий email не связывается автоматически. OAuth-токены и client secret в БД не сохраняются. Просроченные состояния очищаются при новом старте входа.
+
+Удаление candidate выполняется через `DELETE /candidate/account`: matching
+сначала сохраняет `candidate_pipeline.tombstones` и очищает candidate-owned
+projection graph под `PIPELINE_LOCK`, включая pool/PDF, jobs/outbox, feed,
+selection, rerank и hypothesis rows. Затем API transaction блокирует account,
+отзывает все sessions, удаляет recruitment rows без cascade, auth challenges и
+email issue events, после чего удаляет account; остальные account/profile rows
+удаляются обычными `ON DELETE CASCADE`. Tombstone сохраняется для replay fence и
+не содержит профильных данных. Перед API transaction тот же workflow вызывает
+`testing-engine DELETE /internal/candidates/{candidate_id}`: owner tombstone
+блокирует новые попытки, а JSON sessions и raw media удаляются идемпотентно.
+# System inbox attachments
+
+Миграция `023_system_chat_attachments.sql` хранит вложения поддержки в
+`system_chat_files` (owner `accounts`, ограниченный `bytea`, SHA-256 и UUID
+retry key) и связывает опубликованные файлы с `system_notifications` через
+`system_notification_files`. Обе таблицы используют `ON DELETE CASCADE`, поэтому
+удаление аккаунта или уведомления удаляет байты. Непривязанные файлы ограничены
+64 MiB на аккаунт; опубликованные и непривязанные вместе ограничены 256 MiB.
+Обе квоты проверяются под account inbox lock. Orphan-файлы старше суток
+очищаются при следующей загрузке и никогда не выдаются endpoint скачивания до
+публикации в сообщении.

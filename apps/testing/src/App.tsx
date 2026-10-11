@@ -5,7 +5,7 @@ import { Action, Checkbox, Select, State } from "@comit/ui-kit/design";
 import { useEffect, useRef, useState } from "react";
 import { useTestingMedia } from "./media";
 import { MonitoringGlyph } from "./monitoring-glyph";
-import { answerReady, grades, mediaBase64, readSubject, retryDate, subjects, testingError } from "./runtime";
+import { answerReady, grades, mediaBase64, publicationMessage, readSubject, retryDate, subjects, testingError } from "./runtime";
 
 const api = createApiClient();
 const base = import.meta.env.BASE_URL;
@@ -43,6 +43,8 @@ export default function App() {
   const screenLive = !!media.screenStream?.getVideoTracks().some(track => track.readyState === "live");
   const cameraLive = !!media.cameraStream?.getVideoTracks().some(track => track.readyState === "live");
   const recordingEnabled = preflight?.active_session_id ? preflight.active_recording_enabled : preflight?.recording_enabled;
+  const testingDisabled = preflight?.unavailable_reason === "testing_disabled";
+  const unavailableMessage = testingDisabled ? "Тестирование отключено в этом режиме. Вернитесь в резюме." : "Проверка кода временно недоступна. Попробуйте позже — попытка ещё не начата.";
   const title = `Грейд-тест${declaredGrade ? ` · ${grades[declaredGrade]}` : ""} · ${subjects[subject]}`;
   async function run(action: () => Promise<void>) { if (operation.current) return; operation.current = true; setBusy(true); setError(null); try { await action(); } catch (reason) { setError(testingError(reason)); } finally { operation.current = false; setBusy(false); } }
   async function refresh() { setLoading(true); setError(null); try { setPreflight(await api.testingPreflight(subject, mode)); } catch (reason) { setUnauthenticated(reason instanceof ApiError && reason.status === 401); setError(testingError(reason)); } finally { setLoading(false); } }
@@ -63,7 +65,7 @@ export default function App() {
     setPhase("finishing");
     await supervisionQueue.current.catch(() => {});
     const previous = await api.testingResult(id);
-    if (previous.status === "abandoned") { setResult(previous); setPhase("result"); media.stop(); return; }
+    if (previous.status === "abandoned") { setResult(previous); setPhase("result"); media.stop(); if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); return; }
     if (!previous.capture_finalized) {
       const aggregates = await media.finish();
       await api.testingSupervision(id, aggregates);
@@ -79,7 +81,7 @@ export default function App() {
     } catch (reason) {
       if (reason instanceof ApiError && reason.status === 409) {
         const current = await api.testingResult(id);
-        if (current.status === "finished") { await complete(id); return; }
+        if (current.status === "finished" || current.status === "abandoned") { await complete(id); return; }
       }
       throw reason;
     }
@@ -111,7 +113,7 @@ export default function App() {
         throw reason;
       }
       setQuestion(null); setAnswer(null); setAnswerSubmitted(false);
-      if (receipt.status === "finished") await complete(sessionId); else await loadNext(sessionId);
+      if (receipt.status === "finished" || receipt.status === "abandoned") await complete(sessionId); else await loadNext(sessionId);
     });
   }
   return <main className="comit-design testing-app">
@@ -121,9 +123,10 @@ export default function App() {
       <h1>{title}</h1>
       {(phase === "confirm" || phase === "setup") && <>
         {loading ? <State loading /> : error && !preflight ? <><State error={error} retry={() => void refresh()} />{unauthenticated && <Action onClick={back}>Войти как кандидат</Action>}</> : <>
-          {phase === "confirm" && <section className="testing-introduction"><p>Подтвердите уровень знаний по выбранному направлению.</p><Select aria-label="Направление теста" value={subject} onChange={event => setSubject(readSubject(event.target.value))}>{Object.entries(subjects).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</Select>{preflight?.eligible || preflight?.active_session_id ? <Action variant="primary" onClick={() => { void media.requestFullscreen(); setPhase("setup"); }}>Подготовиться к тесту</Action> : <p>{preflight?.unavailable_reason ? "Проверка кода временно недоступна. Попробуйте позже — попытка ещё не начата." : `Следующее прохождение доступно ${retryDate(preflight?.next_attempt_at ?? null)}.`}</p>}<Action onClick={back}>Вернуться в резюме</Action></section>}
-          {phase === "setup" && <>
-            {preflight && !preflight.eligible && !preflight.active_session_id && <p className="testing-notice">{preflight.unavailable_reason ? "Проверка кода временно недоступна. Попробуйте позже — попытка ещё не начата." : `Следующее прохождение доступно ${retryDate(preflight.next_attempt_at)}.`}</p>}
+          {phase === "confirm" && <section className="testing-introduction"><p>Подтвердите уровень знаний по выбранному направлению.</p><Select aria-label="Направление теста" value={subject} onChange={event => setSubject(readSubject(event.target.value))}>{Object.entries(subjects).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</Select>{!testingDisabled && (preflight?.eligible || preflight?.active_session_id) ? <Action variant="primary" onClick={() => { void media.requestFullscreen(); setPhase("setup"); }}>Подготовиться к тесту</Action> : <p>{preflight?.unavailable_reason ? unavailableMessage : `Следующее прохождение доступно ${retryDate(preflight?.next_attempt_at ?? null)}.`}</p>}<Action onClick={back}>Вернуться в резюме</Action></section>}
+          {phase === "setup" && testingDisabled && <section role="status"><p>{unavailableMessage}</p><Action onClick={back}>Вернуться в резюме</Action></section>}
+          {phase === "setup" && !testingDisabled && <>
+            {preflight && !preflight.eligible && !preflight.active_session_id && <p className="testing-notice">{preflight.unavailable_reason ? unavailableMessage : `Следующее прохождение доступно ${retryDate(preflight.next_attempt_at)}.`}</p>}
             {preflight?.active_session_id && <p className="testing-notice">У вас есть начатая попытка. Продолжите её после подключения экрана.</p>}
             <div className="testing-preview-grid"><div><Preview stream={media.cameraStream} label="Камера (с распознаванием лиц)" /><div className="testing-preview-actions"><Action onClick={() => { setWithoutCamera(false); void media.requestCamera(); }}>Включить камеру</Action><Action className="testing-danger" onClick={() => setCameraWarning(true)}>Без камеры</Action></div></div><div><Preview stream={media.screenStream} label="Видео с экрана" /><div className="testing-preview-actions"><Action onClick={() => void media.requestScreen()}>Поделиться всем экраном</Action><Action onClick={() => setRules(true)}>Правила тестирования</Action></div></div></div>
             {preflight && !recordingEnabled && <p className="testing-notice">В этом тесте видео не сохраняется. Платформа учитывает присутствие в кадре и переключения окна.</p>}
@@ -144,10 +147,10 @@ export default function App() {
       {phase === "finishing" && <section className="testing-finishing"><State loading={busy} /><h2>Сохраняем результаты</h2><p>Дождитесь отправки ответов и материалов прохождения.</p>{error && <Action onClick={() => sessionId && void run(() => complete(sessionId))}>Повторить сохранение</Action>}</section>}
       {(error || media.error || media.detectorError || media.uploadError) && <div className="testing-errors" role="alert">{[error, media.error, media.detectorError, media.uploadError].filter(Boolean).map((text, index) => <p key={index}>{text}</p>)}{media.uploadError && <Action onClick={() => void media.retryUploads().catch(() => {})}>Повторить отправку записи</Action>}</div>}
     </section>
-    {phase === "confirm" && preflight && (preflight.eligible || preflight.active_session_id) && <Dialog size="wide" title="Готовы пройти тест?" close={() => setPhase("setup")}><p>Тест по направлению «{subjects[subject]}». Меньше 36 вопросов: выбор ответа, короткие и развёрнутые ответы. В тестах по алгоритмам и Python второе задание — написать код. Вам понадобятся полный экран и доступ к его показу. Камера — по желанию.</p><div className="testing-dialog-actions"><Action onClick={back}>Вернуться</Action><Action variant="primary" onClick={() => { void media.requestFullscreen(); setPhase("setup"); }}>Да, подготовиться</Action></div></Dialog>}
+    {phase === "confirm" && !testingDisabled && preflight && (preflight.eligible || preflight.active_session_id) && <Dialog size="wide" title="Готовы пройти тест?" close={() => setPhase("setup")}><p>Тест по направлению «{subjects[subject]}». Меньше 36 вопросов: выбор ответа, короткие и развёрнутые ответы. В тестах по алгоритмам и Python второе задание — написать код. Вам понадобятся полный экран и доступ к его показу. Камера — по желанию.</p><div className="testing-dialog-actions"><Action onClick={back}>Вернуться</Action><Action variant="primary" onClick={() => { void media.requestFullscreen(); setPhase("setup"); }}>Да, подготовиться</Action></div></Dialog>}
     {cameraWarning && <Dialog size="wide" title="Продолжить без камеры?" close={() => setCameraWarning(false)}><p>Работодатель увидит, что вы отказались от видеоподтверждения честности тестирования.</p><div className="testing-dialog-actions"><Action variant="primary" onClick={() => { setCameraWarning(false); setWithoutCamera(false); void media.requestCamera(); }}>Включить камеру</Action><Action onClick={() => { setCameraWarning(false); setWithoutCamera(true); setCameraConsent(false); media.cameraStream?.getTracks().forEach(track => track.stop()); }}>Всё равно продолжить</Action></div></Dialog>}
     {rules && <Dialog size="wide" title="Правила тестирования и согласие" close={() => setRules(false)}><p>Отвечайте самостоятельно, оставайтесь в полном экране и не переключайтесь на другие окна. Выход из полного экрана и потеря фокуса отмечаются в отчёте. Эти сигналы сами по себе не означают нарушение.</p><p>По вашему отдельному согласию Comit может записывать экран и видео с камеры для проверки честности. Материалы доступны только уполномоченным специалистам, хранятся 90 дней, затем удаляются. Работодатель видит отметку присутствия, а не видеозапись. Отказ от камеры не запрещает прохождение.</p><p>До нажатия «Начать» попытка не учитывается. Начатую попытку можно продолжить после обновления страницы; досрочное завершение не подтверждает грейд. Повторное прохождение доступно по сроку, который покажет платформа.</p><Action onClick={() => setRules(false)}>Понятно</Action></Dialog>}
     {exitWarning && <Dialog size="wide" title="Завершить попытку без результата?" close={() => setExitWarning(false)}><p>Начатая попытка будет учтена. Грейд не будет подтверждён; срок следующего прохождения появится после завершения.</p><div className="testing-dialog-actions"><Action onClick={() => setExitWarning(false)}>Продолжить тест</Action><Action className="testing-danger" disabled={busy} onClick={() => sessionId && void run(async () => { setExitWarning(false); terminalIntent.current = "abandon"; await complete(sessionId); })}>Завершить</Action></div></Dialog>}
-    {phase === "result" && result && <Dialog size="wide" title={result.status === "abandoned" ? "Попытка завершена" : "Результат теста"} close={back}><div className="testing-result-grade">{result.decided_grade ? grades[result.decided_grade] : "Без подтверждения грейда"}</div><p>Направление: {subjects[subject]}. Ответов: {result.answered}.</p>{result.decided_grade && <p role="status">{result.grade_publication?.published ? "Подтверждённый результат сохранён в вашем резюме." : "Результат теста сохранён. Подтверждение в резюме ещё не завершено."}</p>}<p>Пройти ещё раз можно {retryDate(result.next_attempt_at)}.</p>{result.decided_grade && !result.grade_publication?.published && <Action disabled={busy} onClick={() => sessionId && void run(async () => { await api.finishTestingSession(sessionId); setResult(await api.testingResult(sessionId)); })}>Повторить подтверждение</Action>}<Action variant="primary" onClick={back}>Вернуться в резюме</Action></Dialog>}
+    {phase === "result" && result && <Dialog size="wide" title={result.status === "abandoned" ? "Попытка завершена" : "Результат теста"} close={back}><div className="testing-result-grade">{result.decided_grade ? grades[result.decided_grade] : "Без подтверждения грейда"}</div><p>Направление: {subjects[subject]}. Ответов: {result.answered}.</p>{result.decided_grade && <p role="status">{publicationMessage(result.grade_publication)}</p>}{result.failure_reason === "judge_unavailable" ? <p role="status">Проверка не смогла оценить ответ. Грейд не изменён, эта попытка не создаёт срок ожидания. Вернитесь в резюме и начните тест снова, когда проверка будет доступна.</p> : <p>Пройти ещё раз можно {retryDate(result.next_attempt_at)}.</p>}{result.decided_grade && !result.grade_publication?.published && result.grade_publication?.retryable !== false && <Action disabled={busy} onClick={() => sessionId && void run(async () => { await api.finishTestingSession(sessionId); setResult(await api.testingResult(sessionId)); })}>Повторить подтверждение</Action>}<Action variant="primary" onClick={back}>Вернуться в резюме</Action></Dialog>}
   </main>;
 }

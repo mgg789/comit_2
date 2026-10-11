@@ -39,6 +39,10 @@ services:
       AUTH_ALLOWED_ORIGINS: "${AUTH_ALLOWED_ORIGINS:-http://localhost:8088}"
       AUTH_COOKIE_SECURE: 'false'
       AUTH_KEY_ID: "${AUTH_KEY_ID:-v1}"
+      YANDEX_OAUTH_ENABLED: "false"
+      YANDEX_OAUTH_CLIENT_ID: "${YANDEX_OAUTH_CLIENT_ID:-}"
+      YANDEX_OAUTH_CLIENT_SECRET: "${YANDEX_OAUTH_CLIENT_SECRET:-}"
+      YANDEX_OAUTH_SITE_ORIGIN: "${YANDEX_OAUTH_SITE_ORIGIN:-}"
       ACCOUNT_CONSENT_VERSION: "${ACCOUNT_CONSENT_VERSION:-account-v1}"
       TRUST_PROXY: "${TRUST_PROXY:-172.16.0.0/12}"
       SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
@@ -143,8 +147,9 @@ services:
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       TESTING_DATA_DIR: /data/testing
       TESTING_RECORDING_MODE: "${TESTING_RECORDING_MODE:-off}"
-      CODE_JUDGE_URL: "${CODE_JUDGE_URL:?Set URL of the isolated code judge}"
-      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set the isolated judge token}"
+      TESTING_ENABLED: "${TESTING_ENABLED:-true}"
+      CODE_JUDGE_URL: "${CODE_JUDGE_URL:-}"
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:-}"
       CODE_JUDGE_CA_PEM: "${CODE_JUDGE_CA_PEM:-}"
       JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
       JEV_API_KEY: "${JEV_API_KEY:-}"

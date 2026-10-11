@@ -13,7 +13,7 @@ const salary = { type: "object", additionalProperties: false, required: ["from_r
   from_rub: { type: "integer", minimum: 0 }, to_rub: { type: "integer", minimum: 0 } } };
 const common = { city: text, salary, stacks: { type: "array", items: text }, published_at: { type: "string", format: "date-time" } };
 const candidateSchema = { type: "object", additionalProperties: false, required: ["candidate_id", "display_name", ...Object.keys(common), "category"], properties: {
-  candidate_id: { type: "string", pattern: "^[a-f0-9]{64}$" }, display_name: { type: "string", const: "Специалист" }, ...common,
+  candidate_id: { type: "string", pattern: "^[a-f0-9]{64}$" }, display_name: { type: "string", const: "Специалист" }, ...common, salary: { ...salary, properties: { ...salary.properties, to_rub: nullable(salary.properties.to_rub) } },
   category: { type: "object", additionalProperties: false, required: ["specialization", "grade", "grade_status"], properties: {
     specialization: { type: "string", enum: specializations }, grade: { type: "string", enum: grades }, grade_status: { type: "string", enum: ["approved", "self_reported"] } } } } };
 const vacancySchema = { type: "object", additionalProperties: false, required: ["vacancy_id", "title", "company_name", ...Object.keys(common), "schedule", "category", "work_types"], properties: {

@@ -5,6 +5,7 @@ import { PublicShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell
 import { Action, Backdrop, Icon, Select, State, Tags } from "@comit/ui-kit/design";
 import { usePersistentState } from "@comit/ui-kit/ui-state";
 import { WelcomeBackground, candidateUrl, employerUrl } from "./entry";
+import { showcaseSalary as salary } from "./showcase-format";
 
 const api = createApiClient({ baseUrl: "/api" });
 const roleLabels: Record<string, string> = { backend: "Backend-разработчик", frontend: "Frontend-разработчик", fullstack: "Fullstack-разработчик", mobile: "Мобильный разработчик", devops: "DevOps", data: "Аналитик данных", qa: "Тестировщик", ml: "ML-специалист" };
@@ -13,8 +14,6 @@ const stackLabels: Record<string, string> = { python: "Python", node: "Node.js",
 const tabs = [{ id: "vacancies", label: "Вакансии", path: "#/showcase/vacancies", icon: "vacancies" }, { id: "candidates", label: "Соискатели", path: "#/showcase/candidates", icon: "candidates" }] as const;
 type Kind = "vacancies" | "candidates";
 type Card = PublicShowcaseVacancy | PublicShowcaseCandidate;
-const currency = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 });
-function salary(value: Card["salary"]) { return `${currency.format(value.from_rub / 1000)}–${currency.format(value.to_rub / 1000)}к ₽`; }
 function failure(reason: unknown) { return reason instanceof ApiError && reason.status === 409 ? "Список обновился. Загрузите его заново." : "Не удалось загрузить витрину. Попробуйте ещё раз."; }
 function cardKey(card: Card) { return "vacancy_id" in card ? card.vacancy_id : card.candidate_id; }
 function PublicationDate({ value }: { value: string }) {
@@ -35,7 +34,7 @@ export function PublicShowcase({ kind }: { kind: Kind }) {
   const [login, setLogin] = useState<Kind | null>(null), [retry, setRetry] = useState(0);
   const generation = useRef(0), morePending = useRef(false);
   const read = (request: PublicShowcaseQuery): Promise<PublicShowcasePage<Card>> => kind === "vacancies" ? api.listPublicVacancies(request) : api.listPublicCandidates(request);
-  const filters: PublicShowcaseQuery = { limit: 24, q: query.trim(), sort, specialization: SPECIALIZATIONS.find(value => value === specialization), grade: GRADES.find(value => value === grade), stack: Object.hasOwn(stackLabels, stack) ? stack : undefined };
+  const filters: PublicShowcaseQuery = { limit: 24, q: kind === "vacancies" ? query.trim() : undefined, sort, specialization: SPECIALIZATIONS.find(value => value === specialization), grade: GRADES.find(value => value === grade), stack: Object.hasOwn(stackLabels, stack) ? stack : undefined };
   useEffect(() => {
     const current = ++generation.current;
     setLoading(true); setData(null); setError(null); setMoreError(null); setMore(false); morePending.current = false; setLogin(null);
@@ -53,14 +52,14 @@ export function PublicShowcase({ kind }: { kind: Kind }) {
     <Backdrop imagery={false} /><WelcomeBackground />
     <PublicShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} loginHref="#/" navigationLabel="Разделы витрины" items={tabs} selected={kind} navigate={path => { window.location.hash = path; }} />
     <main className="main-content public-content">
-      <div className="public-filters">
-        <Select aria-label="Специализация" value={specialization} onChange={event => setSpecialization(event.target.value)}><option value="">Специализация</option>{SPECIALIZATIONS.map(value => <option key={value} value={value}>{roleLabels[value]}</option>)}</Select>
+      <div className={`public-filters public-filters-${kind}`}>
+        <Select aria-label="Направление" value={specialization} onChange={event => setSpecialization(event.target.value)}><option value="">Направление</option>{SPECIALIZATIONS.map(value => <option key={value} value={value}>{roleLabels[value]}</option>)}</Select>
         <Select aria-label="Грейд" value={grade} onChange={event => setGrade(event.target.value)}><option value="">Грейд</option>{GRADES.map(value => <option key={value} value={value}>{gradeLabels[value]}</option>)}</Select>
         <Select aria-label="Стек" value={stack} onChange={event => setStack(event.target.value)}><option value="">Стек</option>{Object.entries(stackLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select>
-        <input aria-label="Поиск по витрине" className="public-query" placeholder={kind === "vacancies" ? "Вакансия" : "Направление"} maxLength={500} value={query} onChange={event => setQuery(event.target.value)} />
+        {kind === "vacancies" && <input aria-label="Поиск по витрине" className="public-query" placeholder="Вакансия" maxLength={500} value={query} onChange={event => setQuery(event.target.value)} />}
         <Select className="public-sort" aria-label="Сортировка" value={sort} onChange={event => setSort(event.target.value === "oldest" ? "oldest" : "newest")}><option value="newest">Сначала новые</option><option value="oldest">Сначала старые</option></Select>
       </div>
-      {loading || error ? <State loading={loading} error={error} retry={() => setRetry(value => value + 1)} /> : !data?.items.length ? <section className="panel public-empty" role="status"><h1>{query || specialization || grade || stack ? "Ничего не найдено" : kind === "vacancies" ? "Пока нет опубликованных вакансий" : "Пока нет опубликованных резюме"}</h1><p>Попробуйте изменить фильтры или зайдите позже.</p></section> : <div className={kind === "vacancies" ? "vacancy-grid public-vacancies" : "public-candidates"} aria-label={kind === "vacancies" ? "Публичные вакансии" : "Публичные соискатели"}>
+      {loading || error ? <State loading={loading} error={error} retry={() => setRetry(value => value + 1)} /> : !data?.items.length ? <section className="panel public-empty" role="status"><h1>{(kind === "vacancies" && query) || specialization || grade || stack ? "Ничего не найдено" : kind === "vacancies" ? "Пока нет опубликованных вакансий" : "Пока нет опубликованных резюме"}</h1><p>Попробуйте изменить фильтры или зайдите позже.</p></section> : <div className={kind === "vacancies" ? "vacancy-grid public-vacancies" : "public-candidates"} aria-label={kind === "vacancies" ? "Публичные вакансии" : "Публичные соискатели"}>
         {data.items.map(card => "vacancy_id" in card ? <article className="vacancy-card glass" key={card.vacancy_id}>
           <span className="status-pill"><span className="status-dot" />Активная</span><h3>{card.title}</h3><Tags shape="pill" values={card.stacks.map(value => stackLabels[value] || value)} /><div className="salary-row"><strong>{salary(card.salary)}</strong><small>за месяц</small></div>
           <div className="vacancy-footer"><PublicationDate value={card.published_at} /></div><button className="public-card-link" aria-label={`Открыть вакансию ${card.title}`} onClick={() => setLogin("vacancies")} />

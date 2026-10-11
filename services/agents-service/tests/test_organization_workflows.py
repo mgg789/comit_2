@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
 from agents_service.database import connect
 from agents_service.organization_models import OrganizationTaskRequest
 from agents_service.organization_store import (
@@ -231,11 +230,19 @@ def test_pg_waiting_schedule_asks_once_without_calling_llm():
     process_id = uuid4()
     store = OrganizationStore(database_url)
     try:
-        store.create_task(owner_id, OrganizationTaskRequest(kind="schedule_interview", instruction="Arrange interviews",
-            conversation_refs={"process_ids": [str(process_id)]}, idempotency_key=str(uuid4())))
+        class UnavailableBridge(BaseRegistry):
+            def dispatch(self, *_args, **_kwargs):
+                pytest.fail("Saving a delegation without slots must not call the recruitment bridge")
+
+        registry = WorkflowToolRegistry(UnavailableBridge(), store)
+        source = store.create_turn(owner_id, "Arrange interviews", str(uuid4()))
+        registry.bind_turn(store.claim_turn_by_id(owner_id, source.turn_id))
+        registry.dispatch(str(owner_id), "task_start", {"kind": "schedule_interview",
+            "instruction": "Arrange interviews", "process_ids": [str(process_id)], "availability": []}, str(uuid4()))
+        store.update_turn(owner_id, source.turn_id, expected_lease_token=registry.turn.lease_token, status="succeeded")
         task = store.claim_task(owner_id=owner_id, lease_seconds=30)
         assert task is not None
-        _workflow(database_url, store, BaseRegistry()).process(task)
+        _workflow(database_url, store, UnavailableBridge()).process(task)
         current = store.get_task(owner_id, task.task_id)
         assert current.status == "waiting_employer"
         assert len(store.list_pending_answers(owner_id)) == 1
@@ -255,9 +262,12 @@ def test_pg_multi_inquiry_scheduled_report_is_durable():
     owner_id = uuid4()
     process_ids = [uuid4(), uuid4()]
     base = BaseRegistry()
-    base.dispatch = lambda _owner, name, arguments, *_args: {"interviews": [{"kind": "general", "state": "scheduled"}]} if name == "recruitment_get" else {}
     store = OrganizationStore(database_url)
     starts = datetime.now(UTC) + timedelta(days=1)
+    base.dispatch = lambda _owner, name, arguments, *_args: {"interviews": [{
+        "kind": "general", "state": "scheduled", "starts_at": starts.isoformat(),
+        "duration_minutes": 30, "time_zone": "UTC", "format": "remote", "location": "online",
+    }]} if name == "recruitment_get" else {}
     try:
         store.create_task(owner_id, OrganizationTaskRequest(kind="schedule_interview", instruction="Schedule both",
             conversation_refs={"process_ids": [str(value) for value in process_ids], "availability": [{
@@ -379,6 +389,77 @@ def _availability(start: datetime | None = None) -> dict:
         "location": "online",
         "kind": "general",
     }
+
+
+@pytest.mark.parametrize("changed", [
+    {"duration_minutes": 15}, {"time_zone": "Europe/Moscow"},
+    {"location": "another room"}, {"format": "onsite"},
+])
+def test_interview_proposal_preserves_employer_slot_conditions(changed):
+    """The interval does not authorize changing the employer's meeting conditions."""
+    slot = _availability()
+    task = SimpleNamespace(conversation_refs={"availability": [slot]})
+    args = {key: value for key, value in slot.items() if key != "ends_at"}
+    args.update(changed)
+    from agents_service.organization_tools import OrganizationToolError
+    with pytest.raises(OrganizationToolError, match="interview_outside_employer_availability"):
+        WorkflowToolRegistry._check_availability(task, args)
+
+
+@pytest.mark.integration
+def test_pg_old_interview_does_not_complete_new_delegation():
+    """A completed interview outside the supplied slot is no evidence of this task's success."""
+    database_url = os.getenv("AGENTS_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("AGENTS_TEST_DATABASE_URL is not configured")
+    owner_id, process_id = uuid4(), uuid4()
+    store = OrganizationStore(database_url)
+    slot = _availability()
+    old = {**slot, "state": "completed", "starts_at": (datetime.now(UTC) - timedelta(days=5)).isoformat()}
+    base = BaseRegistry()
+    base.dispatch = lambda _owner, name, _args, *_rest: {"interviews": [old]} if name == "recruitment_get" else {"items": []}
+
+    class FinishingRuntime(FakeRuntime):
+        def run_turn(self, turn):
+            return store.update_turn(owner_id, turn.turn_id, expected_lease_token=turn.lease_token, status="succeeded")
+
+    try:
+        task = store.create_task(owner_id, OrganizationTaskRequest(kind="schedule_interview", instruction="Arrange a new meeting",
+            conversation_refs={"process_ids": [str(process_id)], "availability": [slot]}, idempotency_key=str(uuid4())))
+        claimed = store.claim_task(owner_id=owner_id)
+        _workflow(database_url, store, base, FinishingRuntime()).process(claimed)
+        assert store.get_task(owner_id, task.task_id).status == "waiting"
+        assert not any("Собеседования подтверждены" in message.content for message in store.list_messages(owner_id).items)
+    finally:
+        _cleanup_owner(database_url, owner_id)
+
+
+@pytest.mark.integration
+def test_pg_failed_workflow_turn_escalates_in_same_wake():
+    """A terminal runtime failure immediately creates a readable owner question."""
+    database_url = os.getenv("AGENTS_TEST_DATABASE_URL")
+    if not database_url:
+        pytest.skip("AGENTS_TEST_DATABASE_URL is not configured")
+    owner_id, process_id = uuid4(), uuid4()
+    store = OrganizationStore(database_url)
+
+    class FailingRuntime(FakeRuntime):
+        def run_turn(self, turn):
+            return store.update_turn(owner_id, turn.turn_id, expected_lease_token=turn.lease_token,
+                                     status="failed", error_code="provider_call_ambiguous")
+
+    try:
+        task = store.create_task(owner_id, OrganizationTaskRequest(kind="inquiry", instruction="Ask availability",
+            conversation_refs={"process_ids": [str(process_id)]}, idempotency_key=str(uuid4())))
+        claimed = store.claim_task(owner_id=owner_id)
+        _workflow(database_url, store, BaseRegistry(), FailingRuntime()).process(claimed)
+        assert store.get_task(owner_id, task.task_id).status == "waiting_employer"
+        questions = store.list_pending_answers(owner_id)
+        assert len(questions) == 1
+        assert "provider_call_ambiguous" not in questions[0].prompt
+        assert str(task.task_id) not in questions[0].prompt
+    finally:
+        _cleanup_owner(database_url, owner_id)
 
 
 @pytest.mark.integration

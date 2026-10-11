@@ -1,0 +1,12 @@
+import type { RecruitmentView } from "@comit/shared";
+
+/** States in which the existing contacts endpoint may authorize candidate identity. */
+export function mayReadCandidateName(state: RecruitmentView["state"]): boolean {
+  return ["accepted", "offer_sent", "hired", "offer_declined"].includes(state);
+}
+
+/** Append only a name supplied by the authorized contacts endpoint after acceptance. */
+export function recruitmentChatTitle(process: Pick<RecruitmentView, "state" | "terms">, name?: string): string {
+  const title = process.terms?.vacancy_title || "Вакансия";
+  return mayReadCandidateName(process.state) && name?.trim() ? `${title} — ${name.trim()}` : title;
+}

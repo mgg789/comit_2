@@ -29,7 +29,7 @@ export async function testingIntegrationRoutes(app: FastifyInstance,
           401: { type: "object", properties: { detail: { type: "string" } } },
           403: { type: "object", properties: { detail: { type: "string" } } },
           404: { type: "object", properties: { detail: { type: "string" } } },
-          409: { type: "object", properties: { detail: { type: "string" } } },
+          409: { type: "object", properties: { detail: { type: "string" }, upgrade_at: { type: "string", format: "date-time" }, next_attempt_at: { type: "string", format: "date-time" } } },
           503: { type: "object", properties: { detail: { type: "string" } } }
         } }, onRequest: async (request, reply) => {
       if (!token) return reply.code(503).send({ detail: "testing_not_configured" });
@@ -44,7 +44,7 @@ export async function testingIntegrationRoutes(app: FastifyInstance,
         sessionId: body.session_id, grade: body.decided_grade, specialization: body.specialization,
         cameraStatus: body.camera_status, supervisionBadge: body.supervision_badge ?? null, tasksAnswered: body.tasks_answered }));
     } catch (error) {
-      if (error instanceof ProfileError) return reply.code(error.status).send({ detail: error.code });
+      if (error instanceof ProfileError) return reply.code(error.status).send({ detail: error.code, ...(error.retryAt ? { [error.code === "grade_upgrade_cooldown" ? "upgrade_at" : "next_attempt_at"]: error.retryAt } : {}) });
       return reply.code(503).send({ detail: "testing_result_unavailable" });
     }
   });

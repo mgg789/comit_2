@@ -9,7 +9,7 @@ from typing import Literal, Protocol, TypeVar
 from uuid import UUID
 
 from matching_engine.combine_models import CandidateCard, MatchCandidate
-from matching_engine.models import Contract
+from matching_engine.models import CandidateProfile, Contract
 
 logger = logging.getLogger(__name__)
 POLICY_VERSION = "near-equivalent-promotion-v1"
@@ -76,7 +76,7 @@ def compute_fsp_boost(profile: MatchCandidate, *, allow_demo: bool = False) -> d
     return best
 
 
-def compute_weekly_boost(profile: MatchCandidate, *, now: datetime | None = None) -> float:
+def compute_weekly_boost(profile: MatchCandidate | CandidateProfile, *, now: datetime | None = None) -> float:
     """Accept one server-earned reward for the current UTC week, expiring next Monday.
 
     Evidence comes from the authenticated API outbox, not editable metadata.
@@ -102,6 +102,14 @@ def compute_weekly_boost(profile: MatchCandidate, *, now: datetime | None = None
     return 0.0
 
 
+def weekly_activity_deadline(profile: MatchCandidate | CandidateProfile, *, now: datetime | None = None) -> datetime | None:
+    """Expose only a server-earned current reward deadline, independent of ordering mode."""
+    now = now or datetime.now(UTC)
+    if not compute_weekly_boost(profile, now=now):
+        return None
+    return (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=7)
+
+
 class PromotionExplanation(Contract):
     """Public bounded ordering factors, separate from additive model contributions."""
 
@@ -117,7 +125,8 @@ class PromotionExplanation(Contract):
 def promotion_explanation(profile: MatchCandidate, policy: PromotionPolicy) -> PromotionExplanation:
     """Describe eligible ordering bonuses without contact/provider account identifiers."""
     fsp = compute_fsp_boost(profile, allow_demo=policy.allow_demo)
-    weekly = compute_weekly_boost(profile)
+    now = datetime.now(UTC)
+    weekly = compute_weekly_boost(profile, now=now)
     return PromotionExplanation(policy_version=policy.version, mode=policy.mode,
         fsp_bonus=fsp["bonus"], weekly_bonus=weekly, combined_bonus=min(FSP_BOOST_MAX, fsp["bonus"] + weekly),
         max_base_gap=policy.max_base_gap, demo_registry=fsp["factors"].get("demo_registry", False))

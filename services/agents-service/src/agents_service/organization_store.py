@@ -439,6 +439,89 @@ class OrganizationStore:
             return bool(db.execute("SELECT 1 FROM agents_service.organization_tasks WHERE owner_id=%s AND task_id=%s AND status='processing' AND lease_token=%s AND lease_until>now()",
                                    (task.owner_id, task.task_id, task.lease_token)).fetchone())
 
+    def complete_task(self, turn: OrganizationTurn, *, process_id: UUID, outcome: str,
+                      report: str, idempotency_key: str) -> dict[str, Any]:
+        """Atomically save a process result, employer report, question and replay receipt.
+
+        New writes require live task and turn leases and the process's assigned turn.
+        Exact retries return their original receipt after completion without new writes;
+        cancelled or failed tasks never authorize replay. Keys are scoped to the task.
+        """
+        if turn.task_id is None or not idempotency_key or outcome not in {"completed", "needs_employer"}:
+            raise ValueError("invalid_task_completion")
+        arguments = {"turn_id": str(turn.turn_id), "process_id": str(process_id),
+                     "outcome": outcome, "report": report}
+        with self._db() as db, db.transaction():
+            chat = db.execute("SELECT * FROM agents_service.organization_chats WHERE owner_id=%s FOR UPDATE",
+                              (turn.owner_id,)).fetchone()
+            task = db.execute("SELECT * FROM agents_service.organization_tasks WHERE owner_id=%s AND task_id=%s FOR UPDATE",
+                              (turn.owner_id, turn.task_id)).fetchone()
+            if task is None or chat is None or task["chat_id"] != turn.chat_id:
+                raise OrganizationNotFound("organization_task_not_found")
+            if task["status"] in {"stopped", "failed"}:
+                raise OrganizationConflict("organization_task_lease_lost")
+            progress = dict(task["result"] or {})
+            receipts = dict(progress.get("completion_receipts", {}))
+            previous = receipts.get(idempotency_key)
+            if previous is not None:
+                if previous["arguments"] != arguments:
+                    raise OrganizationConflict("idempotency_key_conflict")
+                source = db.execute("""SELECT 1 FROM agents_service.organization_turns
+                    WHERE owner_id=%s AND chat_id=%s AND turn_id=%s AND task_id=%s""",
+                                    (turn.owner_id, turn.chat_id, turn.turn_id, turn.task_id)).fetchone()
+                if source is None:
+                    raise OrganizationConflict("organization_turn_not_found")
+                return previous["response"]
+            live = db.execute("""SELECT 1 FROM agents_service.organization_turns
+                WHERE owner_id=%s AND chat_id=%s AND turn_id=%s AND task_id=%s
+                    AND status='processing' AND lease_token=%s AND lease_until>now()
+                    AND task_lease_token=%s FOR UPDATE""",
+                              (turn.owner_id, turn.chat_id, turn.turn_id, turn.task_id,
+                               turn.lease_token, turn.task_lease_token)).fetchone()
+            task_live = db.execute("""SELECT 1 FROM agents_service.organization_tasks
+                WHERE owner_id=%s AND task_id=%s AND status='processing' AND lease_token=%s
+                    AND lease_until>now() AND (conversation_refs->>'expires_at')::timestamptz>now()""",
+                                   (turn.owner_id, turn.task_id, turn.task_lease_token)).fetchone()
+            if live is None or task_live is None:
+                raise OrganizationConflict("organization_task_lease_lost")
+            if task["kind"] == "stand_in" and (chat["last_seen_at"] is None or db.execute(
+                    "SELECT 1 WHERE %s AND %s::timestamptz>=now()-interval '120 seconds'",
+                    (chat["presence"], chat["last_seen_at"])).fetchone()):
+                raise OrganizationConflict("organization_task_lease_lost")
+            if outcome == "completed" and task["kind"] != "inquiry":
+                raise OrganizationConflict("interview_completion_requires_candidate_acceptance")
+            process_key = str(process_id)
+            if process_key not in task["conversation_refs"]["process_ids"]:
+                raise OrganizationConflict("delegation_process_denied")
+            processes = dict(progress.get("processes", {}))
+            state = dict(processes.get(process_key, {}))
+            if state.get("turn_id") != str(turn.turn_id):
+                raise OrganizationConflict("task_process_turn_mismatch")
+            state.update({"completed": outcome == "completed", "report": report})
+            processes[process_key] = state
+            status = "waiting_employer" if outcome == "needs_employer" else "succeeded"
+            if outcome == "completed" and not all(processes.get(value, {}).get("completed")
+                                                  for value in task["conversation_refs"]["process_ids"]):
+                status = "processing"
+            response = {"result": {"status": status, "report": report}}
+            receipts[idempotency_key] = {"arguments": arguments, "response": response}
+            progress.update({"processes": processes, "report": report, "outcome": outcome,
+                             "completion_receipts": receipts})
+            db.execute("""UPDATE agents_service.organization_tasks SET status=%s,result=%s,updated_at=now()
+                WHERE owner_id=%s AND task_id=%s""", (status, Jsonb(progress), turn.owner_id, turn.task_id))
+            db.execute("""INSERT INTO agents_service.organization_messages
+                (message_id,chat_id,role,content,sequence,idempotency_key)
+                VALUES(%s,%s,'assistant',%s,(SELECT COALESCE(MAX(sequence),-1)+1
+                    FROM agents_service.organization_messages WHERE chat_id=%s),%s)""",
+                       (uuid4(), turn.chat_id, report, turn.chat_id, f"task:{turn.task_id}:report:{idempotency_key}"))
+            if status == "waiting_employer":
+                prompt = report[:2000]
+                db.execute("""INSERT INTO agents_service.organization_pending_answers
+                    (answer_id,chat_id,task_id,prompt,answer_schema) VALUES(%s,%s,%s,%s,%s)""",
+                           (uuid4(), turn.chat_id, turn.task_id, prompt, Jsonb({"type": "object", "required": [
+                               "availability" if task["kind"] == "schedule_interview" else "instruction"]})))
+            return response
+
     def stop_task(self, owner_id: UUID, task_id: UUID, reason: str = "stopped_by_owner") -> OrganizationTask:
         """Cancel a queued or processing task; worker checks this status before dispatch."""
         with self._db() as db:

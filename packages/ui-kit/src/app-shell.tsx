@@ -40,7 +40,7 @@ export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, 
       <button className="plain-icon" onClick={toggleMenu} aria-label="Открыть меню аккаунта" aria-expanded={menu}><span className="account-avatar">{email.slice(0, 1).toUpperCase()}</span><Icon name="chevron" /></button>
     </div>
     {overlayContent}
-    <AnimatePresence>{menu && <motion.div ref={menuRef} className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><p>{email}</p>{menuContent}</motion.div>}</AnimatePresence>
+    <AnimatePresence>{menu && <motion.div ref={menuRef} className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><p>{email}</p><a className="action glass" href="/help/" target="_blank" rel="noopener noreferrer">Справка</a>{menuContent}</motion.div>}</AnimatePresence>
   </header>;
 }
 

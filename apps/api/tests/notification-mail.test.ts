@@ -24,7 +24,7 @@ test("four Figma event types render accessible HTML/plain text with bundled MIME
     assert.match(rendered.text, /Это не реклама/);
     assert.equal(rendered.html.includes(event.email), false);
     assert.equal(rendered.html.includes(event.job_id), false);
-    assert.equal(rendered.attachments.length, 2);
+    assert.equal(rendered.attachments.length, event.kind.endsWith("interview") ? 7 : 2);
     assert.equal(/<script|<iframe|src="https?:/i.test(rendered.html), false);
     for (const asset of rendered.attachments) assert.ok(rendered.html.includes(`cid:${asset.cid}`));
   }

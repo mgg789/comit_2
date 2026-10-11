@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.request
 
 PUBLISH_TIMEOUT_SECONDS = 15
@@ -23,6 +24,8 @@ class TrustedGradePublisher:
     def __init__(self, base_url: str | None = None, token: str | None = None) -> None:
         self.base_url = (base_url or os.environ.get("TESTING_API_URL", "")).rstrip("/")
         self.token = token or os.environ.get("TESTING_ENGINE_TOKEN", "")
+        self.failure_detail: str | None = None
+        self.retry_at: str | None = None
 
     def configured(self) -> bool:
         return bool(self.base_url) and bool(self.token)
@@ -59,5 +62,20 @@ class TrustedGradePublisher:
         try:
             with urllib.request.urlopen(request, timeout=PUBLISH_TIMEOUT_SECONDS) as response:
                 return response.status == 200, f"api_status:{response.status}"
+        except urllib.error.HTTPError as error:
+            try:
+                body = json.loads(error.read(8192))
+                detail = body.get("detail")
+                # Preserve only bounded machine categories, never upstream stack traces.
+                if isinstance(detail, str) and len(detail) <= 80 and all(c.islower() or c == "_" for c in detail):
+                    self.failure_detail = detail
+                date = body.get("upgrade_at", body.get("next_attempt_at"))
+                if isinstance(date, str):
+                    from datetime import datetime
+                    datetime.fromisoformat(date)
+                    self.retry_at = date
+            except (ValueError, TypeError, AttributeError, OSError):
+                pass
+            return False, f"api_status:{error.code}"
         except OSError:
             return False, "api_unreachable"

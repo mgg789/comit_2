@@ -26,6 +26,13 @@ test("proxy derives candidate owner, blocks missing consent and never forwards l
   const calls: Array<{ url: string; options?: RequestInit }> = [];
   const transport: typeof fetch = async (url, options) => {
     calls.push({ url: String(url), options });
+    if (String(url).endsWith("/result")) return Response.json({ session_id: "s-20261011120000123456", status: "abandoned",
+      decided_grade: null, answered: 1, correct: 1, next_attempt_at: null, failure_reason: "judge_unavailable",
+      grade_publication: null, supervision: null, capture_finalized: false });
+    if (String(url).endsWith("/finish")) return Response.json({ session_id: "s-20261011120000123456", status: "finished",
+      decided_grade: "middle", answered: 6, correct: 5, next_attempt_at: "2030-01-01T12:00:00Z", failure_reason: null,
+      grade_publication: { published: false, status: "api_status:409", detail: "grade_upgrade_cooldown", retryable: false,
+        attempts: 1, retry_at: "2030-02-01T12:00:00Z", next_retry_at: null }, supervision: null, capture_finalized: true });
     if (String(url).endsWith("/next")) return Response.json({
       session_id: "s-20261011120000123456", answered: 1, decided_grade: null,
       pending_answer: "def solve(n): return n * 2",
@@ -35,7 +42,7 @@ test("proxy derives candidate owner, blocks missing consent and never forwards l
       specialization: "react", supported_specializations: ["react"], eligible: false, next_attempt_at: null,
       active_session_id: "s-20261011120000123456", active_session_status: "active", next_sequence: 4,
       recording_enabled: true, active_recording_enabled: true, max_questions: 30, supported_question_types: ["mcq", "short_answer", "code", "extended"],
-      judges: { code_required: false, code_ready: true, text_configured: true, types: ["mcq", "short_answer", "code", "extended"] }, unavailable_reason: null,
+      judges: { code_required: false, code_ready: true, text_configured: true, types: ["mcq", "short_answer", "code", "extended"] }, unavailable_reason: String(url).includes("specialization=sql") ? "testing_disabled" : null,
       active_session_consents: { version: "testing-media-v1", processing: true, screen_recording: true, video_analysis: false,
         accepted_at: new Date().toISOString(), retention_days: 90 },
       active_supervision: { total_seconds: 20, in_frame_seconds: 0, focus_lost_seconds: 2,
@@ -68,10 +75,22 @@ test("proxy derives candidate owner, blocks missing consent and never forwards l
     assert.deepEqual(resumed.json().supported_question_types, ["mcq", "short_answer", "code", "extended"]);
     assert.equal(resumed.json().judges.code_ready, true);
     assert.equal(resumed.json().unavailable_reason, null);
+    const disabled = await app.inject({ url: "/candidate/testing/preflight?specialization=sql", headers });
+    assert.equal(disabled.statusCode, 200);
+    assert.equal(disabled.json().unavailable_reason, "testing_disabled");
+    assert.equal(disabled.json().eligible, false);
     const pending = await app.inject({ url: "/candidate/testing/sessions/s-20261011120000123456/next", headers });
     assert.equal(pending.statusCode, 200);
     assert.equal(pending.json().pending_answer, "def solve(n): return n * 2");
     assert.equal(pending.json().task.type, "code");
+    const failed = await app.inject({ url: "/candidate/testing/sessions/s-20261011120000123456/result", headers });
+    assert.equal(failed.statusCode, 200);
+    assert.equal(failed.json().next_attempt_at, null);
+    assert.equal(failed.json().failure_reason, "judge_unavailable");
+    const publication = await app.inject({ method: "POST", url: "/candidate/testing/sessions/s-20261011120000123456/finish", headers, payload: {} });
+    assert.equal(publication.statusCode, 200);
+    assert.deepEqual(publication.json().grade_publication, { published: false, status: "api_status:409", detail: "grade_upgrade_cooldown", retryable: false,
+      attempts: 1, retry_at: "2030-02-01T12:00:00Z", next_retry_at: null });
     assert.deepEqual(resumed.json().active_supervision, { total_seconds: 20, in_frame_seconds: 0,
       focus_lost_seconds: 2, multi_face_events: 0, camera: "denied" });
     assert.equal((await app.inject({ method: "POST", url: "/candidate/testing/sessions", headers: { ...headers, origin: "https://evil.example" },

@@ -1,5 +1,7 @@
 """Typed, Cyrillic PDF resumes with separate owner and public projections."""
 
+import json
+from functools import lru_cache
 from html import escape
 from io import BytesIO
 from pathlib import Path
@@ -10,16 +12,32 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import Flowable, HRFlowable, Paragraph, SimpleDocTemplate
 
 from matching_engine.models import CandidateProfile, Category
 from matching_engine.privacy import sanitize_public_text
 
 _FONT_LOCK = Lock()
+RESUME_TEMPLATE_VERSION = "comit-resume-template:2026-10-v3"
+# Current employer brand, adapted to a white print surface (ui-kit/tokens.css).
+_ACCENT = colors.HexColor("#bfe2ff")
+_INK = colors.HexColor("#272930")
+_MUTED = colors.HexColor("#727478")
 _STATUS = {"confirmed": "подтверждено", "partial": "частично подтверждено",
            "self_reported": "самооценка", "pending": "ожидает проверки", "rejected": "отклонено"}
 _GRADE_STATUS = {"approved": "подтверждено тестированием",
                  "self_reported": "заявлено самостоятельно (самооценка; тестирование ещё не пройдено)"}
+
+
+def has_current_resume_template(pdf: bytes) -> bool:
+    """Recognize our renderer's uncompressed metadata marker without parsing profile text."""
+    return f"/Keywords ({RESUME_TEMPLATE_VERSION})".encode("ascii") in pdf
+
+
+@lru_cache(maxsize=1)
+def _skill_catalog() -> dict:
+    """Load the packaged display snapshot generated from shared/skill-catalog.ts."""
+    return json.loads((Path(__file__).parent / "artifacts" / "resume-skill-catalog.json").read_text())
 
 
 def render_resume(profile: CandidateProfile, category: Category, public: bool = True) -> bytes:
@@ -29,46 +47,73 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
     and opaque metadata stay in private storage rather than public artifacts.
     """
     with _FONT_LOCK:
-        if "ComitSans" not in pdfmetrics.getRegisteredFontNames():
+        if "ComitInter" not in pdfmetrics.getRegisteredFontNames():
             fonts = Path(__file__).parent / "fonts"
-            pdfmetrics.registerFont(TTFont("ComitSans", str(fonts / "DejaVuSans.ttf")))
-            pdfmetrics.registerFont(TTFont("ComitSansBold", str(fonts / "DejaVuSans-Bold.ttf")))
-    body = ParagraphStyle("ComitBody", fontName="ComitSans", fontSize=10, leading=14, spaceAfter=4,
-                          splitLongWords=True)
-    heading = ParagraphStyle("ComitHeading", parent=body, fontName="ComitSansBold", fontSize=13,
-                             leading=18, spaceBefore=10, spaceAfter=6, keepWithNext=True)
-    title = ParagraphStyle("ComitTitle", parent=heading, fontSize=24, leading=30, spaceBefore=0)
-    content: list[Paragraph | Spacer] = []
+            pdfmetrics.registerFont(TTFont("ComitInter", str(fonts / "Inter-Regular.ttf")))
+            pdfmetrics.registerFont(TTFont("ComitInterBold", str(fonts / "Inter-Bold.ttf")))
+            pdfmetrics.registerFontFamily("ComitInter", normal="ComitInter", bold="ComitInterBold")
+    body = ParagraphStyle("ComitBody", fontName="ComitInter", fontSize=9.5, leading=15,
+                          textColor=_INK, spaceAfter=6, splitLongWords=True)
+    heading = ParagraphStyle("ComitHeading", parent=body, fontName="ComitInterBold", fontSize=15,
+                             leading=21, textColor=_INK, spaceBefore=8, spaceAfter=10,
+                             keepWithNext=True)
+    claim_heading = ParagraphStyle("ComitClaim", parent=body, fontName="ComitInterBold",
+                                   fontSize=11, leading=16, spaceBefore=8, spaceAfter=4,
+                                   keepWithNext=True)
+    meta = ParagraphStyle("ComitMeta", parent=body, textColor=_MUTED, fontSize=8.5, leading=13)
+    title = ParagraphStyle("ComitTitle", parent=body, fontName="ComitInterBold", fontSize=32,
+                           leading=39, spaceBefore=0, spaceAfter=12, keepWithNext=True)
+    subtitle = ParagraphStyle("ComitSubtitle", parent=body, fontName="ComitInterBold",
+                              fontSize=13, leading=19, textColor=_INK, spaceAfter=12,
+                              keepWithNext=True)
+    skill_style = ParagraphStyle("ComitSkill", parent=body, leftIndent=9,
+                                 borderPadding=(5, 9, 5, 9), backColor=_ACCENT, spaceAfter=11)
+    content: list[Flowable] = []
 
     def add(text: str, style: ParagraphStyle = body, *, redact: bool = True) -> None:
         clean = sanitize_public_text(text, profile) if public and redact else text
+        if style is heading:
+            rule = HRFlowable(width="100%", thickness=1, color=_ACCENT, spaceBefore=14)
+            rule.keepWithNext = True
+            content.append(rule)
         content.append(Paragraph(escape(clean).replace("\n", "<br/>"), style))
 
     add("Резюме кандидата" if public else profile.display_name, title)
-    add(f"{category.specialization.upper()} / {category.grade.upper()}")
-    add(f"Статус грейда: {_GRADE_STATUS[category.grade_status]}")
+    add(f"{category.specialization.upper()} / {category.grade.upper()}", subtitle)
+    add(f"Статус грейда: {_GRADE_STATUS[category.grade_status]}", meta)
     add(f"Город: {profile.city}")
     if profile.salary:
-        add(f"Ожидания: {profile.salary.from_rub:,} - {profile.salary.to_rub:,} RUB".replace(",", " "), redact=False)
+        expectation = f"от {profile.salary.from_rub:,}" if profile.salary.to_rub is None else f"{profile.salary.from_rub:,} - {profile.salary.to_rub:,}"
+        add(f"Ожидания: {expectation} RUB".replace(",", " "), redact=False)
     if public:
-        add("Контакты доступны после принятия приглашения.")
+        add("Контакты доступны после принятия приглашения.", meta)
     else:
         add(f"Email: {profile.email or '-'}\nТелефон: {profile.phone or '-'}")
     if profile.description:
         add("О себе", heading)
         add(profile.description)
-    for label, skills in (("Домены", profile.domains), ("Стек", profile.stacks),
-                          ("Soft skills", profile.soft_skills)):
+    catalog = _skill_catalog()
+    for group, label, skills in (("domains", "Области знаний", profile.domains),
+                                ("stacks", "Технологии", profile.stacks),
+                                ("soft_skills", "Гибкие навыки", profile.soft_skills)):
         if skills:
             add(label, heading)
             for skill in skills:
-                add(f"{skill.key}: {skill.level}/7 - {_STATUS[skill.status]}")
+                name = catalog["labels"][group].get(skill.key, skill.key)
+                level = catalog["levels"][skill.level - 1] if skill.level else "Уровень не выбран"
+                clean_key = sanitize_public_text(name, profile) if public else name
+                content.append(Paragraph(
+                    f'<b>{escape(clean_key)}</b>&#160;&#160;'
+                    f'<b>{level}</b>&#160;&#160;'
+                    f'<font color="#272930">- {_STATUS[skill.status]}</font>', skill_style,
+                ))
     for label, claims in (("Проекты", profile.projects), ("Опыт работы", profile.experience),
                           ("Достижения", profile.achievements)):
         if claims:
             add(label, heading)
             for claim in claims:
-                add(f"{claim.title} - {_STATUS[claim.status]}", heading)
+                add(claim.title, claim_heading)
+                add(_STATUS[claim.status], meta)
                 if claim.description:
                     add(claim.description)
                 if claim.facts is not None:
@@ -121,14 +166,25 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=(210 * mm, 297 * mm),
                            rightMargin=20 * mm, leftMargin=20 * mm,
-                           topMargin=20 * mm, bottomMargin=20 * mm,
-                           title="Comit - Candidate resume", author="Comit")
+                           topMargin=38 * mm, bottomMargin=22 * mm,
+                           title="Comit - Candidate resume", author="Comit",
+                           keywords=RESUME_TEMPLATE_VERSION)
 
     def footer(canvas, document) -> None:
-        canvas.setFont("ComitSans", 8)
-        canvas.setFillColor(colors.HexColor("#536477"))
-        canvas.drawString(20 * mm, 12 * mm, "COMIT / Профиль и статусы подтверждения")
-        canvas.drawRightString(190 * mm, 12 * mm, str(document.page))
+        """Draw brand furniture outside the splittable text frame on every page."""
+        canvas.saveState()
+        canvas.drawImage(str(Path(__file__).parent / "fonts" / "brand-capsule.png"),
+                         20 * mm, 272 * mm, width=46 * mm, height=13.4 * mm, mask="auto")
+        canvas.setFont("ComitInter", 8)
+        canvas.setFillColor(_MUTED)
+        canvas.drawRightString(190 * mm, 278 * mm, "ПРОФИЛЬ КАНДИДАТА")
+        canvas.setStrokeColor(_ACCENT)
+        canvas.setLineWidth(0.5)
+        canvas.line(20 * mm, 18 * mm, 190 * mm, 18 * mm)
+        canvas.setFont("ComitInter", 8)
+        canvas.drawString(20 * mm, 12 * mm, "Профиль и статусы подтверждения")
+        canvas.drawRightString(190 * mm, 12 * mm, f"Страница {document.page}")
+        canvas.restoreState()
 
     doc.build(content, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()

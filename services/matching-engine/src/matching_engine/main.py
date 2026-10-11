@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from matching_engine.combine_routes import combine_router
 from matching_engine.combine_store import CombineStore
+from matching_engine.candidate_routes import candidate_router
 from matching_engine.feed_routes import feed_router
 from matching_engine.feed_store import FeedStore
 from matching_engine.hypothesis_routes import hypothesis_router
@@ -78,6 +79,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
 
     app.include_router(preference_router(PreferenceStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
+    app.include_router(candidate_router(pipeline_store, require_internal))
     app.include_router(hypothesis_router(HypothesisStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
 

@@ -30,7 +30,7 @@ export interface PublicFacts { domains: PublicReference[]; stacks: PublicReferen
 export interface PublicNarrative { title: string; description: string; status: ClaimStatus; facts: PublicFacts | null; }
 /** Versioned anonymous projection; contacts remain behind accepted invitation permissions. */
 export interface PublicProfile {
-  projection_version: 1; display_name: string; city: string; salary: { from_rub: number; to_rub: number };
+  projection_version: 1; display_name: string; city: string; salary: { from_rub: number; to_rub: number | null };
   description: string; work_types: VacancyWorkType[] | null; relocation_ready: boolean | null;
   relocation_cities: string[]; preferences: string[]; domains: PublicSkill[]; stacks: PublicSkill[];
   soft_skills: PublicSkill[]; projects: PublicNarrative[]; experience: PublicNarrative[]; achievements: PublicNarrative[];
@@ -40,7 +40,7 @@ export interface SearchFactors { lexical_rank: number | null; semantic_rank: num
 /** Public current revision and protected PDF link, independent of any vacancy. */
 export interface PublicCandidateCard {
   candidate_id: string; profile_revision: number; display_name: string; city: string;
-  salary: { from_rub: number; to_rub: number }; category: Category; rank: number; confirmed_strength: number;
+  salary: { from_rub: number; to_rub: number | null }; category: Category; rank: number; confirmed_strength: number;
   resume_url: string; search_factors: SearchFactors;
 }
 /** Safe profile detail with no owner identity, proofs or contact payloads. */

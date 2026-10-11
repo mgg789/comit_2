@@ -69,7 +69,8 @@ def test_internal_auth_consent_and_no_owner_override():
     assert client.post(url, headers=headers, json=body).json()["fields"]["city"] == "Moscow"
 
 
-def test_actual_ocr_when_runtime_installed():
+@pytest.mark.parametrize(("image_format", "filename"), [("PNG", "resume.png"), ("JPEG", "resume.jpg")])
+def test_actual_ocr_when_runtime_installed(image_format, filename):
     if not shutil.which("tesseract"):
         pytest.skip("Tesseract not installed on host; covered in agents-service image acceptance")
     from PIL import Image, ImageDraw, ImageFont
@@ -78,6 +79,6 @@ def test_actual_ocr_when_runtime_installed():
     font = ImageFont.truetype("DejaVuSans.ttf", 48)
     draw.text((30, 40), "Name: Anna Petrova\nCity: Moscow\nSenior frontend developer", fill="black", font=font)
     buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    result = extract_resume(upload(buffer.getvalue(), "resume.png"))
+    image.save(buffer, format=image_format)
+    result = extract_resume(upload(buffer.getvalue(), filename))
     assert result.method == "ocr" and "Petrova" in result.extracted_text

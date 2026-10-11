@@ -6,7 +6,7 @@ import type { TestingPreflight, TestingSpecialization, TestingStartRequest, Test
  * handling stay in one place.
  */
 import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, SystemChatMessageRequest, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
-  SupportLoginRequest, SupportSessionView, SupportOperatorView, SupportConversationPage, SupportMessagePage, SystemNotification, SupportReadStatus,
+  SupportLoginRequest, SupportSessionView, SupportOperatorView, SupportConversationPage, SupportMessagePage, SystemNotification, SupportReadStatus, SystemChatFile, SystemChatFileUpload, SystemChatFileDownload,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
@@ -64,6 +64,10 @@ export interface ApiClient {
   markSystemChatRead(role: AccountRole, body: SystemChatReadRequest): Promise<SystemChatReadStatus>;
   /** Write into own Comit conversation using a stable UUID retry key. */
   sendSystemChatMessage(role: AccountRole, body: SystemChatMessageRequest): Promise<SystemNotification>;
+  /** Upload a support-chat attachment owned by the authenticated account. */
+  uploadSystemChatFile(role: AccountRole, body: SystemChatFileUpload): Promise<SystemChatFile>;
+  /** Download a published support-chat attachment for the authenticated account. */
+  downloadSystemChatFile(role: AccountRole, fileId: string): Promise<SystemChatFileDownload>;
   /** Count unread items across every authorized hiring chat and the system inbox. */
   getChatUnread(role: AccountRole): Promise<ChatUnreadStatus>;
   /** Exchange the operator email and access key for a support session cookie. */
@@ -78,6 +82,10 @@ export interface ApiClient {
   getSupportMessages(accountId: string, afterSequence?: number, limit?: number): Promise<SupportMessagePage>;
   /** Answer an account as Comit using a stable UUID retry key. */
   sendSupportMessage(accountId: string, body: SystemChatMessageRequest): Promise<SystemNotification>;
+  /** Upload an attachment into an account conversation as the support operator. */
+  uploadSupportFile(accountId: string, body: SystemChatFileUpload): Promise<SystemChatFile>;
+  /** Download an attachment published in an account conversation as the support operator. */
+  downloadSupportFile(accountId: string, fileId: string): Promise<SystemChatFileDownload>;
   /** Advance the operator read cursor for one conversation. */
   markSupportConversationRead(accountId: string, body: { read_sequence: number }): Promise<SupportReadStatus>;
   /** Read the latest persisted candidate recommendation without starting provider work. */
@@ -132,6 +140,8 @@ export interface ApiClient {
   getAccount(role: AccountRole): Promise<AccountView>;
   /** Revoke this session, or all account sessions when all is true. */
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
+  /** Permanently remove the authenticated candidate account and its private graph. */
+  deleteCandidateAccount(): Promise<{ deleted: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
   getCandidateSkillCatalog(): Promise<CandidateSkillCatalog>;
   getCandidateProfile(): Promise<CandidateProfileView>;
@@ -334,6 +344,8 @@ export function createApiClient({
     getSystemChat: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/system-chat?after_sequence=${afterSequence}&limit=${limit}`),
     markSystemChatRead: (role, body) => request("POST", `/${role}/system-chat/read`, body),
     sendSystemChatMessage: (role, body) => request("POST", `/${role}/system-chat/messages`, body),
+    uploadSystemChatFile: (role, body) => request("POST", `/${role}/system-chat/files`, body),
+    downloadSystemChatFile: (role, fileId) => request("GET", `/${role}/system-chat/files/${encodeURIComponent(fileId)}`),
     getChatUnread: role => request("GET", `/${role}/chat-unread`),
     supportLogin: body => request("POST", "/support/login", body),
     supportLogout: () => request("POST", "/support/logout", {}),
@@ -341,6 +353,8 @@ export function createApiClient({
     getSupportConversations: (offset = 0, limit = 50) => request("GET", `/support/conversations?offset=${offset}&limit=${limit}`),
     getSupportMessages: (accountId, afterSequence = 0, limit = 100) => request("GET", `/support/conversations/${encodeURIComponent(accountId)}/messages?after_sequence=${afterSequence}&limit=${limit}`),
     sendSupportMessage: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/messages`, body),
+    uploadSupportFile: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/files`, body),
+    downloadSupportFile: (accountId, fileId) => request("GET", `/support/conversations/${encodeURIComponent(accountId)}/files/${encodeURIComponent(fileId)}`),
     markSupportConversationRead: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/read`, body),
     getRecommendationsLatest: () => request("GET", "/candidate/recommendations/latest"),
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
@@ -373,6 +387,7 @@ export function createApiClient({
     verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
+    deleteCandidateAccount: () => request("DELETE", "/candidate/account"),
     getCandidateSkillCatalog: () => request("GET", "/candidate/skills/catalog"),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
     testingPreflight: (specialization, mode = "retake") => request("GET", `/candidate/testing/preflight?specialization=${encodeURIComponent(specialization)}&mode=${mode}`),

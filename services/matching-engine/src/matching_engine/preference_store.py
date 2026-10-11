@@ -18,6 +18,7 @@ from matching_engine.preference_evaluation import evaluate
 from matching_engine.preference_live_policy import (
     FOLLOWUP_ACTION_THRESHOLD,
     INITIAL_ACTION_THRESHOLD,
+    MIN_HOLDOUT_ROWS,
     activation_gate,
     policy_hash,
 )
@@ -164,7 +165,8 @@ class PreferenceStore:
             connection.execute("UPDATE preference_pipeline.controls SET state='observation_limit' WHERE vacancy_id=%s", (control["vacancy_id"],))
             return None
         fresh = sum(control["last_attempt_at"] is None or timestamp(row["decision_at"]) > control["last_attempt_at"] for row in rows)
-        if len(rows) < INITIAL_ACTION_THRESHOLD or (control["last_attempt_at"] is not None and fresh < FOLLOWUP_ACTION_THRESHOLD):
+        if len(rows) < INITIAL_ACTION_THRESHOLD or (
+                control["last_attempt_at"] is not None and fresh < FOLLOWUP_ACTION_THRESHOLD):
             return None
         job_id = uuid4()
         connection.execute("INSERT INTO preference_pipeline.jobs(job_id,vacancy_id,context_hash,epoch) VALUES(%s,%s,%s,%s)",
@@ -252,7 +254,8 @@ class PreferenceStore:
                     or control["context_hash"] != job["context_hash"] or control["epoch"] != job["epoch"]):
                 return False
             rows = self._observations(connection, control, until=job["requested_at"])
-            selected = rows[-(MAX_TRAIN + 16):]
+            holdout_rows = 2 * MIN_HOLDOUT_ROWS
+            selected = rows[-(MAX_TRAIN + holdout_rows):]
             participants = [UUID(row["candidate_key"]) for row in selected]
             if not self._consent(connection, participants, control["identity"]["source"], lock=True):
                 raise ConflictError("preference source consent unavailable")
@@ -261,10 +264,12 @@ class PreferenceStore:
                 raise ConflictError("preference baseline unavailable")
             artifact = artifact_row["artifact"]
             self._verify_rows(selected, artifact)
-            context = {"identity": control["identity"], "train": selected[:-16],
-                       "validation": selected[-16:-8], "golden": selected[-8:]}
-            fresh_audit = bool(len(selected) >= INITIAL_ACTION_THRESHOLD and (control["last_attempt_at"] is None
-                              or timestamp(selected[-16]["decision_at"]) > control["last_attempt_at"]))
+            context = {"identity": control["identity"], "train": selected[:-holdout_rows],
+                       "validation": selected[-holdout_rows:-MIN_HOLDOUT_ROWS],
+                       "golden": selected[-MIN_HOLDOUT_ROWS:]}
+            fresh_audit = bool(len(selected) >= INITIAL_ACTION_THRESHOLD and (
+                control["last_attempt_at"] is None
+                or timestamp(selected[-FOLLOWUP_ACTION_THRESHOLD]["decision_at"]) > control["last_attempt_at"]))
             input_hash = digest(selected)
             plan = {"context_hash": control["context_hash"], "epoch": control["epoch"], "input_hash": input_hash,
                     "policy_hash": policy_hash(), "splits": {name: [{"candidate_key": row["candidate_key"],

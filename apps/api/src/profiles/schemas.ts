@@ -23,7 +23,7 @@ export const candidateProfileFieldsSchema = object({
   work_types: nullable({ ...array({ type: "string", enum: ["onsite", "remote", "hybrid"] }, 3), uniqueItems: true }),
   relocation_ready: nullable({ type: "boolean" }), relocation_cities: array({ ...text(300), minLength: 1 }, 100),
   salary: nullable(object({ from_rub: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-    to_rub: { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER } }, ["from_rub", "to_rub"])),
+    to_rub: nullable({ type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER }) }, ["from_rub", "to_rub"])),
   primary_direction: nullable({ type: "string", enum: ["backend", "frontend", "fullstack", "mobile", "devops", "data", "qa", "ml"] }),
   declared_grade: nullable({ type: "string", enum: ["intern", "junior", "middle", "senior"] }),
   domains: array(skill, 1000), stacks: array(skill, 1000), soft_skills: array(skill, 1000), description: text(10000),

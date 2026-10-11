@@ -38,7 +38,7 @@ test("mailer renders Russian role and expiry without links or challenge id", asy
   assert.match(sent?.html ?? "", /UTC/);
   assert.equal(sent?.html.includes(job.challenge_id), false);
   assert.equal(sent?.html.includes("https://"), false);
-  assert.equal(sent?.attachments.length, 2);
+  assert.equal(sent?.attachments.length, 8);
   for (const attachment of sent?.attachments ?? []) {
     assert.equal(attachment.contentType, "image/png");
     assert.equal(attachment.contentDisposition, "inline");

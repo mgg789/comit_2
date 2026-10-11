@@ -163,6 +163,7 @@
   font-family: var(--employer-logo);
   font-size: 190rem;
   line-height: 1.05;
+  transform: translateY(.09em);
 }
 .login-business {
   font-size: 46rem;
@@ -196,8 +197,8 @@
   padding: 35rem 24rem;
   gap: 0;
   align-items: center;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-card h1 {
   width: 543rem;
@@ -252,8 +253,8 @@
   isolation: isolate;
   overflow: hidden;
   background: transparent;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-digit::before,
 .otp-submit::before {
@@ -460,3 +461,6 @@
   .yandex { font-size: 32rem; height: 48rem; }
   .login-card .checkbox { gap: 12rem; }
 }
+
+/* The consent can wrap to multiple lines; override the reusable top-aligned checkbox. */
+.login-consent .comit-checkbox[type="checkbox"] { align-self: center; }

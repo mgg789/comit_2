@@ -16,6 +16,12 @@ export function errorText(error: unknown): string {
       origin_forbidden: "Запрос отклонён: недопустимый источник.",
       account_not_found: "Диалог не найден.",
       invalid_system_notification: "Сообщение пустое или слишком длинное (максимум 2000 символов).",
+      invalid_system_file: "Поддерживаются PDF, TXT, MD, PNG, JPEG, GIF и WebP размером до 8 МБ; проверьте тип и содержимое файла.",
+      invalid_system_files: "В одном сообщении можно отправить не более 8 вложений.",
+      system_file_storage_limit: "Достигнут лимит неотправленных вложений 64 МБ. Отправьте подготовленные файлы или повторите загрузку через 24 часа.",
+      system_file_account_limit: "Достигнут общий лимит вложений 256 МБ. Продолжите переписку текстом.",
+      system_file_idempotency_conflict: "Повторная загрузка содержит изменённый файл. Выберите файл заново.",
+      system_file_not_found: "Вложение больше недоступно.",
     };
     if (typeof detail === "string" && Object.hasOwn(messages, detail)) return messages[detail]!;
     if (error.status === 404 && error.url.endsWith("/support/login")) return messages.support_not_configured!;
@@ -23,6 +29,7 @@ export function errorText(error: unknown): string {
     if (error.status === 403) return "Нет доступа к этому действию.";
     if (error.status === 404) return "Диалог не найден.";
     if (error.status === 422 || error.status === 400) return "Проверьте заполненные поля.";
+    if (error.status === 413) return "Вложение слишком большое. Один файл — до 8 МБ, общий объём диалога — до 256 МБ.";
     if (error.status === 429) return "Слишком много запросов. Попробуйте немного позже.";
     if (error.status === 503) return "Сервис временно недоступен. Попробуйте ещё раз.";
   }

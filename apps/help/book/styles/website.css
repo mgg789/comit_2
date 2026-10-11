@@ -1,0 +1,6 @@
+/* Brand accents on the standard HonKit theme; navigation and search stay native. */
+.book .book-summary { background: #f5f7fa; }
+.book .book-summary ul.summary li.active > a { color: #244b70; background: #bfe2ff; }
+.book .book-body .page-wrapper .page-inner section.normal a { color: #244b70; }
+.book .book-body .page-wrapper .page-inner section.normal h1,
+.book .book-body .page-wrapper .page-inner section.normal h2 { color: #272930; }

@@ -1,6 +1,7 @@
 /** Candidate-owned source profile store and its transactional projection outbox. */
 import { TEST_SKILL_COORDINATES, TEST_GRADE_LEVELS, type CandidateSkillCatalog, type TestingSpecialization, type TestingGrade } from "@comit/shared";
 import { activeSkillCatalog } from "./skill-catalog.js";
+import { canonicalRepositoryClaimUrl } from "./repository-url.js";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
@@ -51,7 +52,7 @@ const NARRATIVE_GROUPS = ["projects", "experience", "achievements"] as const;
 
 /** Safe API/domain error whose code can be mapped by the owning route. */
 export class ProfileError extends Error {
-  public constructor(public readonly status: number, public readonly code: string) {
+  public constructor(public readonly status: number, public readonly code: string, public readonly retryAt?: string) {
     super(code);
     this.name = "ProfileError";
   }
@@ -197,8 +198,8 @@ function validateFields(value: unknown): asserts value is CandidateProfileFields
   if (fields.relocation_cities !== undefined && (!arrayOfStrings(fields.relocation_cities) || new Set(fields.relocation_cities).size !== fields.relocation_cities.length)) throw invalid("invalid_profile_fields");
   if (fields.salary !== undefined && fields.salary !== null) {
     if (!jsonObject(fields.salary) || Object.keys(fields.salary).some(key => !["from_rub", "to_rub"].includes(key))
-      || !integer(fields.salary.from_rub) || !integer(fields.salary.to_rub)
-      || fields.salary.to_rub < fields.salary.from_rub) throw invalid("invalid_salary");
+      || !integer(fields.salary.from_rub) || (fields.salary.to_rub !== null && !integer(fields.salary.to_rub))
+      || (fields.salary.to_rub !== null && fields.salary.to_rub < fields.salary.from_rub)) throw invalid("invalid_salary");
   }
   if (fields.primary_direction !== undefined && fields.primary_direction !== null
     && !["backend", "frontend", "fullstack", "mobile", "devops", "data", "ml", "qa"].includes(fields.primary_direction)) throw invalid("invalid_profile_fields");
@@ -341,7 +342,7 @@ function externalEvidenceRows(fields: CandidateProfileFields, previous: Map<stri
     if (!narrative?.link || !narrative.description) return false;
     const value = row.verified_value;
     const verified = typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, JsonValue> : null;
-    return verified?.url === narrative.link && verified.contribution_narrative === narrative.description;
+    return verified?.url === canonicalRepositoryClaimUrl(narrative.link) && verified.contribution_narrative === narrative.description;
   }).map(row => ({ key: row.evidence_key, inputHash: row.input_hash, status: row.status,
     verifiedValue: row.verified_value, provenance: row.provenance, checkedAt: row.checked_at }));
 }
@@ -674,7 +675,7 @@ export class CandidateProfileStore {
       if (binding.kind === "repository") {
         if (!binding.claim_id || !binding.url || !binding.narrative) throw invalid("repository_claim_required");
         const narrative = (current.fields[binding.subject as "projects" | "experience" | "achievements"] ?? []).find(item => item.id === binding.claim_id);
-        if (!narrative || narrative.link !== binding.url || narrative.description !== binding.narrative) throw conflict("repository_claim_not_current");
+        if (!narrative || canonicalRepositoryClaimUrl(narrative.link) !== binding.url || narrative.description !== binding.narrative) throw conflict("repository_claim_not_current");
       }
       if (binding.kind === "hh") {
         if (binding.claim_kind !== "experience" || !binding.claim_id) throw invalid("hh_claim_required");
@@ -1086,8 +1087,8 @@ export class CandidateProfileStore {
         "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 AND specialization=$2 ORDER BY decided_at DESC LIMIT 1", [candidateId,input.specialization])).rows[0];
       if (last) {
         const days = (Date.now() - last.decided_at.getTime()) / 86400000;
-        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
-        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
+        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown", new Date(last.decided_at.getTime() + RETAKE_COOLDOWN_DAYS * 86400000).toISOString());
+        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown", new Date(last.decided_at.getTime() + UPGRADE_COOLDOWN_DAYS * 86400000).toISOString());
       }
       const decidedAt = new Date();
       await client.query(`INSERT INTO candidate_grade_results

@@ -101,11 +101,13 @@ def build_features(vacancy: VacancyReady, candidate: MatchCandidate, card: Candi
     semantic = card.explanation.semantic_cosine
     semantic_available = semantic is not None and vacancy.semantic_space_id == candidate.semantic_space_id == EMBEDDING_SPACE_ID
     put("semantic_cosine", semantic or 0, semantic_available)
-    overlap = min(vacancy.zp_max, candidate.salary.to_rub) - max(vacancy.zp_min, candidate.salary.from_rub)
-    span = max(vacancy.zp_max, candidate.salary.to_rub) - min(vacancy.zp_min, candidate.salary.from_rub)
+    # An open expectation is bounded by this vacancy for finite pair features.
+    candidate_upper = candidate.salary.to_rub if candidate.salary.to_rub is not None else max(candidate.salary.from_rub, vacancy.zp_max)
+    overlap = min(vacancy.zp_max, candidate_upper) - max(vacancy.zp_min, candidate.salary.from_rub)
+    span = max(vacancy.zp_max, candidate_upper) - min(vacancy.zp_min, candidate.salary.from_rub)
     put("salary_overlap", max(0, overlap) / max(1, span))
     put("salary_affordability", (vacancy.zp_max - candidate.salary.from_rub) / max(1, vacancy.zp_max))
-    put("salary_midpoint_ratio", (candidate.salary.from_rub + candidate.salary.to_rub) / max(1, vacancy.zp_min + vacancy.zp_max))
+    put("salary_midpoint_ratio", (candidate.salary.from_rub + candidate_upper) / max(1, vacancy.zp_min + vacancy.zp_max))
     grouped: dict[str, list[tuple[float, float, float, bool]]] = {group: [] for group in GROUPS}
     required_keys: set[tuple[str, str]] = set()
     for coord in schema.coordinates:
