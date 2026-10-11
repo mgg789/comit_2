@@ -17,7 +17,8 @@
     "./chat-composer": "./src/chat-composer.tsx",
     "./ui-state": "./src/ui-state.tsx",
     "./system-inbox": "./src/system-inbox.tsx",
-    "./rejection-feedback": "./src/rejection-feedback.ts"
+    "./rejection-feedback": "./src/rejection-feedback.ts",
+    "./legal": "./src/legal.tsx"
   },
   "scripts": {
     "build": "tsc --noEmit",

@@ -7,6 +7,10 @@ import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
 import { Action, Backdrop, Icon, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
+import { LegalDocument } from "@comit/ui-kit/legal";
+
+/** Canonical legal texts bundled at build time (infra/web.Dockerfile copies docs/legal). */
+const legalTexts = import.meta.glob("../../../docs/legal/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 import { api, errorText, useRoute } from "./runtime";
 import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen, RecommendationConsentSettings } from "./screens";
 const candidateInboxTransport: SystemInboxTransport = {
@@ -21,7 +25,6 @@ const navigation = [
   { path: "/statistics", label: "Статистика", icon: "statistics" },
   { path: "/settings", label: "Настройки", icon: "settings" },
 ] as const;
-const legal = import.meta.glob("../../../docs/legal/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 /** Cookie-authenticated candidate shell shares the employer design and motion primitives. */
 export default function App() {
   const { route: fullRoute, navigate } = useRoute();
@@ -86,10 +89,7 @@ export default function App() {
   return <MotionConfig reducedMotion="user">
   <div className={`candidate-app comit-design ${account && route.startsWith("/chat/") ? "chat-page" : ""} ${!account ? "is-login" : ""}`}>
   <Backdrop />{account && <CandidateArt route={route}/>}
-  {route.startsWith("/legal/") ? <main className="main-content candidate-legal panel">
-    <a href="#/resume">← Вернуться</a>
-    <pre>{legal[`../../../docs/legal/${route.slice(7)}.md`] ?? "Документ не найден"}</pre>
-    </main>
+  {route.startsWith("/legal/") ? <LegalDocument text={legalTexts[`../../../docs/legal/${route.slice(7)}.md`]} backHref="#/resume" />
       : checking ? <main className="main-content">
       <State loading/>
       </main>

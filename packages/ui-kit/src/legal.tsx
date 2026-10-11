@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
 
-const documents = import.meta.glob("../../../docs/legal/*.md", {
-  query: "?raw",
-  import: "default",
-  eager: true,
-}) as Record<string, string>;
-
 function inline(text: string): ReactNode[] {
   return text
     .split(/(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*)/g)
@@ -42,12 +36,15 @@ function inline(text: string): ReactNode[] {
     });
 }
 
-/** Public legal documents rendered from the repository's canonical text, without requiring a session. */
-export function LegalDocument({ name }: { name: string }) {
-  const text = documents[`../../../docs/legal/${name}.md`];
+/**
+ * Public legal document rendered from the repository's canonical Markdown, without requiring a session.
+ * Apps load `docs/legal/*.md` with their bundler and pass the text (undefined → «Документ не найден»);
+ * `backHref` is the cabinet's own home route.
+ */
+export function LegalDocument({ text, backHref }: { text: string | undefined; backHref: string }) {
   return (
     <main className="legal-document panel">
-      <a href="#/vacancies">← Вернуться к приложению</a>
+      <a href={backHref}>← Вернуться к приложению</a>
       {!text ? (
         <h1>Документ не найден</h1>
       ) : (

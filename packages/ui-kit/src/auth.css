@@ -196,8 +196,8 @@
   padding: 35rem 24rem;
   gap: 0;
   align-items: center;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-card h1 {
   width: 543rem;
@@ -252,8 +252,8 @@
   isolation: isolate;
   overflow: hidden;
   background: transparent;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-digit::before,
 .otp-submit::before {
@@ -374,9 +374,21 @@
   padding: 0 40rem;
 }
 .login-card .login-consent {
-  align-items: center;
+  /* The consent text wraps on narrow cards: centre the 20px box on the first line, not the block. */
+  --consent-line: calc(1.35 * max(18rem, var(--employer-caption-text-min)));
+  /* Mirrors .comit-checkbox sizing in design.css (24rem, 20rem on phones). */
+  --consent-box: max(24rem, var(--employer-checkbox-min));
+  align-items: flex-start;
   font-size: max(18rem, var(--employer-caption-text-min));
+  line-height: 1.35;
   padding: 0 12rem;
+}
+.login-card .login-consent input {
+  flex-shrink: 0;
+  margin-top: calc((var(--consent-line) - var(--consent-box)) / 2);
+}
+@media (max-width: 760px) {
+  .login-card .login-consent { --consent-box: max(20rem, var(--employer-checkbox-min)); }
 }
 .login-consent a {
   color: inherit;

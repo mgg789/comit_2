@@ -8,3 +8,5 @@ __pycache__
 .env
 context
 docs
+# Legal texts are bundled into the web apps (consent links on the login screens).
+!docs/legal

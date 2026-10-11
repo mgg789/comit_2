@@ -7,6 +7,8 @@ RUN corepack enable && corepack prepare pnpm@9.14.2 --activate
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages ./packages
 COPY apps ./apps
+# Login consent links render these texts via import.meta.glob; without them the pages say «Документ не найден».
+COPY docs/legal ./docs/legal
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @comit/shared --filter @comit/ui-kit --filter @comit/api-client --filter @comit/web-welcome --filter @comit/web-candidate --filter @comit/web-employer --filter @comit/web-testing --filter @comit/web-support build
 

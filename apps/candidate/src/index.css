@@ -4,7 +4,7 @@
 @import "./screens.css";
 .candidate-settings { display: grid; gap: 24rem; max-width: 900rem; }
 .candidate-settings .action { justify-self: start; }
-.candidate-legal pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.7; }
+
 
 /* Contain main-content bottom margins so artwork covers the entire document. */
 .candidate-app { display: flow-root; }

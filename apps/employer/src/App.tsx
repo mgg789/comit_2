@@ -9,7 +9,10 @@ import type { AccountView, AgentsDraftView } from "@comit/shared";
 import { api, asset, errorText, useRoute } from "./runtime";
 import { Action, Backdrop, Icon, State } from "./ui";
 import { Login } from "./login";
-import { LegalDocument } from "./legal";
+import { LegalDocument } from "@comit/ui-kit/legal";
+
+/** Canonical legal texts bundled at build time (infra/web.Dockerfile copies docs/legal). */
+const legalTexts = import.meta.glob("../../../docs/legal/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
 import { Settings } from "./settings";
 import { useEmployerPreferences } from "./preferences";
 import { OrganizationAgent, RecruitmentChat } from "./communications";
@@ -289,7 +292,7 @@ export default function App() {
       <div className={`employer-app ${account && pieces[0] === "chat" && pieces[1] ? "chat-page" : ""} ${account ? "" : "is-login"} ${preferences.reducedMotion ? "reduce-motion" : ""}`}>
         <Backdrop />
         {pieces[0] === "legal" ? (
-          <LegalDocument name={pieces[1] || "privacy-policy"} />
+          <LegalDocument text={legalTexts[`../../../docs/legal/${pieces[1] || "privacy-policy"}.md`]} backHref="#/vacancies" />
         ) : checking ? (
           <main className="auth-check">
             <State loading />
