@@ -209,3 +209,5 @@ API Python HTTP fixtures имеют общий monotonic startup deadline 45 с�
 Регрессия задержки 16 секунд воспроизвела прежний 15-секундный timeout; проверка
 реального PDF сохранена. Причина медленного старта в прежнем CI
 уточняется; гипотеза CPU contention пока не подтверждена.
+
+Три сценария `test_live_employer_agent` (interface_help, markdown_report, background_clarification) требуют явного `AGENT_LIVE_ACCEPTANCE=1` для платного провайдера. Только их точные имена, только в agents-service и только без opt-in разрешены как пропуски общего PG-gate; другие пропуски по-прежнему завершают gate ошибкой. Пороги покрытия не изменены.

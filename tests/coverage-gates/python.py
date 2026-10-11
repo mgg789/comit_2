@@ -20,6 +20,15 @@ ALLOWED_SKIPS = {"test_current_consent_revalidated_without_matching_projection",
 
 
 
+def unexpected_skips(package: str, skips: list[str], live_acceptance: bool) -> set[str]:
+    """Reject skips except named fixtures and opt-in paid tests in their owning package."""
+    allowed = set(ALLOWED_SKIPS)
+    if package == "agents-service" and not live_acceptance:
+        allowed.update({f"test_live_employer_agent[{scenario}]" for scenario in
+                        ("interface_help", "markdown_report", "background_clarification")})
+    return set(skips) - allowed
+
+
 def prepare_api_schema(database_url: str) -> None:
     """Apply real API migrations to disposable matching fixtures that read canonical consent.
 
@@ -112,7 +121,7 @@ def main() -> None:
     if not args.unit:
         skips = [case.get("name") for path in junit_reports for case in ET.parse(path).iter("testcase")
                  if case.find("skipped") is not None]
-        unexpected = set(skips) - ALLOWED_SKIPS
+        unexpected = unexpected_skips(args.package, skips, env.get("AGENT_LIVE_ACCEPTANCE") == "1")
         if unexpected:
             sys.exit(f"Unexpected skipped backend tests: {sorted(unexpected)}")
         print(f"Explicit acceptance contour exclusions: {skips}", flush=True)
