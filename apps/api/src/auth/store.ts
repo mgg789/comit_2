@@ -474,6 +474,41 @@ export class AuthStore {
     return result.rowCount ?? 0;
   }
 
+  /** Permanently remove one candidate account and its API-owned private graph in one transaction. */
+  public async deleteCandidateAccount(accountId: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    let committed = false;
+    try {
+      await client.query("BEGIN");
+      const row = await client.query<{ id: string; email: string; role: AccountRole }>(
+        "SELECT id,email,role FROM accounts WHERE id=$1 FOR UPDATE", [accountId],
+      );
+      const account = row.rows[0];
+      if (!account || account.role !== "candidate") {
+        await client.query("ROLLBACK");
+        committed = true;
+        return false;
+      }
+      // Revoke first, then remove all rows whose foreign keys do not cascade.
+      await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
+      await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
+      await client.query("DELETE FROM recruitment_processes WHERE candidate_id=$1 OR owner_id=$1", [accountId]);
+      await client.query("DELETE FROM auth_challenges WHERE email=$1", [account.email]);
+      await client.query("DELETE FROM auth_issue_events WHERE email=$1", [account.email]);
+      const deleted = await client.query("DELETE FROM accounts WHERE id=$1 AND role='candidate'", [accountId]);
+      await client.query("COMMIT");
+      committed = true;
+      return deleted.rowCount === 1;
+    } catch (error) {
+      if (!committed) {
+        try { await client.query("ROLLBACK"); } catch { /* preserve the original error */ }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   /** Claim one valid mail job with a 120-second lease and recover stale workers. */
   public async claimMail(): Promise<MailJob | null> {
     await this.purgeAuthExpired();

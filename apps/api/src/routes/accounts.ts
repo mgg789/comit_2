@@ -5,7 +5,7 @@ import type { ProfileStore } from "../profiles/store.js";
 import agentsSpec from "../contracts/agents.openapi.json" with { type: "json" };
 import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { type: "json" };
 import type { AuthOptions } from "./auth.js";
-import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
+import { cookieName, originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { showcaseRoutes } from "./showcase.js";
 import { publicShowcaseRoutes } from "./public-showcase.js";
 import { correlatedFetch } from "../operations/index.js";
@@ -35,6 +35,8 @@ export interface AccountGatewayOptions extends AuthOptions {
   agentsToken?: string;
   matchingUrl?: string;
   matchingToken?: string;
+  testingUrl?: string;
+  testingToken?: string;
   transport?: typeof fetch;
   profiles?: ProfileStore;
   vacancyLifecycle?: VacancyLifecycle;
@@ -123,6 +125,8 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
   const matchingUrl = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
   const matchingToken = options.matchingToken ?? process.env.CANDIDATE_PIPELINE_TOKEN;
+  const testingUrl = options.testingUrl ?? process.env.TESTING_ENGINE_URL ?? "http://testing-engine:8102";
+  const testingToken = options.testingToken ?? process.env.TESTING_ENGINE_TOKEN;
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
   for (const [namespace, spec] of [["agents", agentsSpec], ["matching", engineSpec]] as const) {
     for (const [name, value] of Object.entries(spec.components.schemas)) {
@@ -224,6 +228,32 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
       }
     });
   }
+  app.delete<{ Reply: { deleted: true } | { detail: string } }>("/candidate/account", {
+    schema: { tags: ["candidate-account"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
+      response: { 200: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } } } },
+    onRequest: guard("candidate"),
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity || !matchingToken) return reply.code(503).send({ detail: "matching_unavailable" });
+    try {
+      const result = await transport(new URL(`/internal/candidates/${identity.accountId}`, matchingUrl), {
+        method: "DELETE", headers: { "x-internal-token": matchingToken },
+        signal: AbortSignal.timeout(10000), redirect: "error",
+      });
+      if (!result.ok) return reply.code(503).send({ detail: "matching_deletion_unavailable" });
+      if (!testingToken) return reply.code(503).send({ detail: "testing_deletion_unavailable" });
+      const testingResult = await transport(new URL(`/internal/candidates/${identity.accountId}`, testingUrl), {
+        method: "DELETE", headers: { "x-internal-token": testingToken },
+        signal: AbortSignal.timeout(10000), redirect: "error",
+      });
+      if (!testingResult.ok) return reply.code(503).send({ detail: "testing_deletion_unavailable" });
+      if (!await store.deleteCandidateAccount(identity.accountId)) return reply.code(401).send({ detail: "unauthenticated" });
+      reply.clearCookie(cookieName("candidate", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
+      return reply.header("cache-control", "no-store").send({ deleted: true });
+    } catch {
+      return reply.code(503).send({ detail: "account_deletion_unavailable" });
+    }
+  });
   app.get<{ Reply: unknown }>("/candidate/taxonomy", {
     schema: { tags: ["candidate-profile"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
       response: { 200: { $ref: "urn:comit:public:matching:StrictSchema" } } }, onRequest: guard("candidate"),

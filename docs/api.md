@@ -77,6 +77,7 @@ JWT и отзываемая DB-сессия. Нормализованный emai
 | GET | `/auth/{role}/me` | текущий аккаунт из JWT/cookie |
 | POST | `/auth/{role}/logout` | отзыв текущей DB-сессии и очистка cookie |
 | POST | `/auth/{role}/logout-all` | отзыв всех DB-сессий аккаунта |
+| DELETE | `/candidate/account` | окончательное удаление authenticated candidate account и его private graph |
 
 Первый аккаунт требует versioned consent на обработку аккаунта; consent на публикацию
 профиля в пуле остаётся отдельным условием candidate pipeline. Обязательное согласие
@@ -110,6 +111,14 @@ Editable narrative claims получают стабильный UUID на сер
 локальную terminal `failed` projection. `GET /candidate/pipeline` и
 `GET /candidate/resume.pdf` используют account ID из сессии. `GET /candidate/taxonomy`
 отдаёт кандидату текущую strict-schema (`StrictSchema`) из matching-engine.
+
+`DELETE /candidate/account` доступен только authenticated candidate и выполняется
+после явного подтверждения в UI. Gateway сначала ставит matching tombstone и
+удаляет candidate-owned projection под pipeline lock, затем purges testing-engine
+sessions/media under its owner tombstone, и только после этого в API transaction
+отзывает sessions и удаляет source profile, recruitment processes/receipts,
+notifications и account. При недоступном matching-engine source account остаётся,
+чтобы публичная projection не пережила удаление источника.
 
 `GET /candidate/skills/catalog` возвращает `{version, schema_hash, skills}`.
 Каждый элемент `skills`: `{group, key, label, test_subject, confirmed_level,

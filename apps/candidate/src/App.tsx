@@ -1,7 +1,7 @@
 import { SystemInbox, useChatUnread, type SystemInboxTransport } from "@comit/ui-kit/system-inbox";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig } from "framer-motion";
-import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state";
+import { clearPersistentState, PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state";
 import { AppShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
@@ -35,6 +35,9 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [query, setQuery] = usePersistentState(`candidate:${account?.id || "anonymous"}:search`, "");
   const [logout, setLogout] = useState(false);
+  const [deleteAccount, setDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteFailure, setDeleteFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const menuRoot = useRef<HTMLDivElement>(null);
@@ -84,6 +87,28 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function removeAccount() {
+    if (deletingAccount)
+      return;
+    setDeletingAccount(true);
+    setDeleteFailure(null);
+    try {
+      await api.deleteCandidateAccount();
+      if (account) {
+        clearPersistentState("guest", `candidate:${account.id}`);
+        clearPersistentState(`candidate:${account.id}`, "");
+      }
+      setDeleteAccount(false);
+      setAccount(null);
+      navigate("/resume");
+    }
+    catch (reason) {
+      setDeleteFailure(errorText(reason));
+    }
+    finally {
+      setDeletingAccount(false);
+    }
+  }
   const selected = route.startsWith("/offer") || route.startsWith("/chat") ? "/offers" : route;
   return <MotionConfig reducedMotion="user">
   <div className={`candidate-app comit-design ${account && route.startsWith("/chat/") ? "chat-page" : ""} ${!account ? "is-login" : ""}`}>
@@ -104,7 +129,7 @@ export default function App() {
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}
       menu={menu} toggleMenu={() => setMenu(value => !value)} toolsRef={menuRoot} menuRef={menuPanel}
       searchLabel="Поиск предложений" onSearch={() => { setMenu(false); if (route === "/offers") window.dispatchEvent(new Event("candidate:focus-offer-search")); else navigate("/offers?search=1"); }} secondaryLabel="Чаты" secondaryIcon="message" secondaryUnreadCount={unread?.total_unread_count} onSecondary={() => navigate("/chat")}
-      menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action onClick={() => navigate("/offers")}>Мои предложения</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
+      menuContent={<><Action onClick={() => navigate("/chat")}>Мои чаты</Action><Action className="action-danger" onClick={() => { setMenu(false); setDeleteFailure(null); setDeleteAccount(true); }}>Удалить аккаунт</Action><Action onClick={() => { setMenu(false); setLogout(true); setFailure(null); }}>Выйти</Action></>}
     />
     <main className="main-content candidate-content" key={account.id}>
      {route === "/resume" ? <ProfileScreen navigate={navigate}/> : route === "/offers" ? <OffersScreen navigate={navigate} query={query} setQuery={setQuery} focusSearch={new URLSearchParams(fullRoute.split("?")[1]).get("search") === "1"}/> : route.startsWith("/offer/") ? <OfferScreen id={decodeRouteId(route.slice(7))} navigate={navigate}/> : route === "/chat" ? <ChatsScreen navigate={navigate} systemUnread={unread?.system_unread_count}/> : route === "/chat/comit-system" ? <section className="recruitment-screen"><div className="chat-back"><Action className="circle" onClick={() => navigate("/chat")} aria-label="Вернуться"><Icon name="back" /></Action><h1>Comit</h1></div><SystemInbox transport={candidateInboxTransport} errorText={errorText} navigate={navigate} /></section> : route.startsWith("/chat/") ? <ChatScreen id={decodeRouteId(route.slice(6))} route={fullRoute} navigate={navigate}/> : route === "/statistics" ? <StatisticsScreen navigate={navigate}/> : route === "/settings" ? <>
@@ -116,12 +141,19 @@ export default function App() {
               <Action variant="primary" onClick={() => navigate("/resume")}>К резюме</Action>
               <RecommendationConsentSettings />
               <Action onClick={() => { setLogout(true); setFailure(null); }}>Выйти из аккаунта</Action>
+              <Action className="action-danger" onClick={() => { setDeleteFailure(null); setDeleteAccount(true); }}>Удалить аккаунт</Action>
               <a href="#/legal/privacy-policy">Политика конфиденциальности</a>
               </section>
               </> : <State empty="Страница не найдена" retry={() => navigate("/resume")}/>}
     </main>
 
-    <AnimatePresence>{logout && <Dialog title="Выйти из аккаунта?" close={() => { if (!busy)
+    <AnimatePresence>{deleteAccount && <Dialog title="Удалить аккаунт?" close={() => { if (!deletingAccount)
+                setDeleteAccount(false); }}>
+              <p>Резюме, согласия, предложения и все данные аккаунта будут удалены. Профиль исчезнет из подбора и восстановить его будет нельзя.</p>{deleteFailure && <p role="alert">{deleteFailure}</p>}<div className="account-confirmation-actions">
+              <Action disabled={deletingAccount} onClick={() => setDeleteAccount(false)}>Отмена</Action>
+              <Action className="action-danger" disabled={deletingAccount} onClick={() => void removeAccount()}>{deletingAccount ? "Удаляем…" : "Удалить аккаунт"}</Action>
+              </div>
+              </Dialog>}{logout && <Dialog title="Выйти из аккаунта?" close={() => { if (!busy)
                 setLogout(false); }}>
               <p>Для возвращения понадобится код из письма.</p>{failure && <p role="alert">{failure}</p>}<div className="account-confirmation-actions">
               <Action disabled={busy} onClick={() => setLogout(false)}>Отмена</Action>

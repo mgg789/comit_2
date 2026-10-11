@@ -43,7 +43,7 @@ test("HTTP auth enforces one email/one role, consent, cookies, revocation and ga
       return Response.json([]);
     };
     await app.register(accountRoutes, { config, store, mailConfigured: true, transport,
-      agentsToken: "synthetic-agents", matchingToken: "synthetic-pipeline" });
+      agentsToken: "synthetic-agents", matchingToken: "synthetic-pipeline", testingToken: "synthetic-testing" });
     const issue = async (role: AccountRole, email: string) => {
       const response = await app.inject({ method: "POST", url: `/auth/${role}/code`, headers: { origin }, payload: { email } });
       assert.equal(response.statusCode, 202, response.body);
@@ -101,6 +101,20 @@ test("HTTP auth enforces one email/one role, consent, cookies, revocation and ga
     assert.equal((await app.inject({ method: "POST", url: "/auth/candidate/logout", headers: { cookie: candidateCookie } })).statusCode, 403);
     assert.equal((await app.inject({ method: "POST", url: "/auth/candidate/logout", headers: { cookie: candidateCookie, origin } })).statusCode, 200);
     assert.equal((await app.inject({ url: "/auth/candidate/me", headers: { authorization: `Bearer ${candidate.access_token}` } })).statusCode, 401);
+    const deleteCode = await issue("candidate", "candidate@example.com");
+    const deleteResult = await app.inject({ method: "POST", url: "/auth/candidate/verify", headers: { origin },
+      payload: { ...deleteCode, consent: { processing: true, version: "account-v1" } } });
+    assert.equal(deleteResult.statusCode, 200, deleteResult.body);
+    const deleteSession = deleteResult.json<AuthenticatedSession>();
+    const deletion = await app.inject({ method: "DELETE", url: "/candidate/account", headers: {
+      cookie: String(deleteResult.headers["set-cookie"]).split(";")[0], origin,
+    } });
+    assert.equal(deletion.statusCode, 200, deletion.body);
+    assert.equal(deletion.json(), { deleted: true });
+    assert.deepEqual(forwarded.slice(-2).map(item => item.pathname), [
+      `/internal/candidates/${deleteSession.account.id}`, `/internal/candidates/${deleteSession.account.id}`,
+    ]);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [deleteSession.account.id])).rowCount, 0);
     assert.equal((await app.inject({ url: "/auth/employer/me", headers: { cookie: employerCookie } })).statusCode, 200);
   } finally { await app.close(); await pool.end(); }
 });

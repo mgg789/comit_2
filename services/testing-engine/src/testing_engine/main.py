@@ -141,14 +141,36 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             request.state.candidate_key = request.headers.get("x-candidate-id")
             if token and not request.state.candidate_key:
                 return JSONResponse({"detail": "candidate_required"}, status_code=403)
+            if request.state.candidate_key and store.is_deleted(request.state.candidate_key):
+                return JSONResponse({"detail": "candidate_deleted"}, status_code=410)
             if not testing_enabled() and request.url.path != "/testing/preflight":
                 return JSONResponse({"detail": "testing_disabled"}, status_code=503)
             # Serialize the owner's file-backed session mutations across awaits:
             # answer retries, media, supervision and next-task cannot lose writes.
             lock = owner_locks.setdefault(request.state.candidate_key or "offline", asyncio.Lock())
             async with lock:
+                # The request may have waited behind account deletion after
+                # the first marker check; fence it again after acquiring lock.
+                if request.state.candidate_key and store.is_deleted(request.state.candidate_key):
+                    return JSONResponse({"detail": "candidate_deleted"}, status_code=410)
                 return await call_next(request)
         return await call_next(request)
+
+    @app.delete("/internal/candidates/{candidate_id}", tags=["internal"])
+    async def delete_candidate(candidate_id: str, request: Request) -> dict[str, object]:
+        """Delete all testing sessions/media for a candidate and fence retries.
+
+        This endpoint is service-to-service only. The owner key is hashed for
+        the durable tombstone, while the lock serializes deletion with an
+        in-flight answer or media write.
+        """
+        token = os.environ.get("TESTING_ENGINE_TOKEN", "")
+        if not token or not secrets.compare_digest(request.headers.get("x-internal-token", ""), token):
+            raise HTTPException(status_code=401, detail="invalid_internal_token")
+        lock = owner_locks.setdefault(candidate_id, asyncio.Lock())
+        async with lock:
+            removed = await asyncio.to_thread(store.delete_candidate, candidate_id)
+        return {"candidate_id": candidate_id, "deleted": True, "sessions_removed": removed}
 
 
     @app.get("/healthz", tags=["health"])
@@ -480,7 +502,8 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
         if not manifest.exists():
             from testing_engine.store import _atomic_write
             _atomic_write(manifest, {"created_at": session["created_at"], "retention_days": 90,
-                                     "session_id": session_id, "consents": session["consents"]})
+                                     "session_id": session_id, "candidate_key": session["candidate_key"],
+                                     "consents": session["consents"]})
         seq = body.get("sequence", len(list(media_dir.glob("chunk-*"))))
         if type(seq) is not int or not 0 <= seq <= 10000:
             raise HTTPException(status_code=422, detail="invalid_sequence")

@@ -23,6 +23,9 @@ from agents_service.models import Contract
 MAX_BYTES = 5 * 1024 * 1024
 MAX_TEXT = 100000
 MAX_PAGES = 10
+OCR_MAX_DIMENSION = 2400
+OCR_HEADER_MAX_DIMENSION = 3000
+OCR_HEADER_FRACTION = 0.18
 SLOTS = BoundedSemaphore(2)
 
 
@@ -72,6 +75,15 @@ def parse_fields(text: str, method: str) -> dict:
                 break
     if "display_name" not in fields and lines and re.fullmatch(r"[А-ЯЁA-Z][а-яёa-z-]+(?: [А-ЯЁA-Z][а-яёa-z-]+){1,2}", lines[0]):
         fields["display_name"] = lines[0][:160]
+    if "city" not in fields:
+        # Common resume layouts put an unlabeled city in the short header
+        # below the name.  Only accept a single capitalized word before a
+        # separator; free-form body text must remain untouched.
+        for line in lines[1:5]:
+            match = re.match(r"^([А-ЯЁ][а-яё-]{2,})(?=\s*(?:[·•|—–-]|$))", line)
+            if match:
+                fields["city"] = match[1][:160]
+                break
     phone = re.search(r"(?<!\d)(?:\+7|8)[ (.-]*\d{3}[ ).-]*\d{3}[ .-]*\d{2}[ .-]*\d{2}(?!\d)", text)
     if phone:
         fields["phone"] = phone[0][:64]
@@ -115,19 +127,59 @@ def parse_fields(text: str, method: str) -> dict:
 
 def _ocr(path: Path) -> str:
     from PIL import Image
+    from PIL.ImageOps import exif_transpose
+
     Image.MAX_IMAGE_PIXELS = 20000000
     with Image.open(path) as source:
-        if source.width * source.height > 20000000 or source.n_frames != 1:
+        frame_count = getattr(source, "n_frames", 1)
+        if source.width * source.height > 20000000 or frame_count != 1:
             raise ValueError("resume_image_too_large")
         source.load()
-        source.convert("RGB").save(path.with_suffix(".png"))
+        # Keep the OCR input separate from the uploaded file.  In particular,
+        # saving a PNG while it is still open can truncate the source on some
+        # Pillow/platform combinations; EXIF orientation is common in phone
+        # photos and must be applied before Tesseract sees the pixels.
+        image = exif_transpose(source).convert("RGB")
+        header_height = min(
+            round(image.height * OCR_HEADER_FRACTION), int(image.width * 0.23)
+        )
+        header = image.crop((0, 0, image.width, max(1, header_height)))
+        header_scale = min(3.0, OCR_HEADER_MAX_DIMENSION / max(header.size))
+        if header_scale > 1:
+            header = header.resize(
+                (round(header.width * header_scale), round(header.height * header_scale)),
+                Image.Resampling.LANCZOS,
+            )
+        # Phone photos are often only 1k–2k pixels wide.  A bounded upscale
+        # gives Tesseract enough glyph pixels without allowing an attacker to
+        # turn the image limit into an unbounded OCR allocation.
+        scale = min(2.5, OCR_MAX_DIMENSION / max(image.size))
+        if scale > 1:
+            image = image.resize(
+                (round(image.width * scale), round(image.height * scale)),
+                Image.Resampling.LANCZOS,
+            )
+        ocr_path = path.with_name(f"{path.stem}-ocr.png")
+        image.save(ocr_path)
+        header_path = path.with_name(f"{path.stem}-ocr-header.png")
+        # A dedicated high-resolution pass preserves short header facts such
+        # as Backend/Middle that a full-page segmentation can misread.
+        header.save(header_path)
     if not shutil.which("tesseract"):
         raise ValueError("resume_ocr_unavailable")
-    result = subprocess.run(["tesseract", str(path.with_suffix(".png")), "stdout", "-l", "rus+eng"],
+    result = subprocess.run(["tesseract", str(ocr_path), "stdout", "-l", "rus+eng"],
                             capture_output=True, timeout=15, check=False)
-    if result.returncode:
+    header_result = subprocess.run(
+        ["tesseract", str(header_path), "stdout", "-l", "rus+eng", "--psm", "11"],
+        capture_output=True,
+        timeout=15,
+        check=False,
+    )
+    if result.returncode or header_result.returncode:
         raise ValueError("resume_ocr_unavailable")
-    return result.stdout.decode("utf-8", errors="replace")
+    full_text = result.stdout.decode("utf-8", errors="replace")
+    header_text = header_result.stdout.decode("utf-8", errors="replace")
+    return header_text + "\n" + full_text
 
 
 def _extract(path: Path) -> tuple[str, str]:

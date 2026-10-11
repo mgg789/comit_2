@@ -9,8 +9,10 @@ Writes are atomic (tmp + rename); a process-global lock serializes writers.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import shutil
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,9 +50,11 @@ class TestingStore:
     def __init__(self, data_dir: str | Path) -> None:
         self.data_dir = Path(data_dir)
         self.sessions_dir = self.data_dir / "sessions"
+        self.deleted_dir = self.data_dir / "deleted-candidates"
         self.items_path = self.data_dir / "items.json"
         self._lock = threading.Lock()
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self.deleted_dir.mkdir(parents=True, exist_ok=True)
         if not self.items_path.exists():
             _atomic_write(self.items_path, [])
 
@@ -184,6 +188,66 @@ class TestingStore:
         if "/" in session_id or "\\" in session_id or ".." in session_id or not session_id:
             raise ValueError("invalid session id")
         return self.sessions_dir / (session_id + ".json")
+
+    def _deleted_marker(self, candidate_key: str) -> Path:
+        """Return a non-PII tombstone path for one candidate owner."""
+        digest = hashlib.sha256(candidate_key.encode("utf-8")).hexdigest()
+        return self.deleted_dir / f"{digest}.json"
+
+    def is_deleted(self, candidate_key: str) -> bool:
+        """Check whether testing data for this owner has been permanently revoked."""
+        return self._deleted_marker(candidate_key).exists()
+
+    def delete_candidate(self, candidate_key: str) -> int:
+        """Tombstone an owner and remove all sessions plus captured media.
+
+        The marker is created while the store lock is held so a request that
+        starts after deletion cannot create a new session for the deleted
+        owner. Retries are idempotent and do not recreate personal data.
+        """
+        if not candidate_key:
+            raise ValueError("candidate_key_required")
+        removed = 0
+
+        def remove_media(path: Path) -> None:
+            """Remove a capture directory and fail if the filesystem kept it."""
+            try:
+                shutil.rmtree(path)
+            except FileNotFoundError:
+                return
+            if path.exists():
+                raise OSError(f"candidate_media_delete_incomplete: {path.name}")
+
+        with self._lock:
+            marker = self._deleted_marker(candidate_key)
+            if not marker.exists():
+                _atomic_write(marker, {"deleted_at": _now()})
+            for session_path in self.sessions_dir.glob("*.json"):
+                try:
+                    record = json.loads(session_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                if record.get("candidate_key") != candidate_key:
+                    continue
+                session_id = str(record.get("session_id", session_path.stem))
+                session_path.unlink(missing_ok=True)
+                if session_path.exists():
+                    raise OSError(f"candidate_session_delete_incomplete: {session_id}")
+                remove_media(self.data_dir / "media" / session_id)
+                removed += 1
+            # Remove capture directories whose session file is malformed or
+            # was already rotated, when their manifest still names the owner.
+            media_dir = self.data_dir / "media"
+            if media_dir.exists():
+                for session_dir in media_dir.iterdir():
+                    manifest = session_dir / "manifest.json"
+                    try:
+                        payload = json.loads(manifest.read_text(encoding="utf-8"))
+                    except (OSError, ValueError, NotADirectoryError):
+                        continue
+                    if payload.get("candidate_key") == candidate_key:
+                        remove_media(session_dir)
+        return removed
 
     def read_session(self, session_id: str) -> dict:
         return json.loads(self.session_path(session_id).read_text(encoding="utf-8"))

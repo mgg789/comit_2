@@ -99,6 +99,8 @@ class Store:
         missing = missing_requirements(profile)
         with connect(self.database_url) as connection:
             connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            if connection.execute("SELECT 1 FROM candidate_pipeline.tombstones WHERE candidate_id=%s", (candidate_id,)).fetchone():
+                raise ConflictError("candidate_deleted")
             schema = _schema(connection)
             validate_coordinates(profile, schema)
             current = connection.execute(
@@ -144,6 +146,32 @@ class Store:
             if not missing:
                 self._enqueue(connection, candidate_id, revision, schema.version)
             return self._status(connection, candidate_id)
+
+    def delete(self, candidate_id: UUID) -> dict[str, object]:
+        """Hard-delete candidate-owned matching state under a permanent replay fence."""
+        with connect(self.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            connection.execute(
+                "INSERT INTO candidate_pipeline.tombstones(candidate_id) VALUES (%s) ON CONFLICT DO NOTHING",
+                (candidate_id,),
+            )
+            # Keep the order explicit: several legacy references intentionally use NO ACTION.
+            connection.execute("DELETE FROM hypothesis_pipeline.pairs WHERE test_candidate=%s OR control_candidate=%s", (candidate_id, candidate_id))
+            connection.execute("""DELETE FROM learning_pipeline.events
+                WHERE exposure_id IN (SELECT exposure_id FROM feed_pipeline.exposures WHERE candidate_id=%s)""", (candidate_id,))
+            connection.execute("DELETE FROM feed_pipeline.decisions WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM feed_pipeline.saved WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM feed_pipeline.visited WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM feed_pipeline.visited_history WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM feed_pipeline.exposures WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM matching_pipeline.selections WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM matching_pipeline.selection_states WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM rerank_pipeline.cards WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM candidate_pipeline.pool WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM candidate_pipeline.jobs WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM candidate_pipeline.outbox WHERE candidate_id=%s", (candidate_id,))
+            connection.execute("DELETE FROM candidate_pipeline.candidates WHERE candidate_id=%s", (candidate_id,))
+            return {"candidate_id": str(candidate_id), "deleted": True}
 
     @staticmethod
     def _enqueue(connection, candidate_id: UUID, revision: int, schema_version: int) -> None:

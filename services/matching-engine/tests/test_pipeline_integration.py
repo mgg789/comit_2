@@ -296,6 +296,21 @@ def test_consent_withdrawal_invalidates_pool_pdfs_and_creates_event(store: Store
                                      ORDER BY id DESC LIMIT 1""").fetchone()["event_type"] == "candidate.withdrawn"
 
 
+def test_candidate_delete_tombstones_source_and_rejects_stale_intake(store: Store) -> None:
+    """Deletion is idempotent and prevents a queued source snapshot from restoring data."""
+    candidate_id = uuid4()
+    profile = eligible_profile()
+    store.intake(candidate_id, profile)
+
+    assert store.delete(candidate_id) == {"candidate_id": str(candidate_id), "deleted": True}
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT 1 FROM candidate_pipeline.candidates WHERE candidate_id=%s", (candidate_id,)).fetchone() is None
+        assert connection.execute("SELECT 1 FROM candidate_pipeline.tombstones WHERE candidate_id=%s", (candidate_id,)).fetchone() is not None
+    with pytest.raises(ConflictError, match="candidate_deleted"):
+        store.intake(candidate_id, profile)
+    assert store.delete(candidate_id)["deleted"] is True
+
+
 def publish_job(store: Store, job) -> bool:
     """Invoke guarded storage publication directly for stale job race assertions."""
     return store.publish(

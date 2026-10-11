@@ -452,6 +452,17 @@ hash декларации, измеренный level, session id, сервер�
 ## Идентичности Яндекс OAuth
 
 Миграция `022_yandex_oauth.sql`: `auth_oauth_states` хранит только hash случайного browser-bound состояния, роль, версию принятого согласия и expiry (10 минут); DELETE…RETURNING обеспечивает одноразовое потребление между репликами. `auth_oauth_identities` связывает пару `(provider,subject)` с account UUID с каскадным удалением. Один provider identity не создаёт второй аккаунт; существующий email не связывается автоматически. OAuth-токены и client secret в БД не сохраняются. Просроченные состояния очищаются при новом старте входа.
+
+Удаление candidate выполняется через `DELETE /candidate/account`: matching
+сначала сохраняет `candidate_pipeline.tombstones` и очищает candidate-owned
+projection graph под `PIPELINE_LOCK`, включая pool/PDF, jobs/outbox, feed,
+selection, rerank и hypothesis rows. Затем API transaction блокирует account,
+отзывает все sessions, удаляет recruitment rows без cascade, auth challenges и
+email issue events, после чего удаляет account; остальные account/profile rows
+удаляются обычными `ON DELETE CASCADE`. Tombstone сохраняется для replay fence и
+не содержит профильных данных. Перед API transaction тот же workflow вызывает
+`testing-engine DELETE /internal/candidates/{candidate_id}`: owner tombstone
+блокирует новые попытки, а JSON sessions и raw media удаляются идемпотентно.
 # System inbox attachments
 
 Миграция `023_system_chat_attachments.sql` хранит вложения поддержки в

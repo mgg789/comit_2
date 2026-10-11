@@ -19,12 +19,20 @@
 | GET | `/candidate/resume.pdf` | собственный owner PDF после актуальной projection |
 | GET | `/candidate/skills/catalog` | активная схема с названиями, точными предметами тестов и приватными сроками повторной проверки |
 | GET | `/candidate/taxonomy` | текущая strict-schema (ключи доменов/стеков/soft skills) из matching-engine |
+| DELETE | `/candidate/account` | окончательное удаление аккаунта и candidate-owned проекций |
 
 `candidate_id` и owner выводятся из JWT/DB session. Клиент не передаёт owner UUID,
 email, evidence или server timestamps. Создание выполняется с
 `expected_revision=0`; успешная запись увеличивает `revision` монотонно. PUT/PATCH
 с устаревшей ревизией возвращают `409 profile_revision_conflict` и не создают новый
 outbox snapshot.
+
+Кнопка удаления в настройках и меню аватара вызывает этот DELETE только после
+явного подтверждения. Сервер сначала создаёт постоянный tombstone matching и
+удаляет candidate-owned graph под общим pipeline lock; затем отзывает все
+сессии testing-engine/media через owner tombstone и транзакционно удаляет
+account-owned source data. Tombstone блокирует
+запоздалый projection worker и делает повторный downstream cleanup идемпотентным.
 
 Editable fields включают display name, телефон, город, форматы работы, переезд,
 зарплатный диапазон, primary direction, declared grade, домены, стеки, soft skills,
