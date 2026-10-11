@@ -1191,14 +1191,14 @@ textarea::placeholder {
   --comit-glass-backdrop: blur(12rem) saturate(1.4) brightness(1.04);
 }
 :root[data-comit-glass="refractive"] { --comit-glass-backdrop: url("#glass-refraction") saturate(1.4); }
-:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) {
+:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.nav-item.selected):not(.communication-composer), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) {
   background: var(--comit-glass-frost);
   backdrop-filter: var(--comit-glass-backdrop);
   -webkit-backdrop-filter: var(--comit-glass-backdrop);
   box-shadow: var(--comit-glass-shadow);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) { background: var(--comit-glass-fallback); }
+  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.nav-item.selected):not(.communication-composer), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) { background: var(--comit-glass-fallback); }
 }
 
 .legal-text { display: grid; gap: 24rem; }
