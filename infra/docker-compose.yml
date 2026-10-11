@@ -136,6 +136,7 @@ services:
     environment:
       PORT: 8102
       BLUEPRINT_DIR: "/app/blueprints"
+      TESTING_ENABLED: "${TESTING_ENABLED:-true}"
       TESTING_API_URL: http://api:8080
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
       TESTING_DATA_DIR: /data/testing
