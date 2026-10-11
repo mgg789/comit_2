@@ -18,6 +18,7 @@ export function errorText(error: unknown): string {
       invalid_system_notification: "Сообщение пустое или слишком длинное (максимум 2000 символов).",
     };
     if (typeof detail === "string" && Object.hasOwn(messages, detail)) return messages[detail]!;
+    if (error.status === 404 && error.url.endsWith("/support/login")) return messages.support_not_configured!;
     if (error.status === 401) return "Сессия закончилась. Войдите снова.";
     if (error.status === 403) return "Нет доступа к этому действию.";
     if (error.status === 404) return "Диалог не найден.";
