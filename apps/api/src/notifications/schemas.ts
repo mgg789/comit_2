@@ -11,6 +11,9 @@ export const systemNotificationSchema = { type: "object", additionalProperties: 
   } };
 /** Read requests are bounded later by the actual durable delivery watermark. */
 export const systemReadRequestSchema = { type: "object", additionalProperties: false, required: ["read_sequence"], properties: { read_sequence: integer } };
+/** Shared message body for writing into the Comit conversation: UUID retry key plus bounded text. */
+export const systemChatMessageSchema = { type: "object", additionalProperties: false,
+  required: ["idempotency_key", "text"], properties: { idempotency_key: { type: "string", format: "uuid" }, text: { type: "string", minLength: 1, maxLength: 2000 } } };
 /** Monotonic receipt and exact durable unread count. */
 export const systemReadStatusSchema = { type: "object", additionalProperties: false, required: ["read_sequence", "unread_count"], properties: { read_sequence: integer, unread_count: integer } };
 /** Cursor pages preserve the stable Comit system chat identity. */

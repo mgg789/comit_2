@@ -3,7 +3,8 @@
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, SystemChatMessageRequest, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+  SupportLoginRequest, SupportSessionView, SupportOperatorView, SupportConversationPage, SupportMessagePage, SystemNotification, SupportReadStatus,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
@@ -41,8 +42,24 @@ export interface ApiClient {
   getSystemChat(role: AccountRole, afterSequence?: number, limit?: number): Promise<SystemChatPage>;
   /** Mark only delivered system notification sequences read. */
   markSystemChatRead(role: AccountRole, body: SystemChatReadRequest): Promise<SystemChatReadStatus>;
+  /** Write into own Comit conversation using a stable UUID retry key. */
+  sendSystemChatMessage(role: AccountRole, body: SystemChatMessageRequest): Promise<SystemNotification>;
   /** Count unread items across every authorized hiring chat and the system inbox. */
   getChatUnread(role: AccountRole): Promise<ChatUnreadStatus>;
+  /** Exchange the operator email and access key for a support session cookie. */
+  supportLogin(body: SupportLoginRequest): Promise<SupportSessionView>;
+  /** Revoke the current support session and clear its cookie. */
+  supportLogout(): Promise<{ ok: true }>;
+  /** Resolve the current operator from the support session cookie or Bearer token. */
+  getSupportMe(): Promise<SupportOperatorView>;
+  /** Offset-page operator conversations ordered by the latest activity. */
+  getSupportConversations(offset?: number, limit?: number): Promise<SupportConversationPage>;
+  /** Page one account's Comit conversation; never mutates the account's own receipts. */
+  getSupportMessages(accountId: string, afterSequence?: number, limit?: number): Promise<SupportMessagePage>;
+  /** Answer an account as Comit using a stable UUID retry key. */
+  sendSupportMessage(accountId: string, body: SystemChatMessageRequest): Promise<SystemNotification>;
+  /** Advance the operator read cursor for one conversation. */
+  markSupportConversationRead(accountId: string, body: { read_sequence: number }): Promise<SupportReadStatus>;
   /** Read the latest persisted candidate recommendation without starting provider work. */
   getRecommendationsLatest(): Promise<CandidateRecommendationsResponse>;
   get<T>(path: string): Promise<T>;
@@ -289,7 +306,15 @@ export function createApiClient({
     updateEmployerProfile: body => request("PATCH", "/employer/profile", body),
     getSystemChat: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/system-chat?after_sequence=${afterSequence}&limit=${limit}`),
     markSystemChatRead: (role, body) => request("POST", `/${role}/system-chat/read`, body),
+    sendSystemChatMessage: (role, body) => request("POST", `/${role}/system-chat/messages`, body),
     getChatUnread: role => request("GET", `/${role}/chat-unread`),
+    supportLogin: body => request("POST", "/support/login", body),
+    supportLogout: () => request("POST", "/support/logout", {}),
+    getSupportMe: () => request("GET", "/support/me"),
+    getSupportConversations: (offset = 0, limit = 50) => request("GET", `/support/conversations?offset=${offset}&limit=${limit}`),
+    getSupportMessages: (accountId, afterSequence = 0, limit = 100) => request("GET", `/support/conversations/${encodeURIComponent(accountId)}/messages?after_sequence=${afterSequence}&limit=${limit}`),
+    sendSupportMessage: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/messages`, body),
+    markSupportConversationRead: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/read`, body),
     getRecommendationsLatest: () => request("GET", "/candidate/recommendations/latest"),
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
     getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),

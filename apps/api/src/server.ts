@@ -64,6 +64,7 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
         candidateSession: { type: "apiKey", in: "cookie", name: "__Host-comit_candidate_session" },
         employerSession: { type: "apiKey", in: "cookie", name: "__Host-comit_employer_session" },
+        supportSession: { type: "apiKey", in: "cookie", name: "__Host-comit_support_session" },
       } },
     },
   });
@@ -73,7 +74,7 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
   await app.register(swaggerUi, { routePrefix: "/docs" });
   await app.register(healthRoutes, { readiness: async () => {
     if (!operationConfig || !operationsPool) return false;
-    const result = await operationsPool.query("SELECT 1 FROM auth_migrations WHERE name=$1", ["020_training_consent_not_null.sql"]);
+    const result = await operationsPool.query("SELECT 1 FROM auth_migrations WHERE name=$1", ["021_support_console.sql"]);
     return result.rowCount === 1;
   } });
   await app.register(cookie);

@@ -51,6 +51,17 @@ export class SystemNotificationsStore {
   async publish(accountId: string, key: string, type: string, text: string, target: SystemNotificationTarget | null = null): Promise<SystemNotification> {
     return this.transaction(client => this.append(client, accountId, key, type, text, target));
   }
+  /** Record the account's own message in the Comit conversation and acknowledge delivery:
+      the sender has just seen the thread, so only future Comit replies may raise unread. */
+  async sendMessage(role: AccountRole, accountId: string, key: string, text: string): Promise<SystemNotification> {
+    return this.transaction(async client => {
+      await this.inbox(client, accountId, role);
+      const item = await this.append(client, accountId, key, "support.user_message", text);
+      await client.query(`UPDATE system_inboxes SET delivered_sequence=greatest(delivered_sequence,$2),
+        read_sequence=greatest(read_sequence,delivered_sequence,$2) WHERE account_id=$1`, [accountId, item.sequence]);
+      return item;
+    });
+  }
   /** Reconcile newly committed existing monthly-task and like sources without replaying historical mail or interview events. */
   private async reconcile(client: PoolClient, role: AccountRole, accountId: string): Promise<void> {
     if (role !== "candidate") return;
