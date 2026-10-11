@@ -645,7 +645,8 @@ try {
       return {
         input: input.height,
         yandex: yandex.height,
-        alignment: Math.abs(box.y + box.height / 2 - text.y - text.height / 2),
+        // The consent text wraps; the checkbox is centred on its first line.
+        alignment: Math.abs(box.y + box.height / 2 - text.y - parseFloat(getComputedStyle(document.querySelector(".login-consent a")).lineHeight) / 2),
       };
     });
     assert.ok(

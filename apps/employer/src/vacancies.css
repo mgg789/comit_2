@@ -117,6 +117,10 @@
   gap: 6rem;
   min-width: 0;
 }
+/* The free-text description reads in full width instead of a narrow half column. */
+.vacancy-info-fields > div:last-child {
+  grid-column: 1 / -1;
+}
 .vacancy-info-fields dt {
   font-size: 16rem;
   color: var(--comit-text-muted);
@@ -257,6 +261,21 @@
   .vacancy-review-tabs > button {
     min-height: 44px;
     font-size: max(14rem, 12px);
+  }
+  /* Same text size as the neighbouring fields; «Стек (1)» stays on one line. */
+  .vacancy-editor .action.stack-toggle {
+    font-size: max(16rem, 14px);
+    white-space: nowrap;
+  }
+  .vacancy-first h2 {
+    font-size: 24rem;
+  }
+  /* «Редактировать» and «Опубликовать»/«Отозвать» share one row instead of a stray right-aligned line. */
+  .page-heading:has(> .vacancy-publication) > .primary,
+  .page-heading > .vacancy-publication {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-left: 0;
   }
   .vacancy-editor .action.circle {
     width: max(66rem, 44px);

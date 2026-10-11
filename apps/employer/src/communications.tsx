@@ -47,6 +47,15 @@ const employerConversationTransport: ConversationTransport = {
 };
 
 /** Process states shared with the notifications bell. */
+/** Russian labels for interview states shown to the employer. */
+export const interviewStateNames: Record<RecruitmentView["interviews"][number]["state"], string> = {
+  proposed: "ждёт подтверждения кандидата",
+  scheduled: "подтверждено",
+  declined: "кандидат отклонил время",
+  cancelled: "отменено",
+  completed: "проведено",
+};
+
 export const recruitmentStateNames: Record<RecruitmentView["state"], string> = {
   sent: "Приглашение отправлено",
   viewed: "Приглашение просмотрено",
@@ -154,7 +163,7 @@ function RecruitmentChats({ onOpen, systemUnread }: { onOpen: (id: string) => vo
     } catch (reason) { setMoreError(errorText(reason)); } finally { moreInFlight.current = false; paginationEpoch.current += 1; setLoadingMore(false); }
   }
   return <section><PageTitle title="Чаты" />
-    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: "Кандидат", state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
+    <RecruitmentChatList items={[{ id: "comit-system", title: "Comit", subtitle: "Уведомления платформы", state: "Системный чат", unread: systemUnread, system: true }, ...(list.data?.items || []).map(item => ({ id: item.id, title: item.terms?.vacancy_title || "Вакансия", subtitle: `Кандидат ${item.candidate_id.slice(0, 4).toUpperCase()}`, state: recruitmentStateNames[item.state], unread: item.chat_unread_count }))]}
       loading={list.loading} error={list.error} retry={list.refresh} emptyText="Чаты появятся после отправки приглашений кандидатам" onOpen={onOpen}
       hasMore={list.data?.has_more} loadMore={() => void loadMore()} loadingMore={loadingMore} />
     {moreError && <p className="communication-error" role="alert">{moreError}</p>}
@@ -273,8 +282,8 @@ function RecruitmentThread({
             {p.interviews.map((interview) => (
               <p key={interview.id}>
                 Интервью:{" "}
-                {new Date(interview.starts_at).toLocaleString("ru-RU")} ·{" "}
-                {interview.state}
+                {new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} ·{" "}
+                {interviewStateNames[interview.state]}
               </p>
             ))}
           </div>

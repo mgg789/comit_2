@@ -951,10 +951,13 @@ export function Resumes({ navigate }: Navigation) {
   }, [identity]);
   const pages = useResource(async () => {
     const result: ResumeVacancyPage[] = [];
+    // A never-published draft has no saved list (the API answers 404), so skipping it keeps one
+    // fresh draft from failing the whole page. Withdrawn vacancies keep their published_at.
+    const readable = selectedDrafts.filter((vacancy) => vacancy.business_status !== "draft" || !!vacancy.published_at);
     // Keep concurrency bounded while reading every owner vacancy.
-    for (let offset = 0; offset < selectedDrafts.length; offset += 4) {
+    for (let offset = 0; offset < readable.length; offset += 4) {
       const batch = await Promise.all(
-        selectedDrafts.slice(offset, offset + 4).map(async (vacancy) => {
+        readable.slice(offset, offset + 4).map(async (vacancy) => {
           const [saved, processes] = await Promise.all([
             api.getSaved(vacancy.draft_id),
             api.getEmployerRecruitment(vacancy.draft_id),
@@ -1143,13 +1146,15 @@ export function Resumes({ navigate }: Navigation) {
                 <CandidateIdentity candidate={row.candidate} />
               ) : (
                 <>
-                  <AnonymousAvatar name="Резюме недоступно" />
+                  {/* The public profile is hidden (e.g. after hire), but the person stays identifiable by code. */}
+                  <AnonymousAvatar name={`Кандидат ${row.id.slice(0, 4).toUpperCase()}`} />
                   <div className="discovery-identity">
-                    <h3>Резюме недоступно</h3>
+                    <h3>Кандидат {row.id.slice(0, 4).toUpperCase()}</h3>
                     <p>
                       {row.process
                         ? statusLabels[row.process.state]
-                        : "Сохранён"}
+                        : "Сохранён"}{" "}
+                      · резюме скрыто
                     </p>
                   </div>
                 </>

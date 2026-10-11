@@ -861,10 +861,19 @@
   }
 }
 @media (max-width: 760px) {
+  /* Two columns keep the four filters to two rows before the first candidate. */
   .discovery-filters {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin: 20rem 0;
     gap: 8rem;
+  }
+  .discovery-filters > * {
+    width: 100%;
+    min-width: 0;
+  }
+  .discovery-filters > .custom-select.discovery-sort {
+    grid-column: 1 / -1;
   }
   .discovery-filters select,
   .discovery-filters input,
@@ -1121,6 +1130,11 @@
 .statistics-inventory .statistics-summary-grid > div { gap: 2rem; }
 .statistics-summary-grid > div > div { display: flex; align-items: center; gap: 10rem; }
 @media (max-width: 760px) {
+  /* Five stage chips did not wrap and pushed the whole resume card past the screen edge. */
+  .light-row { min-width: 0; }
+  .light-row .discovery-identity { min-width: 0; flex: 1 1 0; }
+  .discovery-milestones { flex: 1 1 100%; flex-wrap: wrap; gap: 8rem; min-width: 0; }
+  .discovery-milestones span { padding: 6rem 12rem; font-size: 13rem; }
   .discovery-tile-actions { width: 100%; }
   .light-row .discovery-tile-actions .discovery-reject { width: 48rem; min-width: 48rem; }
   .light-row .discovery-tile-actions .discovery-dark { flex: 1; }

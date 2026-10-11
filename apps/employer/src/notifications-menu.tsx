@@ -6,6 +6,7 @@ import { Icon } from "./ui";
 import { recruitmentStateNames } from "./communications";
 import {
   badgeText,
+  eventLabel,
   eventsCursor,
   latestSequence,
   readSeen,
@@ -106,7 +107,7 @@ export const NotificationsPanel = forwardRef<HTMLDivElement, {
                 className={event.sequence > seenBefore ? "is-new" : ""}
                 onClick={() => onSelect(event.process_id)}
               >
-                <span>{recruitmentStateNames[event.state]}</span>
+                <span>{eventLabel(event, recruitmentStateNames)}</span>
                 <time dateTime={event.created_at}>{time.format(new Date(event.created_at))}</time>
               </button>
             </li>

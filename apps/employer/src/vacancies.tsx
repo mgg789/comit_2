@@ -245,6 +245,9 @@ export function VacancyEditor({
   );
   const [daily, setDaily] = usePersistentState(`${formKey}daily`, draft?.fields.daily || "");
   const [bio, setBio] = usePersistentState(`${formKey}bio`, draft?.fields.bio || "");
+  // The unsaved new form survives closing the dialog; remember the server draft its first check
+  // created, so checking again updates that draft instead of adding a duplicate to «Черновики».
+  const [createdId, setCreatedId] = usePersistentState(`${formKey}createdId`, "");
   const [busy, setBusy] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
   const [suggestionNote, setSuggestionNote] = useState<string | null>(null);
@@ -323,8 +326,16 @@ export function VacancyEditor({
         expected_revision: current.revision, fields,
       });
     } else {
+      const reusable = createdId ? await api.getVacancy(createdId).catch(() => null) : null;
+      if (reusable && !reusable.archived && (reusable.business_status ?? "draft") === "draft" &&
+        (reusable.state === "editing" || reusable.state === "summary")) {
+        saved = await api.patchVacancy(reusable.draft_id, { expected_revision: reusable.revision, fields });
+        setCurrent(saved);
+        return saved;
+      }
       try {
         saved = await api.createVacancy({ fields });
+        setCreatedId(saved.draft_id);
       } catch (reason) {
         // Creation has no idempotency contract: an ambiguous response must never create a duplicate.
         if (!(reason instanceof ApiError) || reason.status >= 500) {
@@ -449,6 +460,10 @@ export function VacancyEditor({
         initial={{ scale: 0.94, y: 25 }}
         animate={{ scale: 1, y: 0 }}
       >
+        {/* Explicit close: on phones the dialog covers the screen, so there is no backdrop to tap. */}
+        <Action className="circle modal-close" disabled={busy} onClick={onClose} aria-label="Закрыть">
+          <Icon name="close" />
+        </Action>
         {confirm ? (
           <>
             <div className="vacancy-review-tabs" role="tablist" aria-label="Проверка вакансии"
@@ -1069,7 +1084,7 @@ function CandidateDeck({
             {card.city} · {salary(card.salary.from_rub, card.salary.to_rub)}
           </div>
           <div className="candidate-description">
-            Рейтинг подбора: {card.explanation.score.toFixed(3)} · ранг{" "}
+            Совпадение {Math.round(Math.max(0, Math.min(1, card.explanation.score)) * 100)}% · место в подборке{" "}
             {card.rank}
           </div>
           <div className="candidate-controls" onPointerDown={(event) => event.stopPropagation()}>

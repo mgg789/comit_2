@@ -60,7 +60,7 @@ page.on("pageerror", error => errors.push(error.message));
 try {
   await page.goto(base + "#/resume");
   await page.getByRole("heading", { name: "Тестовый кандидат", exact: true }).waitFor();
-  await page.getByRole("heading", { name: "Мини-задание", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Задание недели", exact: true }).waitFor();
   assert.equal(await page.getByRole("button", { name: "Пройти задание", exact: true }).isDisabled(), true);
   await page.getByRole("button", { name: "Редактировать резюме", exact: false }).first().click();
   assert.equal(await page.getByLabel(/^ID участника ФСП/).getAttribute("readonly"), "");

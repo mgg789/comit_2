@@ -77,3 +77,11 @@ test("badge fits the pill", () => {
   assert.equal(badgeText(99), "99");
   assert.equal(badgeText(150), "99+");
 });
+
+test("menu rows say what happened, not the repeated process state", async () => {
+  const { eventLabel } = await import("../src/notifications");
+  const states = { sent: "Приглашение отправлено", viewed: "Просмотрено", accepted: "Приглашение принято", declined: "", rejected: "", offer_sent: "", hired: "", offer_declined: "", withdrawn: "", expired: "" };
+  assert.equal(eventLabel({ type: "interview.propose", state: "accepted" }, states), "Предложено время собеседования");
+  assert.equal(eventLabel({ type: "accept", state: "accepted" }, states), "Кандидат принял приглашение");
+  assert.equal(eventLabel({ type: "future.event", state: "accepted" }, states), "Приглашение принято");
+});
