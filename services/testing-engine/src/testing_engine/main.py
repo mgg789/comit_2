@@ -264,26 +264,22 @@ def create_testing_app(data_dir: Path | None = None, *, allow_unauthenticated: b
             allowed.add("extended")
         if code_ready:
             allowed.add("code")
+        presented = {row["item_id"] for row in session["items"]}
         extended_slot = 2 if family in ("algorithms", "python") else 1
         forced_extended = bool(text_configured and len(session["items"]) == extended_slot and any(
-            row["type"] == "extended" for level in LEVELS for row in store.list_items(family, level, limit=100)))
-        def usable(row: dict) -> bool:
-            if forced_code:
-                return row["type"] == "code"
-            return row["type"] == "extended" if forced_extended else row["type"] in allowed
-        candidates = [row for row in store.list_items(family, state.next_level, limit=100) if usable(row)]
-        presented = {row["item_id"] for row in session["items"]}
-        item = next((row for row in candidates if row["item_id"] not in presented), None)
+            store.list_items(family, level, task_types={"extended"}, exclude_ids=presented)
+            for level in LEVELS))
+        selected_types = {"code"} if forced_code else {"extended"} if forced_extended else allowed
+        candidates = store.list_items(family, state.next_level, limit=100,
+                                      task_types=selected_types, exclude_ids=presented)
+        item = next(iter(candidates), None)
         if item is None:
             for level in LEVELS:
                 if level == state.next_level:
                     continue
-                for row in store.list_items(family, level, limit=100):
-                    if not usable(row):
-                        continue
-                    if row["item_id"] not in presented:
-                        item = row
-                        break
+                candidates = store.list_items(family, level, limit=100,
+                                              task_types=selected_types, exclude_ids=presented)
+                item = next(iter(candidates), None)
                 if item is not None:
                     break
         if item is None or len(session["items"]) >= 30:
