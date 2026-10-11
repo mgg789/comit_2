@@ -1,10 +1,12 @@
 # Команда и владение
 
-| GitHub | Telegram | Ответственность |
-|---|---|---|
-| mgg789 | @mschail | CTO; backend, алгоритмы, данные, интеграции, инфраструктура, общие контракты |
-| Raipus | @iva_nikita | Фронтенд: candidate, employer, welcome, testing, UI-kit |
-| IlyaPum | @iLyaPuMmm | UI/UX, продукт и экономика |
+| GitHub | Имя | Telegram | Ответственность |
+|---|---|---|---|
+| mgg789 | Михаил | @mschail | CTO; backend, алгоритмы, данные, интеграции, инфраструктура, общие контракты |
+| Raipus | Никита | @iva_nikita | Фронтенд: candidate, employer, welcome, testing, UI-kit |
+| IlyaPum | Илья | @iLyaPuMmm | UI/UX, продукт и экономика |
+
+**droidje** — компания Михаила и Ильи. Общий телеграм техподдержки сервисов — [@droidje](https://t.me/droidje). Вопросы безопасности и уязвимости (включая zero-day) не выносите в публичные issues — пишите в @droidje или напрямую CTO (Михаил).
 
 [CODEOWNERS](../.github/CODEOWNERS) назначает ревью по существующим GitHub-логинам. Для автоматического запроса ревью аккаунт должен иметь доступ к репозиторию; файл сам доступ не выдаёт. Участие Codex указывается в trailer `Co-authored-by` конкретных коммитов, без изменения авторства чужой работы. Отображение соавторов и Contributors определяет GitHub.
 
