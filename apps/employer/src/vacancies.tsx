@@ -14,6 +14,8 @@ import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import { candidateName } from "./candidate-name";
 import { domainChoices, featureLabel, softChoices, specializationLabel, stackChoices } from "./labels";
 import "./vacancies.css";
+import "./vacancy-suggestions.css";
+import { changedRequirements, descriptionLength, suggestVacancyRequirements } from "./vacancy-suggestions";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
@@ -245,7 +247,11 @@ export function VacancyEditor({
   const [bio, setBio] = usePersistentState(`${formKey}bio`, draft?.fields.bio || "");
   const [busy, setBusy] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
+  const [suggestionNote, setSuggestionNote] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const description = descriptionLength(bio);
   const saveLock = useRef(false);
+  const manuallyEditedRequirements = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [published, setPublished] = useState(false);
@@ -306,8 +312,8 @@ export function VacancyEditor({
       !Number.isSafeInteger(max) || min < 0 || max < min)
       throw new Error("Проверьте зарплатную вилку: от и до в тысячах рублей.");
     const fields: AgentsDraftFields_Input = {
-      title: title.trim(), class: specialization, stacks: skills,
-      domens: domains, soft_skills: softSkills,
+      title: title.trim(), class: specialization,
+      ...changedRequirements(current, { stacks: skills, domens: domains, soft_skills: softSkills }, manuallyEditedRequirements.current),
       zp_min: min, zp_max: max, city: city.trim(), daily: daily.trim(),
       type: work, bio: bio.trim(),
     };
@@ -351,7 +357,17 @@ export function VacancyEditor({
     setError(null);
     try {
       const saved = await persistFields();
-      const approved = await api.approveVacancy(saved.draft_id, saved.revision);
+      setSuggesting(true);
+      setSuggestionNote(null);
+      const result = await suggestVacancyRequirements(api, saved);
+      setCurrent(result.draft);
+      setSkills(selectedRequirements(result.draft.fields.stacks));
+      setDomains(selectedRequirements(result.draft.fields.domens));
+      setSoftSkills(selectedRequirements(result.draft.fields.soft_skills));
+      setSuggestionNote(result.suggested
+        ? "Требования предложены по описанию. Проверьте уровни во вкладках Стек, Хард и Софт. Ваши правки сохранены."
+        : "Автоподбор требований пока недоступен. Укажите навыки и уровни во вкладках Стек, Хард и Софт вручную.");
+      const approved = await api.approveVacancy(result.draft.draft_id, result.draft.revision);
       setCurrent(approved);
       setReviewDirty(false);
       setReviewTab("info");
@@ -361,6 +377,7 @@ export function VacancyEditor({
     } finally {
       saveLock.current = false;
       setBusy(false);
+      setSuggesting(false);
     }
   };
   async function keepDraft() {
@@ -457,6 +474,7 @@ export function VacancyEditor({
                 </button>
               ))}
             </div>
+            {suggestionNote && <p className="vacancy-suggestion-note" role="status">{suggestionNote}</p>}
             <div className="vacancy-review-panels">
               <motion.div className="vacancy-review-panel vacancy-info"
                 id="vacancy-panel-info" role="tabpanel" aria-labelledby="vacancy-tab-info"
@@ -504,10 +522,12 @@ export function VacancyEditor({
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
                         if (chosen === undefined) return;
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => ({ ...values, [key]: chosen }));
                         setReviewDirty(true);
                       }}
                       onRemove={(key) => {
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => { const next = { ...values }; delete next[key]; return next; });
                         setReviewDirty(true);
                       }}>
@@ -515,6 +535,7 @@ export function VacancyEditor({
                       onChange={(event) => {
                         const choice = panel.choices.find(([key]) => key === event.target.value);
                         if (!choice) return;
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => ({ ...values, [choice[0]]: 4 }));
                         setReviewDirty(true);
                       }}>
@@ -604,8 +625,10 @@ export function VacancyEditor({
                         const choice = stackChoices.find(
                           ([key]) => key === event.target.value,
                         );
-                        if (choice)
+                        if (choice) {
+                          manuallyEditedRequirements.current.add("stacks");
                           setSkills((value) => ({ ...value, [choice[0]]: 4 }));
+                        }
                       }}
                     >
                       <option value="" hidden>Добавить навык</option>
@@ -627,11 +650,13 @@ export function VacancyEditor({
                               const chosen = skillLevels.find(
                                 (value) => String(value) === event.target.value,
                               );
-                              if (chosen !== undefined)
+                              if (chosen !== undefined) {
+                                manuallyEditedRequirements.current.add("stacks");
                                 setSkills((value) => ({
                                   ...value,
                                   [key]: chosen,
                                 }));
+                              }
                             }}
                           >
                             {skillLevels.map((value) => (
@@ -647,6 +672,7 @@ export function VacancyEditor({
                           aria-label={`Удалить навык ${skillLabel(key)}`}
                           onClick={() =>
                             setSkills((value) => {
+                              manuallyEditedRequirements.current.add("stacks");
                               const next = { ...value };
                               delete next[key];
                               return next;
@@ -716,11 +742,16 @@ export function VacancyEditor({
                 </div>
                 <textarea
                   aria-label="Описание проекта"
+                  aria-describedby="vacancy-description-length"
+                  maxLength={12000}
                   placeholder="Описание проекта"
                   value={bio}
                   onChange={(event) => setBio(event.target.value)}
                   required
                 />
+                <p id="vacancy-description-length" className="vacancy-description-hint" data-tone={description.tone}>
+                  {description.label} · {description.length} символов
+                </p>
               </fieldset>
               <Action
                 variant="light"
@@ -728,7 +759,7 @@ export function VacancyEditor({
                 disabled={busy || creationUncertain}
                 className="full-width"
               >
-                {busy ? "Проверяем…" : "Проверить вакансию"}
+                {suggesting ? "Подбираем требования…" : busy ? "Сохраняем…" : "Проверить вакансию"}
               </Action>
             </form>
           </>

@@ -7,18 +7,18 @@ from uuid import uuid4
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
-from psycopg.types.json import Jsonb
-from test_combine_integration import finish, setup_pool
-from test_pipeline_integration import (
-    store as store,  # noqa: PLC0414 - shared disposable DB fixture.
-)
-
 from matching_engine.combine_models import CombineRequest
 from matching_engine.database import connect
 from matching_engine.feed_models import FeedDecisionRequest, FeedRequest
 from matching_engine.feed_store import FeedStore, _encode_cursor
 from matching_engine.main import create_app
 from matching_engine.models import CandidateProfile
+from matching_engine.preference_live_policy import (
+    FOLLOWUP_ACTION_THRESHOLD,
+    INITIAL_ACTION_THRESHOLD,
+    MIN_HOLDOUT_ROWS,
+    MIN_TRAIN_ROWS,
+)
 from matching_engine.preference_model import apply
 from matching_engine.preference_store import PreferenceStore
 from matching_engine.preference_worker import PreferenceWorker
@@ -27,6 +27,11 @@ from matching_engine.rerank_hash import digest
 from matching_engine.rerank_store import RerankStore
 from matching_engine.rerank_worker import RerankWorker
 from matching_engine.store import ConflictError, NotFoundError, Store
+from psycopg.types.json import Jsonb
+from test_combine_integration import finish, setup_pool
+from test_pipeline_integration import (
+    store as store,  # noqa: PLC0414 - shared disposable DB fixture.
+)
 
 pytestmark = pytest.mark.integration
 
@@ -93,13 +98,14 @@ def react(store, feed, vacancy_id, owner_id, session_id, rows, start: int, end: 
 
 def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     """Actually fit a model, score remaining cards and rollback without moving delivered cards."""
+    assert INITIAL_ACTION_THRESHOLD == 30  # Product threshold, not the obsolete 24/40 gates.
     feed, vacancy_id, owner_id, session_id, rows, artifact = numeric_feed(store)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 29)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD - 1)
     preferences = PreferenceStore(store.database_url)
     assert preferences.status(owner_id, vacancy_id)["job_id"] is None
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 29, 30)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, INITIAL_ACTION_THRESHOLD - 1, INITIAL_ACTION_THRESHOLD)
     queued = preferences.status(owner_id, vacancy_id)
-    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == 30
+    assert queued["job_state"] == "queued" and queued["eligible_reactions"] == INITIAL_ACTION_THRESHOLD
     with connect(store.database_url) as connection:
         delivered = {
             row["exposure_id"]: row["position"]
@@ -113,10 +119,10 @@ def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
     with connect(store.database_url) as connection:
         model = connection.execute("SELECT * FROM preference_pipeline.models WHERE model_hash=%s", (active["active_model_hash"],)).fetchone()
         report = connection.execute("SELECT plan,report FROM preference_pipeline.jobs WHERE job_id=%s", (model["job_id"],)).fetchone()
-        assert len(report["plan"]["splits"]["train"]) == 14
-        assert len(report["plan"]["splits"]["golden"]) == 8
+        assert len(report["plan"]["splits"]["train"]) == MIN_TRAIN_ROWS
+        assert len(report["plan"]["splits"]["golden"]) == MIN_HOLDOUT_ROWS
         assert report["report"]["fit_performed"] and "model_full_json" not in report["report"]
-    page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(40), 1)
+    page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(INITIAL_ACTION_THRESHOLD), 1)
     assert page.items[0].preference_state == "personalized"
     assert page.items[0].preference_model_hash == active["active_model_hash"]
     assert page.items[0].preference_adjustment == pytest.approx(sum(page.items[0].preference_contributions.values()))
@@ -131,7 +137,7 @@ def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
         }
         assert all(current.get(exposure_id) == position
                    for exposure_id, position in delivered.items())
-        remaining = connection.execute("SELECT e.*,s.features FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions f USING(session_id) JOIN learning_pipeline.samples s ON s.main_run_id=f.main_run_id AND s.candidate_id=e.candidate_id WHERE e.position>40 ORDER BY position").fetchall()
+        remaining = connection.execute("SELECT e.*,s.features FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions f USING(session_id) JOIN learning_pipeline.samples s ON s.main_run_id=f.main_run_id AND s.candidate_id=e.candidate_id WHERE e.position>%s ORDER BY position", (INITIAL_ACTION_THRESHOLD,)).fetchall()
         expected = sorted(remaining, key=lambda row: (-apply(row["features"], row["card"]["rerank_score"], model["model"], artifact)["score"], -row["card"]["explanation"]["score"], str(row["candidate_id"])))
         assert [row["candidate_id"] for row in remaining] == [row["candidate_id"] for row in expected]
     key = uuid4()
@@ -148,7 +154,7 @@ def test_real_fit_activation_suffix_and_rollback_preserve_receipts(store):
 def test_queue_idempotency_crash_reclaim_and_stale_worker(store):
     """Only one lease survives restart and duplicate reaction cannot create another job."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 42)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     preferences = PreferenceStore(store.database_url)
     with ThreadPoolExecutor(max_workers=2) as executor:
         claims = list(executor.map(lambda _: preferences.claim(30, 5), range(2)))
@@ -168,7 +174,7 @@ def test_queue_idempotency_crash_reclaim_and_stale_worker(store):
 def test_owner_auth_reset_and_incompatible_context(store):
     """HTTP controls enforce ownership, CAS and reset cutoff; context changes block old fitting."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 42)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     preferences = PreferenceStore(store.database_url)
     job = preferences.claim(30, 5)
     client = TestClient(create_app(store=store, internal_token="synthetic-test-token"))
@@ -186,7 +192,7 @@ def test_owner_auth_reset_and_incompatible_context(store):
 def test_corrupt_features_retry_is_sealed_and_bounded(store):
     """Snapshot corruption never activates; bounded failure stays observable and retryable."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 42)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     with connect(store.database_url) as connection:
         connection.execute("UPDATE learning_pipeline.samples SET feature_hash='corrupt' WHERE candidate_id=%s", (rows[0]["candidate_id"],))
     preferences = PreferenceStore(store.database_url)
@@ -202,7 +208,7 @@ def test_corrupt_features_retry_is_sealed_and_bounded(store):
 def test_withdrawal_erases_model_and_source_only_revocation_blocks_runtime(store):
     """Fitted participant withdrawal removes coefficients/seals and falls back on undelivered cards."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 42)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     preferences = PreferenceStore(store.database_url)
     assert PreferenceWorker(preferences).process_once()
     assert preferences.status(owner_id, vacancy_id)["state"] == "active"
@@ -221,13 +227,13 @@ def test_withdrawal_erases_model_and_source_only_revocation_blocks_runtime(store
 def test_followup_fit_requires_sixteen_new_unique_candidates(store):
     """Continuous learning consumes fresh audit candidates rather than replaying its prior holdout."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 60)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 30)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     preferences = PreferenceStore(store.database_url)
     assert PreferenceWorker(preferences).process_once()
     initial = preferences.status(owner_id, vacancy_id)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 30, 45)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, INITIAL_ACTION_THRESHOLD, INITIAL_ACTION_THRESHOLD + FOLLOWUP_ACTION_THRESHOLD - 1)
     assert preferences.status(owner_id, vacancy_id)["job_id"] == initial["job_id"]
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 45, 46)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, INITIAL_ACTION_THRESHOLD + FOLLOWUP_ACTION_THRESHOLD - 1, INITIAL_ACTION_THRESHOLD + FOLLOWUP_ACTION_THRESHOLD)
     assert preferences.status(owner_id, vacancy_id)["job_id"] != initial["job_id"]
     assert PreferenceWorker(preferences).process_once()
     with connect(store.database_url) as connection:
@@ -235,14 +241,14 @@ def test_followup_fit_requires_sixteen_new_unique_candidates(store):
         assert len(jobs) == 2 and all(job["state"] in ("ready", "rejected") for job in jobs)
         original = {row["candidate_key"] for split in ("train", "validation", "golden") for row in jobs[0]["plan"]["splits"][split]}
         fresh = {row["candidate_key"] for split in ("validation", "golden") for row in jobs[1]["plan"]["splits"][split]}
-        assert len(fresh) == 16 and not original.intersection(fresh)
+        assert len(fresh) == FOLLOWUP_ACTION_THRESHOLD and not original.intersection(fresh)
 
 
 @pytest.mark.parametrize("purpose", ["pool_consent", "training_consent"])
 def test_source_only_revocation_and_fit_lock(store, monkeypatch, purpose):
     """Source updates cannot race fit/publication; later source-only revocation suppresses immediately."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 44)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     candidate_id = rows[0]["candidate_id"]
     with connect(store.database_url) as connection:
         assert connection.execute("SELECT to_regclass('public.candidate_profiles') AS name").fetchone()["name"] is None
@@ -265,7 +271,7 @@ def test_source_only_revocation_and_fit_lock(store, monkeypatch, purpose):
         preferences = PreferenceStore(store.database_url)
         assert PreferenceWorker(preferences).process_once()
         assert preferences.status(owner_id, vacancy_id)["state"] == "active"
-        page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(40), 1)
+        page = feed.page(owner_id, vacancy_id, session_id, _encode_cursor(INITIAL_ACTION_THRESHOLD), 1)
         assert page.items[0].preference_state == "personalized"
         with connect(store.database_url) as connection:
             connection.execute(f"UPDATE public.candidate_profiles SET {purpose}=false WHERE candidate_id=%s", (candidate_id,))
@@ -283,7 +289,7 @@ def test_source_only_revocation_and_fit_lock(store, monkeypatch, purpose):
 def test_lease_expiry_during_fit_rejects_publication(store, monkeypatch):
     """Publication checks wall time after fitting, rather than the fit transaction's start time."""
     feed, vacancy_id, owner_id, session_id, rows, _artifact = numeric_feed(store, 42)
-    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, 40)
+    react(store, feed, vacancy_id, owner_id, session_id, rows, 0, INITIAL_ACTION_THRESHOLD)
     preferences = PreferenceStore(store.database_url)
     job = preferences.claim(300, 5)
     import matching_engine.preference_store as module

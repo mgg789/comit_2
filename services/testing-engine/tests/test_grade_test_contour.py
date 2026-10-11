@@ -3,14 +3,13 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from testing_engine import adaptive
 from testing_engine.main import create_testing_app
 from testing_engine.store import TestingStore
 
 
 def _client(tmp_path: Path) -> TestClient:
-    return TestClient(create_testing_app(data_dir=tmp_path / "testing-data"))
+    return TestClient(create_testing_app(data_dir=tmp_path / "testing-data", allow_unauthenticated=True))
 
 
 def test_seed_bank_covers_all_families_and_levels(tmp_path: Path) -> None:
@@ -19,7 +18,7 @@ def test_seed_bank_covers_all_families_and_levels(tmp_path: Path) -> None:
     from testing_engine.bank_seed import FAMILIES, initial_items
 
     inserted = store.seed_items(initial_items())
-    assert inserted == 37
+    assert inserted == 44
     for family in FAMILIES:
         for level in (1, 2, 3, 4):
             assert store.list_items(family["family"], level), (family, level)
@@ -62,7 +61,7 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path, monkeypatch) -
             **({"code": f"def {function_name}(*args):\n    return None"}
                if task_payload["type"] == "code"
                else {"answer": _correct_index(task_payload["prompt"])
-                     if task_payload["type"] == "mcq" else "развернутый ответ"})})
+                     if task_payload["type"] in ("mcq", "short_answer") else "развернутый ответ"})})
         body = answer.json()
         if task_payload["type"] == "code":
             # Secure default (issue #18): without a configured judge service,
@@ -71,7 +70,7 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path, monkeypatch) -
             assert body["correct"] is None
             continue
         assert body["judge_status"] == "auto", body
-        assert body["correct"] is True, (task_payload["prompt"], task_payload["options"])
+        assert body["correct"] is True, (task_payload["prompt"], task_payload.get("options"))
         if body["status"] == "finished":
             break
 
@@ -81,13 +80,16 @@ def test_session_lifecycle_mcq_scoring_and_finish(tmp_path: Path, monkeypatch) -
     assert result["answered"] >= 2
 
 
-def _correct_index(prompt: str) -> int:
+def _correct_index(prompt: str) -> int | str:
     """Look up the stored answer for a prompt via the bank (test-only helper)."""
     from testing_engine.bank_seed import initial_items
 
     for item in initial_items():
-        if item["type"] == "mcq" and item["prompt"] == prompt:
-            return item["answer_index"]
+        if item["prompt"] == prompt:
+            if item["type"] == "mcq":
+                return item["answer_index"]
+            if item["type"] == "short_answer":
+                return item["expected_answers"][0]
     raise AssertionError("prompt not in bank: " + prompt)
 
 

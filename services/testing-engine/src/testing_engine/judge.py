@@ -1,162 +1,89 @@
-"""Answer checking: MCQ inline, code via the code-judge service.
+"""Answer checks; candidate code only runs through the isolated broker."""
 
-- check_mcq: exact server-side comparison (the stored answer never leaves).
-- CodeJudgeClient: HTTP client for the code-judge microservice (env
-  CODE_JUDGE_URL, operator-configured). There is deliberately NO local
-  fallback: untrusted candidate code never executes inside testing-engine
-  (issue #18: the former local sandbox was an RCE path). Without a configured
-  service, code answers are recorded as unscored ("code_judge_unavailable")
-  and do not affect the grade.
-- LocalPythonJudge remains available ONLY for offline test fixtures behind
-  the explicit TESTING_LOCAL_JUDGE=1 flag; it uses an import allowlist and
-  JSON-based result comparison performed in the parent process, so candidate
-  __eq__/dunder tricks cannot forge a verdict.
-- Extended answers are NOT auto-judged in this pass: recorded as "manual"
-  and excluded from scoring (rubric judging lands in a later pass).
-"""
-
-from __future__ import annotations
-
-import ast
+import hashlib
 import json
 import os
-import subprocess
-import sys
-import tempfile
+import ssl
+import urllib.request
 from pathlib import Path
 
-LOCAL_TIMEOUT_SECONDS = 10
-# Allowlist, not denylist (issue #18): anything not listed is rejected, so new
-# escape-hatch modules cannot appear without a code change.
-ALLOWED_MODULES = frozenset((
-    "math", "json", "re", "itertools", "collections", "functools", "string",
-    "statistics", "heapq", "enum", "dataclasses", "copy", "random", "decimal",
-    "fractions", "typing",
-))
+from testing_engine.rubric import RubricJudge
 
 
 def check_mcq(payload: dict, answer: int | str) -> bool | None:
-    """Exact comparison against the stored answer index; None on malformed input."""
-    expected = payload.get("answer_index")
+    """Compare a validated option index to the private bank answer."""
     try:
-        given = int(answer)
-    except (TypeError, ValueError):
+        return int(answer) == payload["answer_index"]
+    except (TypeError, ValueError, KeyError):
         return None
-    return given == expected if isinstance(expected, int) else None
-
-
-def code_is_safe(code: str) -> bool:
-    """Allowlist imports, reject dunder access and star-imports entirely."""
-    try:
-        tree = ast.parse(code)
-    except (SyntaxError, ValueError):
-        return False
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            if any(alias.name.split(".")[0] not in ALLOWED_MODULES for alias in node.names):
-                return False
-        elif isinstance(node, ast.ImportFrom):
-            if (node.module or "").split(".")[0] not in ALLOWED_MODULES:
-                return False
-        elif isinstance(node, ast.Attribute) and node.attr.startswith("__") or isinstance(node, ast.Name) and node.id.startswith("__"):
-            return False
-    return True
 
 
 class LocalPythonJudge:
-    """Offline fixture judge: TEST-only, requires TESTING_LOCAL_JUDGE=1."""
+    """Removed unsafe legacy executor: even fixture flags cannot enable it."""
 
-    def judge(self, payload: dict, code: str) -> tuple[bool | None, str]:
-        if os.environ.get("TESTING_LOCAL_JUDGE") != "1":
-            return None, "local_judge_disabled"
-        function_name = str(payload.get("function_name", ""))
-        tests = payload.get("tests", [])
-        if not function_name or not isinstance(tests, list) or not tests:
-            return None, "item_has_no_tests"
-        if not code_is_safe(code):
-            return False, "unsafe_code_rejected"
-        cases = json.dumps([
-            {"args": test.get("args", []), "expected": test.get("expected")}
-            for test in tests], ensure_ascii=False)
-        # The child only prints JSON-serialised values; verdict comparison
-        # happens in THIS process against our own data, so candidate-defined
-        # __eq__ can never influence the outcome (issue #18, PoC 2).
-        harness = (
-            "import json as _json, sys as _sys\n"
-            "namespace = {}\n"
-            "exec(compile(_sys.stdin.read(), 'solution', 'exec'), namespace)\n"
-            "cases = _json.loads(_sys.argv[1])\n"
-            "values = [namespace[" + repr(function_name) + "](*case['args']) for case in cases]\n"
-            "print(_json.dumps({'values': values}))\n"
-        )
-        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as handle:
-            handle.write(code)
-            solution_path = Path(handle.name)
-        try:
-            completed = subprocess.run(
-                [sys.executable, "-I", "-c", harness, cases],
-                input=code, capture_output=True, text=True,
-                timeout=LOCAL_TIMEOUT_SECONDS, check=False,
-                env={"PATH": "/usr/bin:/bin", "PYTHONDONTWRITEBYTECODE": "1"},
-                cwd=solution_path.parent,
-            )
-        except subprocess.TimeoutExpired:
-            return False, "timeout"
-        finally:
-            solution_path.unlink(missing_ok=True)
-        if completed.returncode != 0:
-            return False, "runtime_error"
-        try:
-            values = json.loads(completed.stdout.strip().splitlines()[-1])["values"]
-        except (ValueError, IndexError, KeyError):
-            return False, "judge_output_invalid"
-        correct = all(value == case["expected"]
-                      for value, case in zip(values, tests))
-        return correct, "auto"
+    def judge(self, payload: dict, code: str) -> tuple[None, str]:
+        """Never execute untrusted Python in testing-engine or its host."""
+        return None, "local_judge_disabled"
 
 
 class CodeJudgeClient:
-    """HTTP client for the code-judge microservice; no local fallback (issue #18)."""
+    """Authenticated client of the isolated broker, with no local fallback."""
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = (base_url or os.environ.get("CODE_JUDGE_URL", "")).rstrip("/")
+        self.base_url = (base_url or os.getenv("CODE_JUDGE_URL", "")).rstrip("/")
+        self.token = os.getenv("CODE_JUDGE_TOKEN", "")
 
     def configured(self) -> bool:
-        return self.base_url.startswith(("http://", "https://"))
+        """Require both internal endpoint and explicit service credential."""
+        return self.base_url.startswith(("http://", "https://")) and bool(self.token)
 
-    def judge(self, payload: dict, code: str) -> tuple[bool | None, str]:
-        """Submit code and wait for the verdict; never execute code locally."""
-        import urllib.request
+    def _request(self, route: str, body: dict | None = None) -> dict:
+        request = urllib.request.Request(self.base_url + route,
+            data=json.dumps(body).encode() if body is not None else None,
+            headers={"content-type": "application/json", "x-internal-token": self.token})
+        context = ssl.create_default_context()
+        private_ca = os.getenv("CODE_JUDGE_CA_PEM", "").replace("\\n", "\n")
+        if private_ca:
+            context.load_verify_locations(cadata=private_ca)
+        with urllib.request.urlopen(request, timeout=55 if body else 12, context=context) as response:
+            record = json.loads(response.read(65537))
+        if not isinstance(record, dict):
+            raise TypeError("invalid_judge_response")
+        return record
 
+    def ready(self) -> bool:
+        """Probe the broker's actual sandbox, not merely the HTTP liveness."""
+        try:
+            return self.configured() and self._request("/ready").get("runner") == "docker-isolated"
+        except (OSError, ValueError, TypeError):
+            return False
+
+    def judge(self, payload: dict, code: str, *, owner: str = "offline", key: str = "") -> tuple[bool | None, str]:
+        """Submit server-owned tests and accept only a terminal typed verdict."""
         if not self.configured():
             return None, "code_judge_unavailable"
         try:
-            request = urllib.request.Request(
-                self.base_url + "/submissions",
-                data=json.dumps({"item_id": str(payload.get("item_id", "")),
-                                 "language": "python", "code": code}).encode("utf-8"),
-                headers={"content-type": "application/json"}, method="POST")
-            with urllib.request.urlopen(request, timeout=30) as response:
-                created = json.loads(response.read().decode("utf-8"))
-            submission_id = str(created.get("submission_id", ""))
-            if not submission_id.replace("-", "").isalnum() or len(submission_id) > 64:
+            record = self._request("/submissions", {"item_id": payload.get("item_id", "reference"),
+                "owner_id": owner, "idempotency_key": key or hashlib.sha256(code.encode()).hexdigest(),
+                "code": code, "problem": {"function_name": payload["function_name"], "tests": payload["tests"]}})
+            if record.get("status") != "judged" or type(record.get("correct")) is not bool:
                 return None, "code_judge_unavailable"
-            detail_url = self.base_url + "/submissions/" + submission_id
-            for _ in range(30):
-                with urllib.request.urlopen(detail_url, timeout=10) as response:
-                    record = json.loads(response.read().decode("utf-8"))
-                if record.get("status") == "judged":
-                    return record.get("correct"), "code_judge:" + str(record.get("verdict_kind", ""))
-            return None, "code_judge_timeout"
-        except (OSError, ValueError, KeyError):
+            return record["correct"], "code_judge:" + str(record.get("verdict_kind", "unknown"))
+        except (OSError, ValueError, KeyError, TypeError):
             return None, "code_judge_unavailable"
 
 
-def judge_answer(payload: dict, answer: str) -> tuple[bool | None, str]:
-    """Dispatch by task type; extended answers are recorded as manual (no auto-scoring)."""
+def judge_answer(payload: dict, answer: str, *, owner: str = "offline", key: str = "",
+                 cache_dir: Path | None = None) -> tuple[bool | None, str]:
+    """Dispatch question checks; None means retryable infrastructure failure."""
     task_type = payload.get("type")
     if task_type == "mcq":
         return check_mcq(payload, answer), "auto"
+    if task_type == "short_answer":
+        normalized = " ".join(answer.strip().casefold().split())
+        return normalized in payload.get("expected_answers", []), "auto"
     if task_type == "code":
-        return CodeJudgeClient().judge(payload, answer)
-    return None, "manual"
+        return CodeJudgeClient().judge(payload, answer, owner=owner, key=key)
+    if task_type == "extended":
+        return RubricJudge(cache_dir).judge(payload, answer, owner=owner)
+    return None, "unsupported_question_type"

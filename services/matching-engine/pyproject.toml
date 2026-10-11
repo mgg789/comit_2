@@ -1,4 +1,5 @@
 [project]
+license = { text = "Apache-2.0" }
 name = "matching-engine"
 version = "0.1.0"
 description = "Comit matching engine: strict pre-filter, hybrid scoring, top-k, reranker, tinder feedback (context/50)"

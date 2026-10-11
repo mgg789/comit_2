@@ -67,7 +67,8 @@ def verify_pipeline(client: httpx.Client, database_url: str, values: list[dict])
     combine_worker = CombineWorker(CombineStore(database_url))
     for _ in range(20):
         combine_worker.process_once()
-    matching_headers = {"X-Internal-Token": os.environ["CANDIDATE_PIPELINE_TOKEN"]}
+    matching_headers = {"X-Internal-Token": os.environ["CANDIDATE_PIPELINE_TOKEN"],
+                        "X-Owner-ID": str(client.headers["X-Owner-ID"])}
     for value in values:
         ready = client.get("/internal/vacancies/" + value["vacancy_id"] + "/ready", headers=matching_headers)
         ready.raise_for_status()

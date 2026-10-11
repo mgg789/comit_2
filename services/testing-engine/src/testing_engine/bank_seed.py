@@ -110,7 +110,7 @@ def initial_items() -> list[dict]:
              ["4", "1", "0", "Ошибку"], 0),
         _code(p, 2, "Реализуйте flatten(nested): плоский список из списка списков.",
               "flatten",
-              [{"args": [[1, 2], [3]], "expected": [1, 2, 3]},
+              [{"args": [[[1, 2], [3]]], "expected": [1, 2, 3]},
                {"args": [[]], "expected": []}]),
         _code(p, 3, "Реализуйте word_counts(text): словарь частот слов в нижнем регистре.",
               "word_counts",
@@ -164,6 +164,17 @@ def initial_items() -> list[dict]:
         _ext(t, 2, "Опишите, как вы организуете передачу задачи между разработчиками.",
              ["письменный контекст", "критерии приёмки", "демо/передача знаний", "ответственный на вопрос"]),
     ]
+    # Exact short answers complement choice questions without executing user code.
+    for family, prompt, expected in (
+        ("algorithms", "Сколько сравнений в худшем случае нужно линейному поиску в массиве из 8 элементов? Введите число.", ["8"]),
+        ("sql", "Введите SQL-команду, которая выбирает строки из таблицы (одно слово).", ["select"]),
+        ("rest_api", "Какой HTTP-код означает, что ресурс не найден? Введите число.", ["404"]),
+        ("python", "Чему равно len([1, 2, 3]) в Python? Введите число.", ["3"]),
+        ("react", "Введите имя хука React для локального состояния компонента.", ["usestate"]),
+        ("docker", "Введите инструкцию Dockerfile, задающую базовый образ (одно слово).", ["from"]),
+        ("teamwork", "Как называется регулярная встреча Scrum для обсуждения того, что улучшить в процессе команды?", ["ретроспектива", "retrospective"]),
+    ):
+        items.append({"family": family, "level": 2, "type": "short_answer", "prompt": prompt, "expected_answers": expected})
     return items
 
 

@@ -55,6 +55,7 @@ services:
       VERIFICATION_ENGINE_TOKEN: "${VERIFICATION_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       VERIFICATION_DOCUMENT_KEY: "${VERIFICATION_DOCUMENT_KEY:-Y29taXQtZGV2LW9ubHktbm90LWEtc2VjcmV0LTEyMzQ=}"
       FSP_DEMO_ENABLED: 'true'
+      TESTING_ENGINE_URL: http://testing-engine:8102
       SUPPORT_EMAIL: "${SUPPORT_EMAIL:-}"
       SUPPORT_ACCESS_KEY: "${SUPPORT_ACCESS_KEY:-}"
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
@@ -101,6 +102,9 @@ services:
       context: ".."
       dockerfile: infra/matching-engine.Dockerfile
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       PORT: 8101
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
@@ -138,6 +142,16 @@ services:
       TESTING_API_URL: http://api:8080
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:-comit-dev-only-nonsecret-configuration-123456}"
       TESTING_DATA_DIR: /data/testing
+      TESTING_RECORDING_MODE: "${TESTING_RECORDING_MODE:-off}"
+      CODE_JUDGE_URL: "${CODE_JUDGE_URL:?Set URL of the isolated code judge}"
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set the isolated judge token}"
+      CODE_JUDGE_CA_PEM: "${CODE_JUDGE_CA_PEM:-}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
     ports:
     - 127.0.0.1:${TESTING_PORT:-8102}:8102
     volumes:
@@ -204,6 +218,9 @@ services:
     - matching_engine
     - migrate
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
     depends_on:
       postgres:
@@ -220,6 +237,9 @@ services:
     - matching_engine
     - worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       HF_HOME: "/models"
       PIPELINE_MAX_ATTEMPTS: 5
@@ -242,6 +262,9 @@ services:
     - matching_engine
     - vacancy-worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       HF_HOME: "/models"
       PIPELINE_MAX_ATTEMPTS: 5
@@ -264,6 +287,9 @@ services:
     - matching_engine
     - combine-worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -283,6 +309,9 @@ services:
     - matching_engine
     - rerank-worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -302,6 +331,9 @@ services:
     - matching_engine
     - feed-refill-worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -321,6 +353,9 @@ services:
     - matching_engine
     - preference-worker
     environment:
+      APP_ENV: development
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-active}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-true}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:-comit-dev}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300

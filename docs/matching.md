@@ -60,8 +60,10 @@ Trigger (vacancy.ready | candidate.ready/withdrawn | ручной вызов)
 Состояние на 09.10.2026: сходимость тиндер-лупа измерена на синтетических
 работодателях ([preference-convergence](preference-convergence.md)), слой гипотез —
 [hypothesis-validation](hypothesis-validation.md), R₀ — [сложный бенчмарк](rerank-hard-benchmark.md).
-Precision@5/10, MRR и ablation по эталонной разметке пока не опубликованы;
-ФСП-буст не подключён, поэтому ablation «без ФСП-буста» сейчас не имеет смысла.
+Дополнение 11.10.2026: Precision/MRR/Recall/MAP/NDCG рассчитаны отдельным
+воспроизводимым отчётом ниже. Это синтетические оценки teacher-модели, а не
+разметка реальных работодателей. FSP/недельный бонус подключён отдельным
+ограниченным слоем после R₀, с режимами off/shadow/active.
 
 ## Регрессия скоринга (golden)
 
@@ -159,11 +161,12 @@ Main-v2 — ручная стартовая политика, не обучен�
 коэффициентом 0.6 к rating contribution при `grade_status=self_reported`). Рейтинг — percentile
 существующего порядка grade/confirmed_strength внутри всего класса до фильтрации;
 одинаковые grade/strength получают одинаковый score. Это не ratingPoints.
-Freshness и ФСП в скоре сейчас не участвуют. FSP-данные приходят как внешнее
+Freshness и ФСП не изменяют базовый main score. FSP-данные приходят как внешнее
 evidence (демо-реестр, статус привязки `partial`) и показываются в карточке и
 PDF, но combine-скоринг их не читает; домены по ФСП автоматически не
-подтверждаются. Скоринговый буст `fsp-boost-draft-v1` (`fsp_boost.py`)
-реализован и покрыт тестами, но осознанно не подключён — [детали](integration.md).
+подтверждаются. Отдельный `near-equivalent-promotion-v1` (`fsp_boost.py`) переставляет только
+почти равноценные строки после R₀; см. точные ограничения ниже. Старый
+неподключённый draft заменён, основной scoring-policy и R₀ artifact неизменны.
 Сохраняются базовые веса 0.45 для рейтинга и 0.35 для strict, нормированные по
 доступным каналам вакансии. При class-only без навыков остаётся рейтинг.
 
@@ -239,7 +242,7 @@ selections endpoints возвращали 409. Финал: 199 кандидат�
 `tests/artifacts/combine/`; скрипт воспроизводит весь проход.
 
 Это проверка контрактов на синтетике, не Precision/MRR качества найма.
-Веса main-v1 не обучены; FSP-буст и freshness как отдельный сигнал скоринга не подключены. Vacancy-local preference learning и feed-refill реализованы отдельно ([preference-learning.md](preference-learning.md), [feed-refill.md](feed-refill.md)).
+Веса main-v1 не обучены; исторический прогон выше не включал FSP/freshness. Текущий FSP overlay описан ниже. Vacancy-local preference learning и feed-refill реализованы отдельно ([preference-learning.md](preference-learning.md), [feed-refill.md](feed-refill.md)).
 Структурированного расписания кандидата ещё нет: vacancy daily сохраняется,
 но автоматическое сравнение графиков не выполняется. JWT/ownership работодателя
 нужны перед подключением internal методов к браузерному интерфейсу.
@@ -624,3 +627,95 @@ API повторно проверяет исходные согласия и edi
 20 решающих пар (p≥0.95 → 98.8 % supported; ложные вердикты ограничены
 пер-сторонним бюджетом Bonferroni). Слой гипотез — длинный горизонт; live-политика не менялась.
 Детали — [hypothesis-validation](hypothesis-validation.md).
+
+
+## Precision, MRR и дополнительные замеры (11.10.2026)
+
+`matching_engine.ranking_metrics` считает Precision@1/3/5/10, Recall, Hit Rate,
+MRR (средний reciprocal rank), MAP (средний AP), graded NDCG и покрытие разметки.
+Положительная релевантность — независимая оценка ≥2 по шкале 0–3. Precision
+делится на k даже при коротком списке; неизвестные метки не становятся отрицательными.
+Если семейство имеет неизвестную метку, его метрика неопределена, а coverage виден.
+Recall/AP без положительных меток и NDCG без положительного gain также неопределены.
+
+Отчёт: `services/matching-engine/tests/fixtures/ranking-metrics-report.json`.
+Проверяются hash dataset/manifest/family/artifact и evaluation-only статус.
+Старые запечатанные файлы не перезаписываются, обучение и активация не выполняются.
+Исходный v7 содержит **12 семейств, но 4 quarantined** после swap-audit; общий
+quality gate не пройден. В основных таблицах только 8 оставшихся семейств.
+Это ограниченный диагностический результат; нельзя заявлять качество найма или
+готовность rollout на основании этих цифр.
+
+| Метрика | Main-v2 | R₀ |
+|---|---:|---:|
+| Precision@5 | 0.95000 | 0.95000 |
+| Precision@10 | 0.67500 | 0.67500 |
+| Recall@5 | 0.70000 | 0.70000 |
+| Recall@10 | 1.00000 | 1.00000 |
+| MRR@10 | 0.93750 | 1.00000 |
+| MAP@10 | 0.95369 | 0.98452 |
+| NDCG@10 | 0.98057 | 0.99664 |
+
+В JSON также полные per-family значения, срезы направления/ветки и 95% интервалы
+по 2000 paired family bootstrap выборкам (seed=42). Срезы <3 семейств помечены
+unsupported; интервалы описательные, без заявления о множественной значимости.
+
+```bash
+PYTHONPATH=services/matching-engine/src python -m matching_engine.ranking_metrics \
+  --dataset tests/artifacts/reranker/rerank-hard-benchmark-v7/dataset.json \
+  --artifact services/matching-engine/src/matching_engine/artifacts/r0-c18f4bc1.json \
+  --output /tmp/comit-ranking-metrics.json
+```
+
+Исходные teacher-артефакты git-ignored и нужны для полного повторения; опубликованный
+отчёт включает их hashes. Unit-тесты с ручным расчётом исполняются без этих файлов.
+FSP/weekly labels отсутствуют в этом cohort: измерить их реальную пользу здесь
+нельзя. Для этих сигналов проверяются инварианты, а не выдуманная прибавка NDCG.
+
+## Ограниченное продвижение FSP и еженедельной активности
+
+`MATCHING_PROMOTION_MODE=shadow` по умолчанию только измеряет возможные перестановки
+в служебном счётчике без персональных данных. `off` выключает слой; `active` применяет
+его к окончательному R₀-порядку (и безопасному main fallback). Состав main top-k,
+strict-фильтры, base score, веса, модель и recommended/reserve принадлежность
+сохраняются. Уже существующий employer preference слой остаётся самостоятельным.
+
+Формула FSP: `0.02 × (0.5 × min(rating/2000,1) + 0.5 × rank_weight)`;
+веса разряда MS=.12, КМС=.09, I=.06, II=.04, III=.03. Несколько фактов не
+складываются. Отсутствующие, неподтверждённые и нечисловые данные дают ноль.
+Демо-факты допускаются только при `APP_ENV=development` и
+`MATCHING_PROMOTION_ALLOW_DEMO=true`; для них допускается partial статус
+демо-привязки, который не превращается в реальное подтверждение ФСП.
+
+Недельная награда: доверенный `external_evidence.kind=weekly_challenge`,
+`status=confirmed`, `verified_value.provider=comit_weekly_challenge:v1`, UTC
+`completed_at` и `expires_at` следующего понедельника 00:00. Она даёт 0.005,
+не складывается с повторами и не раскрывается как публичное достижение.
+API формирует её из своей таблицы, не из редактируемого профиля. Итог FSP+weekly
+ограничен 0.02. Просроченные/будущие/неправильно датированные награды дают ноль.
+
+Точная гарантия: перестановка только соседей одинакового вида, если абсолютная
+разница **нормализованных main scores ≤0.02**, бонус правого больше, а
+`base_right + bonus_right > base_left + bonus_left`. Любая новая инверсия должна
+пройти через такой обмен: никакая цепочка не может протащить пару через больший
+разрыв. Равные бонусы и нулевые бонусы сохраняют исходный порядок полностью.
+Это консервативная доставка почти равноценных результатов, а не изменение модели.
+
+Снимок promotion policy и UTC-неделя включены в отдельный `tail_policy_hash`:
+смена режима/недели делает старые rerank/feed generations obsolete. Перед публикацией
+повторно проверяется текущая identity, поэтому старый worker не публикует просроченную
+награду. Main-v2 hash и запечатанный R₀ остаются прежними. `RerankCard.promotion`
+содержит policy_version/mode/fsp_bonus/weekly_bonus/combined_bonus/max_base_gap/
+demo_registry отдельно от коэффициентов модели, без идентификаторов провайдера. Randomized pair tests,
+no-FSP no-op, строгие исключения и PostgreSQL freshness-regression проверяют границы.
+
+Анонимный поиск витрины теперь индексирует только видимые имя, город, специализацию,
+грейд и непомеченные rejected стеки; скрытые biography/projects/evidence больше не
+могут влиять на результат как поисковый oracle (GitHub issue #29).
+
+
+Регрессия preference (issue #19): реальные DB-сценарии берут пороги, позиции
+курсоров и размеры audit-split из `preference_live_policy`; отдельный assert
+фиксирует первую активацию ровно после 30 действий. Проверены границы 29→30,
+затем 15→16 новых уникальных кандидатов, сохранение уже показанных карточек,
+rollback и отзыв согласия. Golden-математика проходит без обновления snapshot.

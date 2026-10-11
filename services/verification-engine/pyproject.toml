@@ -1,4 +1,5 @@
 [project]
+license = { text = "Apache-2.0" }
 name = "verification-engine"
 version = "0.1.0"
 description = "Comit external claim verification with explicit provenance and safe degradation"

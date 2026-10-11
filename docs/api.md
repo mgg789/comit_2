@@ -62,7 +62,7 @@ compose сервисы слушают 8080/8101/8102/8103/8104/8105. Полны�
 | Метод | Путь | Назначение |
 |---|---|---|
 | GET | `/healthz` | liveness: `{status, service, version}` |
-| GET | `/ready` | `{status:"ok", service, version}` только при валидной auth-конфигурации, доступной БД и применённой миграции `021_support_console.sql`; иначе 503 `{status:"unavailable"}` |
+| GET | `/ready` | `{status:"ok", service, version}` только при валидной auth-конфигурации, доступной БД и применённых миграциях `021_support_console.sql` и `021_weekly_challenges.sql`; иначе 503 `{status:"unavailable"}` |
 | GET | `/metrics` | Prometheus-метрики процесса ([api-operations.md](api-operations.md)) |
 
 Аутентификация уже подключена в `apps/api`: пароль не используется. Код на email
@@ -111,13 +111,24 @@ Editable narrative claims получают стабильный UUID на сер
 `GET /candidate/resume.pdf` используют account ID из сессии. `GET /candidate/taxonomy`
 отдаёт кандидату текущую strict-schema (`StrictSchema`) из matching-engine.
 
-Browser profile projection выдаёт `self_reported` без выдуманного UUID тестовой
-сессии. API-сторона trusted producer реализована: `POST /internal/testing/session-result`
-(см. [ниже](#история-подтверждённых-тестов-кандидата)) пишет evidence `grade:trusted`
-и `declared_grade`, после чего projection отдаёт `approved` с реальными
-`test_session_id` и `approved_at`, только если подтверждённый грейд совпадает с
-текущим `declared_grade`; иначе остаётся `self_reported`. Прямой approved intake
-в matching не заменяет source. Self reported
+`GET /candidate/skills/catalog` возвращает `{version, schema_hash, skills}`.
+Каждый элемент `skills`: `{group, key, label, test_subject, confirmed_level,
+next_attempt_at, upgrade_at}`; даты — UTC ISO8601 или null, группа — `domains`,
+`stacks`, `soft_skills`. Registry берётся из `/internal/strict-schema` с cache
+30 секунд, результаты и cooldown — только текущего аккаунта из accepted ledger;
+ответ `no-store`. `401` — нет кандидатской сессии, `503` — каталог недоступен.
+Нет отдельного запроса preflight для каждого навыка: он вызывается перед запуском
+выбранного теста. Новый unknown coordinate → `400 unknown_skill_coordinate`;
+старые неизменённые значения допускают сохранение остальных полей.
+Подробности уровней, восстановления evidence и точного соответствия предметов —
+[candidate-profile.md](candidate-profile.md).
+
+Общая категория `declared_grade` остаётся `self_reported`, пока отдельный trusted
+результат направления не подтвердит её; browser не передаёт UUID тестовой сессии.
+Внутренний `/internal/testing/session-result` обновляет evidence и exact outbox
+атомарно. Семь предметных тестов подтверждают только собственную skill-координату,
+не общую профессию; legacy trusted результаты направлений читаются совместимо.
+Прямой approved intake в matching не заменяет source. Self reported
 grade допускается в пул при выполнении остальных требований, получает badge в
 public PDF, а в policy `main-v2` confidence `0.6` уменьшает только его rating
 contribution. Pending/rejected grade остаются блокирующими.
@@ -132,9 +143,9 @@ contribution. Pending/rejected grade остаются блокирующими.
 | GET | `/blueprints` | список blueprint'ов (шаблонов заданий) |
 | GET | `/blueprints/{id}` | один blueprint; 404 если нет |
 
-Маршруты адаптивного контура `/testing/sessions/*` реализованы в
-`create_testing_app`, но развёрнутый entrypoint их не обслуживает; контракт —
-[testing-engine.md](testing-engine.md). Там же описан отдельный сервис code-judge.
+Entry point запускает `create_testing_app` с авторизацией внутренних маршрутов
+`/testing/sessions/*`; браузер работает через API proxy ниже. Контракт и граница
+изолированного judge — [testing-engine.md](testing-engine.md).
 
 ### integration-engine
 
@@ -658,6 +669,20 @@ read-only списки без сессии и без detail/PDF/contact-дост
 
 Доверенный producer `POST /internal/testing/session-result` принимает `X-Internal-Token`, сверяемый с `TESTING_ENGINE_TOKEN`, и поля `candidate_id`, `session_id`, `specialization`, `decided_grade`, `tasks_answered`, необязательный `supervision_badge`. Browser JWT не даёт права отправлять результаты. Запись результата, подтверждённое свидетельство `grade:trusted`, revision профиля и outbox проекции изменяются одной транзакцией. Повтор идентичного результата возвращает прежний результат без повторного начисления активности; повтор session_id с другим владельцем или содержимым — 409. Повторный тест разрешён через 7 дней, повышение оценки — через 30 дней.
 
-Ответ 200: `{recorded:true, grade, decided_at}`; без `TESTING_ENGINE_TOKEN` — 503 `testing_not_configured`, неверный токен — 401, cooldown — 409 `retake_cooldown`/`grade_upgrade_cooldown`. Publisher адаптивного контура (`services/testing-engine/src/testing_engine/publisher.py`) отправляет именно этот контракт и берёт `tasks_given` (число оценённых адаптивных ответов) для wire `tasks_answered`. Compose передаёт testing-engine `TESTING_API_URL` и токен, но развёрнутый entrypoint запускает только blueprint-реестр, поэтому автоматическая публикация из контейнера пока не происходит ([testing-engine.md](testing-engine.md)). Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
+Ответ 200: `{recorded:true, grade, decided_at}`; без `TESTING_ENGINE_TOKEN` — 503 `testing_not_configured`, неверный токен — 401, cooldown — 409 `retake_cooldown`/`grade_upgrade_cooldown`. Publisher адаптивного контура (`services/testing-engine/src/testing_engine/publisher.py`) отправляет именно этот контракт и берёт `tasks_given` (число оценённых адаптивных ответов) для wire `tasks_answered`. Compose передаёт testing-engine `TESTING_API_URL` и токен; entrypoint запускает адаптивный контур и trusted publisher ([testing-engine.md](testing-engine.md)). Незавершённые попытки и отсутствующая история не восстанавливаются искусственно.
 
-`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness.
+`/ready` возвращает 503 при отсутствующей auth-конфигурации, недоступной БД или неприменённой завершающей миграции 020; `/healthz` остаётся liveness. После объединения с dev trusted publisher берёт `tasks_given` (число подтверждённых адаптивных ответов) для wire `tasks_answered`; повтор результата идемпотентен.
+
+## Кандидатский тест: браузерный API
+
+Все маршруты `/candidate/testing` требуют действующую кандидатскую cookie/Bearer-сессию; мутации требуют разрешённый Origin. `GET /preflight?specialization=<family>&mode=retake|upgrade` возвращает eligible, next_attempt_at, upgrade_at, active_session_id, supported_specializations, recording_enabled, max_questions. `POST /sessions` принимает specialization, optional declared_grade/mode, consents {version: testing-media-v1, processing: true, screen_recording: boolean, video_analysis: boolean}. Попытка создаётся только этим запросом.
+
+`GET /sessions/:id/next` возвращает безопасное задание; `POST .../answer` — {item_id, answer: number|string}. `POST .../supervision` принимает ограниченные total_seconds/in_frame_seconds/focus_lost_seconds/multi_face_events/camera. `POST .../media` — {kind: screen|webcam, sequence, data_base64, mime_type?}; максимум base64 3 млн символов. `POST .../finish` вызывается после загрузки записи и supervision; `GET .../result` содержит grade_publication и next_attempt_at. `POST .../abandon` прерывает попытку без доверенного результата. ID кандидата никогда не принимается от браузера. Типы — `packages/shared/src/testing.ts`. Внутренний `POST /internal/testing/session-result` сохранён совместимым.
+
+В подтверждённом внутреннем результате optional `camera_status` передаётся как granted/denied/unavailable и сохраняется в grade-evidence. Старые результаты без явного выбора камеры получают unknown, а не «отказ». Защищённый detail работодателя `/employer/candidates/:id` добавляет только `testing_results` (subject, grade, supervision_badge, camera_status), после проверки актуальности публичной проекции; запись, внутренние идентификаторы и сырые счётчики не раскрываются. Preflight возобновления содержит active_session_consents, active_supervision, next_sequence и active_session_status. Накопительные supervision checkpoints не могут уменьшаться, а отказ камеры сохраняется при возобновлении. Capture_finalized делает повтор завершения после потерянного ответа безопасным.
+
+Согласие processing обязательно для новых попыток. screen_recording соответствует режиму на старте: true для full, false для off. Режим фиксируется в попытке; active_recording_enabled возвращает его при возобновлении, а recording_enabled — текущую настройку для новых попыток. Старые попытки без сохранённого режима не принимают запись; legacy processing в preflight может отсутствовать и не восстанавливается задним числом. Сервер ограничивает total_seconds фактическим временем с начала попытки + 5 секунд; без сохранённого video_analysis всегда принудительно camera=denied. Эти клиентские показатели не являются доказательством честности.
+
+## Дополнения: импорт, ФСП и практика
+
+Новые owner-scoped маршруты и DTO: [импорт PDF/фото](resume-import.md), [привязка демо-ФСП](fsp-link.md), [недельные задания](weekly-challenges.md). Jev использует существующий enrich/job контракт: [vacancy-suggestions.md](vacancy-suggestions.md).

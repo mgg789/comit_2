@@ -72,7 +72,7 @@ export interface CandidateIntake {
   metadata?: Record<string, JsonValue>;
   /** Provider facts are safe, structured evidence; private provenance stays in api-core. */
   external_evidence?: Array<{
-    kind: "fsp" | "repository" | "hh";
+    kind: "fsp" | "repository" | "hh" | "weekly_challenge";
     subject: string;
     status: ClaimStatus;
     verified_value: JsonValue | null;
@@ -118,7 +118,7 @@ export interface CandidatePoolEntry {
   resume_url: string;
   /** Allowlisted FSP/repository facts; provenance and account identity remain private. */
   external_evidence?: Array<{
-    kind: "fsp" | "repository" | "hh";
+    kind: "fsp" | "repository" | "hh" | "weekly_challenge";
     subject: string;
     status: ClaimStatus;
     verified_value: JsonValue | null;

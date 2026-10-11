@@ -4,7 +4,8 @@ import type { CandidateProfileMutation } from "@comit/shared";
 import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { ProfileStore } from "../profiles/store.js";
-import { candidateProfileMutationSchema, candidateProfileViewSchema } from "../profiles/schemas.js";
+import { candidateProfileMutationSchema, candidateProfileViewSchema, candidateSkillCatalogSchema } from "../profiles/schemas.js";
+import { candidateResumeImportRoutes } from "./candidate-resume-import.js";
 import { candidateVerificationRoutes } from "./candidate-verification.js";
 
 /** Shared auth and database boundaries are injected; the browser cannot choose a profile owner. */
@@ -37,6 +38,15 @@ export async function candidateProfileRoutes(app: FastifyInstance, options: Cand
     schema: { tags: ["candidate-profile"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
       response: { 200: candidateProfileViewSchema } }, onRequest: guard,
   }, read);
+  app.get<{ Reply: unknown }>("/candidate/skills/catalog", { onRequest: guard,
+    schema: { tags: ["candidate-profile"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
+      response: { 200: candidateSkillCatalogSchema } },
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
+    try { return reply.header("cache-control", "no-store").send(await options.profiles.skillCatalog(identity.accountId)); }
+    catch (error) { return failure(reply, error); }
+  });
   for (const method of ["PUT", "PATCH"] as const) {
     app.route<{ Body: CandidateProfileMutation; Reply: unknown }>({ method, url: "/candidate/profile",
       schema: { tags: ["candidate-profile"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
@@ -62,6 +72,7 @@ export async function candidateProfileRoutes(app: FastifyInstance, options: Cand
     catch (error) { return failure(reply, error); }
   });
   await candidateVerificationRoutes(app, options);
+  await candidateResumeImportRoutes(app, options);
 }
 
 function failure(reply: FastifyReply, error: unknown): FastifyReply {

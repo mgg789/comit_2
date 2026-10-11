@@ -1,4 +1,5 @@
 [project]
+license = { text = "Apache-2.0" }
 name = "code-judge"
 version = "0.1.0"
 description = "Comit code-judge bridge: submission storage, sandboxed execution, DMOJ judge-server packaging (docs/testing-design.md)"
@@ -11,6 +12,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "pytest-cov>=6,<8",
   "httpx>=0.27",
   "pytest>=8",
 ]

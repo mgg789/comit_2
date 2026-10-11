@@ -88,12 +88,26 @@ test("support console: constant-time login, per-conversation unread and replies 
     assert.equal((await app.inject({ method: "POST", url: `/support/conversations/${randomUUID()}/messages`, headers: { cookie: cookieHeader, ...origin },
       payload: { idempotency_key: randomUUID(), text: "Кому?" } })).statusCode, 404);
 
+    // Future cursors must not hide the next user message, and missing inboxes are 404.
+    const futureRead = await app.inject({ method: "POST", url: `/support/conversations/${employer}/read`,
+      headers: { cookie: cookieHeader, ...origin }, payload: { read_sequence: Number.MAX_SAFE_INTEGER } });
+    assert.equal(futureRead.statusCode, 409);
+    assert.equal(futureRead.json<{ detail: string }>().detail, "support_read_not_available");
+    assert.equal((await app.inject({ method: "POST", url: `/support/conversations/${randomUUID()}/read`,
+      headers: { cookie: cookieHeader, ...origin }, payload: { read_sequence: 0 } })).statusCode, 404);
+    const readRows = await pool.query("SELECT read_sequence FROM support_conversation_reads WHERE account_id=$1", [employer]);
+    assert.equal(readRows.rowCount, 0);
+
     // Read receipt is monotonic and counts only user messages.
     const read = await app.inject({ method: "POST", url: `/support/conversations/${employer}/read`, headers: { cookie: cookieHeader, ...origin },
       payload: { read_sequence: reply.json<SystemNotification>().sequence } });
     assert.equal(read.statusCode, 200); assert.equal(read.json<{ unread_count: number }>().unread_count, 0);
     assert.equal((await app.inject({ method: "POST", url: `/support/conversations/${employer}/read`, headers: { cookie: cookieHeader, ...origin },
       payload: { read_sequence: 1 } })).json<{ unread_count: number }>().unread_count, 0);
+
+    await notifications.sendMessage("employer", employer, `user:${randomUUID()}`, "Ещё один вопрос");
+    const afterRead = (await app.inject({ url: "/support/conversations", headers: { cookie: cookieHeader, ...origin } })).json<SupportConversationPage>();
+    assert.equal(afterRead.items.find(item => item.account_id === employer)?.unread_count, 1);
 
     // Logout revokes the session server-side; replaying the cookie fails closed.
     assert.equal((await app.inject({ method: "POST", url: "/support/logout", headers: { cookie: cookieHeader, ...origin } })).statusCode, 200);

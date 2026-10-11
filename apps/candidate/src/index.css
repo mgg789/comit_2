@@ -23,3 +23,8 @@
   .candidate-content { margin-bottom: calc(120rem + env(safe-area-inset-bottom)); }
   .candidate-app .nav { bottom: calc(18rem + env(safe-area-inset-bottom)); }
 }
+
+.candidate-grade-section header { display: flex; align-items: center; justify-content: space-between; gap: 20rem; flex-wrap: wrap; }
+.candidate-skill-assessment .candidate-skill-test { margin-left: auto; font-size: 18rem; min-height: 44rem; padding: 10rem 16rem; }
+
+.candidate-test-upgrade { display: flex; align-items: flex-start; gap: 14rem; }

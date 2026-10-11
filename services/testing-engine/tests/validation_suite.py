@@ -23,7 +23,6 @@ import tempfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from testing_engine.bank_seed import initial_items
 from testing_engine.main import create_testing_app
 from testing_engine.store import TestingStore
@@ -35,10 +34,10 @@ N_STRONG = 3
 EXPERT_ROUNDS = 4
 
 
-def _ground_truth(data_dir: Path) -> dict[str, int]:
+def _ground_truth(data_dir: Path) -> dict[str, int | str]:
     bank = json.loads((data_dir / "items.json").read_text(encoding="utf-8"))
-    return {row["item_id"]: row["payload"]["answer_index"]
-            for row in bank if row["type"] == "mcq" and row["family"] == FAMILY}
+    return {row["item_id"]: (row["payload"]["answer_index"] if row["type"] == "mcq" else row["payload"]["expected_answers"][0])
+            for row in bank if row["type"] in ("mcq", "short_answer") and row["family"] == FAMILY}
 
 
 def _docker_mcq_ids(data_dir: Path) -> list[str]:
@@ -48,7 +47,7 @@ def _docker_mcq_ids(data_dir: Path) -> list[str]:
 
 
 def _run_session(client: TestClient, candidate_key: str, *, quality: str,
-                 truth: dict[str, int]) -> dict:
+                 truth: dict[str, int | str]) -> dict:
     """One adaptive docker-family session; returns items, grade and answers.
 
     strong/retest-strong answer every MCQ correctly; weak answers wrongly;
@@ -68,7 +67,7 @@ def _run_session(client: TestClient, candidate_key: str, *, quality: str,
         if quality in ("strong", "retest-strong", "leak"):
             choice = truth_index
         else:
-            choice = (truth_index + 1) % len(task["options"])
+            choice = (truth_index + 1) % len(task["options"]) if isinstance(truth_index, int) else "incorrect"
         posted = client.post(f"/testing/sessions/{session_id}/answer", json={
             "item_id": task["item_id"], "answer": choice})
         presented.append({"item_id": task["item_id"], "choice": choice,
@@ -93,7 +92,7 @@ def _point_biserial(binary: list[int], values: list[float]) -> float:
 
 
 def _judge_item(client: TestClient, candidate_key: str, target_item_id: str,
-                truth: dict[str, int], choice: int) -> bool | None:
+                truth: dict[str, int | str], choice: int) -> bool | None:
     """Drive a fresh session until the target item appears, then judge it."""
     session = client.post("/testing/sessions", json={
         "candidate_key": candidate_key, "specialization": FAMILY,
@@ -116,7 +115,7 @@ def _judge_item(client: TestClient, candidate_key: str, target_item_id: str,
 
 def run(data_dir: Path) -> dict:
     """Execute all four checks and return the report dict."""
-    app = create_testing_app(data_dir=data_dir)
+    app = create_testing_app(data_dir=data_dir, allow_unauthenticated=True)
     client = TestClient(app)
     store = TestingStore(data_dir)
     store.seed_items(initial_items())
@@ -156,7 +155,7 @@ def run(data_dir: Path) -> dict:
     # not bleed in. Leaker burns the seed instances in the morning; the
     # generator (simulated by store.add_generated_item) refills the slots;
     # the follower must receive only untouched instances.
-    leak_app = create_testing_app(data_dir=data_dir / "leak-instance")
+    leak_app = create_testing_app(data_dir=data_dir / "leak-instance", allow_unauthenticated=True)
     leak_client = TestClient(leak_app)
     leak_truth = _ground_truth(data_dir / "leak-instance")
     leaker = _run_session(leak_client, "leaker", quality="strong", truth=leak_truth)
@@ -174,7 +173,7 @@ def run(data_dir: Path) -> dict:
     # The cheater applies the leaked sheet wherever a burned instance resurfaces.
     overlap = 0
     leaked_correct = 0
-    repeat_rejected = None
+    repeat_safe = None
     cheater = leak_client.post("/testing/sessions", json={
         "candidate_key": "cheater", "specialization": FAMILY,
         "declared_grade": "middle"}).json()["session_id"]
@@ -190,14 +189,20 @@ def run(data_dir: Path) -> dict:
                 "item_id": task["item_id"], "answer": leaked_choice})
             if posted.json().get("correct") is True:
                 leaked_correct += 1
-            if repeat_rejected is None:
+            if repeat_safe is None:
                 twice = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
                     "item_id": task["item_id"], "answer": leaked_choice})
-                repeat_rejected = twice.status_code == 404
+                repeat_safe = twice.status_code == 200 and twice.json().get("answered") == posted.json().get("answered")
             continue
-        leak_client.post(f"/testing/sessions/{cheater}/answer", json={
+        posted = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
             "item_id": task["item_id"], "answer": 0})
-    repeat_rejected = bool(repeat_rejected)
+        if repeat_safe is None:
+            twice = leak_client.post(f"/testing/sessions/{cheater}/answer", json={
+                "item_id": task["item_id"], "answer": 0})
+            before = posted.json().get("answered")
+            after = leak_client.get(f"/testing/sessions/{cheater}/result").json().get("answered")
+            repeat_safe = twice.status_code == 200 and twice.json().get("answered") == before == after
+    repeat_safe = bool(repeat_safe)
 
     expert_total = right_true + wrong_false
     report = {
@@ -214,7 +219,7 @@ def run(data_dir: Path) -> dict:
                             "rotated_in": rotated_in,
                             "overlap_with_follower": overlap,
                             "leaked_answer_advantage": leaked_correct,
-                            "repeat_submit_rejected": repeat_rejected},
+                            "repeat_submit_idempotent": repeat_safe},
     }
     report["passed"] = (
         stability == 1.0
@@ -222,7 +227,7 @@ def run(data_dir: Path) -> dict:
         and expert_total >= 30
         and report["expert_ground_truth"]["agreement"] == 1.0
         and overlap == 0
-        and repeat_rejected)
+        and repeat_safe)
     return report
 
 

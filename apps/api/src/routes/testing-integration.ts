@@ -5,7 +5,7 @@ import { ProfileError, type ProfileStore } from "../profiles/store.js";
 interface TrustedResult {
   candidate_id: string; session_id: string; specialization: string;
   decided_grade: "intern" | "junior" | "middle" | "senior";
-  supervision_badge?: string | null; tasks_answered: number;
+  camera_status?: "granted" | "denied" | "unavailable"; supervision_badge?: string | null; tasks_answered: number;
 }
 
 /** Browser sessions cannot publish grades; missing service configuration fails closed. */
@@ -19,6 +19,7 @@ export async function testingIntegrationRoutes(app: FastifyInstance,
           candidate_id: { type: "string", format: "uuid" }, session_id: { type: "string", minLength: 1, maxLength: 120 },
           specialization: { type: "string", minLength: 1, maxLength: 100 },
           decided_grade: { type: "string", enum: ["intern", "junior", "middle", "senior"] },
+          camera_status: { enum: ["granted", "denied", "unavailable"] },
           supervision_badge: { anyOf: [{ type: "string", maxLength: 100 }, { type: "null" }] },
           tasks_answered: { type: "integer", minimum: 1, maximum: 1000 }
         } }, response: {
@@ -41,7 +42,7 @@ export async function testingIntegrationRoutes(app: FastifyInstance,
       const body = request.body;
       return reply.header("cache-control", "no-store").send(await options.profiles.recordTrustedGrade(body.candidate_id, {
         sessionId: body.session_id, grade: body.decided_grade, specialization: body.specialization,
-        supervisionBadge: body.supervision_badge ?? null, tasksAnswered: body.tasks_answered }));
+        cameraStatus: body.camera_status, supervisionBadge: body.supervision_badge ?? null, tasksAnswered: body.tasks_answered }));
     } catch (error) {
       if (error instanceof ProfileError) return reply.code(error.status).send({ detail: error.code });
       return reply.code(503).send({ detail: "testing_result_unavailable" });

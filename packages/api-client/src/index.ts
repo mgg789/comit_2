@@ -1,3 +1,5 @@
+import type { CandidateSkillCatalog } from "@comit/shared";
+import type { TestingPreflight, TestingSpecialization, TestingStartRequest, TestingSession, TestingNextTask, TestingAnswerRequest, TestingAnswerReceipt, TestingSupervision, TestingMediaRequest, TestingResult } from "@comit/shared";
 /**
  * Minimal typed HTTP client for Comit services.
  * All apps talk to api-core through this wrapper so auth headers and error
@@ -15,7 +17,7 @@ import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutat
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
   InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
-  AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
+  AgentsJobView, AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -34,6 +36,24 @@ export interface ApiClientOptions {
 }
 
 export interface ApiClient {
+  /** Inspect eligibility without creating an attempt. */
+  testingPreflight(specialization: TestingSpecialization, mode?: "retake" | "upgrade"): Promise<TestingPreflight>;
+  /** Create the first attempt only after explicit consent and Start. */
+  startTestingSession(body: TestingStartRequest): Promise<TestingSession>;
+  /** Repeated reads return the same unanswered question. */
+  nextTestingTask(sessionId: string): Promise<TestingNextTask>;
+  /** Submit one choice or a bounded typed answer. */
+  answerTestingTask(sessionId: string, body: TestingAnswerRequest): Promise<TestingAnswerReceipt>;
+  /** Read actual grade publication status and cooldown. */
+  testingResult(sessionId: string): Promise<TestingResult>;
+  /** Finish after recording uploads and final supervision have succeeded. */
+  finishTestingSession(sessionId: string): Promise<TestingResult>;
+  /** Persist locally computed supervision counters. */
+  testingSupervision(sessionId: string, body: TestingSupervision): Promise<{ session_id: string; badge: string }>;
+  /** Upload an idempotent consent-authorized recording chunk. */
+  uploadTestingMedia(sessionId: string, body: TestingMediaRequest): Promise<{ stored: string; retention_days: number }>;
+  /** Stop an attempt without publishing incomplete evidence. */
+  abandonTestingSession(sessionId: string): Promise<TestingSession>;
   /** Read account-owned company settings, including initial revision zero. */
   getEmployerProfile(): Promise<EmployerProfileView>;
   /** Save company settings with revision CAS. */
@@ -113,6 +133,7 @@ export interface ApiClient {
   /** Revoke this session, or all account sessions when all is true. */
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
+  getCandidateSkillCatalog(): Promise<CandidateSkillCatalog>;
   getCandidateProfile(): Promise<CandidateProfileView>;
   /** Read the last 30 Moscow calendar days of own confirmed test results. */
   getCandidateTestingHistory(): Promise<CandidateTestingHistory>;
@@ -132,6 +153,12 @@ export interface ApiClient {
   listVacancies(limit?: number, cursor?: string, offset?: number): Promise<AgentsDraftPage>;
   /** Create an editable source draft without approving or publishing it. */
   createVacancy(body: AgentsDraftCreate): Promise<AgentsDraftView>;
+  /** Queue cached requirement suggestions for the exact owned draft revision. */
+  enrichVacancy(draftId: string, expectedRevision: number): Promise<AgentsJobView>;
+  /** Read the state of an owner-scoped durable agent job. */
+  getAgentJob(jobId: string): Promise<AgentsJobView>;
+  /** Retry an owner-scoped failed job using the server retry policy. */
+  retryAgentJob(jobId: string): Promise<AgentsJobView>;
   /** Read a managed vacancy, including archived audit status. */
   getVacancy(draftId: string): Promise<AgentsDraftView>;
   /** Stage a revision-checked edit; publishing requires a new approved summary. */
@@ -346,7 +373,17 @@ export function createApiClient({
     verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
+    getCandidateSkillCatalog: () => request("GET", "/candidate/skills/catalog"),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
+    testingPreflight: (specialization, mode = "retake") => request("GET", `/candidate/testing/preflight?specialization=${encodeURIComponent(specialization)}&mode=${mode}`),
+    startTestingSession: body => request("POST", "/candidate/testing/sessions", body),
+    nextTestingTask: id => request("GET", `/candidate/testing/sessions/${encodeURIComponent(id)}/next`),
+    answerTestingTask: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/answer`, body),
+    finishTestingSession: id => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/finish`, {}),
+    testingResult: id => request("GET", `/candidate/testing/sessions/${encodeURIComponent(id)}/result`),
+    testingSupervision: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/supervision`, body),
+    uploadTestingMedia: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/media`, body),
+    abandonTestingSession: id => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/abandon`, {}),
     getCandidateTestingHistory: () => request("GET", "/candidate/testing-history"),
     getCandidatePipeline: () => request("GET", "/candidate/pipeline"),
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
@@ -356,6 +393,9 @@ export function createApiClient({
     getAgentCapabilities: () => request("GET", "/employer/agents/capabilities"),
     listVacancies: (limit = 50, cursor, offset = 0) => request("GET", `/employer/vacancies?limit=${limit}&offset=${offset}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
     createVacancy: body => request("POST", "/employer/vacancies", body),
+    enrichVacancy: (id, revision) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(id)}/enrich`, { expected_revision: revision }),
+    getAgentJob: id => request("GET", `/employer/agents/jobs/${encodeURIComponent(id)}`),
+    retryAgentJob: id => request("POST", `/employer/agents/jobs/${encodeURIComponent(id)}/retry`, {}),
     getVacancy: draftId => request("GET", `/employer/vacancies/${encodeURIComponent(draftId)}`),
     patchVacancy: (draftId, body) => request("PATCH", `/employer/vacancies/${encodeURIComponent(draftId)}`, body),
     approveVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/approve`, { expected_revision: expectedRevision }),

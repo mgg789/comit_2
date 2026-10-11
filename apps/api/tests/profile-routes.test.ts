@@ -1,3 +1,4 @@
+import { fixtureSkillCatalog } from "./helpers/skill-catalog.js";
 /** Real PostgreSQL/auth checks; the upstream HTTP transport is explicitly an isolated test double. */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -25,7 +26,7 @@ test("source profile ownership, proof rejection, CAS and selected PDF consent wa
     const secret = "synthetic-only-profile-route-secret-32-bytes";
     const config = loadAuthConfig({ AUTH_SECRET: secret, AUTH_ALLOWED_ORIGINS: "http://localhost:39580", AUTH_COOKIE_SECURE: "false" });
     const store = new AuthStore(pool, secret);
-    const profiles = new ProfileStore(pool);
+    const profiles = new ProfileStore(pool, fixtureSkillCatalog);
     const login = async (role: AccountRole, email: string) => {
       const receipt = await store.issue(role, email, "192.0.2.10");
       const mail = await store.claimMail();

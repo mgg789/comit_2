@@ -44,9 +44,13 @@ class TrustedGradePublisher:
             "specialization": session.get("specialization", "backend"),
             "decided_grade": session.get("decided_grade"),
             "supervision_badge": (session.get("supervision") or {}).get("badge"),
+            "camera_status": "denied" if not session.get("consents", {}).get("video_analysis", False)
+                else session.get("supervision", {}).get("camera", "unavailable"),
             # submit_answer persists the adaptive scored answer count as tasks_given.
             "tasks_answered": session.get("tasks_given", 0),
         }
+        if session.get("consents", {}).get("version") != "testing-media-v1":
+            body.pop("camera_status", None)
         request = urllib.request.Request(
             self.base_url + "/internal/testing/session-result",
             data=json.dumps(body, ensure_ascii=False).encode("utf-8"),

@@ -84,3 +84,25 @@ def test_laya_unconfigured_does_not_block_other_worker_jobs(monkeypatch):
         provider.derive({}, {"schema_hash": "a", "coordinates": []})
     assert error.value.retryable is False
     assert calls == []
+
+
+def test_laya_abstains_on_uncertain_or_degraded_provider_results():
+    """A real-model low-confidence response must not silently fill required grades."""
+    schema = {"schema_hash": "a", "coordinates": [{"index": 0, "group": "stack", "key": "python"}]}
+    probabilities = {str(i): (0.4 if i == 2 else 0.075) for i in range(9)}
+    for response, code in [
+        ({"answers": {"0": {"probabilities": probabilities, "confidence": .27}}}, "laya_uncertain_requirements"),
+        ({"degraded": True, "answers": {}}, "laya_degraded_response"),
+    ]:
+        provider = LayaClient(client=client(lambda _, response=response: httpx.Response(200, json=response)))
+        with pytest.raises(ProviderError, match=code):
+            provider.derive({"bio": "Python required; React is not needed"}, schema)
+
+
+def test_laya_rejects_uniform_positive_filling_of_the_entire_registry():
+    """The observed real-provider all-skills grade-3 failure never reaches a draft or cache."""
+    schema = {"schema_hash": "a", "coordinates": [{"index": i, "group": "stack", "key": f"skill{i}"} for i in range(8)]}
+    answers = {str(i): {"probabilities": {str(j): int(j == 4) for j in range(9)}, "confidence": 1} for i in range(8)}
+    provider = LayaClient(client=client(lambda _: httpx.Response(200, json={"answers": answers})))
+    with pytest.raises(ProviderError, match="laya_undifferentiated_requirements"):
+        provider.derive({"bio": "One specific skill is required"}, schema)

@@ -181,3 +181,19 @@ def test_legacy_baseline_uses_current_source_revision_when_pool_lags(store: Stor
         assert baseline["profile_revision"] == 2
         with pytest.raises(ConflictError):
             feed._profile_snapshot(connection, card.candidate_id, 1)
+
+
+def test_promotion_week_rollover_invalidates_existing_feed(store, monkeypatch):
+    """A stored reward-bearing feed cannot survive the UTC reward week boundary."""
+    from datetime import UTC, datetime, timedelta
+
+    import matching_engine.fsp_boost as boost
+    feed, vacancy_id, owner_id = ready_feed(store)
+    session = feed.open(owner_id, FeedRequest(limit=1), vacancy_id)
+    class NextWeek(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.now(UTC) + timedelta(days=7)
+    monkeypatch.setattr(boost, "datetime", NextWeek)
+    with pytest.raises(ConflictError, match="model identity"):
+        feed.page(owner_id, vacancy_id, session.session_id, session.next_cursor, 10)

@@ -103,8 +103,7 @@ public PDF обязан показать badge. В `main-v2` коэффицие�
 rating contribution self reported. Trusted testing source
 (`POST /internal/testing/session-result`) реализован в API и даёт approved grade с
 реальными `test_session_id` и `approved_at`, если подтверждённый грейд совпадает с
-заявленным; publisher testing-engine есть в коде, но развёрнутый entrypoint его не
-запускает ([testing-engine.md](testing-engine.md)). UUID самоотчёту не создаётся.
+заявленным; entrypoint testing-engine запускает адаптивный контур и trusted publisher ([testing-engine.md](testing-engine.md)). UUID самоотчёту не создаётся.
 
 Эти команды описывают локальный контур. Фактический PostgreSQL/Harrier acceptance,
 production deployment и пользовательский runtime требуют отдельного свежего

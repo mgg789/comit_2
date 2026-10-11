@@ -1,0 +1,60 @@
+import assert from "node:assert/strict";
+import {test} from "node:test";
+import {randomUUID} from "node:crypto";
+import {readFile} from "node:fs/promises";
+import {Pool} from "pg";
+import {ProfileStore} from "../src/profiles/store.js";
+import {weeklyTasks,weeklyWindow,weeklyView} from "../src/profiles/weekly-challenge.js";
+import Fastify from "fastify";
+import cookie from "@fastify/cookie";
+import {candidateWeeklyChallengeRoutes} from "../src/routes/candidate-weekly-challenge.js";
+import {loadAuthConfig} from "../src/auth/config.js";
+import {AuthStore} from "../src/auth/store.js";
+import {hashSessionId} from "../src/auth/crypto.js";
+import {signSession} from "../src/auth/session.js";
+
+test("UTC boundaries and deterministic bank hide answer keys",()=>{
+ assert.equal(weeklyWindow(new Date("2026-10-11T23:59:59Z")).week,"2026-10-05");
+ assert.equal(weeklyWindow(new Date("2026-10-12T00:00:00Z")).week,"2026-10-12");
+ const a=weeklyTasks("account","2026-10-05");assert.deepEqual(a,weeklyTasks("account","2026-10-05"));
+ assert.equal(a.length,3); for(const q of a)assert.ok(q.choices.includes(q.answer));
+ assert.ok(weeklyView("2026-10-05",new Date(),{questions:a,correct:null,completed_at:null}).questions.every(q=>!("answer"in q)));
+});
+const url=process.env.WEEKLY_TEST_DATABASE_URL;
+test("weekly reward is owner-bound, durable, one-per-week and projected atomically",{skip:!url},async()=>{
+ const schema=`weekly_${randomUUID().replaceAll("-","")}`;
+ const admin=new Pool({connectionString:url}),pool=new Pool({connectionString:url,options:`-c search_path=${schema}`});
+ const app=Fastify();
+ try{
+  await admin.query(`CREATE SCHEMA ${schema}`);
+  for(const migration of ["001_accounts","002_candidate_profiles","005_training_consent","019_testing_grades","021_weekly_challenges"])await pool.query(await readFile(new URL(`../migrations/${migration}.sql`,import.meta.url),"utf8"));
+  const owner=randomUUID(),other=randomUUID();
+  for(const id of [owner,other])await pool.query("INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)VALUES($1,$2,'candidate',true,'v1',now())",[id,`${id}@example.invalid`]);
+  const profiles=new ProfileStore(pool),consent={processing:true,pool:false,version:"profile-v1"};
+  for(const id of [owner,other])await profiles.save(id,{expected_revision:0,fields:{},consent});
+  const config=loadAuthConfig({AUTH_SECRET:"synthetic-weekly-secret-at-least-32chars",AUTH_ALLOWED_ORIGINS:"http://localhost",AUTH_COOKIE_SECURE:"false"});
+  const store=new AuthStore(pool,config.secret),sid="a".repeat(43),expiry=new Date(Date.now()+60000).toISOString();
+  await pool.query("INSERT INTO sessions(id,account_id,role,session_hash,expires_at)VALUES($1,$2,'candidate',$3,$4)",[randomUUID(),owner,hashSessionId(sid),expiry]);
+  const token=await signSession(config,"candidate",owner,sid,expiry),headers={authorization:`Bearer ${token}`,origin:"http://localhost"};
+  await app.register(cookie);await app.register(candidateWeeklyChallengeRoutes,{config,store,profiles,mailConfigured:false});
+  assert.equal((await app.inject({url:"/candidate/weekly-challenge"})).statusCode,401);
+  assert.equal((await app.inject({method:"POST",url:"/candidate/weekly-challenge/start",headers:{...headers,origin:"https://evil.invalid"},payload:{}})).statusCode,403);
+  const start=await app.inject({method:"POST",url:"/candidate/weekly-challenge/start",headers,payload:{}});assert.equal(start.statusCode,200,start.body);
+  const week=start.json().week as string;
+  const questions=weeklyTasks(owner,week),answers=Object.fromEntries(questions.map(q=>[q.id,q.answer]));
+  const submit=()=>app.inject({method:"POST",url:"/candidate/weekly-challenge/submit",headers,payload:{week,answers}});
+  const [one,two]=await Promise.all([submit(),submit()]);assert.equal(one.statusCode,200,one.body);assert.deepEqual(one.json(),two.json());assert.equal(one.json().passed,true);
+  assert.equal((await profiles.get(owner))?.revision,2);
+  assert.equal((await profiles.get(other))?.revision,1);
+  assert.equal((await profiles.weeklyChallenge(other,"read")).status,"available");
+  const view=(await profiles.get(owner))!;assert.ok(view.evidence["external:weekly_challenge:current"]);
+  const projected=(await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=2",[owner])).rows[0].payload;
+  assert.equal(projected.external_evidence[0].kind,"weekly_challenge");
+  const saved=await profiles.save(owner,{expected_revision:2,fields:{description:"Updated"}});assert.ok(saved.evidence["external:weekly_challenge:current"]);
+  const failedWeek=new Date("2026-11-02T12:00:00Z");await profiles.weeklyChallenge(other,"start",undefined,failedWeek);
+  const wrong=Object.fromEntries(weeklyTasks(other,"2026-11-02").map(q=>[q.id,q.choices.find(c=>c!==q.answer)!]));
+  assert.equal((await profiles.weeklyChallenge(other,"submit",{week:"2026-11-02",answers:wrong},failedWeek)).passed,false);
+  assert.ok(!(await profiles.get(other))?.evidence["external:weekly_challenge:current"]);
+  await assert.rejects(()=>profiles.weeklyChallenge(other,"submit",{week:"2026-11-02",answers:wrong},new Date("2026-11-09T00:00:00Z")),/weekly_task_expired/);
+ }finally{await app.close();await pool.end();await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await admin.end();}
+});

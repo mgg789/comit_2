@@ -142,7 +142,9 @@ def main() -> None:
     artifacts = BASE / "artifacts/combine"
     artifacts.mkdir(parents=True, exist_ok=True)
     (artifacts / "fixtures.json").write_text(json.dumps({"candidates": candidates, "vacancies": vacancies}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    headers = {"x-internal-token": os.environ["CANDIDATE_PIPELINE_TOKEN"]}
+    owners = {value["input"]["owner_id"] for value in vacancies}
+    assert len(owners) == 1, "acceptance fixtures must share one explicit owner"
+    headers = {"x-internal-token": os.environ["CANDIDATE_PIPELINE_TOKEN"], "x-owner-id": owners.pop()}
     with httpx.Client(base_url=api_url, headers=headers, timeout=30) as client:
         assert httpx.get(f"{api_url}/internal/matching/events", timeout=10).status_code == 401
         schema = get_json(client, "/internal/strict-schema")

@@ -1,4 +1,6 @@
 /** Candidate-owned source profile store and its transactional projection outbox. */
+import { TEST_SKILL_COORDINATES, TEST_GRADE_LEVELS, type CandidateSkillCatalog, type TestingSpecialization, type TestingGrade } from "@comit/shared";
+import { activeSkillCatalog } from "./skill-catalog.js";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
@@ -12,16 +14,21 @@ import type {
   CandidateVerificationDocumentUpload,
   InvitationTerms,
   JsonValue,
+  PublicTestingResult,
+  WeeklyChallengeView, WeeklyChallengeAnswer,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
 import {
   canonicalJson,
+  withTrustedSkillResults,
   projectCandidateIntake,
   projectionTimestamp,
   type ProfileEvidenceRow,
   type ProjectionAccount,
   type ProjectionConsent,
 } from "./projection.js";
+
+import { weeklyWindow, weeklyTasks, weeklyView, type WeeklyTask } from "./weekly-challenge.js";
 
 const PROFILE_CONSENT_VERSION = "profile-v1";
 const MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
@@ -313,12 +320,20 @@ function externalEvidenceRows(fields: CandidateProfileFields, previous: Map<stri
   key: string; inputHash: string; status: string; verifiedValue: JsonValue | null; provenance: string[]; checkedAt: Date | string | null;
 }> {
   return [...previous.values()].filter(row => {
+    if (row.evidence_key.startsWith("grade:") && Object.hasOwn(TEST_SKILL_COORDINATES, row.evidence_key.slice(6))) return true;
+    if (row.evidence_key === "external:testing_mapping:v1") return true;
+    if (row.evidence_key.startsWith("external:testing_removed:")) {
+      const subject = row.evidence_key.slice("external:testing_removed:".length);
+      if (!Object.hasOwn(TEST_SKILL_COORDINATES, subject)) return false;
+      const coordinate = TEST_SKILL_COORDINATES[subject as TestingSpecialization];
+      return !(fields[coordinate.group] ?? []).some(skill => skill.key === coordinate.key);
+    }
     if (!row.evidence_key.startsWith("external:")) return false;
     if (row.evidence_key.startsWith("external:fsp:")) {
       const subject = row.evidence_key.slice("external:fsp:".length).split(":");
       return subject[0] === fields.fsp_id && (!subject[1] || subject[1] === fields.fsp_claim_id);
     }
-    if (row.evidence_key.startsWith("external:hh:")) return true;
+    if (row.evidence_key.startsWith("external:hh:") || row.evidence_key === "external:weekly_challenge:current") return true;
     const subject = row.evidence_key.slice("external:repository:".length);
     const parts = subject.split(":");
     if (parts.length !== 2 || !NARRATIVE_GROUPS.includes(parts[0] as typeof NARRATIVE_GROUPS[number])) return false;
@@ -354,10 +369,22 @@ async function profileRow(client: PoolClient, accountId: string, lock = false): 
 }
 
 async function evidenceFor(client: PoolClient, accountId: string): Promise<EvidenceDbRow[]> {
-  return (await client.query<EvidenceDbRow>(
+  const rows = (await client.query<EvidenceDbRow>(
     `SELECT evidence_key, input_hash, status, verified_value, provenance, checked_at
        FROM candidate_profile_evidence WHERE candidate_id = $1 ORDER BY evidence_key`, [accountId],
   )).rows;
+  // Accepted-result ledger is durable even when older profile edits dropped grade:* evidence.
+  const results = (await client.query<{ specialization: string; grade: TestingGrade; session_id: string; decided_at: Date; supervision_badge: string | null }>(
+    "SELECT DISTINCT ON (specialization) specialization,grade,session_id,decided_at,supervision_badge FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY specialization,decided_at DESC", [accountId])).rows;
+  for (const result of results) {
+    if (!Object.hasOwn(TEST_SKILL_COORDINATES, result.specialization)) continue;
+    const key = `grade:${result.specialization}`;
+    if (rows.some(row => row.evidence_key === key)) continue;
+    rows.push({ evidence_key: key, input_hash: createHash("sha256").update(canonicalJson({ session_id: result.session_id, grade: result.grade })).digest("hex"),
+      status: "confirmed", verified_value: { grade: result.grade, session_id: result.session_id, supervision_badge: result.supervision_badge },
+      provenance: ["testing-engine: accepted result ledger"], checked_at: result.decided_at });
+  }
+  return rows;
 }
 
 function delivery(row: DeliveryRow | null, revision: number): CandidateProjectionDelivery {
@@ -381,7 +408,8 @@ async function latestDelivery(client: PoolClient, accountId: string, revision: n
 }
 
 async function viewInTransaction(client: PoolClient, accountId: string, account: AccountRow, profile: ProfileRow): Promise<CandidateProfileView> {
-  const evidence = await evidenceFor(client, accountId);
+  const trusted = withTrustedSkillResults(profile.fields, await evidenceFor(client, accountId));
+  const evidence = trusted.rows;
   const outbox = await latestDelivery(client, accountId, Number(profile.revision));
   const evidenceView: Record<string, CandidateClaimEvidence> = Object.fromEntries(evidence.map(row => [row.evidence_key, {
     input_hash: row.input_hash,
@@ -393,7 +421,7 @@ async function viewInTransaction(client: PoolClient, accountId: string, account:
   return {
     candidate_id: account.id,
     revision: Number(profile.revision),
-    fields: profile.fields,
+    fields: trusted.fields,
     evidence: evidenceView,
     consents: {
       processing: profile.processing_consent,
@@ -456,7 +484,72 @@ export async function applyRecruitmentHire(client: PoolClient, processId: string
  * one transaction, so matching never observes a profile without its snapshot.
  */
 export class CandidateProfileStore {
-  public constructor(private readonly pool: Pool) {}
+  public constructor(private readonly pool: Pool, private readonly catalog: () => Promise<CandidateSkillCatalog> = activeSkillCatalog) {}
+
+  /** One authenticated catalog read batches subject results and authoritative cooldown dates. */
+  public async skillCatalog(accountId: string): Promise<CandidateSkillCatalog> {
+    const catalog = await this.catalog();
+    const rows = (await this.pool.query<{ specialization: string; grade: TestingGrade; decided_at: Date }>(
+      "SELECT DISTINCT ON (specialization) specialization,grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY specialization,decided_at DESC", [accountId])).rows;
+    return { ...catalog, skills: catalog.skills.map(skill => { const last = rows.find(row => row.specialization === skill.test_subject);
+      return { ...skill, confirmed_level: last ? TEST_GRADE_LEVELS[last.grade] : null,
+        next_attempt_at: last ? new Date(last.decided_at.getTime()+7*86400000).toISOString() : null,
+        upgrade_at: last ? new Date(last.decided_at.getTime()+30*86400000).toISOString() : null }; }) };
+  }
+
+  /** Reconcile at most limit legacy subjects once per mapping version, under ordinary account/profile locks.
+   * Runs only at worker startup or an explicit backfill pass, never in the delivery polling loop.
+   * A durable marker survives later declaration edits; no user level is overwritten.
+   */
+  public async reconcileTrustedSkillResults(limit = 100): Promise<{ processed: number; reprojected: number }> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError("invalid backfill limit");
+    const marker = "external:testing_mapping:v1";
+    const candidates = (await this.pool.query<{ candidate_id: string }>(`SELECT p.candidate_id FROM candidate_profiles p
+      WHERE EXISTS (SELECT 1 FROM candidate_grade_results g WHERE g.candidate_id=p.candidate_id AND g.specialization=ANY($1::text[]))
+      AND NOT EXISTS (SELECT 1 FROM candidate_profile_evidence e WHERE e.candidate_id=p.candidate_id AND e.evidence_key=$2)
+      ORDER BY p.candidate_id LIMIT $3`, [Object.keys(TEST_SKILL_COORDINATES), marker, limit])).rows;
+    let processed = 0, reprojected = 0;
+    for (const candidate of candidates) {
+      const changed = await transaction(this.pool, async client => {
+        const account = await accountFor(client, candidate.candidate_id);
+        const profile = await profileRow(client, candidate.candidate_id, true);
+        if (!profile) return null;
+        const evidence = await evidenceFor(client, candidate.candidate_id);
+        if (evidence.some(row => row.evidence_key === marker)) return null;
+        const trusted = withTrustedSkillResults(profile.fields, evidence);
+        const payload = projectCandidateIntake(account, trusted.fields, trusted.rows, Number(profile.revision), {
+          processing: profile.processing_consent, pool: profile.pool_consent, training: profile.training_consent,
+          training_version: profile.training_consent_version, training_accepted_at: profile.training_consent_accepted_at,
+          version: profile.consent_version, accepted_at: profile.consent_accepted_at,
+        });
+        const previous = (await client.query<{ payload: unknown }>(
+          "SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=$2 ORDER BY created_at DESC LIMIT 1",
+          [candidate.candidate_id, profile.revision])).rows[0];
+        const needsProjection = canonicalJson(previous?.payload) !== canonicalJson(payload);
+        for (const row of trusted.rows.filter(row => SKILL_GROUPS.some(group => row.evidence_key.startsWith(`${group}:`))
+          && row.provenance.some(item => item.startsWith("testing-engine:")))) {
+          await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+            VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7) ON CONFLICT(candidate_id,evidence_key) DO UPDATE SET
+            input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+            [candidate.candidate_id,row.evidence_key,row.input_hash,row.status,JSON.stringify(row.verified_value),JSON.stringify(row.provenance),row.checked_at]);
+        }
+        await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+          VALUES($1,$2,$3,'confirmed','{"version":1}'::jsonb,'["testing-engine: coordinate mapping v1"]'::jsonb,now())`,
+          [candidate.candidate_id,marker,createHash("sha256").update(marker).digest("hex")]);
+        if (needsProjection) {
+          const refreshed = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET revision=revision+1,fields=$2::jsonb,updated_at=now()
+            WHERE candidate_id=$1 RETURNING *`, [candidate.candidate_id, JSON.stringify(trusted.fields)])).rows[0]!;
+          await client.query(`UPDATE candidate_profile_outbox SET state='obsolete',lease_token=NULL,lease_until=NULL,updated_at=now()
+            WHERE candidate_id=$1 AND state IN ('queued','processing','retrying','failed')`, [candidate.candidate_id]);
+          await enqueue(client,account,refreshed,await evidenceFor(client,candidate.candidate_id));
+        }
+        return needsProjection;
+      });
+      if (changed !== null) processed++;
+      if (changed) reprojected++;
+    }
+    return { processed, reprojected };
+  }
 
   /** Read a private profile after enforcing the candidate account boundary. */
   public async get(accountId: string): Promise<CandidateProfileView | null> {
@@ -482,6 +575,23 @@ export class CandidateProfileStore {
       const rawFields = replace || !current ? mutation.fields : { ...current.fields, ...mutation.fields };
       const fields = normalizeNarratives(rawFields, current?.fields ?? null);
       validateFields(fields);
+      const changedSkills = SKILL_GROUPS.flatMap(group => (fields[group] ?? []).filter(skill =>
+        !(current?.fields[group] ?? []).some(old => old.key === skill.key && old.level === skill.level)).map(skill => ({ group, ...skill })));
+      const changedReferences = NARRATIVE_GROUPS.flatMap(group => (fields[group] ?? []).flatMap(item => {
+        const previous = (current?.fields[group] ?? []).find(old => old.id === item.id);
+        return (["domains", "stacks"] as const).flatMap(factGroup => (item.facts?.[factGroup] ?? [])
+          .filter(key => !(previous?.facts?.[factGroup] ?? []).includes(key)).map(key => ({ group: factGroup, key })));
+      }));
+      if (changedSkills.length || changedReferences.length) {
+        const catalog = await this.catalog();
+        for (const reference of changedReferences) {
+          if (!catalog.skills.some(item => item.group === reference.group && item.key === reference.key)) throw invalid("unknown_skill_coordinate");
+        }
+        for (const skill of changedSkills) {
+          if (!catalog.skills.some(item => item.group === skill.group && item.key === skill.key)) throw invalid("unknown_skill_coordinate");
+          if (skill.level < 1) throw invalid("invalid_skill_level");
+        }
+      }
       const consent: NonNullable<CandidateProfileMutation["consent"]> = hasConsent ? mutation.consent! : {
         processing: current?.processing_consent ?? false,
         pool: current?.pool_consent ?? false,
@@ -517,7 +627,16 @@ export class CandidateProfileStore {
       const previous = new Map((bindingChanged ? previousRows.filter(row => !isFspImportedAchievement(row)) : previousRows)
         .map(row => [row.evidence_key, row]));
       await client.query("DELETE FROM candidate_profile_evidence WHERE candidate_id = $1", [accountId]);
-      const rows = [...evidenceRows(fields, previous), ...externalEvidenceRows(fields, previous)];
+      const previouslyVisible = withTrustedSkillResults(current?.fields ?? {}, previousRows).fields;
+      const removals = Object.entries(TEST_SKILL_COORDINATES).flatMap(([subject, coordinate]) => {
+        const key = `external:testing_removed:${subject}`;
+        const explicitlyChanged = replace || Object.hasOwn(mutation.fields, coordinate.group);
+        if (!explicitlyChanged || previous.has(key) || !(previouslyVisible[coordinate.group] ?? []).some(skill => skill.key === coordinate.key)
+          || (fields[coordinate.group] ?? []).some(skill => skill.key === coordinate.key)) return [];
+        return [{ key, inputHash: createHash("sha256").update(canonicalJson({ subject, removed: true })).digest("hex"),
+          status: "self_reported", verifiedValue: { subject, removed: true }, provenance: ["candidate: explicit skill removal"], checkedAt: new Date() }];
+      });
+      const rows = [...evidenceRows(fields, previous), ...externalEvidenceRows(fields, previous), ...removals];
       for (const row of rows) {
         await client.query(
           `INSERT INTO candidate_profile_evidence(candidate_id, evidence_key, input_hash, status, verified_value, provenance, checked_at)
@@ -912,12 +1031,43 @@ export class CandidateProfileStore {
     );
     if (result.rowCount !== 1) throw new Error("projection lease is no longer valid");
   }
+  /** Start/read/submit weekly practice under the account+profile locks; one reward per UTC week. */
+  public async weeklyChallenge(accountId: string, operation: "read" | "start" | "submit", input?: WeeklyChallengeAnswer, now = new Date()): Promise<WeeklyChallengeView> {
+    return transaction(this.pool, async client => {
+      const account = await accountFor(client, accountId, true);
+      const profile = await profileRow(client, accountId, true);
+      if (!profile) throw new ProfileError(404, "profile_not_found");
+      if (!profile.processing_consent) throw new ProfileError(409, "processing_consent_required");
+      const { week, expires } = weeklyWindow(now);
+      if (operation === "submit" && input?.week !== week) throw new ProfileError(409, "weekly_task_expired");
+      if (operation === "start") await client.query(`INSERT INTO candidate_weekly_challenges(candidate_id,week,expires_at,questions)
+        VALUES($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING`, [accountId,week,expires,JSON.stringify(weeklyTasks(accountId,week))]);
+      const row = (await client.query<{ questions: WeeklyTask[]; correct: number | null; completed_at: Date | null }>(
+        "SELECT questions,correct,completed_at FROM candidate_weekly_challenges WHERE candidate_id=$1 AND week=$2 FOR UPDATE",[accountId,week])).rows[0];
+      if (operation !== "submit" || row?.completed_at) return weeklyView(week,expires,row);
+      if (!row || !input) throw new ProfileError(409,"weekly_task_not_started");
+      if (Object.keys(input.answers).length !== row.questions.length || row.questions.some(q => !q.choices.includes(input.answers[q.id] ?? ""))) throw new ProfileError(400,"weekly_answers_invalid");
+      const correct = row.questions.filter(q => q.answer === input.answers[q.id]).length;
+      await client.query("UPDATE candidate_weekly_challenges SET answers=$3::jsonb,correct=$4,completed_at=$5 WHERE candidate_id=$1 AND week=$2",[accountId,week,JSON.stringify(input.answers),correct,now]);
+      if (correct >= 2) {
+        const value = { completed_at: now.toISOString(), expires_at: expires.toISOString(), provider: "comit_weekly_challenge:v1" };
+        await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+          VALUES($1,'external:weekly_challenge:current',$2,'confirmed',$3::jsonb,'["comit_weekly_challenge:v1"]'::jsonb,$4)
+          ON CONFLICT(candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+          [accountId,createHash("sha256").update(week).digest("hex"),JSON.stringify(value),now]);
+        const refreshed = (await client.query<ProfileRow>("UPDATE candidate_profiles SET revision=revision+1,updated_at=now() WHERE candidate_id=$1 RETURNING *",[accountId])).rows[0]!;
+        await enqueue(client,account,refreshed,await evidenceFor(client,accountId));
+      }
+      return weeklyView(week,expires,{...row,correct,completed_at:now});
+    });
+  }
+
   /** Accept a trusted finished session atomically with evidence and matching projection.
    * Identical publisher retries never add another activity; cross-owner/session reuse fails closed.
    */
   public async recordTrustedGrade(candidateId: string, input: {
     sessionId: string; grade: "intern" | "junior" | "middle" | "senior"; specialization: string;
-    supervisionBadge: string | null; tasksAnswered: number;
+    cameraStatus?: "granted" | "denied" | "unavailable"; supervisionBadge: string | null; tasksAnswered: number;
   }): Promise<{ recorded: true; grade: string; decided_at: string }> {
     return transaction(this.pool, async client => {
       const account = await accountFor(client, candidateId, true);
@@ -933,7 +1083,7 @@ export class CandidateProfileStore {
         return { recorded: true, grade: previous.grade, decided_at: previous.decided_at.toISOString() };
       }
       const last = (await client.query<{ grade: string; decided_at: Date }>(
-        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1", [candidateId])).rows[0];
+        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 AND specialization=$2 ORDER BY decided_at DESC LIMIT 1", [candidateId,input.specialization])).rows[0];
       if (last) {
         const days = (Date.now() - last.decided_at.getTime()) / 86400000;
         if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
@@ -944,20 +1094,47 @@ export class CandidateProfileStore {
         (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(),candidateId,input.sessionId,input.specialization,
         input.grade,input.supervisionBadge,input.tasksAnswered,decidedAt]);
-      const fields: CandidateProfileFields = { ...profile.fields, declared_grade: input.grade };
+      const isDirection = ["backend", "frontend", "fullstack", "mobile", "devops", "data", "ml", "qa"].includes(input.specialization);
+      const coordinate = Object.hasOwn(TEST_SKILL_COORDINATES, input.specialization) ? TEST_SKILL_COORDINATES[input.specialization as TestingSpecialization] : undefined;
+      if (!isDirection && !coordinate) throw invalid("unknown_testing_subject");
+      const fields: CandidateProfileFields = isDirection ? { ...profile.fields, declared_grade: input.grade } : { ...profile.fields };
+      const explicitlyRemoved = coordinate && (await client.query("SELECT 1 FROM candidate_profile_evidence WHERE candidate_id=$1 AND evidence_key=$2", [candidateId,`external:testing_removed:${input.specialization}`])).rowCount === 1;
+      if (coordinate && !explicitlyRemoved && !(fields[coordinate.group] ?? []).some(skill => skill.key === coordinate.key)) {
+        fields[coordinate.group] = [...(fields[coordinate.group] ?? []), { key: coordinate.key, level: TEST_GRADE_LEVELS[input.grade] }];
+      }
       const refreshed = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET revision=revision+1,fields=$2::jsonb,updated_at=now()
         WHERE candidate_id=$1 RETURNING *`, [candidateId,JSON.stringify(fields)])).rows[0]!;
       const inputHash = createHash("sha256").update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
       await client.query(`INSERT INTO candidate_profile_evidence
         (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
-        VALUES ($1,'grade:trusted',$2,'confirmed',$3::jsonb,$4::jsonb,$5)
+        VALUES ($1,$6,$2,'confirmed',$3::jsonb,$4::jsonb,$5)
         ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
           verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
-        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
-          JSON.stringify(["testing-engine: adaptive session"]),decidedAt]);
+        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId, camera_status: input.cameraStatus ?? "unknown", supervision_badge: input.supervisionBadge }),
+          JSON.stringify(["testing-engine: adaptive session"]),decidedAt,isDirection ? "grade:trusted" : `grade:${input.specialization}`]);
+      if (coordinate && !explicitlyRemoved) {
+        const declared = fields[coordinate.group]!.find(skill => skill.key === coordinate.key)!;
+        const hash = createHash("sha256").update(canonicalJson(declared), "utf8").digest("hex");
+        await client.query(`INSERT INTO candidate_profile_evidence(candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
+          VALUES($1,$2,$3,'confirmed',$4::jsonb,$5::jsonb,$6) ON CONFLICT(candidate_id,evidence_key) DO UPDATE SET
+          input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
+          [candidateId,`${coordinate.group}:${coordinate.key}`,hash,JSON.stringify({ key: coordinate.key, level: TEST_GRADE_LEVELS[input.grade], grade: input.grade, session_id: input.sessionId }),JSON.stringify(["testing-engine: adaptive session"]),decidedAt]);
+      }
       await enqueue(client,account,refreshed,await evidenceFor(client,candidateId));
       return { recorded: true, grade: input.grade, decided_at: decidedAt.toISOString() };
     });
+  }
+
+  /** Return latest accepted subject grades only after the caller validates public profile access. */
+  public async publicTestingResults(candidateId: string): Promise<PublicTestingResult[]> {
+    const rows = (await this.pool.query<{ subject: string; grade: PublicTestingResult["grade"]; supervision_badge: string | null; camera_status: string | null }>(`
+      SELECT DISTINCT ON (g.specialization) g.specialization AS subject,g.grade,g.supervision_badge,
+        CASE WHEN e.verified_value->>'session_id'=g.session_id THEN e.verified_value->>'camera_status' ELSE NULL END AS camera_status
+      FROM candidate_grade_results g LEFT JOIN candidate_profile_evidence e ON e.candidate_id=g.candidate_id
+        AND e.evidence_key='grade:'||g.specialization
+      WHERE g.candidate_id=$1 ORDER BY g.specialization,g.decided_at DESC`, [candidateId])).rows;
+    return rows.map(row => ({ subject: row.subject, grade: row.grade, supervision_badge: row.supervision_badge,
+      camera_status: row.camera_status === "granted" || row.camera_status === "denied" || row.camera_status === "unavailable" ? row.camera_status : "unknown" }));
   }
 
 }

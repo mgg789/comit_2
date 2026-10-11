@@ -1,0 +1,5 @@
+.vacancy-description-hint { display: flex; align-items: center; gap: 10rem; font-size: 16rem; color: var(--comit-text-muted); }
+.vacancy-description-hint::before { content: ""; flex: 0 0 8rem; width: 8rem; height: 8rem; border-radius: 50%; background: var(--employer-warning); }
+.vacancy-description-hint[data-tone="short"]::before { background: var(--employer-danger); }
+.vacancy-description-hint[data-tone="detailed"]::before { background: var(--employer-success); }
+.vacancy-suggestion-note { margin: 12rem 0; color: var(--comit-text-muted); font-size: 16rem; line-height: 1.4; }

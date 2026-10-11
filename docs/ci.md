@@ -15,9 +15,9 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
-| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` → `runtime-shared.test.mjs` → тесты ui-kit/employer/candidate |
+| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` → `runtime-shared.test.mjs` → тесты ui-kit/employer/candidate/testing |
 | `api` | python:3.12-bookworm + Node 22 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
-| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip (`services/code-judge` в CI пока не входит) |
+| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification/code-judge `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip; реальный Docker acceptance вынесен в отдельный ephemeral job |
 | `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов с disposable PostgreSQL → line/branch gates каждого пакета |
 | `smoke` | хост (нужен docker) | explicit `docker-compose.dev.yml --profile dev`, проект `comit-ci`, порты 38xxx, real pinned Harrier cache → `SMOKE_MODE=dev ./tests/smoke.sh` → `down -v` |
 
@@ -26,6 +26,15 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 - Smoke использует `--env-file /dev/null`: defaults только явного dev compose, без `.env` продакшена.
   Все семь опубликованных API/service портов, включая agents/verification, находятся в 38xxx.
+- Generic smoke явно задаёт `CODE_JUDGE_URL=http://127.0.0.1:1` внутри testing-engine
+  и синтетические сервисные токены: этот endpoint недоступен. После обычного smoke
+  отдельный HTTP-шаг проверяет `code_ready=false`, отсутствие типа `code`, отказ
+  старта Python/Algorithms с 503 и отсутствие израсходованной попытки. Это не
+  подтверждение готовности судьи: реальный Docker и HTTP broker проверяет отдельная
+  джоба `Code judge isolation`. `python3 tests/compose-config.py` рендерит dev compose
+  также с фактическими значениями `smoke.env` из workflow, чтобы обязательная новая
+  переменная не могла отсутствовать только в CI. Эта регрессия выполняется в
+  disposable isolation job, где уже доступны Python и Docker Compose.
 - До запуска smoke cache `comit-ci_harrier_cache` получает реальные model files из
   `comit_harrier_cache` через read-only mount, если он существует; копируется только
   `hub/models--microsoft--harrier-oss-v1-270m`, без HF credentials. При отсутствии
@@ -154,3 +163,44 @@ smoke и откат образов при ошибке — подробност�
 
 - Нет кэша pnpm/pip между прогонами (первое время ок; добавить `actions/cache` или registry при замедлении).
 - Образы не публикуются в registry — сборка на месте; при росте времени сборки перейти на GHCR.
+
+## Приёмка браузерного тестирования
+
+`pnpm --filter @comit/web-testing test` проверяет состояния индикаторов, очередь
+записи, восстановление счётчиков и валидацию ответов. API coverage job устанавливает
+настоящий testing-engine и запускает `testing-browser-http.test.ts` с отдельной
+PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, публикация и cooldown.
+`TESTING_ENGINE_TEST_PYTHON` указывает Python с установленным testing-engine;
+`TESTING_BROWSER_TEST_DATABASE_URL` — только disposable PostgreSQL.
+Локальное измерение 11.10.2026: 34 теста testing-engine, 79,74% строк / 69,80%
+ветвей; штатный gate 75% / 60% пройден. Это покрытие этого сервиса, не всего UI
+и не проверка физических устройств пользователя.
+
+## Проверки пакета завершения
+
+CI также запускает unit-контракт demo-каталога, frontend merge-resume regression и все `apps/api/tests/*.test.ts`, включая FSP/weekly/import. API coverage runner автоматически создаёт отдельные временные БД для новых `*_TEST_DATABASE_URL`. Полный результат текущего пакета — [package-validation.md](package-validation.md).
+
+
+Пакет `code-judge` входит в Python unit/regression coverage gate: минимум 80%
+строк и 60% ветвей. Реальный Docker sandbox — отдельный явный acceptance-контур;
+общий Python job без Docker не выдаёт его за пройденный. Job `Code judge isolation` запускает эти проверки на одноразовом GitHub-hosted runner без production-секретов и доступа к серверу приложения. Команда и граница VM
+описаны в [deploy.md](deploy.md#изолированная-проверка-кода).
+
+Реальная проверка `Code judge isolation (disposable runner)` выполняется отдельно
+на GitHub-hosted Ubuntu: pinned Python image, Docker isolation и HTTP broker
+acceptance. Generic compose smoke использует явно недоступный judge endpoint и
+проверяет отказ начала code-теста без создания попытки; выполнение кода он не
+подтверждает. Актуальные результаты нового тестирования —
+[package-validation.md](package-validation.md); таблица выше описывает прежний
+checkpoint и не заменяет проверки текущего SHA.
+
+После deploy добавлен отдельный job `public-smoke` на GitHub-hosted runner:
+реальный домен/TLS, health/readiness, JSON API, HTML/SVG и auth/privacy boundaries.
+Регрессии `python tests/public-smoke.py` и `python tests/deploy-config.py`
+выполняются в CI до merge. Порядок и ограничения — [deploy.md](deploy.md#отдельная-внешняя-проверка-после-cd).
+
+API Python HTTP fixtures имеют общий monotonic startup deadline 45 секунд,
+раннее обнаружение exit/signal/spawn error и bounded cleanup TERM 2 с → KILL 2 с.
+Регрессия задержки 16 секунд воспроизвела прежний 15-секундный timeout; проверка
+реального PDF сохранена. Конкретная причина медленного старта в прежнем CI
+не установлена, CPU contention не объявляется доказанным.

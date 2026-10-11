@@ -91,7 +91,7 @@ class LayaClient:
     """Form-only Jev Local ordinal decisions, preserving absent versus explicit zero."""
 
     model = "aac6fef/laya-multilingual-mlx"
-    version = "laya-requirements-v1"
+    version = "laya-requirements-v2"
 
     def __init__(self, base_url: str | None = None, client: httpx.Client | None = None):
         self.base_url = (base_url if base_url is not None else os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444")).rstrip("/")
@@ -123,6 +123,8 @@ class LayaClient:
                 for c in batch}
             response = _request(self.client, "POST", self.base_url + "/api/v1/decisions",
                                 headers={"Host": "localhost:12444"}, json={"state": state, "questions": questions})
+            if response.get("degraded") is True or response.get("fallback") is True:
+                raise ProviderError("laya_degraded_response", False)
             answers = response.get("answers")
             if not isinstance(answers, dict) or set(answers) != set(questions):
                 raise ProviderError("invalid_laya_answers", False)
@@ -138,10 +140,19 @@ class LayaClient:
                 except (ValueError, TypeError):
                     raise ProviderError("invalid_laya_probabilities", False) from None
                 selected = max(range(9), key=lambda i: values[i])
+                confidence = answer.get("confidence")
+                # Abstain instead of turning diffuse probabilities into authoritative grades.
+                if (values[selected] < .5 or confidence is not None and
+                        (not isinstance(confidence, (int, float)) or
+                         isinstance(confidence, bool) or not .5 <= confidence <= 1)):
+                    raise ProviderError("laya_uncertain_requirements", False)
                 if selected:
                     result[groups[coordinate["group"]]][coordinate["key"]] = selected - 1
                 evidence[f"{coordinate['group']}:{coordinate['key']}"] = {"selected": selected,
                     "probabilities": probs, "confidence": answer.get("confidence")}
+        selections = [item["selected"] for item in evidence.values()]
+        if len(selections) >= 8 and len(set(selections)) == 1 and selections[0] > 1:
+            raise ProviderError("laya_undifferentiated_requirements", False)
         return {"fields": result, "provenance": {"model": self.model, "version": self.version,
                 "input_hash": fingerprint(state), "schema_hash": schema["schema_hash"], "evidence": evidence}}
 

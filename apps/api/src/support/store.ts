@@ -92,21 +92,22 @@ export class SupportConsoleStore {
     return { items, next_sequence: items.at(-1)?.sequence ?? after, has_more: rows.length > limit };
   }
 
-  /** Monotonic operator read watermark for one conversation; unknown inbox is 404. */
+  /** Monotonic operator watermark bounded by existing messages; unknown inbox is 404, future cursor is 409. */
   async markRead(accountId: string, sequence: number): Promise<SupportReadStatus> {
     if (!validSequence(sequence)) throw new SystemNotificationsError(422, "invalid_support_read_sequence");
-    const result = await this.pool.query<QueryResultRow & { read_sequence: string; unread_count: string }>(`WITH inbox AS (
-        SELECT account_id FROM system_inboxes WHERE account_id=$1
+    const result = await this.pool.query<QueryResultRow & { read_sequence: string | null; unread_count: string; last_sequence: string }>(`WITH inbox AS (
+        SELECT account_id,last_sequence FROM system_inboxes WHERE account_id=$1
       ), upsert AS (
-        INSERT INTO support_conversation_reads(account_id,read_sequence) SELECT $1,$2 WHERE EXISTS (SELECT 1 FROM inbox)
+        INSERT INTO support_conversation_reads(account_id,read_sequence) SELECT account_id,$2 FROM inbox WHERE $2<=last_sequence
         ON CONFLICT (account_id) DO UPDATE SET read_sequence=greatest(support_conversation_reads.read_sequence,excluded.read_sequence), updated_at=now()
         RETURNING read_sequence
-      ) SELECT COALESCE((SELECT read_sequence FROM upsert),(SELECT read_sequence FROM support_conversation_reads WHERE account_id=$1)) AS read_sequence,
+      ) SELECT inbox.last_sequence, COALESCE((SELECT read_sequence FROM upsert),(SELECT read_sequence FROM support_conversation_reads WHERE account_id=$1)) AS read_sequence,
         (SELECT count(*) FROM system_notifications n WHERE n.account_id=$1 AND n.type='support.user_message'
-          AND n.sequence>COALESCE((SELECT read_sequence FROM upsert),(SELECT read_sequence FROM support_conversation_reads WHERE account_id=$1),0)) AS unread_count`,
+          AND n.sequence>COALESCE((SELECT read_sequence FROM upsert),(SELECT read_sequence FROM support_conversation_reads WHERE account_id=$1),0)) AS unread_count FROM inbox`,
       [accountId, sequence]);
     const row = result.rows[0];
     if (!row) throw new SystemNotificationsError(404, "account_not_found");
+    if (sequence > Number(row.last_sequence)) throw new SystemNotificationsError(409, "support_read_not_available");
     return { read_sequence: Number(row.read_sequence), unread_count: Number(row.unread_count) };
   }
 }

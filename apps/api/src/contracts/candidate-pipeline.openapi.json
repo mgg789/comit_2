@@ -5009,7 +5009,8 @@
             "enum": [
               "fsp",
               "repository",
-              "hh"
+              "hh",
+              "weekly_challenge"
             ],
             "title": "Kind"
           },
@@ -5101,6 +5102,16 @@
           },
           "explanation": {
             "$ref": "#/components/schemas/ScoreBreakdown"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromotionExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "exposure_id": {
             "type": "string",
@@ -6920,6 +6931,56 @@
         "title": "PreferenceStatus",
         "description": "Operational state without coefficients, personal feature payloads or participant identifiers."
       },
+      "PromotionExplanation": {
+        "properties": {
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "active"
+            ],
+            "title": "Mode"
+          },
+          "fsp_bonus": {
+            "type": "number",
+            "title": "Fsp Bonus"
+          },
+          "weekly_bonus": {
+            "type": "number",
+            "title": "Weekly Bonus"
+          },
+          "combined_bonus": {
+            "type": "number",
+            "title": "Combined Bonus"
+          },
+          "max_base_gap": {
+            "type": "number",
+            "title": "Max Base Gap"
+          },
+          "demo_registry": {
+            "type": "boolean",
+            "title": "Demo Registry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy_version",
+          "mode",
+          "fsp_bonus",
+          "weekly_bonus",
+          "combined_bonus",
+          "max_base_gap",
+          "demo_registry"
+        ],
+        "title": "PromotionExplanation",
+        "description": "Public bounded ordering factors, separate from additive model contributions."
+      },
       "PublicCandidateCard": {
         "properties": {
           "candidate_id": {
@@ -7526,6 +7587,16 @@
             },
             "type": "object",
             "title": "Rerank Contributions"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromotionExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "artifact_hash": {
             "anyOf": [

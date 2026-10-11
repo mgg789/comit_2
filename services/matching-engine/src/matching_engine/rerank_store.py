@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 from matching_engine.combine_models import CandidateCard, MatchCandidate, ScoringPolicy
 from matching_engine.combine_store import CombineStore, _lock
 from matching_engine.database import connect
+from matching_engine.fsp_boost import promote, promotion_explanation, promotion_policy
 from matching_engine.models import StrictSchema
 from matching_engine.rerank_models import (
     RerankCard,
@@ -314,6 +315,26 @@ class RerankStore:
         """Recover bounded expired leases and skip obsolete snapshots without mutable input reads."""
         with connect(self.database_url) as connection:
             _lock(connection)
+            # Refresh bounded current runs after a rollout or reward-week boundary,
+            # even if no profile/vacancy event arrived to enqueue new work.
+            from matching_engine.rerank_model import tail_policy_hash
+            settings = connection.execute("SELECT active_artifact_hash FROM rerank_pipeline.settings WHERE singleton").fetchone()
+            active = settings["active_artifact_hash"]
+            artifact = None if active is None else connection.execute(
+                "SELECT artifact FROM rerank_pipeline.artifacts WHERE artifact_hash=%s", (active,)).fetchone()["artifact"]
+            stale = connection.execute("""SELECT mr.* FROM matching_pipeline.controls mc
+                JOIN matching_pipeline.runs mr ON mr.run_id=mc.current_run_id AND mr.state='ready'
+                JOIN matching_pipeline.settings ms ON ms.pool_generation=mr.pool_generation
+                JOIN candidate_pipeline.settings cs ON cs.active_schema_version=mr.schema_version
+                JOIN vacancy_pipeline.vacancies v ON v.vacancy_id=mr.vacancy_id
+                    AND v.revision=mr.vacancy_revision AND v.state='ready' AND v.business_status='open'
+                JOIN rerank_pipeline.controls rc ON rc.vacancy_id=mr.vacancy_id
+                JOIN rerank_pipeline.runs rr ON rr.run_id=rc.current_run_id AND rr.main_run_id=mr.run_id
+                WHERE rr.tail_policy_hash<>%s ORDER BY mr.created_at,mr.run_id LIMIT 100""",
+                (tail_policy_hash(artifact),)).fetchall()
+            for main in stale:
+                if CombineStore._valid(connection, main):
+                    self.queue(connection, main)
             connection.execute("""UPDATE rerank_pipeline.runs SET state='failed',error_code='lease_exhausted',lease_token=NULL,lease_until=NULL
                 WHERE state='processing' AND lease_until<=now() AND attempts>=%s""", (max_attempts,))
             while True:
@@ -366,14 +387,22 @@ class RerankStore:
                 raise ValueError("rerank result is not a permutation of main top-k")
             if outcome.feature_schema_hash != row["feature_schema_hash"] or outcome.tail_policy_hash != row["tail_policy_hash"]:
                 raise ValueError("rerank result schema or tail policy differs from queued identity")
+            if outcome.mode == "main_fallback":
+                from matching_engine.rerank_model import RerankScore
+                expected = promote([RerankScore(card.candidate_id, None, {}, "recommended")
+                                    for card in job.cards], job.candidates, job.cards, promotion_policy())
+                if [item.candidate_id for item in outcome.items] != [item.candidate_id for item in expected]:
+                    raise ValueError("fallback must preserve the bounded main promotion order")
+            inputs = {candidate.candidate_id: candidate for candidate in job.candidates}
             recommended = 0
             for position, item in enumerate(outcome.items, 1):
                 original = originals[item.candidate_id]
-                if outcome.mode == "main_fallback" and (item.kind != "recommended" or item.score is not None or original.position != position):
+                if outcome.mode == "main_fallback" and (item.kind != "recommended" or item.score is not None):
                     raise ValueError("fallback must preserve the complete main order")
                 card = RerankCard(**{**original.model_dump(), "position": position}, main_position=original.position,
                     rerank_position=position if outcome.mode == "learned" else None, mode=outcome.mode, kind=item.kind,
                     rerank_score=item.score, rerank_contributions=item.contributions, artifact_hash=row["artifact_hash"],
+                    promotion=promotion_explanation(inputs[item.candidate_id], promotion_policy()),
                     approval_receipt_hash=row["approval_receipt_hash"], activation_revision=row["activation_revision"],
                     activation_kind=self._activation_kind(row))
                 recommended += item.kind == "recommended"

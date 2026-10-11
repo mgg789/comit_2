@@ -1,0 +1,6305 @@
+{
+  "protocol": {
+    "version": "retrieval-metrics-v1",
+    "label_source": "sealed synthetic teacher labels",
+    "relevant_grade": 2,
+    "precision_denominator": "k",
+    "unjudged_policy": "undefined; report coverage",
+    "uncertainty": "2000 paired family bootstrap draws; descriptive, no multiple-testing claim",
+    "real_hiring_outcomes": false,
+    "training_or_activation": false
+  },
+  "family_count": 8,
+  "aggregate": {
+    "1": {
+      "precision": {
+        "baseline": {
+          "mean": 0.875,
+          "families": 8,
+          "ci95": [
+            0.625,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.125,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.375
+          ]
+        }
+      },
+      "recall": {
+        "baseline": {
+          "mean": 0.125,
+          "families": 8,
+          "ci95": [
+            0.08928571428571427,
+            0.14285714285714285
+          ]
+        },
+        "model": {
+          "mean": 0.15,
+          "families": 8,
+          "ci95": [
+            0.14285714285714285,
+            0.16428571428571428
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.025,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.07500000000000001
+          ]
+        }
+      },
+      "hit_rate": {
+        "baseline": {
+          "mean": 0.875,
+          "families": 8,
+          "ci95": [
+            0.625,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.125,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.375
+          ]
+        }
+      },
+      "reciprocal_rank": {
+        "baseline": {
+          "mean": 0.875,
+          "families": 8,
+          "ci95": [
+            0.625,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.125,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.375
+          ]
+        }
+      },
+      "average_precision": {
+        "baseline": {
+          "mean": 0.875,
+          "families": 8,
+          "ci95": [
+            0.625,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.125,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.375
+          ]
+        }
+      },
+      "ndcg": {
+        "baseline": {
+          "mean": 0.9166666666666666,
+          "families": 8,
+          "ci95": [
+            0.75,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.08333333333333334,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.25
+          ]
+        }
+      },
+      "judged_coverage": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "3": {
+      "precision": {
+        "baseline": {
+          "mean": 0.9583333333333334,
+          "families": 8,
+          "ci95": [
+            0.875,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.04166666666666667,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.125
+          ]
+        }
+      },
+      "recall": {
+        "baseline": {
+          "mean": 0.425,
+          "families": 8,
+          "ci95": [
+            0.41785714285714287,
+            0.42857142857142855
+          ]
+        },
+        "model": {
+          "mean": 0.44999999999999996,
+          "families": 8,
+          "ci95": [
+            0.42857142857142855,
+            0.4928571428571428
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.024999999999999994,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.07499999999999998
+          ]
+        }
+      },
+      "hit_rate": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "reciprocal_rank": {
+        "baseline": {
+          "mean": 0.9375,
+          "families": 8,
+          "ci95": [
+            0.8125,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0625,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.1875
+          ]
+        }
+      },
+      "average_precision": {
+        "baseline": {
+          "mean": 0.9236111111111112,
+          "families": 8,
+          "ci95": [
+            0.7708333333333333,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0763888888888889,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.22916666666666669
+          ]
+        }
+      },
+      "ndcg": {
+        "baseline": {
+          "mean": 0.9608934394981037,
+          "families": 8,
+          "ci95": [
+            0.8826803184943108,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.03910656050189637,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.11731968150568911
+          ]
+        }
+      },
+      "judged_coverage": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "5": {
+      "precision": {
+        "baseline": {
+          "mean": 0.95,
+          "families": 8,
+          "ci95": [
+            0.85,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 0.95,
+          "families": 8,
+          "ci95": [
+            0.85,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "recall": {
+        "baseline": {
+          "mean": 0.7,
+          "families": 8,
+          "ci95": [
+            0.6714285714285715,
+            0.7142857142857143
+          ]
+        },
+        "model": {
+          "mean": 0.7,
+          "families": 8,
+          "ci95": [
+            0.6714285714285715,
+            0.7142857142857143
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "hit_rate": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "reciprocal_rank": {
+        "baseline": {
+          "mean": 0.9375,
+          "families": 8,
+          "ci95": [
+            0.8125,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0625,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.1875
+          ]
+        }
+      },
+      "average_precision": {
+        "baseline": {
+          "mean": 0.9191666666666667,
+          "families": 8,
+          "ci95": [
+            0.7575,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 0.95,
+          "families": 8,
+          "ci95": [
+            0.85,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.03083333333333333,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0925
+          ]
+        }
+      },
+      "ndcg": {
+        "baseline": {
+          "mean": 0.9595642870736398,
+          "families": 8,
+          "ci95": [
+            0.8786928612209194,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 0.976893881053746,
+          "families": 8,
+          "ci95": [
+            0.9306816431612379,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.017329593980106195,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.051988781940318585
+          ]
+        }
+      },
+      "judged_coverage": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "10": {
+      "precision": {
+        "baseline": {
+          "mean": 0.6749999999999999,
+          "families": 8,
+          "ci95": [
+            0.625,
+            0.7
+          ]
+        },
+        "model": {
+          "mean": 0.6749999999999999,
+          "families": 8,
+          "ci95": [
+            0.625,
+            0.7
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "recall": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "hit_rate": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "reciprocal_rank": {
+        "baseline": {
+          "mean": 0.9375,
+          "families": 8,
+          "ci95": [
+            0.8125,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0625,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.1875
+          ]
+        }
+      },
+      "average_precision": {
+        "baseline": {
+          "mean": 0.9536904761904762,
+          "families": 8,
+          "ci95": [
+            0.8610714285714286,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 0.9845238095238095,
+          "families": 8,
+          "ci95": [
+            0.9535714285714285,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.030833333333333324,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.09249999999999997
+          ]
+        }
+      },
+      "ndcg": {
+        "baseline": {
+          "mean": 0.9805678442335195,
+          "families": 8,
+          "ci95": [
+            0.9417035327005583,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 0.9966442069424046,
+          "families": 8,
+          "ci95": [
+            0.9899326208272141,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.01607636270888524,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.04822908812665572
+          ]
+        }
+      },
+      "judged_coverage": {
+        "baseline": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "model": {
+          "mean": 1.0,
+          "families": 8,
+          "ci95": [
+            1.0,
+            1.0
+          ]
+        },
+        "paired_delta": {
+          "mean": 0.0,
+          "families": 8,
+          "ci95": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    }
+  },
+  "slices": {
+    "backend": {
+      "families": 1,
+      "supported": false,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.14285714285714285,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.14285714285714285,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.42857142857142855,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.42857142857142855,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.7142857142857143,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.7142857142857143,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.7,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.7,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        }
+      }
+    },
+    "data": {
+      "families": 2,
+      "supported": false,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.14285714285714285,
+              "families": 2,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "model": {
+              "mean": 0.14285714285714285,
+              "families": 2,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.42857142857142855,
+              "families": 2,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "model": {
+              "mean": 0.42857142857142855,
+              "families": 2,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.7142857142857143,
+              "families": 2,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "model": {
+              "mean": 0.7142857142857143,
+              "families": 2,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.7,
+              "families": 2,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "model": {
+              "mean": 0.7,
+              "families": 2,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "frontend": {
+      "families": 3,
+      "supported": true,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.09523809523809523,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.14285714285714285
+              ]
+            },
+            "model": {
+              "mean": 0.1619047619047619,
+              "families": 3,
+              "ci95": [
+                0.14285714285714285,
+                0.20000000000000004
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.06666666666666667,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.20000000000000004
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.7777777777777778,
+              "families": 3,
+              "ci95": [
+                0.3333333333333333,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.22222222222222224,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.6666666666666666
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 0.8888888888888888,
+              "families": 3,
+              "ci95": [
+                0.6666666666666666,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.11111111111111112,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.3333333333333333
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.41904761904761906,
+              "families": 3,
+              "ci95": [
+                0.4000000000000001,
+                0.42857142857142855
+              ]
+            },
+            "model": {
+              "mean": 0.4857142857142857,
+              "families": 3,
+              "ci95": [
+                0.42857142857142855,
+                0.6
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.06666666666666665,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.19999999999999996
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.7962962962962963,
+              "families": 3,
+              "ci95": [
+                0.38888888888888884,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.20370370370370372,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.6111111111111112
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.8957158386616096,
+              "families": 3,
+              "ci95": [
+                0.687147515984829,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.10428416133839032,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.31285248401517096
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.6761904761904761,
+              "families": 3,
+              "ci95": [
+                0.6,
+                0.7142857142857143
+              ]
+            },
+            "model": {
+              "mean": 0.6761904761904761,
+              "families": 3,
+              "ci95": [
+                0.6,
+                0.7142857142857143
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.7844444444444445,
+              "families": 3,
+              "ci95": [
+                0.35333333333333333,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.08222222222222221,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.24666666666666667
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.8921714321963727,
+              "families": 3,
+              "ci95": [
+                0.6765142965891183,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9383836828099893,
+              "families": 3,
+              "ci95": [
+                0.8151510484299679,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.04621225061361652,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.13863675184084956
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.6333333333333333,
+              "families": 3,
+              "ci95": [
+                0.5,
+                0.6999999999999998
+              ]
+            },
+            "model": {
+              "mean": 0.6333333333333333,
+              "families": 3,
+              "ci95": [
+                0.5,
+                0.6999999999999998
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.8765079365079366,
+              "families": 3,
+              "ci95": [
+                0.6295238095238095,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9587301587301588,
+              "families": 3,
+              "ci95": [
+                0.8761904761904761,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0822222222222222,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.2466666666666666
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.9481809179560519,
+              "families": 3,
+              "ci95": [
+                0.8445427538681556,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9910512185130792,
+              "families": 3,
+              "ci95": [
+                0.9731536555392375,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.042870300557027306,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.1286109016710819
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mixed": {
+      "families": 3,
+      "supported": true,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.09523809523809523,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.14285714285714285
+              ]
+            },
+            "model": {
+              "mean": 0.1619047619047619,
+              "families": 3,
+              "ci95": [
+                0.14285714285714285,
+                0.20000000000000004
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.06666666666666667,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.20000000000000004
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.6666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.3333333333333333,
+              "families": 3,
+              "ci95": [
+                0.0,
+                1.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.7777777777777778,
+              "families": 3,
+              "ci95": [
+                0.3333333333333333,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.22222222222222224,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.6666666666666666
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 0.8888888888888888,
+              "families": 3,
+              "ci95": [
+                0.6666666666666666,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.11111111111111112,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.3333333333333333
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.41904761904761906,
+              "families": 3,
+              "ci95": [
+                0.4000000000000001,
+                0.42857142857142855
+              ]
+            },
+            "model": {
+              "mean": 0.4857142857142857,
+              "families": 3,
+              "ci95": [
+                0.42857142857142855,
+                0.6
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.06666666666666665,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.19999999999999996
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.7962962962962963,
+              "families": 3,
+              "ci95": [
+                0.38888888888888884,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.20370370370370372,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.6111111111111112
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.8957158386616096,
+              "families": 3,
+              "ci95": [
+                0.687147515984829,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.10428416133839032,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.31285248401517096
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.6761904761904761,
+              "families": 3,
+              "ci95": [
+                0.6,
+                0.7142857142857143
+              ]
+            },
+            "model": {
+              "mean": 0.6761904761904761,
+              "families": 3,
+              "ci95": [
+                0.6,
+                0.7142857142857143
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.7844444444444445,
+              "families": 3,
+              "ci95": [
+                0.35333333333333333,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.8666666666666667,
+              "families": 3,
+              "ci95": [
+                0.6,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.08222222222222221,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.24666666666666667
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.8921714321963727,
+              "families": 3,
+              "ci95": [
+                0.6765142965891183,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9383836828099893,
+              "families": 3,
+              "ci95": [
+                0.8151510484299679,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.04621225061361652,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.13863675184084956
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.6333333333333333,
+              "families": 3,
+              "ci95": [
+                0.5,
+                0.6999999999999998
+              ]
+            },
+            "model": {
+              "mean": 0.6333333333333333,
+              "families": 3,
+              "ci95": [
+                0.5,
+                0.6999999999999998
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 0.8333333333333334,
+              "families": 3,
+              "ci95": [
+                0.5,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.16666666666666666,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.5
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 0.8765079365079366,
+              "families": 3,
+              "ci95": [
+                0.6295238095238095,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9587301587301588,
+              "families": 3,
+              "ci95": [
+                0.8761904761904761,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0822222222222222,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.2466666666666666
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 0.9481809179560519,
+              "families": 3,
+              "ci95": [
+                0.8445427538681556,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 0.9910512185130792,
+              "families": 3,
+              "ci95": [
+                0.9731536555392375,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.042870300557027306,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.1286109016710819
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 3,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 3,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "mixed_alt": {
+      "families": 4,
+      "supported": true,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.14285714285714285,
+              "families": 4,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "model": {
+              "mean": 0.14285714285714285,
+              "families": 4,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.42857142857142855,
+              "families": 4,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "model": {
+              "mean": 0.42857142857142855,
+              "families": 4,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.7142857142857143,
+              "families": 4,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "model": {
+              "mean": 0.7142857142857143,
+              "families": 4,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.7,
+              "families": 4,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "model": {
+              "mean": 0.7,
+              "families": 4,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 4,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 4,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ml": {
+      "families": 2,
+      "supported": false,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.14285714285714285,
+              "families": 2,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "model": {
+              "mean": 0.14285714285714285,
+              "families": 2,
+              "ci95": [
+                0.14285714285714285,
+                0.14285714285714285
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.42857142857142855,
+              "families": 2,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "model": {
+              "mean": 0.42857142857142855,
+              "families": 2,
+              "ci95": [
+                0.42857142857142855,
+                0.42857142857142855
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.7142857142857143,
+              "families": 2,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "model": {
+              "mean": 0.7142857142857143,
+              "families": 2,
+              "ci95": [
+                0.7142857142857143,
+                0.7142857142857143
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.7,
+              "families": 2,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "model": {
+              "mean": 0.7,
+              "families": 2,
+              "ci95": [
+                0.7,
+                0.7
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 2,
+              "ci95": [
+                1.0,
+                1.0
+              ]
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 2,
+              "ci95": [
+                0.0,
+                0.0
+              ]
+            }
+          }
+        }
+      }
+    },
+    "stack_only": {
+      "families": 1,
+      "supported": false,
+      "metrics": {
+        "1": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.14285714285714285,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.14285714285714285,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "3": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.42857142857142855,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.42857142857142855,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "5": {
+          "precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 0.7142857142857143,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.7142857142857143,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        },
+        "10": {
+          "precision": {
+            "baseline": {
+              "mean": 0.7,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 0.7,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "recall": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "hit_rate": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "reciprocal_rank": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "average_precision": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "ndcg": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          },
+          "judged_coverage": {
+            "baseline": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "model": {
+              "mean": 1.0,
+              "families": 1,
+              "ci95": null
+            },
+            "paired_delta": {
+              "mean": 0.0,
+              "families": 1,
+              "ci95": null
+            }
+          }
+        }
+      }
+    }
+  },
+  "families": [
+    {
+      "family_id": "backend-hard-2",
+      "slices": [
+        "backend",
+        "mixed_alt"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "frontend-hard-1",
+      "slices": [
+        "frontend",
+        "mixed"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 0.0,
+            "recall": 0.0,
+            "hit_rate": 0.0,
+            "reciprocal_rank": 0.0,
+            "average_precision": 0.0,
+            "ndcg": 0.3333333333333333,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 5
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.2,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 5
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 0.6666666666666666,
+            "recall": 0.4,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 0.5,
+            "average_precision": 0.38888888888888884,
+            "ndcg": 0.687147515984829,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 5
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.6,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 5
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 0.6,
+            "recall": 0.6,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 0.5,
+            "average_precision": 0.35333333333333333,
+            "ndcg": 0.6765142965891183,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 5
+          },
+          "model": {
+            "precision": 0.6,
+            "recall": 0.6,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 0.6,
+            "ndcg": 0.8151510484299679,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 5
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.5,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 0.5,
+            "average_precision": 0.6295238095238095,
+            "ndcg": 0.8445427538681556,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 5
+          },
+          "model": {
+            "precision": 0.5,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 0.8761904761904761,
+            "ndcg": 0.9731536555392375,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 5
+          }
+        }
+      }
+    },
+    {
+      "family_id": "frontend-hard-2",
+      "slices": [
+        "frontend",
+        "mixed_alt"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "frontend-hard-3",
+      "slices": [
+        "frontend",
+        "stack_only"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "data-hard-1",
+      "slices": [
+        "data",
+        "mixed"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "data-hard-2",
+      "slices": [
+        "data",
+        "mixed_alt"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "ml-hard-1",
+      "slices": [
+        "ml",
+        "mixed"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    },
+    {
+      "family_id": "ml-hard-2",
+      "slices": [
+        "ml",
+        "mixed_alt"
+      ],
+      "cutoffs": {
+        "1": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.14285714285714285,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 1,
+            "relevant_total": 7
+          }
+        },
+        "3": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.42857142857142855,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 3,
+            "relevant_total": 7
+          }
+        },
+        "5": {
+          "baseline": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 1.0,
+            "recall": 0.7142857142857143,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 5,
+            "relevant_total": 7
+          }
+        },
+        "10": {
+          "baseline": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          },
+          "model": {
+            "precision": 0.7,
+            "recall": 1.0,
+            "hit_rate": 1.0,
+            "reciprocal_rank": 1.0,
+            "average_precision": 1.0,
+            "ndcg": 1.0,
+            "judged_coverage": 1.0,
+            "returned": 7,
+            "relevant_total": 7
+          }
+        }
+      }
+    }
+  ],
+  "label_quality": {
+    "swap_correct": 26,
+    "swap_total": 36,
+    "quarantined_families": [
+      "backend-hard-1",
+      "backend-hard-3",
+      "data-hard-3",
+      "ml-hard-3"
+    ],
+    "passed": false,
+    "input_families": 12,
+    "policy": "quarantined families excluded; no activation claim"
+  },
+  "provenance": {
+    "dataset_hash": "7cb99549f3525967593552f34b577ec4d6c488a3bdc06282dda7906723f197ec",
+    "manifest_hash": "daac45df571186c0dd7ab6ba71637e62e732e042063dabd34de9b40a154da8c2",
+    "artifact_hash": "c18f4bc1f2926b58643f68d985e5598f6bc28ac8b8d03bfaeeab00472dcbbcc9",
+    "dataset_version": "rerank-hard-benchmark-v7"
+  },
+  "report_hash": "7a884d2a2b5f783afdffd5431b210fb0ff4a5ee59bfdb60d97fdb4f3ad272502"
+}

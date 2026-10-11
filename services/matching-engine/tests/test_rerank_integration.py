@@ -259,3 +259,57 @@ def test_worker_persists_failure_and_explicit_retry(store: Store, monkeypatch) -
     monkeypatch.setattr(module, "rerank_cards", original)
     assert runner.process_once()
     assert reranks.status(vacancy_id).state == "ready"
+
+
+def test_active_promotion_is_published_and_mode_switch_invalidates_it(store, monkeypatch):
+    """Real intake -> pool -> main -> fallback publication preserves model scores."""
+    monkeypatch.setenv("MATCHING_PROMOTION_MODE", "active")
+    combines, vacancy_id, ids = setup_pool(store)
+    store.intake(ids[-1], eligible_profile(source_revision=2, work_types=["remote"], external_evidence=[{
+        "kind": "fsp", "subject": "synthetic", "status": "confirmed",
+        "verified_value": {"rating": 2000, "rank": "MS", "demo_registry": False}}]))
+    assert worker(store).process_once()
+    finish(combines)
+    reranks = RerankStore(store.database_url)
+    assert RerankWorker(reranks).process_once()
+    assert reranks.status(vacancy_id).state == "ready"
+    page = reranks.selections(vacancy_id, "recommended", 10, 0)
+    assert page.items[0].candidate_id == ids[-1]
+    assert page.items[0].promotion.mode == "active"
+    assert page.items[0].promotion.fsp_bonus > 0
+    assert page.items[0].rerank_score is None
+    learned = reranks.register(artifact_for(store))
+    reranks.promote(learned)
+    assert RerankWorker(reranks).process_once()
+    learned_page = reranks.selections(vacancy_id, "recommended", 10, 0)
+    assert learned_page.run.mode == "learned"
+    assert learned_page.items[0].candidate_id == ids[-1]
+    monkeypatch.setenv("MATCHING_PROMOTION_MODE", "off")
+    assert reranks.status(vacancy_id).state == "obsolete"
+    with pytest.raises(ConflictError):
+        reranks.selections(vacancy_id, "recommended", 10, 0)
+    assert RerankWorker(reranks).process_once()  # No manual retry/profile event required.
+    assert reranks.status(vacancy_id).state == "ready"
+    assert reranks.selections(vacancy_id, "recommended", 10, 0).items[0].candidate_id == ids[0]
+
+
+def test_weekly_reward_uses_trusted_private_projection_without_public_achievement(store, monkeypatch):
+    """Server evidence reaches ordering while remaining absent from public resume evidence."""
+    from datetime import UTC, datetime, timedelta
+    monkeypatch.setenv("MATCHING_PROMOTION_MODE", "active")
+    combines, vacancy_id, ids = setup_pool(store)
+    now = datetime.now(UTC)
+    expires = (now + timedelta(days=7 - now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    store.intake(ids[-1], eligible_profile(source_revision=2, work_types=["remote"], external_evidence=[{
+        "kind": "weekly_challenge", "subject": "current", "status": "confirmed", "verified_value": {
+            "provider": "comit_weekly_challenge:v1", "completed_at": now.isoformat(), "expires_at": expires.isoformat()}}]))
+    assert worker(store).process_once()
+    finish(combines)
+    reranks = RerankStore(store.database_url)
+    assert RerankWorker(reranks).process_once()
+    page = reranks.selections(vacancy_id, "recommended", 10, 0)
+    assert page.items[0].candidate_id == ids[-1]
+    assert page.items[0].promotion.weekly_bonus == .005
+    with connect(store.database_url) as connection:
+        public = connection.execute("SELECT public_profile FROM candidate_pipeline.pool WHERE candidate_id=%s", (ids[-1],)).fetchone()["public_profile"]
+    assert not any(item["kind"] == "weekly_challenge" for item in public["external_evidence"])

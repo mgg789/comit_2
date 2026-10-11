@@ -2193,6 +2193,78 @@
         }
       }
     },
+    "/internal/candidate-recommendations/generate": {
+      "post": {
+        "summary": "Recommendation",
+        "operationId": "recommendation_internal_candidate_recommendations_generate_post",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecommendationInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecommendationOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/organization-agent/chat": {
       "get": {
         "summary": "Chat",
@@ -3764,6 +3836,78 @@
           }
         }
       }
+    },
+    "/internal/candidate-resume/parse": {
+      "post": {
+        "summary": "Parse",
+        "operationId": "parse_internal_candidate_resume_parse_post",
+        "parameters": [
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          },
+          {
+            "name": "x-owner-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Owner-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4413,6 +4557,38 @@
         ],
         "title": "CapabilityView",
         "description": "Optional provider availability; manual editing remains explicitly available."
+      },
+      "Count": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "employer_feedback",
+              "matching"
+            ],
+            "title": "Source"
+          },
+          "category": {
+            "type": "string",
+            "maxLength": 64,
+            "title": "Category"
+          },
+          "count": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 3.0,
+            "title": "Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "category",
+          "count"
+        ],
+        "title": "Count",
+        "description": "A canonical category count, never arbitrary prose or an individual observation."
       },
       "CreateRequest": {
         "properties": {
@@ -6585,6 +6761,234 @@
         ],
         "title": "PublicationView",
         "description": "Publication handoff status; accepted means matching intake accepted the payload."
+      },
+      "RecommendationInput": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Count"
+            },
+            "type": "array",
+            "maxItems": 21,
+            "minItems": 1,
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence"
+        ],
+        "title": "RecommendationInput",
+        "description": "Only bounded counts are accepted; names, IDs and raw feedback are forbidden."
+      },
+      "RecommendationOutput": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 3000,
+            "minLength": 40,
+            "title": "Text"
+          },
+          "referenced_categories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 21,
+            "minItems": 1,
+            "title": "Referenced Categories"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "referenced_categories"
+        ],
+        "title": "RecommendationOutput",
+        "description": "Validated bounded text and exact category references, excluding private reasoning."
+      },
+      "ResumeFields": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "primary_direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Direction"
+          },
+          "declared_grade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Declared Grade"
+          },
+          "work_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Types"
+          },
+          "experience": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Experience"
+          },
+          "projects": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Projects"
+          },
+          "achievements": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Achievements"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "title": "ResumeFields",
+        "description": "Only editable declarations; evidence, FSP identity and contact permissions are excluded."
+      },
+      "ResumeResult": {
+        "properties": {
+          "fields": {
+            "$ref": "#/components/schemas/ResumeFields"
+          },
+          "extracted_text": {
+            "type": "string",
+            "title": "Extracted Text"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "pdf_text",
+              "ocr",
+              "mixed"
+            ],
+            "title": "Method"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fields",
+          "extracted_text",
+          "method",
+          "warnings"
+        ],
+        "title": "ResumeResult",
+        "description": "Suggestions require review; raw text remains visible so extraction omissions are recoverable."
+      },
+      "ResumeUpload": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "content_base64": {
+            "type": "string",
+            "maxLength": 6990508,
+            "minLength": 4,
+            "title": "Content Base64"
+          },
+          "processing_consent": {
+            "type": "boolean",
+            "const": true,
+            "title": "Processing Consent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "filename",
+          "content_base64",
+          "processing_consent"
+        ],
+        "title": "ResumeUpload",
+        "description": "Bounded inline bytes; no client filesystem path or external URL is accepted."
       },
       "RevisionRequest": {
         "properties": {

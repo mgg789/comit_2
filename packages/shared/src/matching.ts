@@ -130,6 +130,8 @@ export interface RerankStatus {
 }
 /** Main factors are preserved with explicit scalar R0 score and feature contributions. */
 export interface RerankCard extends CandidateCard {
+  /** Bounded activity/evidence promotion, kept separate from model score contributions. */
+  promotion?: { policy_version: string; mode: "off" | "shadow" | "active"; fsp_bonus: number; weekly_bonus: number; combined_bonus: number; max_base_gap: number; demo_registry: boolean } | null;
   activation_revision?: number;
   approval_receipt_hash?: string | null;
   activation_kind?: "gated" | "manual_override" | "none";

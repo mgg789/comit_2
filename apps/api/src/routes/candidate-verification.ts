@@ -1,6 +1,6 @@
 /** Candidate-owned provider checks. Provider facts are bound to the authenticated account by api-core. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { CandidateVerificationDocumentUpload, CandidateVerificationRequest } from "@comit/shared";
+import type { CandidateVerificationDocumentUpload, CandidateVerificationRequest, FspDemoApproval } from "@comit/shared";
 import type { AuthOptions } from "./auth.js";
 import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { ProfileError, type ProfileStore } from "../profiles/store.js";
@@ -104,7 +104,7 @@ export async function candidateVerificationRoutes(app: FastifyInstance, options:
     try {
       const identity = await resolveSession(request, "candidate", options.config, options.store);
       if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
-      if (!originAllowed(request, options.config, identity.transport === "bearer")) return reply.code(403).send({ detail: "origin_forbidden" });
+      if (request.method !== "GET" && !originAllowed(request, options.config, identity.transport === "bearer")) return reply.code(403).send({ detail: "origin_forbidden" });
       identities.set(request, identity);
     } catch { return reply.code(503).send({ detail: "auth_unavailable" }); }
   };
@@ -124,8 +124,51 @@ export async function candidateVerificationRoutes(app: FastifyInstance, options:
     try { payload = await response.json(); } catch { /* provider error is mapped below */ }
     return { status: response.status, payload };
   };
+  const demoEnabled = () => process.env.NODE_ENV === "development" && process.env.FSP_DEMO_ENABLED === "true";
+  const exchangeDemo = async (accountId: string, body: { expected_revision: number; state: string; code: string }) => {
+    const fixture = await options.profiles.assertFspDemoState(accountId, body.expected_revision, body.state);
+    if (!integrationToken || integrationToken.length > 4096) throw new ProfileError(503, "verification_auth_unavailable");
+    const response = await transport(new URL("/fsp/demo/token", integrationUrl), {
+      method: "POST", headers: { "content-type": "application/json", "x-internal-token": integrationToken }, body: JSON.stringify({ code: body.code, state: body.state }),
+      signal: AbortSignal.timeout(5000), redirect: "error",
+    });
+    if (!response.ok) throw new ProfileError(response.status === 404 ? 404 : 422, "demo_code_invalid_or_replayed");
+    const payload: unknown = await response.json();
+    if (!isDemoParticipant(payload)) throw new ProfileError(503, "verification_invalid_response");
+    if (payload.fsp_id !== fixture) throw new ProfileError(422, "demo_fixture_mismatch");
+    return options.profiles.completeFspDemoAuthorization(accountId, body.expected_revision, body.state, payload);
+  };
+  app.get("/candidate/profile/fsp/status", {
+    schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], response: { 200: {
+      type: "object", additionalProperties: false, required: ["demo_available", "real_available"], properties: { demo_available: { type: "boolean" }, real_available: { const: false, type: "boolean" } },
+    } } }, onRequest: guard,
+  }, async (_request, reply) => reply.header("cache-control", "no-store").send({ demo_available: demoEnabled(), real_available: false }));
+  app.post<{ Body: FspDemoApproval }>("/candidate/profile/fsp/demo/approve", {
+    schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], body: {
+      type: "object", additionalProperties: false, required: ["expected_revision", "state", "import_consent"], properties: {
+        expected_revision: { type: "integer", minimum: 1 }, state: { type: "string", minLength: 20, maxLength: 256 }, import_consent: { type: "boolean", const: true },
+      },
+    }, response: { 200: candidateProfileViewSchema } }, onRequest: guard,
+  }, async (request, reply) => {
+    if (!demoEnabled()) return reply.code(503).send({ detail: "fsp_demo_disabled" });
+    const identity = identities.get(request);
+    if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
+    try {
+      const fixture = await options.profiles.assertFspDemoState(identity.accountId, request.body.expected_revision, request.body.state);
+      const response = await transport(new URL("/fsp/demo/authorize", integrationUrl), {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fixture_id: fixture, state: request.body.state, redirect_uri: process.env.FSP_DEMO_CALLBACK_URL ?? "http://localhost:8080/candidate/profile/fsp/demo/callback" }),
+        signal: AbortSignal.timeout(5000), redirect: "error",
+      });
+      if (!response.ok) throw new ProfileError(503, "fsp_demo_unavailable");
+      const receipt: unknown = await response.json();
+      if (!receipt || typeof receipt !== "object" || !("code" in receipt) || typeof receipt.code !== "string" || receipt.code.length < 20 || receipt.code.length > 256
+        || !("state" in receipt) || receipt.state !== request.body.state) throw new ProfileError(503, "verification_invalid_response");
+      return reply.header("cache-control", "no-store").send(await exchangeDemo(identity.accountId, { ...request.body, code: receipt.code }));
+    } catch (error) { return profileFailure(reply, error); }
+  });
   app.post<{ Body: CandidateVerificationRequest; Reply: unknown }>("/candidate/profile/fsp/demo/authorize", {
-    schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], body: candidateVerificationRequestSchema, response: { 200: resultSchema } }, onRequest: guard,
+    schema: { tags: ["candidate-verification"], security: [{ bearerAuth: [] }, { candidateSession: [] }], body: candidateVerificationRequestSchema, response: { 200: { type: "object", additionalProperties: false, required: ["state", "expires_at", "authorize_url", "callback_url", "demo"], properties: { state: { type: "string" }, expires_at: { type: "string", format: "date-time" }, authorize_url: { type: "string", format: "uri" }, callback_url: { type: "string", format: "uri" }, demo: { type: "boolean", const: true } } } } }, onRequest: guard,
   }, async (request, reply) => {
     const identity = identities.get(request);
     if (process.env.NODE_ENV !== "development" || process.env.FSP_DEMO_ENABLED !== "true") return reply.code(503).send({ detail: "fsp_demo_disabled" });
@@ -146,17 +189,7 @@ export async function candidateVerificationRoutes(app: FastifyInstance, options:
     const identity = identities.get(request);
     if (!identity) return reply.code(401).send({ detail: "unauthenticated" });
     try {
-      const fixture = await options.profiles.assertFspDemoState(identity.accountId, request.body.expected_revision, request.body.state);
-      if (!integrationToken || integrationToken.length > 4096) throw new ProfileError(503, "verification_auth_unavailable");
-      const response = await transport(new URL("/fsp/demo/token", integrationUrl), {
-        method: "POST", headers: { "content-type": "application/json", "x-internal-token": integrationToken }, body: JSON.stringify({ code: request.body.code, state: request.body.state }),
-        signal: AbortSignal.timeout(5000), redirect: "error",
-      });
-      if (!response.ok) return reply.code(response.status === 404 ? 404 : 422).send({ detail: "demo_code_invalid_or_replayed" });
-      const payload: unknown = await response.json();
-      if (!isDemoParticipant(payload)) return reply.code(503).send({ detail: "verification_invalid_response" });
-      if (payload.fsp_id !== fixture) return reply.code(422).send({ detail: "demo_fixture_mismatch" });
-      return reply.header("cache-control", "no-store").send(await options.profiles.completeFspDemoAuthorization(identity.accountId, request.body.expected_revision, request.body.state, payload));
+      return reply.header("cache-control", "no-store").send(await exchangeDemo(identity.accountId, request.body));
     } catch (error) { return profileFailure(reply, error); }
   });
   app.post<{ Body: CandidateVerificationRequest; Reply: unknown }>("/candidate/profile/verifications/fsp", {

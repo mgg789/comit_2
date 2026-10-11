@@ -1,0 +1,36 @@
+# ONLY on a dedicated disposable judge VM, never on the application host.
+# Pre-pull the pinned image before disabling VM outbound access.
+name: comit-code-judge
+services:
+  code-judge:
+    build:
+      context: ..
+      dockerfile: infra/code-judge.Dockerfile
+    environment:
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:?Set a dedicated CODE_JUDGE_TOKEN}"
+      CODE_JUDGE_IMAGE: python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+      CODE_JUDGE_DATA_DIR: /data/judge
+      CODE_JUDGE_PORT: '8106'
+    group_add:
+      - "${DOCKER_SOCKET_GID:?Set the dedicated daemon socket group}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - judge-results:/data/judge
+    ports:
+      - 127.0.0.1:8106:8106
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8106/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+volumes:
+  judge-results:

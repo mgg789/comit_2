@@ -46,15 +46,19 @@ export class VacancyLifecycle {
   }
 
   /** Check source ownership and publication on every new write, including candidate and agent actions. */
-  public async writable(owner: string, draftId: string, client: PoolClient): Promise<boolean> {
-    const pending = await client.query("SELECT 1 FROM vacancy_lifecycle_commands WHERE draft_id=$1 AND phase IN ('queued','source_applied')", [draftId]);
-    if (pending.rowCount) return false;
+  public async writable(owner: string, draftId: string, client: Pool | PoolClient): Promise<boolean> {
+    const lifecycle = (await client.query<{ pending: boolean | null; inactive_at: Date | null }>(`SELECT
+      bool_or(phase IN ('queued','source_applied')) AS pending,
+      max(updated_at) FILTER (WHERE phase='completed') AS inactive_at
+      FROM vacancy_lifecycle_commands WHERE draft_id=$1`, [draftId])).rows[0];
+    if (lifecycle?.pending) return false;
     const response = await this.call("agents", `/internal/vacancy-drafts/${draftId}`, owner);
     if (response.status === 404) return false;
     if (!response.ok) throw new RecruitmentError(503, "vacancy_authority_unavailable");
     const draft = await response.json() as AgentsDraftView;
     return draft.owner_id === owner && draft.draft_id === draftId && !draft.archived && draft.business_status === "open"
-      && draft.state === "created" && draft.publication?.status === "accepted";
+      && (draft.publication?.status === "accepted" || !!draft.published_at &&
+        (!lifecycle?.inactive_at || Date.parse(draft.published_at) > lifecycle.inactive_at.getTime()));
   }
 
   /** Persist a checked CAS command before any remote mutation, then resume its exact outcome on retries. */

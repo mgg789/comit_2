@@ -32,6 +32,13 @@ export function proxyTrustConfig(value: string | undefined): false | string[] {
   return addresses;
 }
 
+const requiredApiMigrations = ["021_support_console.sql", "021_weekly_challenges.sql"] as const;
+
+/** Admit traffic only when every current API schema branch has been migrated. */
+export function requiredApiMigrationsApplied(names: readonly string[]): boolean {
+  return requiredApiMigrations.every(name => names.includes(name));
+}
+
 /** Build the complete production route graph without listening, enabling registration regressions. */
 export async function createApiServer({ logger = true }: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -74,8 +81,8 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
   await app.register(swaggerUi, { routePrefix: "/docs" });
   await app.register(healthRoutes, { readiness: async () => {
     if (!operationConfig || !operationsPool) return false;
-    const result = await operationsPool.query("SELECT 1 FROM auth_migrations WHERE name=$1", ["021_support_console.sql"]);
-    return result.rowCount === 1;
+    const result = await operationsPool.query<{ name: string }>("SELECT name FROM auth_migrations WHERE name = ANY($1::text[])", [requiredApiMigrations]);
+    return requiredApiMigrationsApplied(result.rows.map(row => row.name));
   } });
   await app.register(cookie);
   await app.register(candidatePipelineRoutes);

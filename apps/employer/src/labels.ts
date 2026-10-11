@@ -1,50 +1,7 @@
 /** Human-readable labels for matching keys shared by employer screens; keys stay canonical. */
 
-// Canonical stack keys from matching_engine/strict.py INITIAL_GROUPS; keep labels human-readable.
-export const stackChoices = [
-  ["python", "Python"],
-  ["node", "Node.js"],
-  ["go", "Go"],
-  ["php", "PHP"],
-  ["react", "React"],
-  ["vue", "Vue"],
-  ["angular", "Angular"],
-  ["html_css_jquery", "HTML / CSS / jQuery"],
-  ["tailwind", "Tailwind CSS"],
-  ["electron", "Electron"],
-  ["figma", "Figma"],
-  ["postgres", "PostgreSQL"],
-  ["mongo", "MongoDB"],
-  ["sqlite", "SQLite"],
-  ["mysql", "MySQL"],
-  ["docker", "Docker"],
-] as const;
-
-export const domainChoices = [
-  ["ux_userflow", "UX и пользовательские сценарии"],
-  ["architecture_thinking", "Архитектура систем"],
-  ["rest_api", "REST API"],
-  ["sql", "SQL"],
-  ["doc_databases", "Документные базы данных"],
-  ["data_analytics_stats", "Аналитика и статистика"],
-  ["math", "Математика"],
-  ["algorithms", "Алгоритмы"],
-  ["lowlevel_optimization", "Низкоуровневая оптимизация"],
-  ["cybersecurity", "Информационная безопасность"],
-  ["devops", "DevOps"],
-  ["ai_agents", "AI-агенты"],
-  ["nlp_and_arbitrary_data", "NLP и неструктурированные данные"],
-  ["neural_nets", "Нейронные сети"],
-  ["classical_ml", "Классическое машинное обучение"],
-] as const;
-export const softChoices = [
-  ["teamwork", "Командная работа"],
-  ["representation", "Презентация и коммуникация"],
-  ["leadership", "Лидерство"],
-  ["project_management", "Управление проектами"],
-  ["time_management", "Управление временем"],
-  ["self_organization", "Самоорганизация"],
-] as const;
+import { stackChoices, domainChoices, softChoices } from "@comit/shared";
+export { stackChoices, domainChoices, softChoices };
 
 /** Specialization as a short tag (cards, deck). */
 export const specializationLabels: Record<string, string> = {

@@ -77,3 +77,18 @@ jobs:
           args=()
           if [[ "$ADOPT_LEGACY" == true ]]; then args+=(--adopt-legacy); fi
           python3 infra/deploy.py "$RELEASE_SHA" --repo "$GITHUB_WORKSPACE" "${args[@]}"
+
+  public-smoke:
+    name: Verify deployed public HTTPS and API responses
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Probe real public deployment from an external runner
+        env:
+          PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL || 'https://comit.droidje.com' }}
+        run: python3 infra/public-smoke.py "$PUBLIC_SITE_URL"

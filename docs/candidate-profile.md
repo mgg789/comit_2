@@ -17,6 +17,7 @@
 | POST | `/candidate/profile/projection/retry` | retry последней terminal `failed` projection |
 | GET | `/candidate/pipeline` | статус matching projection кандидата |
 | GET | `/candidate/resume.pdf` | собственный owner PDF после актуальной projection |
+| GET | `/candidate/skills/catalog` | активная схема с названиями, точными предметами тестов и приватными сроками повторной проверки |
 | GET | `/candidate/taxonomy` | текущая strict-schema (ключи доменов/стеков/soft skills) из matching-engine |
 
 `candidate_id` и owner выводятся из JWT/DB session. Клиент не передаёт owner UUID,
@@ -33,7 +34,17 @@ projection state и consent timestamp запрещены в source mutation.
 
 ## Декларации и evidence
 
-Навык хранит заявленный `level` 0–7. Narrative claim имеет стабильный серверный
+Новый навык выбирается из активного каталога matching-engine. В интерфейсе уровни:
+Intern, Junior, Junior+, Middle, Middle+, Senior, Senior+; внутренние значения —
+1–7. Ноль читается только для совместимости со старыми профилями.
+Новый неизвестный ключ или неверная пара группы и ключа отклоняется API с
+`400 unknown_skill_coordinate`; изменение уровня на ноль — `invalid_skill_level`.
+Старый неизвестный навык можно оставить без изменений при редактировании других
+полей, явно заменить каноническим или удалить. Свободный дополнительный опыт
+пишется в `description`, не создавая координату strict vector. Если registry
+недоступен, новые/изменённые навыки не сохраняются; неизменённые значения сохраняются.
+
+Навык хранит заявленный `level` отдельно от результата теста. Narrative claim имеет стабильный серверный
 UUID: существующий ID можно вернуть для обновления того же claim, а новый ID всегда
 выдаёт сервер. Это не запрещает round-trip ID вложенного claim; ID профиля и
 `candidate_id` не являются editable полями. Claim нужен для адресации отдельных
@@ -50,7 +61,25 @@ Evidence — отдельный read-only канал ответа. Для каж
 Канонизация сортирует ключи объектов, сохраняет порядок массивов и исключает
 `undefined`. При изменении уже подтверждённого значения projection возвращает
 `self_reported`, пока источник не подтвердит новый hash. Это не даёт source profile
-самому назначить себе proof.
+самому назначить себе proof. Предметные тесты — отдельные независимые измерения:
+изменение декларации не переписывает принятое сервером измерение. Matching получает
+измеренный уровень и `confirmed` для той же координаты, декларация остаётся в source.
+
+Точное соответствие тестов: `algorithms`, `sql`, `rest_api` → `domains`;
+`python`, `react`, `docker` → `stacks`; `teamwork` → `soft_skills`.
+Intern/Junior/Middle/Senior теста дают 1/2/4/6 соответственно. Уровни «+» тестом
+не подтверждаются. Teamwork подтверждает результат предметного теста, а не
+наблюдение поведения человека в реальной команде. Skill test не меняет
+`declared_grade`, и отдельного списка несвязанных грейдов в профиле нет.
+
+`grade:<subject>` и ledger `candidate_grade_results` читаются совместимо:
+старые результаты получают координатное evidence с hash текущей декларации;
+потерянные старым редактором `grade:*` восстанавливаются из accepted ledger.
+Старые отсутствующие или пустые группы восстанавливаются по принятому результату.
+Явное удаление в новом редакторе записывает серверный marker
+`external:testing_removed:<subject>`: он исключает навык из восстановления и matching,
+пока кандидат не добавит его снова. Так legacy-пустота отличается от удаления. Новый trusted
+результат пишет координатное evidence, source revision и outbox в одной транзакции.
 
 ## Согласия и грейд
 
@@ -61,12 +90,12 @@ Profile consent отдельный от account consent и использует 
 draft.
 
 `declared_grade` — пользовательская декларация. Browser contour выдаёт
-`self_reported`: UUID сессии не придумывается. Trusted testing source
-(`POST /internal/testing/session-result`, [api.md](api.md)) реализован в API: он
-обновляет authoritative evidence, ставит новый exact snapshot в outbox и даёт
-legacy `approved` с настоящими `test_session_id` и `approved_at`, только если
-подтверждённый грейд совпадает с `declared_grade`. Publisher testing-engine есть в
-коде, но развёрнутый сервис его не запускает ([testing-engine.md](testing-engine.md)).
+`self_reported`: UUID сессии не придумывается. Внутренний trusted producer
+`/internal/testing/session-result` атомарно пишет evidence и exact outbox.
+Предметные тесты подтверждают собственную координату, не общую профессию;
+legacy результаты направлений могут дать `approved` с настоящими session id
+и временем при совпадении подтверждённого и declared грейда; они не создаются
+выбором предмета в новом интерфейсе.
 Передача approved напрямую в matching не заменяет source.
 Оба состояния могут получить категорию и попасть в пул при наличии остальных
 обязательных полей; `pending`/`rejected` остаются заблокированными.
@@ -163,3 +192,17 @@ features. Копии экспортов контролирует операто�
 
 Тексты: [тестовые документы](legal/README.md), [согласие](legal/processing-consent.md),
 [добровольное обучение](legal/training-consent.md). UI в этот проход не входит.
+
+## Восстановление проекций предметных тестов
+
+Profile worker при старте обрабатывает не более 100 профилей с accepted предметным
+результатом без маркера `external:testing_mapping:v1`. Под обычными блокировками
+account/profile он восстанавливает coordinate evidence, сравнивает точный snapshot,
+и лишь при изменении увеличивает source revision и ставит новую проекцию в outbox.
+Повторный старт не меняет отмеченные профили; маркер сохраняется при редактировании.
+Source самооценка остаётся прежней. Проекция не выполняется в обход worker/consent.
+
+Для большего накопленного объёма оператор может повторять
+`pnpm --filter @comit/api profile:worker --backfill-only` с штатным окружением,
+пока очередной проход не найдёт необработанных профилей. Это ограниченный проход,
+не сканирование на каждом polling cycle. В рамках разработки live-backfill не запускался.

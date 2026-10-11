@@ -20,6 +20,9 @@ export type AgentsAvailabilitySlot = { "starts_at": string; "ends_at": string; "
 /** Optional provider availability; manual editing remains explicitly available. */
 export type AgentsCapabilityView = { "manual_editing": true; "agent": boolean; "enrichment": boolean; "fallback": "manual_editing"; "disabled_code": "agent_disabled_manual_available"; };
 
+/** A canonical category count, never arbitrary prose or an individual observation. */
+export type AgentsCount = { "source": "employer_feedback" | "matching"; "category": string; "count": number; };
+
 /** Human publication confirmation for one exact approved summary. */
 export type AgentsCreateRequest = { "expected_revision": number; "summary_hash": string; };
 
@@ -127,6 +130,21 @@ export type AgentsPresenceUpdate = { "present": boolean; };
 
 /** Publication handoff status; accepted means matching intake accepted the payload. */
 export type AgentsPublicationView = { "status": "pending" | "accepted" | "failed"; "source_revision": number; "matching_status"?: (string | null); "job_id"?: (string | null); "summary_hash"?: (string | null); "error"?: (string | null); };
+
+/** Only bounded counts are accepted; names, IDs and raw feedback are forbidden. */
+export type AgentsRecommendationInput = { "evidence": Array<AgentsCount>; };
+
+/** Validated bounded text and exact category references, excluding private reasoning. */
+export type AgentsRecommendationOutput = { "text": string; "referenced_categories": Array<string>; };
+
+/** Only editable declarations; evidence, FSP identity and contact permissions are excluded. */
+export type AgentsResumeFields = { "display_name"?: (string | null); "phone"?: (string | null); "city"?: (string | null); "description": string; "primary_direction"?: (string | null); "declared_grade"?: (string | null); "work_types"?: (Array<string> | null); "experience"?: Array<Record<string, string>>; "projects"?: Array<Record<string, string>>; "achievements"?: Array<Record<string, string>>; };
+
+/** Suggestions require review; raw text remains visible so extraction omissions are recoverable. */
+export type AgentsResumeResult = { "fields": AgentsResumeFields; "extracted_text": string; "method": "pdf_text" | "ocr" | "mixed"; "warnings": Array<string>; };
+
+/** Bounded inline bytes; no client filesystem path or external URL is accepted. */
+export type AgentsResumeUpload = { "filename": string; "content_base64": string; "processing_consent": true; };
 
 /** Revision guard shared by approval and other mutating operations. */
 export type AgentsRevisionRequest = { "expected_revision": number; };
