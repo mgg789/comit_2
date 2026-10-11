@@ -364,7 +364,12 @@
   margin-bottom: 18rem;
   overflow: hidden;
 }
-.discovery-accordion summary {
+.discovery-accordion-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   padding: 20rem 25rem;
   min-height: 120rem;
   display: flex;
@@ -374,10 +379,7 @@
   cursor: pointer;
   font-size: 26rem;
 }
-.discovery-accordion summary::-webkit-details-marker {
-  display: none;
-}
-.discovery-accordion summary > span {
+.discovery-accordion-toggle {
   width: 80rem;
   height: 80rem;
   border-radius: 50%;
@@ -388,7 +390,7 @@
   place-items: center;
   transition: transform 0.18s;
 }
-.discovery-accordion[open] summary > span {
+.discovery-accordion[data-open="true"] .discovery-accordion-toggle {
   transform: rotate(45deg);
 }
 .discovery-accordion-body {
@@ -396,7 +398,6 @@
   font-size: 24rem;
   display: grid;
   gap: 28rem;
-  animation: discovery-expand 0.25s ease-out;
 }
 .discovery-accordion-body article {
   display: grid;
@@ -861,10 +862,19 @@
   }
 }
 @media (max-width: 760px) {
+  /* Two columns keep the four filters to two rows before the first candidate. */
   .discovery-filters {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin: 20rem 0;
     gap: 8rem;
+  }
+  .discovery-filters > * {
+    width: 100%;
+    min-width: 0;
+  }
+  .discovery-filters > .custom-select.discovery-sort {
+    grid-column: 1 / -1;
   }
   .discovery-filters select,
   .discovery-filters input,
@@ -972,13 +982,13 @@
     border-radius: 20rem;
     margin-bottom: 12rem;
   }
-  .discovery-accordion summary {
+  .discovery-accordion-trigger {
     min-height: 75rem;
     font-size: 16rem;
     padding: 15rem;
     gap: 12rem;
   }
-  .discovery-accordion summary > span {
+  .discovery-accordion-toggle {
     width: 44rem;
     height: 44rem;
     font-size: 30rem;
@@ -1121,6 +1131,11 @@
 .statistics-inventory .statistics-summary-grid > div { gap: 2rem; }
 .statistics-summary-grid > div > div { display: flex; align-items: center; gap: 10rem; }
 @media (max-width: 760px) {
+  /* Five stage chips did not wrap and pushed the whole resume card past the screen edge. */
+  .light-row { min-width: 0; }
+  .light-row .discovery-identity { min-width: 0; flex: 1 1 0; }
+  .discovery-milestones { flex: 1 1 100%; flex-wrap: wrap; gap: 8rem; min-width: 0; }
+  .discovery-milestones span { padding: 6rem 12rem; font-size: 13rem; }
   .discovery-tile-actions { width: 100%; }
   .light-row .discovery-tile-actions .discovery-reject { width: 48rem; min-width: 48rem; }
   .light-row .discovery-tile-actions .discovery-dark { flex: 1; }
@@ -1146,4 +1161,12 @@
   .statistics-expense-categories small { font-size: 12rem; }
   .statistics-expense-total { flex-direction: column; gap: 4rem; }
   .statistics-expense-total strong { font-size: 36rem; }
+}
+
+.discovery-accordion-content { overflow: hidden; }
+.discovery-accordion-toggle > span { transform: translateY(-2px); line-height: 1; }
+.light-row .discovery-tile-actions .action,
+.light-row .discovery-tile-actions .action .icon { color: var(--employer-ink); }
+@media (prefers-reduced-motion: reduce) {
+  .discovery-accordion-toggle { transition: none; }
 }

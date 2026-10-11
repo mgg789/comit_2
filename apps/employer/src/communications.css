@@ -188,8 +188,8 @@
   padding: 12rem;
   border-radius: 14rem;
   background: var(--employer-paint-ffffff0f);
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
   font-size: 18rem;
 }
 .agent-attached-document-icon {
@@ -270,8 +270,8 @@
   font-size: 54rem;
   font-weight: 400;
   padding: 0 !important;
-  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
 }
 .agent-close .icon {
   width: 28rem;

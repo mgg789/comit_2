@@ -25,6 +25,7 @@ import { stackChoices } from "./labels";
 import { candidateName } from "./candidate-name";
 import { SHOWCASE_SORTS, candidateCode, isShowcaseSort, orderCandidates } from "./showcase-order";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
+import { ResumeAccordion } from "./resume-accordion";
 import "./discovery.css";
 
 const evidenceLabels: Record<string, string> = {
@@ -672,74 +673,58 @@ export function Resume({
           <p className="discovery-bio">{detail.description}</p>
         )}
         {sections.map((section) => (
-          <details className="discovery-accordion" key={section.title}>
-            <summary>
-              {section.title}
-              <span>+</span>
-            </summary>
-            <div className="discovery-accordion-body">
-              {section.entries.length ? (
-                section.entries.map((item, index) => (
-                  <article key={`${item.title}-${index}`}>
-                    <h3>{item.title}</h3>
-                    <p>{item.description}</p>
-                    <small>
-                      Статус: {evidenceLabels[item.status] || item.status}
-                    </small>
-                  </article>
-                ))
-              ) : (
-                <p>Опубликованных данных пока нет.</p>
-              )}
-            </div>
-          </details>
-        ))}
-        <details className="discovery-accordion">
-          <summary>
-            Тесты — переносимые<span>+</span>
-          </summary>
-          <div className="discovery-accordion-body">
-            {candidate.testing_results?.map(result => <article key={result.subject} className="employer-testing-result"><h3>{testingSubjectLabel(result.subject)} · {gradeLabels[result.grade]}</h3><p>Подтверждено тестированием</p><p className="muted">{testingPresenceLabel(result)}</p><p className="muted">Автоматическая отметка присутствия, не заключение о честности.</p></article>)}
-            <p>Общий грейд: {gradeLabels[candidate.category.grade]}</p>
-            <p>
-              {candidate.category.grade_status === "approved"
-                ? "Подтверждён тестированием"
-                : "Указан кандидатом; подтверждение отсутствует"}
-            </p>
-          </div>
-        </details>
-        <details className="discovery-accordion">
-          <summary>
-            Вектор навыков<span>+</span>
-          </summary>
-          <div className="discovery-accordion-body discovery-skills">
-            {[...detail.domains, ...detail.stacks, ...detail.soft_skills].map(
-              (skill, index) => (
-                <div className="skill-row" key={`${skill.key}-${index}`}>
-                  <header>
-                    <span>{skill.key}</span>
-                    <span>
-                      {skill.level}/7 ·{" "}
-                      {evidenceLabels[skill.status] || skill.status}
-                    </span>
-                  </header>
-                  <div className="skill-track">
-                    <span
-                      style={{
-                        width: `${Math.min(100, Math.max(0, (skill.level / 7) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ),
+          <ResumeAccordion title={section.title} key={section.title}>
+            {section.entries.length ? (
+              section.entries.map((item, index) => (
+                <article key={`${item.title}-${index}`}>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <small>
+                    Статус: {evidenceLabels[item.status] || item.status}
+                  </small>
+                </article>
+              ))
+            ) : (
+              <p>Опубликованных данных пока нет.</p>
             )}
-            {!detail.domains.length &&
-              !detail.stacks.length &&
-              !detail.soft_skills.length && (
-                <p>Опубликованных навыков пока нет.</p>
-              )}
-          </div>
-        </details>
+          </ResumeAccordion>
+        ))}
+        <ResumeAccordion title="Тесты — переносимые">
+          {candidate.testing_results?.map(result => <article key={result.subject} className="employer-testing-result"><h3>{testingSubjectLabel(result.subject)} · {gradeLabels[result.grade]}</h3><p>Подтверждено тестированием</p><p className="muted">{testingPresenceLabel(result)}</p><p className="muted">Автоматическая отметка присутствия, не заключение о честности.</p></article>)}
+          <p>Общий грейд: {gradeLabels[candidate.category.grade]}</p>
+          <p>
+            {candidate.category.grade_status === "approved"
+              ? "Подтверждён тестированием"
+              : "Указан кандидатом; подтверждение отсутствует"}
+          </p>
+        </ResumeAccordion>
+        <ResumeAccordion title="Вектор навыков" bodyClassName="discovery-skills">
+          {[...detail.domains, ...detail.stacks, ...detail.soft_skills].map(
+            (skill, index) => (
+              <div className="skill-row" key={`${skill.key}-${index}`}>
+                <header>
+                  <span>{skill.key}</span>
+                  <span>
+                    {skill.level}/7 ·{" "}
+                    {evidenceLabels[skill.status] || skill.status}
+                  </span>
+                </header>
+                <div className="skill-track">
+                  <span
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (skill.level / 7) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ),
+          )}
+          {!detail.domains.length &&
+            !detail.stacks.length &&
+            !detail.soft_skills.length && (
+              <p>Опубликованных навыков пока нет.</p>
+            )}
+          </ResumeAccordion>
         {notice && (
           <p className="inline-notice" role="status">
             {notice}
@@ -951,10 +936,12 @@ export function Resumes({ navigate }: Navigation) {
   }, [identity]);
   const pages = useResource(async () => {
     const result: ResumeVacancyPage[] = [];
+    // Never-published drafts have no saved list; withdrawn published vacancies remain readable.
+    const readable = selectedDrafts.filter((vacancy) => vacancy.business_status !== "draft" || !!vacancy.published_at);
     // Keep concurrency bounded while reading every owner vacancy.
-    for (let offset = 0; offset < selectedDrafts.length; offset += 4) {
+    for (let offset = 0; offset < readable.length; offset += 4) {
       const batch = await Promise.all(
-        selectedDrafts.slice(offset, offset + 4).map(async (vacancy) => {
+        readable.slice(offset, offset + 4).map(async (vacancy) => {
           const [saved, processes] = await Promise.all([
             api.getSaved(vacancy.draft_id),
             api.getEmployerRecruitment(vacancy.draft_id),

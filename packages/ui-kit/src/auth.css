@@ -197,8 +197,8 @@
   padding: 35rem 24rem;
   gap: 0;
   align-items: center;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-card h1 {
   width: 543rem;
@@ -253,8 +253,8 @@
   isolation: isolate;
   overflow: hidden;
   background: transparent;
-  backdrop-filter: blur(100rem);
   -webkit-backdrop-filter: blur(100rem);
+  backdrop-filter: blur(100rem);
 }
 .otp-digit::before,
 .otp-submit::before {

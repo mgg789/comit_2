@@ -50,6 +50,15 @@ const employerConversationTransport: ConversationTransport = {
   downloadFile: (id, fileId) => api.downloadChatFile("employer", id, fileId),
 };
 
+/** Russian labels for interview states shown to the employer. */
+export const interviewStateNames: Record<RecruitmentView["interviews"][number]["state"], string> = {
+  proposed: "ждёт подтверждения кандидата",
+  scheduled: "подтверждено",
+  declined: "кандидат отклонил время",
+  cancelled: "отменено",
+  completed: "проведено",
+};
+
 /** Process states shared with the notifications bell. */
 export const recruitmentStateNames: Record<RecruitmentView["state"], string> = {
   sent: "Приглашение отправлено",
@@ -300,8 +309,8 @@ function RecruitmentThread({
             {p.interviews.map((interview) => (
               <p key={interview.id}>
                 Интервью:{" "}
-                {new Date(interview.starts_at).toLocaleString("ru-RU")} ·{" "}
-                {interview.state}
+                {new Intl.DateTimeFormat("ru-RU", { dateStyle: "short", timeStyle: "short", timeZone: interview.time_zone }).format(new Date(interview.starts_at))} ·{" "}
+                {interviewStateNames[interview.state]}
               </p>
             ))}
           </div>

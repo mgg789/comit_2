@@ -31,3 +31,7 @@ __pycache__/
 # Python coverage databases
 .coverage
 .coverage.*
+
+# Local provider credentials; never commit or include in image contexts.
+qwen-token.txt
+qwen_token.txt

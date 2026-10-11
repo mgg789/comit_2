@@ -271,6 +271,12 @@
   .chat-tile-state { flex-basis: 100%; padding-left: 54rem; }
   .recruitment-thread .recruitment-messages { height: max(180rem, calc(100dvh - 430rem)); }
   .recruitment-thread .communication-composer-wrap { bottom: 180rem; }
+  /* In a phone chat the deadline is a one-line reminder: the full explanation lives on the offer
+     screen, otherwise it takes most of the screen and squeezes the message history to a strip. */
+  .recruitment-conversation .recruitment-deadline { margin: 8rem 0; padding: 10rem 14rem; border-radius: 14rem; }
+  .recruitment-conversation .recruitment-deadline strong { font-size: 14rem; }
+  .recruitment-conversation .recruitment-deadline p { display: none; }
+  .recruitment-conversation .recruitment-deadline small { display: block; margin-top: 2rem; font-size: 12rem; }
 }
 
 .message-composer .attach-button .icon { width: 28rem; height: 28rem; }

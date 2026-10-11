@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { skillTestSubject, skillLevelLabel, TEST_GRADE_LEVELS, type CandidateSkillCatalogItem } from "@comit/shared";
-import { skillTestAction } from "../src/testing-launch";
+import { screenShareSupported, skillTestAction } from "../src/testing-launch";
 
 const skill: CandidateSkillCatalogItem = { group: "stacks", key: "react", label: "React", test_subject: "react", confirmed_level: null, next_attempt_at: null, upgrade_at: null };
 test("test actions bind exact canonical coordinates, never arbitrary aliases or the wrong group", () => {
@@ -19,4 +19,10 @@ test("skill actions reflect server availability and distinguish confirmation fro
   assert.equal(skillTestAction({ ...skill, test_subject: null }, now).label, "Пока нет теста");
   assert.equal(skillTestAction({ ...skill, confirmed_level: 4, upgrade_at: "2026-10-12T00:00:01Z" }, now).label, "Тест через 2 дн.");
   assert.deepEqual(skillTestAction({ ...skill, confirmed_level: 4, upgrade_at: "2026-10-10T00:00:00Z" }, now), { label: "Улучшить", mode: "upgrade", disabled: false });
+});
+
+test("phones without screen sharing are told before launch", () => {
+  assert.equal(screenShareSupported(undefined), false);
+  assert.equal(screenShareSupported({}), false);
+  assert.equal(screenShareSupported({ getDisplayMedia: () => undefined }), true);
 });
