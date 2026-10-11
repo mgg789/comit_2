@@ -90,6 +90,7 @@ test("PostgreSQL salary market excludes drafts, other grades, stale revisions an
     await vacancy(900000, 1000000, { schema: 2 });
     await vacancy(900000, 1000000, { revision: 2 });
     await vacancy(900000, 1000000, { stacks: { python: 4 } });
+    await vacancy(900000, 1000000, { stacks: { python: 4, postgresql: 0 } });
     const result = await store.get(query);
     assert.equal(result.sample_count, 3);
     assert.equal(result.average_salary_rub, 200000);

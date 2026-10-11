@@ -22,7 +22,7 @@ export class SalaryMarketStore {
           AND v.profile->>'zp_min' IS NOT NULL AND v.profile->>'zp_max' IS NOT NULL
           AND CASE WHEN cardinality($3::text[])=0 THEN true ELSE
             NOT EXISTS (SELECT 1 FROM unnest($3::text[]) AS wanted(key)
-              WHERE NOT COALESCE(v.profile->'stacks' ? wanted.key, false)) END
+              WHERE COALESCE((v.profile->'stacks'->>wanted.key)::numeric, 0) <= 0) END
           AND (v.profile->>'zp_min')::numeric >= 0
           AND (v.profile->>'zp_max')::numeric >= (v.profile->>'zp_min')::numeric
       )
