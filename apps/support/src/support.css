@@ -7,6 +7,11 @@
   gap: 16rem;
   padding: 24rem clamp(16rem, 4vw, 48rem) 48rem;
   box-sizing: border-box;
+  color: var(--comit-text);
+  font-family: var(--employer-font, inherit);
+  font-size: 22rem;
+  line-height: 1.35;
+  background: var(--comit-bg);
 }
 
 .support-shell-header {
@@ -65,6 +70,7 @@
 }
 
 .support-screen {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 18rem;
@@ -72,6 +78,49 @@
   margin: 0 auto;
 }
 
-.support-screen .chat-back h1 {
+.support-screen-header h1 {
   margin: 0;
+  font-size: 34rem;
+  font-weight: 700;
+  letter-spacing: -1rem;
+}
+
+/* Tile previews are longer than cabinet process states: keep the label in charge. */
+.support-screen .chat-tile-state {
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Conversation screen reuses the kit chat-page system: the thread fills the
+   viewport below the console header, the absolute chat-back keeps its own band. */
+.support-app.chat-page {
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 24rem;
+}
+
+.support-app.chat-page .recruitment-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.support-app.chat-page .recruitment-thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(964rem, 100%);
+  margin: 0 auto;
+  padding-top: 84rem;
+}
+
+.support-app.chat-page .chat-history-viewport {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 24rem;
 }

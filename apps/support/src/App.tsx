@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEventHandler } from "react";
+import { useEffect, useRef, useState, type FormEventHandler } from "react";
 import { ApiError } from "@comit/api-client";
 import type { SupportConversation, SupportOperatorView, SystemNotification } from "@comit/shared";
 import { Action, Field, Icon, State } from "@comit/ui-kit/design";
@@ -39,26 +39,29 @@ function LoginScreen({ onLogin }: { onLogin: (operator: SupportOperatorView) => 
 /** Conversation directory: every account that has touched the Comit chat, newest activity first. */
 function ChatsScreen({ navigate }: { navigate: (path: string) => void }) {
   const conversations = useResource(() => api.getSupportConversations(0, 100));
-  const poll = useRef<ReturnType<typeof setTimeout>>(null);
-  const load = useCallback(() => {
-    if (document.visibilityState !== "visible") return;
-    void api.getSupportConversations(0, 100).then(page => conversations.setData(page)).catch(() => undefined);
-    // Chain a quiet refresh; failures keep the last confirmed list.
-    if (poll.current) clearTimeout(poll.current);
-    poll.current = setTimeout(load, 5000);
-  }, [conversations]);
+  const setData = conversations.setData;
   useEffect(() => {
-    load();
-    document.addEventListener("visibilitychange", load);
-    return () => { if (poll.current) clearTimeout(poll.current); document.removeEventListener("visibilitychange", load); };
-  }, [load]);
+    // Quiet 5 s refresh; setData is a stable setter, so this effect never restarts on renders.
+    let active = true, timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = () => {
+      if (document.visibilityState === "visible") {
+        void api.getSupportConversations(0, 100)
+          .then(page => { if (active) setData(page); })
+          .catch(() => undefined);
+      }
+      timer = setTimeout(poll, 5000);
+    };
+    timer = setTimeout(poll, 5000);
+    document.addEventListener("visibilitychange", poll);
+    return () => { active = false; if (timer) clearTimeout(timer); document.removeEventListener("visibilitychange", poll); };
+  }, [setData]);
   const items = (conversations.data?.items ?? []).map(item => ({
     id: item.account_id, title: item.email, subtitle: roleLabel[item.role],
     state: item.last_text ? `${time(item.last_created_at)} · ${item.last_text}` : "Нет сообщений",
     unread: item.unread_count > 0 ? item.unread_count : undefined,
   }));
   return <section className="support-screen">
-    <div className="chat-back"><h1>Чаты поддержки</h1></div>
+    <div className="support-screen-header"><h1>Чаты поддержки</h1></div>
     <RecruitmentChatList loading={conversations.loading} error={conversations.error} retry={conversations.refresh}
       emptyText="Диалогов пока нет — они появятся, когда пользователи напишут в чат Comit."
       items={items} onOpen={id => navigate(`/chat/${id}`)} />
@@ -117,19 +120,21 @@ function ConversationScreen({ accountId, navigate }: { accountId: string; naviga
         <small>{conversation ? roleLabel[conversation.role] : "Загружаем…"}</small>
       </div>
     </div>
-    <div className="chat-history-viewport"><div className="recruitment-messages" aria-label="Диалог поддержки">
-      {(loading || error) && <State loading={loading} error={error} />}
-      {!loading && !items.length && <p className="empty-note">Сообщений пока нет.</p>}
-      {items.map(item => <article key={item.id} className={`message-bubble ${item.type === "support.reply" ? "outgoing" : "incoming"}`}>
-        <p>{item.text}</p>
-        <time dateTime={item.created_at}>{time(item.created_at)}</time>
-      </article>)}
-    </div></div>
-    <div className="communication-composer-wrap">
-      {error && <p className="communication-error" role="alert">{error}</p>}
-      <ChatComposer text={text} onTextChange={value => { setText(value); setError(null); }} onSubmit={event => void submit(event)}
-        messageLabel="Ответ от имени Comit" sendLabel="Ответить как Comit" placeholder="Ответ от имени Comit" maxLength={2000}
-        canSubmit={!sending && !!text.trim()} sending={sending} attachDisabled onAttach={() => undefined} attachLabel="Вложения в поддержке недоступны" />
+    <div className="recruitment-thread">
+      <div className="chat-history-viewport"><div className="recruitment-messages" aria-label="Диалог поддержки">
+        {(loading || error) && <State loading={loading} error={error} />}
+        {!loading && !items.length && <p className="empty-note">Сообщений пока нет.</p>}
+        {items.map(item => <article key={item.id} className={`message-bubble ${item.type === "support.reply" ? "outgoing" : "incoming"}`}>
+          <p>{item.text}</p>
+          <time dateTime={item.created_at}>{time(item.created_at)}</time>
+        </article>)}
+      </div></div>
+      <div className="communication-composer-wrap">
+        {error && <p className="communication-error" role="alert">{error}</p>}
+        <ChatComposer text={text} onTextChange={value => { setText(value); setError(null); }} onSubmit={event => void submit(event)}
+          messageLabel="Ответ от имени Comit" sendLabel="Ответить как Comit" placeholder="Ответ от имени Comit" maxLength={2000}
+          canSubmit={!sending && !!text.trim()} sending={sending} attachDisabled onAttach={() => undefined} attachLabel="Вложения в поддержке недоступны" />
+      </div>
     </div>
   </section>;
 }
@@ -155,7 +160,7 @@ export default function App() {
   if (checking) return <main className="support-app comit-design"><State loading /></main>;
   if (!operator) return <main className="support-app comit-design"><LoginScreen onLogin={setOperator} /></main>;
   const chatMatch = /^\/chat\/([0-9a-f-]{36})$/.exec(route.split("?")[0]!);
-  return <main className="support-app comit-design">
+  return <main className={`support-app comit-design${chatMatch ? " chat-page" : ""}`}>
     <header className="support-shell-header">
       <span className="support-brand"><Icon name="logo" /> Comit · Поддержка</span>
       <Action variant="glass" onClick={() => void logout()} disabled={busy}>Выйти</Action>

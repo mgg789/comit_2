@@ -18,6 +18,7 @@
 | [comit.droidje.com/candidate/](https://comit.droidje.com/candidate/) | Кабинет кандидата: профиль, опрос, тест, приглашения, чаты |
 | [comit.droidje.com/employer/](https://comit.droidje.com/employer/) | Кабинет работодателя: вакансии, подборка с объяснением, лента, найм |
 | [comit.droidje.com/api/docs](https://comit.droidje.com/api/docs) | OpenAPI (Swagger UI) |
+| [comit.droidje.com/support/](https://comit.droidje.com/support/) | Консоль службы поддержки (вход оператора) |
 
 Вход — по email и одноразовому коду из письма. В локальном dev-контуре код подставляется
 на форму автоматически, тестировать можно без SMTP.
