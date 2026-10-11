@@ -22,8 +22,10 @@ TABLES = {
     "vacancy_pipeline.vacancies": "vacancy_id",
     "vacancy_pipeline.ready": "vacancy_id",
     "agents_service.drafts": "draft_id",
+    "public.candidate_profile_outbox": "id",
 }
 OWNER_FILTER = "id IN (SELECT candidate_id FROM public.candidate_profiles UNION SELECT owner_id FROM public.employer_profiles UNION SELECT owner_id FROM vacancy_pipeline.vacancies)"
+ACK_FILTER = "state='delivered' AND EXISTS (SELECT 1 FROM public.candidate_profiles p JOIN candidate_pipeline.pool c USING(candidate_id) WHERE p.candidate_id=candidate_profile_outbox.candidate_id AND p.revision=candidate_profile_outbox.source_revision AND c.revision=candidate_profile_outbox.projected_revision)"
 TOMBSTONES = {
     "candidate_pipeline.candidates": [("candidate_pipeline.tombstones", "candidate_id")],
     "vacancy_pipeline.vacancies": [("vacancy_pipeline.tombstones", "vacancy_id"), ("agents_service.vacancy_tombstones", "vacancy_id")],
@@ -60,7 +62,8 @@ def export(source):
     sql = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\n"
     for i, table in enumerate(TABLES):
         names = ",".join('"' + c + '"' for c in columns[table])
-        where = " WHERE " + OWNER_FILTER if table == "public.accounts" else ""
+        filters = {"public.accounts": OWNER_FILTER, "public.candidate_profile_outbox": ACK_FILTER}
+        where = " WHERE " + filters[table] if table in filters else ""
         sql += f"\\echo START_{i}\nCOPY (SELECT {names} FROM {table}{where}) TO STDOUT;\n\\echo END_{i}\n"
     sql += "COMMIT;\n"
     output = run(source, sql)
@@ -100,6 +103,7 @@ def transfer_sql(columns, data, apply):
         sql += f"INSERT INTO {table} ({names}) SELECT {names} FROM demo_{i} s WHERE NOT EXISTS (SELECT 1 FROM {table} t WHERE t.{key}=s.{key});\n"
     # Constraints are checked during INSERT; extra invariants catch broken projections.
     sql += "DO $$ BEGIN IF EXISTS (SELECT 1 FROM demo_5 p JOIN public.candidate_profiles c ON c.candidate_id=p.candidate_id WHERE NOT c.pool_consent OR NOT c.processing_consent) THEN RAISE EXCEPTION 'demo_transfer consent invariant'; END IF; END $$;\n"
+    sql += "DO $$ BEGIN IF EXISTS (SELECT 1 FROM demo_5 p JOIN public.candidate_profiles c ON c.candidate_id=p.candidate_id WHERE NOT EXISTS (SELECT 1 FROM (SELECT DISTINCT ON (candidate_id) candidate_id,state,source_revision,projected_revision FROM public.candidate_profile_outbox ORDER BY candidate_id,source_revision DESC,created_at DESC) o WHERE o.candidate_id=c.candidate_id AND o.state='delivered' AND o.source_revision=c.revision AND o.projected_revision=p.revision)) THEN RAISE EXCEPTION 'demo_transfer public source ACK invariant'; END IF; END $$;\n"
     sql += "COMMIT;\n" if apply else "ROLLBACK;\n"
     return sql
 

@@ -64,6 +64,13 @@ class PostgreSQLTransferTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "demo_transfer inactive schema projection"):
             transfer.run(self.command, sql)
 
+    def test_only_current_delivered_acknowledgements_exported(self):
+        copied = self.data["public.candidate_profile_outbox"].strip().splitlines()
+        pool = self.data["candidate_pipeline.pool"].strip().splitlines()
+        self.assertEqual(len(copied), len(pool))
+        state_index = self.columns["public.candidate_profile_outbox"].index("state")
+        self.assertTrue(all(line.split("\t")[state_index] == "delivered" for line in copied))
+
 
 if __name__ == "__main__":
     unittest.main()

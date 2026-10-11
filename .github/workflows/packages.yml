@@ -13,6 +13,15 @@ jobs:
     runs-on: [self-hosted, ci]
     timeout-minutes: 25
     steps:
+      - name: Restore this repository workspace ownership
+        run: |
+          case "$RUNNER_NAME" in
+            mgg-ci-[123]) ;;
+            *) echo "Unsupported package runner" >&2; exit 1 ;;
+          esac
+          docker run --rm \
+            --mount "type=bind,source=/home/mgg/actions-runners/${RUNNER_NAME}/_work/comit_2,target=/work" \
+            alpine:3.20 chown -R "$(id -u):$(id -g)" /work
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
