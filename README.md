@@ -45,7 +45,7 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 - **Презентация**: [Google Slides](https://docs.google.com/presentation/d/1csFfRs20WJFlEqlPujfLhpAnB1E3YNWOK_Y3tGc3UOM/edit?usp=sharing)
 - **Дизайн**: [Figma — LCT core \| ЛЦТ 2026 ФСП](https://www.figma.com/design/gPFLCJKXEoRwRP3YLyMsX4/LCT-core-%7C-%D0%9B%D0%A6%D0%A2-2026-%D0%A4%D0%A1%D0%9F?node-id=0-1&t=LPk0C0vv17PMQCYn-1)
 - **Схемы и архитектура (FigJam)**: [LCT core \| Схемы проекта](https://www.figma.com/board/HSYre3JOQlCaPQxQp9gj6R/LCT-core-%7C-%D0%A1%D1%85%D0%B5%D0%BC%D1%8B-%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82%D0%B0?node-id=0-1&t=gKnYZlsk3evyWJNZ-1)
-- **Демо-видео**: [Google Drive](https://drive.google.com/drive/folders/1w5vVd7tjaDT8-EnzcIRqwQ3oF1BklijG?usp=sharing)
+- **PDF документация и демо-видео**: [Google Drive](https://drive.google.com/drive/folders/1w5vVd7tjaDT8-EnzcIRqwQ3oF1BklijG?usp=sharing)
 
 ## Что умеем
 
@@ -167,7 +167,10 @@ droidje — [@droidje](https://t.me/droidje) — или напрямую CTO п�
 ## Документация
 
 Живая документация подсистем — в [`docs/`](docs/), канон требований и продуктовый контекст —
-в [`context/README.md`](context/README.md). С чего начать:
+в [`context/README.md`](context/README.md). 
+Упакованная в файл PDF документация: [Google Drive](https://drive.google.com/drive/folders/1w5vVd7tjaDT8-EnzcIRqwQ3oF1BklijG?usp=sharing)
+
+С чего начать:
 
 | Файл | О чём |
 |---|---|
