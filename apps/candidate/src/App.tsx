@@ -5,7 +5,7 @@ import { PersistentStateScope, usePersistentState } from "@comit/ui-kit/ui-state
 import { AppShellHeader, Dialog, homePageHref } from "@comit/ui-kit/app-shell";
 import { ApiError } from "@comit/api-client";
 import type { AccountView } from "@comit/shared";
-import { Action, Backdrop, Icon, PageTitle, State } from "@comit/ui-kit/design";
+import { Action, Backdrop, Icon, LegalText, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
 import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen, RecommendationConsentSettings } from "./screens";
@@ -88,7 +88,7 @@ export default function App() {
   <Backdrop />{account && <CandidateArt route={route}/>}
   {route.startsWith("/legal/") ? <main className="main-content candidate-legal panel">
     <a href="#/resume">← Вернуться</a>
-    <pre>{legal[`../../../docs/legal/${route.slice(7)}.md`] ?? "Документ не найден"}</pre>
+    <LegalText text={legal[`../../../docs/legal/${route.slice(7).replace(/\.md$/, "")}.md`] ?? "Документ не найден"} />
     </main>
       : checking ? <main className="main-content">
       <State loading/>
@@ -96,7 +96,7 @@ export default function App() {
         : authError ? <main className="main-content">
         <State error={authError} retry={() => void checkAccount()}/>
         </main>
-          : !account ? <EmailLogin homeHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
+          : !account ? <EmailLogin oauthRole="candidate" oauthEnabled={import.meta.env.PROD} homeHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} requestCode={email => api.requestLoginCode("candidate", email)} verifyCode={async (body) => (await api.verifyLoginCode("candidate", body)).account} onLogin={setAccount} errorText={errorText}/>
             : <PersistentStateScope scope={`candidate:${account.id}`}>
     <AppShellHeader brandHref={homePageHref(window.location.origin, import.meta.env.DEV, import.meta.env.VITE_WELCOME_URL)} brandLabel="Comit — главная" navigationLabel="Навигация кандидата"
       items={navigation.map(item => ({ ...item, id: item.path }))} selected={selected} navigate={navigate} email={account.email}

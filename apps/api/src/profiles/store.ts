@@ -51,7 +51,7 @@ const NARRATIVE_GROUPS = ["projects", "experience", "achievements"] as const;
 
 /** Safe API/domain error whose code can be mapped by the owning route. */
 export class ProfileError extends Error {
-  public constructor(public readonly status: number, public readonly code: string) {
+  public constructor(public readonly status: number, public readonly code: string, public readonly retryAt?: string) {
     super(code);
     this.name = "ProfileError";
   }
@@ -197,8 +197,8 @@ function validateFields(value: unknown): asserts value is CandidateProfileFields
   if (fields.relocation_cities !== undefined && (!arrayOfStrings(fields.relocation_cities) || new Set(fields.relocation_cities).size !== fields.relocation_cities.length)) throw invalid("invalid_profile_fields");
   if (fields.salary !== undefined && fields.salary !== null) {
     if (!jsonObject(fields.salary) || Object.keys(fields.salary).some(key => !["from_rub", "to_rub"].includes(key))
-      || !integer(fields.salary.from_rub) || !integer(fields.salary.to_rub)
-      || fields.salary.to_rub < fields.salary.from_rub) throw invalid("invalid_salary");
+      || !integer(fields.salary.from_rub) || (fields.salary.to_rub !== null && !integer(fields.salary.to_rub))
+      || (fields.salary.to_rub !== null && fields.salary.to_rub < fields.salary.from_rub)) throw invalid("invalid_salary");
   }
   if (fields.primary_direction !== undefined && fields.primary_direction !== null
     && !["backend", "frontend", "fullstack", "mobile", "devops", "data", "ml", "qa"].includes(fields.primary_direction)) throw invalid("invalid_profile_fields");
@@ -1086,8 +1086,8 @@ export class CandidateProfileStore {
         "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 AND specialization=$2 ORDER BY decided_at DESC LIMIT 1", [candidateId,input.specialization])).rows[0];
       if (last) {
         const days = (Date.now() - last.decided_at.getTime()) / 86400000;
-        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
-        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown");
+        if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown", new Date(last.decided_at.getTime() + RETAKE_COOLDOWN_DAYS * 86400000).toISOString());
+        if (GRADE_RANK[input.grade]! > GRADE_RANK[last.grade]! && days < UPGRADE_COOLDOWN_DAYS) throw new ProfileError(409, "grade_upgrade_cooldown", new Date(last.decided_at.getTime() + UPGRADE_COOLDOWN_DAYS * 86400000).toISOString());
       }
       const decidedAt = new Date();
       await client.query(`INSERT INTO candidate_grade_results

@@ -1,0 +1,51 @@
+# Local browser gateway: internal services expose no host ports.
+# Compose 2.24.4+ is required for !override/!reset.
+services:
+  postgres:
+    ports: !reset []
+  api:
+    ports: !reset []
+  model-cache-init:
+    build:
+      context: ".."
+      dockerfile: infra/matching-engine.Dockerfile
+    environment:
+      HF_HOME: /models
+    volumes:
+      - harrier_cache:/models
+    command:
+      - python
+      - -c
+      - |
+        from huggingface_hub import snapshot_download
+        from matching_engine.embeddings import MODEL_ID, MODEL_REVISION, HarrierEncoder
+        if not HarrierEncoder().is_available:
+            snapshot_download(MODEL_ID, revision=MODEL_REVISION)
+        if not HarrierEncoder().is_available:
+            raise RuntimeError("pinned_harrier_cache_incomplete")
+        print("Pinned Harrier cache is ready")
+    profiles: [dev]
+  matching-engine:
+    ports: !reset []
+    depends_on:
+      model-cache-init:
+        condition: service_completed_successfully
+  candidate-worker:
+    depends_on:
+      model-cache-init:
+        condition: service_completed_successfully
+  vacancy-worker:
+    depends_on:
+      model-cache-init:
+        condition: service_completed_successfully
+  testing-engine:
+    ports: !reset []
+  integration-engine:
+    ports: !reset []
+  agents-service:
+    ports: !reset []
+  verification-engine:
+    ports: !reset []
+  web:
+    ports: !override
+      - "127.0.0.1:${WEB_PORT:-8088}:80"

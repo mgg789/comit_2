@@ -1185,3 +1185,24 @@ textarea::placeholder {
 
 /* Loading is ongoing progress feedback even when decorative motion is reduced. */
 :is(.employer-app, .candidate-app) .spinner { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }
+
+/* Shared experiment: foreground stays sharp; one static filter serves every surface. */
+:root[data-comit-glass="frosted"], :root[data-comit-glass="refractive"] {
+  --comit-glass-backdrop: blur(12rem) saturate(1.4) brightness(1.04);
+}
+:root[data-comit-glass="refractive"] { --comit-glass-backdrop: url("#glass-refraction") saturate(1.4); }
+:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) {
+  background: var(--comit-glass-frost);
+  backdrop-filter: var(--comit-glass-backdrop);
+  -webkit-backdrop-filter: var(--comit-glass-backdrop);
+  box-shadow: var(--comit-glass-shadow);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface), .glass.glass-surface::before, .candidate-offer-card, .candidate-testing-tooltip, .candidate-swipe, .testing-question) { background: var(--comit-glass-fallback); }
+}
+
+.legal-text { display: grid; gap: 24rem; }
+.legal-text p { white-space: pre-line; }
+.legal-text a { color: var(--employer-blue); text-decoration: underline; }
+.legal-text .legal-table { overflow-x: auto; }
+.legal-text th, .legal-text td { padding: 12rem; border: 1px solid var(--employer-border); text-align: left; vertical-align: top; }

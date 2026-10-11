@@ -17,15 +17,15 @@ const sessionResponse = { type: "object", additionalProperties: false, required:
 const resultResponse = { type: "object", additionalProperties: false,
   required: ["session_id", "status", "decided_grade", "answered", "correct", "next_attempt_at", "grade_publication", "supervision", "capture_finalized"],
   properties: { ...sessionProperties, decided_grade: grade, answered: { type: "integer", minimum: 0 }, correct: { type: "integer", minimum: 0 },
-    capture_finalized: { type: "boolean" }, next_attempt_at: { type: "string", format: "date-time" }, supervision: { anyOf: [{ type: "string" }, { type: "null" }] },
+    capture_finalized: { type: "boolean" }, next_attempt_at: nullableDate, failure_reason: { anyOf: [{ const: "judge_unavailable" }, { type: "null" }] }, supervision: { anyOf: [{ type: "string" }, { type: "null" }] },
     grade_publication: { anyOf: [{ type: "object", additionalProperties: false, required: ["published", "status"],
-      properties: { published: { type: "boolean" }, status: { type: "string" } } }, { type: "null" }] } } };
+      properties: { published: { type: "boolean" }, status: { type: "string" }, retryable: { type: "boolean" }, attempts: { type: "integer", minimum: 0 }, detail: { anyOf: [{ type: "string" }, { type: "null" }] }, retry_at: nullableDate, next_retry_at: nullableDate } }, { type: "null" }] } } };
 const successSchemas: Record<string, object> = {
   sessions: sessionResponse, abandon: sessionResponse, result: resultResponse, finish: resultResponse,
   preflight: { type: "object", additionalProperties: false,
     required: ["specialization", "supported_specializations", "eligible", "next_attempt_at", "upgrade_at", "active_session_id", "active_session_consents", "active_supervision", "next_sequence", "recording_enabled", "active_recording_enabled", "max_questions", "supported_question_types", "active_session_status"],
     properties: { supported_question_types: { type: "array", items: { enum: ["mcq", "short_answer", "code", "extended"] } },
-      unavailable_reason: { anyOf: [{ const: "code_judge_unavailable" }, { type: "null" }] },
+      unavailable_reason: { anyOf: [{ enum: ["code_judge_unavailable", "testing_disabled"] }, { type: "null" }] },
       judges: { type: "object", additionalProperties: false, required: ["code_required", "code_ready", "text_configured", "types"], properties: {
         code_required: { type: "boolean" }, code_ready: { type: "boolean" }, text_configured: { type: "boolean" },
         types: { type: "array", items: { enum: ["mcq", "short_answer", "code", "extended"] } } } },

@@ -7,4 +7,6 @@ __pycache__
 *.log
 .env
 context
-docs
+docs/*
+!docs/legal/
+!docs/legal/**

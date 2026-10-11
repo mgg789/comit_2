@@ -66,9 +66,9 @@ export function useRoute() {
   return { route, navigate };
 }
 /** Whole RUB salary comes from the immutable invitation or the private profile. */
-export function salary(from: number, to: number): string {
+export function salary(from: number, to: number | null): string {
   const format = (value: number) => new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(value / 1000);
-  return `${format(from)}–${format(to)}к ₽`;
+  return to === null ? `от ${format(from)}к ₽` : `${format(from)}–${format(to)}к ₽`;
 }
 /** Read every owner-scoped invitation page before computing any visible counts. */
 export async function readInvitations(): Promise<RecruitmentView[]> {

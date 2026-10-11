@@ -37,6 +37,10 @@ services:
       AUTH_ALLOWED_ORIGINS: "${AUTH_ALLOWED_ORIGINS:?Set explicit browser origins}"
       AUTH_COOKIE_SECURE: 'true'
       AUTH_KEY_ID: "${AUTH_KEY_ID:-v1}"
+      YANDEX_OAUTH_ENABLED: "${YANDEX_OAUTH_ENABLED:-false}"
+      YANDEX_OAUTH_CLIENT_ID: "${YANDEX_OAUTH_CLIENT_ID:-}"
+      YANDEX_OAUTH_CLIENT_SECRET: "${YANDEX_OAUTH_CLIENT_SECRET:-}"
+      YANDEX_OAUTH_SITE_ORIGIN: "${YANDEX_OAUTH_SITE_ORIGIN:-}"
       ACCOUNT_CONSENT_VERSION: "${ACCOUNT_CONSENT_VERSION:-account-v1}"
       TRUST_PROXY: "${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}"
       SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
@@ -191,7 +195,7 @@ services:
       api:
         condition: service_healthy
     ports:
-    - "${WEB_PORT:-8088}:80"
+    - "127.0.0.1:${WEB_PORT:-8088}:80"
     restart: unless-stopped
   candidate-migrate:
     build:

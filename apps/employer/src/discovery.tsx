@@ -1067,7 +1067,7 @@ export function Resumes({ navigate }: Navigation) {
           <div className="resume-vacancy-options">
             <label>
               <input
-                type="checkbox"
+                type="checkbox" className="comit-checkbox"
                 checked={selection === null}
                 onChange={(event) =>
                   setSelection(event.target.checked ? null : [])
@@ -1078,7 +1078,7 @@ export function Resumes({ navigate }: Navigation) {
             {drafts.data?.map((vacancy) => (
               <label key={vacancy.draft_id}>
                 <input
-                  type="checkbox"
+                  type="checkbox" className="comit-checkbox"
                   checked={
                     selection === null || selection.includes(vacancy.draft_id)
                   }

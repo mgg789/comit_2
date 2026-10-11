@@ -62,7 +62,7 @@ body { margin: 0; }
 .welcome-logo { display: flex; align-items: center; gap: calc(70 * var(--welcome-unit)); margin: 0; height: calc(297 * var(--welcome-unit)); }
 .welcome-logo-tile { display: grid; place-items: center; flex: 0 0 calc(300 * var(--welcome-unit)); height: 100%; border-radius: calc(100 * var(--welcome-unit)); background: var(--comit-text); }
 .welcome-logo-tile img { width: calc(197.834 * var(--welcome-unit)); height: calc(197.472 * var(--welcome-unit)); }
-.welcome-wordmark { font-family: var(--employer-logo); font-size: calc(200 * var(--welcome-unit)); font-weight: 400; line-height: .715; white-space: nowrap; }
+.welcome-wordmark { font-family: var(--employer-logo); font-size: calc(200 * var(--welcome-unit)); font-weight: 400; line-height: .715; transform: translateY(.09em); white-space: nowrap; }
 .welcome-entries { display: grid; gap: calc(34 * var(--welcome-unit)); width: calc(888 * var(--welcome-unit)); margin: calc(97 * var(--welcome-unit)) auto 0; }
 .welcome-card { position: relative; overflow: hidden; display: flex; align-items: center; gap: calc(24 * var(--welcome-unit)); min-height: calc(120 * var(--welcome-unit)); padding: calc(24 * var(--welcome-unit)); padding-left: calc(28 * var(--welcome-unit)); border-radius: calc(32 * var(--welcome-unit)); background: var(--comit-text); color: var(--employer-ink); }
 .welcome-card-line { position: absolute; left: calc(975 * var(--welcome-unit)); top: calc(59 * var(--welcome-unit)); width: calc(25 * var(--welcome-unit)); height: calc(4 * var(--welcome-unit)); }

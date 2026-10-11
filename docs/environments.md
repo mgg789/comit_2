@@ -49,19 +49,28 @@ cache (команда — в [deploy.md](deploy.md), раздел «Подгот
 ## Поднять dev
 
 ```sh
-make dev-up                # отдельный compose-проект comit-dev
-SMOKE_MODE=dev make smoke
-make dev-down              # данные dev-volumes сохраняются
+make dev-up    # comit-dev: pinned model bootstrap -> readiness -> один порт
+make dev-down  # stop, данные volumes сохраняются
 ```
 
-- Приложение: http://localhost:8088 (`/`, `/candidate/`, `/employer/`).
-- Вход: любой email, код на форме появляется сам (`dev_code` в ответе API);
-  в этом режиме письма не отправляются и mail outbox не пишется.
-- Мок ФСП доступен, сценарий демо-привязки работает end-to-end.
-- Production `.env` не читается: все dev-секреты имеют безопасные значения по
-  умолчанию. Свой dev-env передавайте отдельным `--env-file`.
-- Если production-стек запущен одновременно, разведите порты через переменные
-  `WEB_PORT`, `API_PORT` и т.д.
+- Адрес: http://localhost:8088 (`/`, `/candidate/`, `/employer/`, `/testing/`, `/support/`, `/api/`).
+- Первый запуск скачивает образы и публичный Harrier snapshot точной revision в
+  `comit-dev_harrier_cache`; заполненный cache проверяется и повторно используется.
+  Matching runtime не скачивает модель. Ошибка подготовки блокирует старт API/web.
+- Вход: любой email, код появляется на форме; письма не отправляются.
+- Мок ФСП использует текущий внутренний `/api/candidate/profile/fsp/demo/approve` flow.
+  Legacy authorize redirect через отдельный integration port в single-port режиме
+  не используется; для него нужна отдельная настройка gateway. Включения старого
+  redirect или прямого browser доступа к private integration API launcher не делает.
+- Тестирование выключено целиком. Реальный judge подключается явно:
+  `COMIT_LOCAL_PROJECT=comit-dev ./infra/local-dev.sh --env-file /absolute/private/dev.env --with-judge`.
+- Production `.env` не читается; dev использует локальные nonsecret defaults.
+  Внешние AI providers требуют своих credentials и при отсутствии явно недоступны.
+- Другой порт задаётся `WEB_PORT`, другой локальный проект — `COMIT_LOCAL_PROJECT`.
+- `make dev-models` отдельно подготавливает модель; команды подготовки и старта
+  используют один и тот же cache volume. `SMOKE_MODE=dev make smoke` рассчитан на
+  прямые host ports базового dev compose; в single-port режиме backend checks
+  запускайте внутри контейнеров ([deploy.md](deploy.md)).
 
 ## Запуск без Docker (точечно, для разработки)
 
@@ -82,7 +91,7 @@ pnpm --filter @comit/web-welcome dev       # :5176
 ## Проверки контуров
 
 - `make smoke` — production-проверка: `/healthz` всех сервисов, публичные
-  маршруты, границы auth, отсутствие testing UI, `503` ФСП-мока.
+  маршруты, границы auth, доступность testing UI, `503` ФСП-мока.
 - `SMOKE_MODE=dev make smoke` — то же с ожиданиями dev-режима (ФСП-фикстуры 200).
 - `make compose-check` — валидация resolved compose-файлов.
 - CD дополнительно проверяет HTTPS origins, secure cookies, отключённые dev

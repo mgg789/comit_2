@@ -41,6 +41,8 @@ export function EmailLogin<Account>({
   brandSubtitle,
   homeHref = "/",
   consentHref = "#/legal/processing-consent",
+  oauthRole,
+  oauthEnabled = false,
 }: {
   requestCode: (email: string) => Promise<EmailLoginReceipt>;
   verifyCode: (request: EmailLoginVerification) => Promise<Account>;
@@ -49,7 +51,11 @@ export function EmailLogin<Account>({
   brandSubtitle?: string;
   homeHref?: string;
   consentHref?: string;
+  /** Production consumers opt in; server readiness still controls provider availability. */
+  oauthRole?: "candidate" | "employer";
+  oauthEnabled?: boolean;
 }) {
+  const [yandexReady, setYandexReady] = useState(false);
   const [email, setEmail] = useState("");
   const [consent, setConsent] = useState(false);
   const [consentError, setConsentError] = useState(false);
@@ -67,6 +73,47 @@ export function EmailLogin<Account>({
     setConsentError(true);
     consentInput.current?.focus();
     return false;
+  }
+  useEffect(() => {
+    const errors: Record<string, string> = {
+      oauth_email_conflict: "Этот email уже зарегистрирован. Войдите по почте.",
+      role_mismatch: "Аккаунт зарегистрирован для другой роли. Войдите в соответствующий кабинет.",
+      oauth_state_invalid: "Срок входа через Яндекс истёк. Попробуйте ещё раз.",
+      oauth_denied: "Вход через Яндекс отменён. Можно войти по почте.",
+      oauth_provider_unavailable: "Яндекс временно недоступен. Попробуйте ещё раз или войдите по почте.",
+    };
+    const reason = new URLSearchParams(window.location.hash.slice(1)).get("oauth-error");
+    if (reason && errors[reason]) {
+      setError(errors[reason]);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    if (!oauthEnabled || !oauthRole) return;
+    const abort = new AbortController();
+    void fetch(`/api/auth/${oauthRole}/providers`, { credentials: "same-origin", signal: abort.signal })
+      .then(async response => {
+        if (!response.ok) return;
+        const providers: unknown = await response.json();
+        setYandexReady(Boolean(providers && typeof providers === "object" && "yandex" in providers && providers.yandex === true));
+      }).catch(() => { /* Email remains usable when provider discovery fails. */ });
+    return () => abort.abort();
+  }, [oauthEnabled, oauthRole]);
+  async function startYandex() {
+    if (busy || !consent || !yandexReady || !oauthRole) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/auth/${oauthRole}/yandex/start`, { method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" }, body: JSON.stringify({ consent: { processing: true, version: "account-v1" } }) });
+      const body: unknown = await response.json();
+      if (!response.ok || !body || typeof body !== "object" || !("authorization_url" in body) || typeof body.authorization_url !== "string")
+        throw new Error("oauth_unavailable");
+      const destination = new URL(body.authorization_url);
+      if (destination.origin !== "https://oauth.yandex.ru" || destination.pathname !== "/authorize") throw new Error("oauth_invalid_redirect");
+      window.location.assign(destination.href);
+    } catch {
+      setError("Вход через Яндекс временно недоступен. Войдите по почте.");
+      setBusy(false);
+    }
   }
   useEffect(() => {
     if (receipt) input.current?.focus();
@@ -216,7 +263,7 @@ export function EmailLogin<Account>({
             <Action
               className="otp-submit"
               type="submit"
-              disabled={busy || code.length !== 6}
+              disabled={busy || !consent || code.length !== 6}
             >
               Продолжить
             </Action>
@@ -248,7 +295,7 @@ export function EmailLogin<Account>({
             <Action
               type="submit"
               className="circle"
-              disabled={busy}
+              disabled={busy || !consent}
               onClick={(event) => {
                 if (!requireConsent()) event.preventDefault();
               }}
@@ -266,12 +313,9 @@ export function EmailLogin<Account>({
           <button
             type="button"
             className="yandex"
-            onClick={() => {
-              if (requireConsent())
-                setError(
-                  "Вход через Яндекс пока не подключён. Войдите по почте.",
-                );
-            }}
+            disabled={busy || !consent || !yandexReady}
+            title={!oauthEnabled ? "Вход через Яндекс отключён в dev" : !yandexReady ? "Вход через Яндекс пока не настроен" : !consent ? "Отметьте согласие на обработку данных" : undefined}
+            onClick={() => { void startYandex(); }}
             aria-label="Войти через Яндекс"
           >
             <img

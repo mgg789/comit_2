@@ -31,7 +31,7 @@ export interface CandidateProfileFields {
   work_types?: ("onsite" | "remote" | "hybrid")[] | null;
   relocation_ready?: boolean | null;
   relocation_cities?: string[];
-  salary?: { from_rub: number; to_rub: number } | null;
+  salary?: { from_rub: number; to_rub: number | null } | null;
   primary_direction?: Specialization | null;
   declared_grade?: Grade | null;
   domains?: CandidateDeclaredSkill[];

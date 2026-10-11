@@ -49,7 +49,8 @@ def render_resume(profile: CandidateProfile, category: Category, public: bool = 
     add(f"Статус грейда: {_GRADE_STATUS[category.grade_status]}")
     add(f"Город: {profile.city}")
     if profile.salary:
-        add(f"Ожидания: {profile.salary.from_rub:,} - {profile.salary.to_rub:,} RUB".replace(",", " "), redact=False)
+        expectation = f"от {profile.salary.from_rub:,}" if profile.salary.to_rub is None else f"{profile.salary.from_rub:,} - {profile.salary.to_rub:,}"
+        add(f"Ожидания: {expectation} RUB".replace(",", " "), redact=False)
     if public:
         add("Контакты доступны после принятия приглашения.")
     else:

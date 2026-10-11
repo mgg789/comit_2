@@ -61,7 +61,7 @@ export interface CandidateCard {
   position: number;
   display_name: string;
   city: string;
-  salary: { from_rub: number; to_rub: number };
+  salary: { from_rub: number; to_rub: number | null };
   category: Category;
   rank: number;
   confirmed_strength: number;

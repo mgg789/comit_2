@@ -204,3 +204,14 @@
   .candidate-skill-assessment .candidate-skill-test { margin-left: 0; max-width: 100%; }
   .candidate-profile-section .primary { max-width: 100%; padding-inline: 24rem; }
 }
+
+/* Import remains visually and functionally disabled until explicit consent. */
+.resume-dropzone { border: 2rem dashed var(--employer-blue); border-radius: 28rem; background: var(--employer-paint-2f2f2d); transition: opacity 150ms, border-color 150ms; }
+.resume-dropzone.is-disabled { opacity: .38; }
+.resume-dropzone.is-dragging { outline: 3rem solid var(--employer-blue); outline-offset: 4rem; }
+.resume-dropzone > button { width: 100%; min-height: 230rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18rem; color: inherit; background: transparent; border: 0; padding: 30rem; text-align: center; font: inherit; cursor: pointer; }
+.resume-dropzone > button:disabled { cursor: not-allowed; }
+.resume-dropzone small { color: var(--comit-text-muted); }
+.resume-file-input { display: none; }
+.candidate-achievement-files { display: grid; gap: 12rem; margin-top: 18rem; }
+.candidate-achievement-files input[type=file] { max-width: 100%; }

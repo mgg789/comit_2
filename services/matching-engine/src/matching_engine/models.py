@@ -42,6 +42,26 @@ class SalaryRange(Contract):
         return self
 
 
+class CandidateSalary(Contract):
+    """Candidate minimum in RUB; null upper bound means no salary ceiling."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_legacy_range(cls, value: object) -> object:
+        """Existing typed finite ranges remain accepted by internal callers."""
+        return value.model_dump() if isinstance(value, SalaryRange) else value
+
+    from_rub: int = Field(ge=0)
+    to_rub: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def ordered(self) -> "CandidateSalary":
+        """Preserve valid legacy finite expectations without inventing a ceiling."""
+        if self.to_rub is not None and self.to_rub < self.from_rub:
+            raise ValueError("to_rub must be greater than or equal to from_rub")
+        return self
+
+
 class Consent(Contract):
     """Explicit, versioned consent snapshot supplied by the trusted API."""
 
@@ -170,7 +190,7 @@ class CandidateProfile(Contract):
     relocation_cities: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
         default_factory=list, max_length=100
     )
-    salary: SalaryRange | None = None
+    salary: CandidateSalary | None = None
     primary_direction: Direction | None = None
     grade_result: GradeResult | None = None
     consents: Consent = Field(default_factory=Consent)
@@ -252,7 +272,7 @@ class PoolEntry(Contract):
     profile_revision: int
     display_name: str
     city: str
-    salary: SalaryRange
+    salary: CandidateSalary
     category: Category
     rank: int
     confirmed_strength: int

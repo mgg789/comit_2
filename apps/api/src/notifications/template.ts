@@ -1,5 +1,5 @@
 /** Event emails share the verified OTP shell, bundled CID assets and plain-text fallback. */
-import { renderMailLayout, escapeMailHtml, type VerificationAttachment } from "../auth/email-template.js";
+import { renderMailLayout, escapeMailHtml, mailDigits, type VerificationAttachment } from "../auth/email-template.js";
 
 /** Four notification kinds represented by the product's Figma email frames. */
 export type NotificationKind = "monthly_task" | "employer_interview" | "candidate_interview" | "resume_liked";
@@ -47,6 +47,8 @@ export function notificationContent(message: NotificationMail): {
   let description: string;
   let button: string | undefined;
   let time: string | undefined;
+  let timeDigits: ReturnType<typeof mailDigits> | undefined;
+  let weekday: string | undefined;
   switch (message.kind) {
     case "monthly_task":
       subject = "Ежемесячное задание Comit";
@@ -74,16 +76,19 @@ export function notificationContent(message: NotificationMail): {
     const date = new Date(message.starts_at ?? "");
     if (!Number.isFinite(date.getTime()) || !message.time_zone) throw new TypeError("invalid_interview_time");
     time = new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: message.time_zone }).format(date);
+    timeDigits = mailDigits(new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: message.time_zone }).format(date));
+    weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short", timeZone: message.time_zone }).format(date).toUpperCase();
     // Include the zone explicitly: a recipient's local mail client must never silently shift the appointment.
     time += ` (${message.time_zone})`;
   }
   const descriptionHtml = escapeMailHtml(description);
   const action = button
     ? `<a href="${escapeMailHtml(destination.href)}" style="display:inline-block;padding:18px 24px;border:1px solid #656565;border-radius:60px;background-color:#303030;color:#f0f0f0;font-size:20px;font-weight:600;text-decoration:none;">${escapeMailHtml(button)}</a>`
-    : `<div style="padding:18px 12px;border-radius:20px;background-color:#0064b5;background-image:linear-gradient(100deg,#0064b5,#00467f 48%,#bfe2ff);font-size:26px;font-weight:700;color:#f0f0f0;">${escapeMailHtml(time!)}</div>
+    : `<div aria-label="${escapeMailHtml(time!)}" style="max-width:439px;margin:0 auto;padding:10px 12px;border-radius:20px;background-color:#0064b5;background-image:linear-gradient(100deg,#0064b5,#00467f 48%,#bfe2ff);font-size:42px;font-weight:400;line-height:51px;color:#f0f0f0;"><span style="vertical-align:middle;">${escapeMailHtml(weekday!)} </span>${timeDigits!.html}</div>
+<p style="margin:10px 0 0;font-size:14px;line-height:20px;color:#9c9c9c;">${escapeMailHtml(time!)}</p>
 <p style="margin:24px 0 0;"><a href="${escapeMailHtml(destination.href)}" style="display:inline-block;padding:18px 24px;border:1px solid #656565;border-radius:60px;background-color:#303030;color:#f0f0f0;font-size:20px;font-weight:600;text-decoration:none;">Открыть собеседование</a></p>`;
-  const rendered = renderMailLayout({ title: subject, preview: description,
-    content: `<p style="margin:0 0 30px;color:#f0f0f0;font-size:25px;font-weight:600;line-height:34px;">${descriptionHtml}</p>${action}`,
+  const rendered = renderMailLayout({ title: subject, preview: description, ...(timeDigits ? { attachments: timeDigits.attachments } : {}),
+    content: `<p style="margin:0 0 30px;color:#f0f0f0;font-size:20px;font-weight:600;line-height:24px;letter-spacing:-0.6px;">${descriptionHtml}</p>${action}`,
     note: "" });
   return { ...rendered, subject,
     text: `${description}\n\n${time ? `${time}\n\n` : ""}${button ?? "Открыть собеседование"}: ${destination.href}\n\nПисьмо отправлено сервисом Comit. Это не реклама` };

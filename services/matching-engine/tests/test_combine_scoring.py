@@ -186,3 +186,13 @@ def test_missing_work_fields_preserve_legacy_input_without_inventing_consent() -
     assert profile.work_types is None and profile.relocation_ready is None
     with pytest.raises(ValidationError):
         eligible_profile().model_validate({**profile.model_dump(), "relocation_ready": "yes"})
+
+
+def test_candidate_minimum_has_no_ceiling_but_still_rejects_low_salary():
+    value = candidate(salary={"from_rub": 120000, "to_rub": None})
+    assert strict_filter(vacancy(zp_min=250000, zp_max=300000), value).passed is True
+    assert strict_filter(vacancy(zp_min=50000, zp_max=110000), value).passed is False
+    assert strict_filter(vacancy(zp_min=120000, zp_max=120000), value).passed is True
+    # A legacy finite expectation still keeps its declared upper limit.
+    finite = candidate(salary={"from_rub": 120000, "to_rub": 150000})
+    assert strict_filter(vacancy(zp_min=250000, zp_max=300000), finite).passed is False

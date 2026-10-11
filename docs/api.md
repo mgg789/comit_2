@@ -686,3 +686,16 @@ read-only списки без сессии и без detail/PDF/contact-дост
 ## Дополнения: импорт, ФСП и практика
 
 Новые owner-scoped маршруты и DTO: [импорт PDF/фото](resume-import.md), [привязка демо-ФСП](fsp-link.md), [недельные задания](weekly-challenges.md). Jev использует существующий enrich/job контракт: [vacancy-suggestions.md](vacancy-suggestions.md).
+
+В полном локальном disabled-режиме testing preflight возвращает
+`unavailable_reason: "testing_disabled"` и `eligible: false`; все операции
+над testing session возвращают `503 {"detail":"testing_disabled"}`.
+Фасад сохраняет этот reason; обязательная авторизация и owner scope действуют.
+
+## Яндекс OAuth
+
+`GET /auth/{candidate|employer}/providers` → `{yandex: boolean}` (без кеширования). `POST /auth/{role}/yandex/start` принимает `{consent:{processing:true,version:"account-v1"}}`, требует доверенный Origin и возвращает `{authorization_url:string}` с browser-binding cookie. `GET /auth/{role}/yandex/callback?code=…&state=…` обменивает одноразовый code на сервере, создаёт обычную revocable session и перенаправляет в кабинет; ошибки уходят в безопасный `#oauth-error=<category>`. Не настроенный провайдер отвечает 503 при попытке старта. Контракт применяется только при полной production-конфигурации. Подробная [настройка Яндекс ID](yandex-oauth.md).
+
+## Завершение теста без оценки и отказ публикации
+
+Testing result допускает `next_attempt_at:null` и `failure_reason:"judge_unavailable"`: сессия `abandoned` после трёх неоценённых ответных проверок не публикует грейд и не добавляет кулдаун. `grade_publication` сохраняет `retryable`, `attempts`, `detail`, `retry_at`, `next_retry_at` для bounded retries и понятного отказа. Внутренний `/internal/testing/session-result` при 409 `grade_upgrade_cooldown` возвращает `upgrade_at`, при `retake_cooldown` — `next_attempt_at` (UTC ISO8601). Исходные сроки и политика повышения не меняются.

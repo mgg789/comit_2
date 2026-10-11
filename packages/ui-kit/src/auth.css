@@ -163,6 +163,7 @@
   font-family: var(--employer-logo);
   font-size: 190rem;
   line-height: 1.05;
+  transform: translateY(.09em);
 }
 .login-business {
   font-size: 46rem;

@@ -3,6 +3,7 @@ import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-st
 import type { AccountView } from "@comit/shared";
 import { api, errorText, useResource } from "./runtime";
 import { useEmployerPreferences } from "./preferences";
+import { Checkbox } from "@comit/ui-kit/design";
 import { Action, Field, PageTitle, Select, State } from "./ui";
 import "./settings.css";
 
@@ -81,11 +82,11 @@ export function Settings({
           </Field>
           <label className="settings-toggle">
             <span><strong>Отправлять по Enter</strong><small>{preferences.submitWithEnter ? "Shift + Enter — новая строка" : "Enter — новая строка; отправка кнопкой"}</small></span>
-            <input type="checkbox" role="switch" checked={preferences.submitWithEnter} onChange={(event) => updatePreferences({ submitWithEnter: event.target.checked })} />
+            <Checkbox role="switch" checked={preferences.submitWithEnter} onChange={(event) => updatePreferences({ submitWithEnter: event.target.checked })} />
           </label>
           <label className="settings-toggle">
             <span><strong>Уменьшить анимацию</strong><small>Меньше движения в интерфейсе</small></span>
-            <input type="checkbox" role="switch" checked={preferences.reducedMotion} onChange={(event) => updatePreferences({ reducedMotion: event.target.checked })} />
+            <Checkbox role="switch" checked={preferences.reducedMotion} onChange={(event) => updatePreferences({ reducedMotion: event.target.checked })} />
           </label>
           <p className="settings-description settings-local">Настройки сохраняются только в этом браузере. Если браузер запрещает хранение, они действуют до перезагрузки страницы.</p>
         </section>

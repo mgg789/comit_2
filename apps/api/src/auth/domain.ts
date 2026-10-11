@@ -49,6 +49,8 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
         app.post(`/auth/${role}/${path}`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
           reply.code(503).send({ detail: "auth_not_configured" }));
       }
+      app.get(`/auth/${role}/providers`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
+        reply.header("cache-control", "no-store").send({ yandex: false }));
       app.get(`/auth/${role}/me`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
         reply.code(503).send({ detail: "auth_not_configured" }));
     }

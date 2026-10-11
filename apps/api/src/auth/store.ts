@@ -383,6 +383,57 @@ export class AuthStore {
     }
   }
 
+  /** Persist a ten-minute OAuth intent; opaque state doubles as a browser binding cookie. */
+  public async issueOAuthState(role: AccountRole, state: string, consentVersion: string): Promise<void> {
+    if (consentVersion !== this.consentVersion) throw new AuthError(400, "consent_invalid");
+    await this.pool.query("DELETE FROM auth_oauth_states WHERE expires_at <= now()");
+    await this.pool.query("INSERT INTO auth_oauth_states(state_hash, role, consent_version, expires_at) VALUES ($1,$2,$3,now()+interval '10 minutes')",
+      [hashSessionId(state), requireRole(role), consentVersion]);
+  }
+
+  /** Consume before provider I/O: callback replay and concurrent redemption fail across replicas. */
+  public async consumeOAuthState(role: AccountRole, state: string): Promise<boolean> {
+    const result = await this.pool.query("DELETE FROM auth_oauth_states WHERE state_hash=$1 AND role=$2 AND expires_at>now() AND consent_version=$3 RETURNING state_hash",
+      [hashSessionId(state), requireRole(role), this.consentVersion]);
+    return result.rowCount === 1;
+  }
+
+  /** Authenticate a provider subject. Existing email accounts are never silently linked by email. */
+  public async loginYandex(role: AccountRole, subject: string, emailInput: string): Promise<VerificationResult> {
+    const email = requireEmail(emailInput);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await lockAdvisory(client, [advisoryKey(`email:${email}`), advisoryKey(`yandex:${subject}`)]);
+      const linked = await client.query<AccountRow>(
+        `SELECT a.* FROM auth_oauth_identities i JOIN accounts a ON a.id=i.account_id WHERE i.provider='yandex' AND i.subject=$1 FOR UPDATE OF a`, [subject]);
+      let row = linked.rows[0];
+      if (row && row.role !== role) throw new AuthError(409, "role_mismatch");
+      if (!row) {
+        const existing = await client.query("SELECT id FROM accounts WHERE email=$1", [email]);
+        if (existing.rowCount) throw new AuthError(409, "oauth_email_conflict");
+        const inserted = await client.query<AccountRow>(
+          `INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)
+           VALUES ($1,$2,$3,true,$4,now()) RETURNING *`, [randomUUID(), email, role, this.consentVersion]);
+        row = inserted.rows[0];
+        if (!row) throw new Error("oauth_account_missing");
+        await client.query("INSERT INTO auth_oauth_identities(provider,subject,account_id) VALUES ('yandex',$1,$2)", [subject,row.id]);
+      }
+      // Record the current consent accepted on this OAuth start, including legacy accounts.
+      const accepted = await client.query<AccountRow>(
+        "UPDATE accounts SET processing_consent_version=$2,processing_consent_at=now() WHERE id=$1 RETURNING *", [row.id,this.consentVersion]);
+      row = accepted.rows[0];
+      if (!row) throw new Error("oauth_account_missing");
+      const sessionId = createSessionId();
+      const expiresAt = new Date(Date.now()+AUTH_LIMITS.sessionTtlMs);
+      await client.query("INSERT INTO sessions(id,account_id,role,session_hash,expires_at) VALUES ($1,$2,$3,$4,$5)",
+        [randomUUID(),row.id,role,hashSessionId(sessionId),expiresAt]);
+      await client.query("COMMIT");
+      return { account: account(row), session_id: sessionId, expires_at: expiresAt.toISOString() };
+    } catch (error) { await rollback(client); throw error; }
+    finally { client.release(); }
+  }
+
   /** Resolve a live session to its account, respecting role and database revocation. */
   public async session(roleInput: AccountRole, accountId: string, sessionId: string): Promise<AuthAccount | null> {
     let role: AccountRole;

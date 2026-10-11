@@ -4065,7 +4065,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -4203,7 +4203,7 @@
           "salary": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SalaryRange"
+                "$ref": "#/components/schemas/CandidateSalary"
               },
               {
                 "type": "null"
@@ -4333,6 +4333,34 @@
         "title": "CandidateProfile",
         "description": "Complete or draft input; contacts remain private until downstream acceptance."
       },
+      "CandidateSalary": {
+        "properties": {
+          "from_rub": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "From Rub"
+          },
+          "to_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Rub"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "from_rub"
+        ],
+        "title": "CandidateSalary",
+        "description": "Candidate minimum in RUB; null upper bound means no salary ceiling."
+      },
       "CandidateStatus": {
         "properties": {
           "candidate_id": {
@@ -4433,7 +4461,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -5076,7 +5104,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -6670,7 +6698,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7001,7 +7029,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7065,7 +7093,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7270,7 +7298,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "description": {
             "type": "string",
@@ -7512,7 +7540,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"

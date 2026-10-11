@@ -107,12 +107,12 @@ export function useResource<T>(
 
 /** Whole-RUB salary interval; figures are always supplied by the backend. */
 export function salary(from?: number | null, to?: number | null): string {
-  if (from == null || to == null) return "Зарплата не указана";
+  if (from == null) return "Зарплата не указана";
   const format = (value: number) =>
     new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(
       value / 1000,
     );
-  return `${format(from)}–${format(to)}к ₽`;
+  return to == null ? `от ${format(from)}к ₽` : `${format(from)}–${format(to)}к ₽`;
 }
 
 /** Read SPA state from a hash so deep links work under the existing nginx base. */

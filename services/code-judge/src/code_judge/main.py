@@ -6,6 +6,7 @@ import json
 import os
 import secrets
 import threading
+import weakref
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -48,7 +49,10 @@ def create_app(data_dir: Path | None = None, *, runner: DockerRunner | None = No
     app = FastAPI(title="Comit Code Judge", version="0.2.0")
     store = SubmissionStore(data_dir or Path(os.getenv("CODE_JUDGE_DATA_DIR", "data/code-judge")))
     executor = runner or DockerRunner()
-    lock = threading.Lock()
+    registry_lock = threading.Lock()
+    identity_locks: weakref.WeakValueDictionary[str, threading.Lock] = weakref.WeakValueDictionary()
+    concurrency = max(1, min(4, int(os.getenv("CODE_JUDGE_CONCURRENCY", "2"))))
+    execution_slots = threading.BoundedSemaphore(concurrency)
 
     @app.on_event("startup")
     async def clean_previous_process() -> None:
@@ -75,9 +79,8 @@ def create_app(data_dir: Path | None = None, *, runner: DockerRunner | None = No
 
     @app.get("/ready")
     def ready() -> dict:
-        with lock:
-            if not executor.ready():
-                raise HTTPException(503, "runner_unavailable")
+        if not executor.ready():
+            raise HTTPException(503, "runner_unavailable")
         return {"status": "ok", "runner": "docker-isolated"}
 
     @app.post("/submissions")
@@ -85,7 +88,9 @@ def create_app(data_dir: Path | None = None, *, runner: DockerRunner | None = No
         # One worker/process per file-backed instance; serialize duplicate calls.
         identity = hashlib.sha256((body.owner_id + "\0" + body.idempotency_key).encode()).hexdigest()
         fingerprint = hashlib.sha256(json.dumps(body.model_dump(), sort_keys=True).encode()).hexdigest()
-        with lock:
+        with registry_lock:
+            identity_lock = identity_locks.setdefault(identity, threading.Lock())
+        with identity_lock:
             try:
                 record = store.read(identity)
             except FileNotFoundError:
@@ -94,12 +99,16 @@ def create_app(data_dir: Path | None = None, *, runner: DockerRunner | None = No
                 if record["fingerprint"] != fingerprint:
                     raise HTTPException(409, "submission_conflict")
                 return {key: record[key] for key in ("submission_id", "status", "correct", "verdict_kind")}
+            if not execution_slots.acquire(timeout=1):
+                raise HTTPException(503, "runner_busy")
             try:
                 if not executor.ready():
                     raise RunnerUnavailable
                 correct, kind = executor.judge(body.problem.model_dump(), body.code)
             except RunnerUnavailable as error:
                 raise HTTPException(503, "runner_unavailable") from error
+            finally:
+                execution_slots.release()
             record = {"submission_id": identity, "fingerprint": fingerprint,
                       "status": "judged", "correct": correct, "verdict_kind": kind}
             store.save(record)

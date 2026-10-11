@@ -54,19 +54,20 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 
 ## Как запустить локально
 
-Требования: Docker Compose v2 и Make.
-
-Перед `make dev-up` задайте `CODE_JUDGE_URL` и `CODE_JUDGE_TOKEN` существующего
-изолированного judge — [подключение](docs/deploy.md#изолированная-проверка-кода).
+Требования: Docker Compose 2.24.4+ и Make. Первый запуск требует интернета
+для сборки образов и скачивания публичного pinned Harrier; затем matching работает
+по локальному cache. Необязательный внешний judge не нужен для запуска сайта.
 
 ```sh
-make dev-up               # изолированный dev-стек (отдельные volumes comit-dev)
-SMOKE_MODE=dev make smoke # проверка, что всё поднялось
+make dev-up  # отдельные volumes comit-dev, bootstrap Harrier и ожидание readiness
 ```
 
-- Приложение: http://localhost:8088 — витрина, `/candidate/`, `/employer/`, `/testing/`, `/support/`.
-- Одноразовый код входа подставляется на форму автоматически (dev-only), мок ФСП включён.
-- `make dev-down` останавливает стек, сохраняя данные.
+- Приложение: http://localhost:8088 — витрина, `/candidate/`, `/employer/`, `/testing/`, `/support/`, API `/api/`. На хост публикуется один loopback-порт.
+- Одноразовый код входа подставляется автоматически (dev-only), мок ФСП включён.
+- Тестирование полностью выключено без judge: попытки и оценки не создаются.
+- Для реального judge: `COMIT_LOCAL_PROJECT=comit-dev ./infra/local-dev.sh --env-file /absolute/private/dev.env --with-judge` ([настройка](docs/deploy.md#локальный-запуск-через-один-порт)).
+- `make dev-models` отдельно готовит точную модель; `make dev-down` останавливает стек, сохраняя volumes.
+- Ошибка скачивания модели останавливает bootstrap, без fake embeddings или ослабления readiness.
 
 Production-контур, отличия dev/prod и запуск без Docker — [docs/environments.md](docs/environments.md).
 

@@ -13,6 +13,7 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
+import { glassEffect } from "./glass-effect";
 import { motion } from "framer-motion";
 import {
   ArrowUpRight,
@@ -349,6 +350,14 @@ export function Select({
 
 /** Refractive backdrop filter and Figma background imagery, isolated from content. */
 export function Backdrop({ imagery = true }: { imagery?: boolean } = {}) {
+  useEffect(() => {
+    const update = () => {
+      document.documentElement.dataset.comitGlass = glassEffect(window.location.search, navigator.userAgent, CSS.supports("backdrop-filter", "url(#glass-refraction)"));
+    };
+    update();
+    window.addEventListener("popstate", update);
+    return () => window.removeEventListener("popstate", update);
+  }, []);
   const map = (vertical: boolean) =>
     `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><defs><linearGradient id="g" x2="${vertical ? "0" : "1"}" y2="${vertical ? "1" : "0"}"><stop stop-color="${vertical ? "#000000" : "#00007f"}"/><stop offset=".08" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset=".92" stop-color="${vertical ? "#007f00" : "#7f007f"}"/><stop offset="1" stop-color="${vertical ? "#00ff00" : "#ff007f"}"/></linearGradient></defs><rect width="256" height="256" fill="url(#g)"/></svg>`)}`;
   return (
@@ -386,13 +395,8 @@ export function Backdrop({ imagery = true }: { imagery?: boolean } = {}) {
               result="lens"
             />
             <feGaussianBlur in="lens" stdDeviation="2" result="smooth" />
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="smooth"
-              scale="42"
-              xChannelSelector="R"
-              yChannelSelector="G"
-            />
+            <feDisplacementMap in="SourceGraphic" in2="smooth" scale="-24" xChannelSelector="R" yChannelSelector="G" result="bent" />
+            <feGaussianBlur in="bent" stdDeviation="0.4" />
           </filter>
         </defs>
       </svg>
@@ -584,3 +588,5 @@ export function RecruitmentClock({ deadline }: { deadline?: RecruitmentDeadline 
   const label = deadline.stage === "initial" ? "Свяжитесь в чате, назначьте собеседование или примите решение" : deadline.stage === "conversation" ? "Назначьте собеседование или примите решение" : "Примите решение после собеседования";
   return <aside className="recruitment-deadline" aria-label="Срок следующего действия"><strong>{remaining > 0 ? `Осталось: ${days} д. ${String(hours).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")} рабочего времени` : "Срок действия истёк. Обновляем состояние предложения."}</strong><p>{label}. Выходные не учитываются.{[0, 6].includes(weekday) ? " Таймер приостановлен до понедельника." : ""}</p><small>До {new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short", timeZone: deadline.time_zone }).format(new Date(deadline.due_at))} · Москва</small></aside>;
 }
+
+export { LegalText } from "./legal-text";

@@ -27,7 +27,10 @@ const databaseUrl = process.env.CHAT_SSE_TEST_DATABASE_URL;
 test("chat SSE bounds streams, resumes durable events and stops after consent/session revocation", { skip: !databaseUrl }, async () => {
   const pool = new Pool({ connectionString: databaseUrl });
   const revocationApp = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } } });
+  const authorizationApp = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } } });
   const app = Fastify({ ajv: { customOptions: { removeAdditional: false, coerceTypes: false, useDefaults: false } } });
+  const clients: AbortController[] = [];
+  let releasePolls = () => {};
   try {
     await migrate(pool);
     await pool.query("TRUNCATE accounts,auth_challenges,auth_issue_events,auth_verify_events RESTART IDENTITY CASCADE");
@@ -48,19 +51,38 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
       VALUES($1,$2,$3,$4,$5,1,'sent',$6,now())`, [processId, owner.id, candidate.id, randomUUID(), randomUUID(), {
       company_name: "Synthetic", description: "Invitation", salary: { from_rub: 100, to_rub: 200 }, contact_method: "platform",
       vacancy_title: "Backend", city: "Москва", daily: "5/2", work_type: "remote" }]);
+    // Independent processes avoid lifecycle row locks serializing the concurrency fixture.
+    const concurrentProcesses = Array.from({ length: 5 }, () => randomUUID());
+    for (const id of concurrentProcesses) await pool.query(`INSERT INTO recruitment_processes
+      (id,owner_id,candidate_id,vacancy_id,draft_id,profile_revision,state,terms,invited_at)
+      SELECT $1,owner_id,candidate_id,$3,$4,profile_revision,state,terms,invited_at
+      FROM recruitment_processes WHERE id=$2`, [id, processId, randomUUID(), randomUUID()]);
     const message = { id: randomUUID(), sequence: 5, sender_id: owner.id, created_at: "2026-10-07T00:00:00Z", text: "Synthetic live message", files: [] };
     const calls: number[] = [];
     let failure = 0;
+    let blockPolls = false, blockedPolls = 0, nextSequence = 5;
+    const blockedProcesses = new Set<string>();
+    let pollsReady = () => {};
+    const pollsBlocked = new Promise<void>(resolve => { pollsReady = resolve; });
+    const pollGate = new Promise<void>(resolve => { releasePolls = resolve; });
     const transport: typeof fetch = async (input, init) => {
-      assert.equal(new URL(String(input)).pathname, "/internal/chat/events");
-      const payload = JSON.parse(String(init?.body)) as { after_sequence: number; actor_id: string };
-      assert.equal(payload.actor_id, candidate.id);
+      const operation = new URL(String(input)).pathname;
+      if (operation === "/internal/chat/history") return Response.json({ messages: [], next_sequence: 5 });
+      assert.equal(operation, "/internal/chat/events");
+      const payload = JSON.parse(String(init?.body)) as { after_sequence: number; actor_id: string; process_id: string };
+      assert.ok([candidate.id, owner.id].includes(payload.actor_id));
       calls.push(payload.after_sequence);
+      if (blockPolls) {
+        blockedProcesses.add(payload.process_id);
+        blockedPolls++;
+        if (blockedPolls === 3) pollsReady();
+        await pollGate;
+      }
       if (failure) return Response.json({ detail: "synthetic-private-error" }, { status: failure });
-      return Response.json(payload.after_sequence < 5 ? { events: [{ sequence: 5, type: "message.created", message }], next_sequence: 5 } : { events: [], next_sequence: payload.after_sequence });
+      return Response.json(payload.after_sequence < 5 ? { events: [{ sequence: 5, type: "message.created", message }], next_sequence: 5 } : { events: [], next_sequence: Math.max(payload.after_sequence, nextSequence) });
     };
     await app.register(cookie);
-    await app.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false, chatUrl: "http://synthetic-chat", chatToken: "synthetic-private-token", chatTransport: transport, streamLifetimeMs: 80, streamPollMs: 10 });
+    await app.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false, chatUrl: "http://synthetic-chat", chatToken: "synthetic-private-token", chatTransport: transport, streamLifetimeMs: 1000, streamPollMs: 25 });
     const path = `/candidate/recruitment/${processId}/chat/events`;
     const headers = { authorization: candidate.authorization };
     await pool.query("INSERT INTO recruitment_events(event_id,process_id,revision,type,state) VALUES($1,$2,1,'invited','sent')", [randomUUID(), processId]);
@@ -75,7 +97,7 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
     assert.equal((await app.inject({ url: `${path}?after_sequence=2`, headers: { ...headers, "last-event-id": "3" } })).statusCode, 400);
     const stream = await app.inject({ url: path, headers });
     assert.equal(stream.statusCode, 200, stream.body); assert.match(String(stream.headers["content-type"]), /text\/event-stream/);
-    assert.match(stream.body, /id: 5\nevent: message.created/); assert.match(stream.body, /: heartbeat/); assert.match(stream.body, /event: reconnect/);
+    assert.match(stream.body, /id: 5\nevent: message.created/); assert.match(stream.body, /event: reconnect/);
     assert.equal(stream.body.split("Synthetic live message").length - 1, 1);
     const resumed = await app.inject({ url: path, headers: { ...headers, "last-event-id": "5" } });
     assert.ok(!resumed.body.includes("message.created"));
@@ -84,27 +106,36 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
     const resync = await app.inject({ url: path, headers });
     assert.equal(resync.statusCode, 410); assert.equal(resync.json().detail, "chat_resync_required");
     failure = 0;
-    const first = app.inject({ url: path, headers }), second = app.inject({ url: path, headers });
-    await new Promise(resolve => setTimeout(resolve, 10));
-    assert.equal((await app.inject({ url: path, headers })).statusCode, 429);
-    await Promise.all([first, second]);
     // Real response headers confirm the stream is open before changing durable
     // authorization. The separate bounded lifetime must not race a PG commit.
     await revocationApp.register(cookie);
     await revocationApp.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false,
       chatUrl: "http://synthetic-chat", chatToken: "synthetic-private-token", chatTransport: transport,
-      streamLifetimeMs: 5000, streamPollMs: 10 });
-    const address = await revocationApp.listen({ host: "127.0.0.1", port: 0 });
-    const openStream = async () => {
-      const response = await fetch(`${address}${path}`, { headers, signal: AbortSignal.timeout(10_000) });
+      streamLifetimeMs: 15000, streamPollMs: 25 });
+    let address = await revocationApp.listen({ host: "127.0.0.1", port: 0 });
+    const openStream = async (role: "candidate" | "employer" = "candidate", id = processId) => {
+      const controller = new AbortController(); clients.push(controller);
+      const actorHeaders = { authorization: role === "candidate" ? candidate.authorization : owner.authorization };
+      const response = await fetch(`${address}/${role}/recruitment/${id}/chat/events`, {
+        headers: actorHeaders, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20_000)]),
+      });
       assert.equal(response.status, 200, response.status === 200 ? undefined : await response.text());
-      const reader = response.body?.getReader();
-      assert.ok(reader);
-      const firstFrame = await reader.read();
-      assert.equal(firstFrame.done, false);
+      const reader = response.body?.getReader(); assert.ok(reader);
+      const firstFrame = await reader.read(); assert.equal(firstFrame.done, false);
       const prefix = new TextDecoder().decode(firstFrame.value);
       assert.match(prefix, /retry: 1000/);
-      return { reader, prefix };
+      return { reader, prefix, controller, id };
+    };
+    const readUntil = async (stream: Awaited<ReturnType<typeof openStream>>, pattern: RegExp) => {
+      const decoder = new TextDecoder();
+      let body = stream.prefix;
+      while (!pattern.test(body)) {
+        const frame = await stream.reader.read();
+        assert.equal(frame.done, false, `Stream closed before ${pattern}: ${body}`);
+        body += decoder.decode(frame.value, { stream: true });
+      }
+      stream.prefix = body;
+      return body;
     };
     const finishStream = async (stream: Awaited<ReturnType<typeof openStream>>) => {
       const decoder = new TextDecoder();
@@ -115,10 +146,40 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
         body += decoder.decode(frame.value, { stream: true });
       }
     };
+    // Headers and heartbeat synchronize readiness; no sleep guesses when slots are acquired.
+    const first = await openStream("candidate", concurrentProcesses[0]), second = await openStream("candidate", concurrentProcesses[1]);
+    assert.equal((await revocationApp.inject({ url: path, headers })).statusCode, 429);
+    assert.match(await readUntil(first, /: heartbeat/), /id: 5\nevent: message.created/);
+    const third = await openStream("employer", concurrentProcesses[2]), fourth = await openStream("employer", concurrentProcesses[3]);
+    for (const item of [first, second, third, fourth]) { await readUntil(item, /: heartbeat/); item.prefix = ""; }
+    blockPolls = true;
+    await Promise.race([pollsBlocked, new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error("poll_budget_readiness_timeout")), 10_000);
+      timer.unref(); pollsBlocked.then(() => clearTimeout(timer));
+    })]);
+    // All three poll slots are held at the provider. Interactive history still succeeds.
+    const history = await revocationApp.inject({ url: `/candidate/recruitment/${concurrentProcesses[4]}/chat/messages`, headers });
+    assert.equal(history.statusCode, 200, history.body);
+    // One of the four live streams skips busy ticks without advancing its durable cursor.
+    const busyStream = [first, second, third, fourth].find(item => !blockedProcesses.has(item.id));
+    assert.ok(busyStream);
+    const busyBody = await readUntil(busyStream, /: heartbeat/);
+    assert.ok(!busyBody.includes("event: error"));
+    assert.ok(!busyBody.includes("id: 6"));
+    blockPolls = false; nextSequence = 6; releasePolls();
+    // A later page proves the busy stream remained open and catches up from its saved cursor.
+    assert.ok(!(await readUntil(busyStream, /id: 6\nevent: cursor/)).includes("event: error"));
+    assert.equal(blockedPolls, 3);
+    for (const item of [first, second, third, fourth]) item.controller.abort();
+    // Existing streams can finish their released poll before surrendering actor slots.
+    await revocationApp.close();
+    await authorizationApp.register(cookie);
+    await authorizationApp.register(chatRoutes, { store, config, profiles, recruitment, mailConfigured: false,
+      chatUrl: "http://synthetic-chat", chatToken: "synthetic-private-token", chatTransport: transport,
+      streamLifetimeMs: 15000, streamPollMs: 25 });
+    address = await authorizationApp.listen({ host: "127.0.0.1", port: 0 });
     const duringWithdrawal = await openStream();
-    // Exercise a mutation after the old 80ms fixture lifetime, rather than
-    // relying on a scheduling sleep to assume that Fastify started the request.
-    await new Promise(resolve => setTimeout(resolve, 120));
+    await readUntil(duringWithdrawal, /: heartbeat/);
     await profiles.save(candidate.id, { expected_revision: 1, fields: {}, consent: { processing: false, pool: false, version: "profile-v1" } });
     const closed = await finishStream(duringWithdrawal);
     assert.match(closed, /event: error/); assert.ok(!closed.includes("synthetic-private-error"));
@@ -128,5 +189,5 @@ test("chat SSE bounds streams, resumes durable events and stops after consent/se
     await store.revokeAll("candidate", candidate.id);
     assert.match(await finishStream(duringLogout), /chat_session_revoked/);
     assert.equal((await app.inject({ url: path, headers })).statusCode, 401);
-  } finally { await revocationApp.close(); await app.close(); await pool.end(); }
+  } finally { releasePolls(); for (const client of clients) client.abort(); await authorizationApp.close(); await revocationApp.close(); await app.close(); await pool.end(); }
 });

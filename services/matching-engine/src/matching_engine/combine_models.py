@@ -16,6 +16,7 @@ from matching_engine.models import (
     NarrativeRole,
     PoolEntry,
     SalaryRange,
+    CandidateSalary,
     StrictBoolean,
     WorkType,
 )
@@ -166,7 +167,7 @@ class CandidateCard(Contract):
     position: int
     display_name: str
     city: str
-    salary: SalaryRange
+    salary: CandidateSalary
     category: Category
     rank: int
     confirmed_strength: int

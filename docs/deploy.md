@@ -254,7 +254,7 @@ release; эти проверки подключения сами по себе �
 
 | Переменная | Где | По умолчанию | Назначение |
 |---|---|---|---|
-| `WEB_PORT`, `API_PORT`, `MATCHING_PORT`, `TESTING_PORT`, `INTEGRATION_PORT`, `AGENTS_PORT`, `VERIFICATION_PORT` | compose | 8088, 28080, 28101, 8102, 8103, 28104, 28105 | host-порты; все, кроме web, только на `127.0.0.1` |
+| `WEB_PORT`, `API_PORT`, `MATCHING_PORT`, `TESTING_PORT`, `INTEGRATION_PORT`, `AGENTS_PORT`, `VERIFICATION_PORT` | compose | 8088, 28080, 28101, 8102, 8103, 28104, 28105 | host-порты; production все только на `127.0.0.1`; direct dev web сохраняет прежний bind, local launcher только loopback |
 | `API_RATE_LIMIT`, `API_RATE_WINDOW_SECONDS`, `API_RATE_FALLBACK_KEYS` | api | 240, 60, 10000 | квота запросов ([api-operations.md](api-operations.md)) |
 | `PIPELINE_MAX_ATTEMPTS`, `PIPELINE_LEASE_SECONDS`, `PIPELINE_RETRY_BASE_SECONDS`, `PIPELINE_POLL_SECONDS` | matching workers | 5, 300, 30, 2 | попытки, lease, backoff и опрос очередей (compose задаёт 5/300) |
 | `AGENTS_LEASE_SECONDS`, `AGENTS_POLL_SECONDS` | agents workers | 300, 2 | lease и опрос очередей агентов |
@@ -292,3 +292,87 @@ rollback уже проверенного сервером release: операт�
 и публичные status-проверки до переключения current. Этот job проверяет HTTP
 контракты, а не браузерный JS userflow, SMTP-доставку или пользовательский вход.
 Проверка вручную: `python3 infra/public-smoke.py https://comit.droidje.com`.
+
+## Локальный запуск через один порт
+
+Из корня репозитория: `./infra/local-dev.sh`. Скрипт выполняет `up -d --build --wait`
+в отдельном Compose project `comit-local`; доступны `/`, `/candidate/`, `/employer/`,
+`/testing/`, `/support/` и `/api/` на `http://localhost:8088`. Только nginx публикует
+порт, привязанный к `127.0.0.1`; остальные сервисы доступны внутри Compose.
+Нужен Docker Compose 2.24.4+ (`!reset`, `!override`). Перед первым запуском
+`model-cache-init` скачивает точный `MODEL_ID`/`MODEL_REVISION` Harrier в общий
+project volume перед стартом matching/API/web; имеющийся snapshot проверяется и
+используется без сети. При download error bootstrap падает, readiness не ослабляется.
+Отдельная подготовка: `./infra/local-dev.sh run --rm --build --no-deps model-cache-init`.
+На первом запуске нужен интернет; fake embeddings отсутствуют.
+
+`./infra/local-dev.sh --env-file /absolute/private/dev.env` использует существующий
+приватный файл без перезаписи. Для диагностики вместо `up` можно передать `ps`,
+`logs` или `config --quiet`; для остановки — `stop`. Именованные volumes сохраняются.
+`WEB_PORT` меняет browser port; `COMIT_LOCAL_PROJECT=comit-local-name` создаёт другой
+изолированный проект; `make dev-up` использует `comit-dev`. Скрипт отклоняет production project names.
+
+По умолчанию скрипт принудительно задаёт `TESTING_ENABLED=false`, даже если env file
+содержит адрес judge: отключены все направления тестирования, без создания попыток,
+проверки ответов и публикации грейда. UI объясняет отключение и предлагает вернуться
+в резюме. Прямой `docker-compose.dev.yml` сохраняет обычное enabled-поведение для CI.
+
+Для полноценного тестирования: `./infra/local-dev.sh --env-file /absolute/private/dev.env --with-judge`.
+В приватном env file обязательны `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`; для частного
+CA — `CODE_JUDGE_CA_PEM`. Judge должен быть реальным изолированным сервисом;
+скрипт не запускает локальный исполнитель кода и не монтирует Docker socket.
+Недоступность judge закрывает code-тестирование по существующему контракту.
+
+В web image копируется `docs/legal` до Vite build: Markdown юридических страниц
+включается в bundle при сборке, а не читается из runtime filesystem.
+
+Для Yandex OAuth production API принимает `YANDEX_OAUTH_ENABLED` (по умолчанию
+`false`), `YANDEX_OAUTH_CLIENT_ID`, `YANDEX_OAUTH_CLIENT_SECRET` и
+`YANDEX_OAUTH_SITE_ORIGIN`. При включении все три значения обязательны; site origin
+должен быть HTTPS и входить в `AUTH_ALLOWED_ORIGINS`. В dev provider выключен.
+Callback paths: `/api/auth/candidate/yandex/callback` и
+`/api/auth/employer/yandex/callback`; секрет хранится только в приватном env file.
+
+### Диагностика медленного локального Docker runtime
+
+Проверяйте давление всей Linux VM, а не только CPU отдельного API:
+`docker exec <local-postgres-container> sh -c 'cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io; head -12 /proc/meminfo'`.
+Это чтение статистики, без env/secrets. `docker stats --no-stream` по нескольким
+конкретным именам помогает отделить потребление проекта от соседних контейнеров.
+HTTP измеряется с ограничением времени, например
+`curl --max-time 8 -s -o /dev/null -w '%{time_total}\n' http://localhost:8088/api/healthz`.
+
+Пример наблюдения 11.10.2026, до применения изменений prerelease: 70 контейнеров
+делили VM с 7.75 GiB RAM; доступно около 572 MiB. Memory PSI `full avg10=96.05`
+и `some avg10=97.23` показывали почти постоянные задержки reclaim; CPU PSI
+`some avg10=90.96`. Docker ps занял 26.31 s, welcome превысил timeout 8 s,
+API health ответил за 1.66 s. В этом срезе prerelease API использовал 110 MiB,
+matching — 56 MiB и 0.10% CPU; эти цифры не доказывают проблему фронтенда или
+самого matching. Частичные stats не локализовали всю нагрузку до одного сервиса.
+
+При таком давлении корректное восстановление требует отдельного разрешения на
+изменение памяти Docker VM либо остановку выбранных соседних стеков. Оптимизация
+кода приложения не устраняет недостаток общей VM RAM. Автоматическая остановка
+чужих проектов и изменение Docker settings в local launcher отсутствуют.
+Эти измерения относятся к конкретному срезу, а не к производительности fresh launch.
+
+OAuth callback query (`code`, `state`) не пишется в access log: отдельные callback
+locations отключают его и на application nginx, и в host nginx template, включая
+HTTP redirect на HTTPS. Обычные API access logs сохраняются. Изменение template
+само по себе не обновляет live server; proxy headers/timeouts сохранены.
+
+### Web security headers и внутренние метрики
+
+Application nginx и HTTPS host template выставляют `nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin` и CSP с `frame-ancestors 'none'`.
+CSP разрешает текущие assets с того же origin, локальный MediaPipe Wasm, inline React
+styles, data/blob SVG и media streams; Yandex authorize разрешён для form-action.
+Остальные scripts/connections остаются same-origin. HTTPS host выставляет HSTS
+`max-age=15552000`; на локальном HTTP HSTS не выставляется.
+
+`/api/metrics` и варианты после нормализации закрыты gateway с 404. Прямой внутренний
+`http://api:8080/metrics` сохраняется для scrape; API endpoint не удалён.
+Production web port теперь только `127.0.0.1:${WEB_PORT:-8088}` и обслуживается через
+host TLS proxy. Базовый dev bind не изменён; local launcher уже использует loopback.
+Это изменения repository templates, без live nginx reload или изменения сервера.
+Реальный браузерный CSP/camera/glass сценарий требует отдельной проверки после build.

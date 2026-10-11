@@ -17,11 +17,16 @@ class CriterionVerdict(BaseModel):
     met: StrictBool
 
 
+class UncertainVerdict(ValueError):
+    """Well-formed provider output lacks confidence; it is not an incorrect answer."""
+
+
 class RubricVerdict(BaseModel):
     """Provider output contains no grade, score weights, or control instructions."""
 
     model_config = ConfigDict(extra="forbid")
     criteria: list[CriterionVerdict]
+    uncertain: StrictBool = False
 
 
 class RubricJudge:
@@ -47,7 +52,7 @@ class RubricJudge:
             return json.loads(response.read(262145))
 
     def judge(self, payload: dict, answer: str, *, owner: str = "") -> tuple[bool | None, str]:
-        """Cache only validated verdicts; outages/ambiguous output remain retryable."""
+        """Cache validated verdicts and explicit uncertainty; infrastructure failures remain retryable."""
         rubric = payload.get("rubric")
         if not self.configured() or not isinstance(rubric, list) or not 1 <= len(rubric) <= 12:
             return None, "text_judge_unavailable"
@@ -87,8 +92,10 @@ class RubricJudge:
                         raise ValueError("invalid_classes")
                     if any(type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1 for value in scores):
                         raise ValueError("invalid_probability")
-                    if not 0.99 <= sum(scores) <= 1.01 or max(scores) < 0.8:
-                        raise ValueError("uncertain_verdict")
+                    if not 0.99 <= sum(scores) <= 1.01:
+                        raise ValueError("invalid_probability_sum")
+                    if max(scores) < 0.8:
+                        raise UncertainVerdict("uncertain_verdict")
                     criteria.append(CriterionVerdict(met=scores[1] > scores[0]))
                 verdict = RubricVerdict(criteria=criteria)
             else:
@@ -99,6 +106,8 @@ class RubricJudge:
                         json.dumps(trusted, ensure_ascii=False)},
                         {"role": "user", "content": json.dumps({"untrusted_candidate_answer": answer}, ensure_ascii=False)}]}, key)
                 verdict = RubricVerdict.model_validate_json(body["choices"][0]["message"]["content"])
+            if verdict.uncertain:
+                return None, "rubric:uncertain"
             if len(verdict.criteria) != len(rubric):
                 raise ValueError("criterion_count")
             if path and not path.exists():
@@ -107,5 +116,12 @@ class RubricJudge:
                 temporary.write_text(verdict.model_dump_json(), encoding="utf-8")
                 temporary.replace(path)
             return all(point.met for point in verdict.criteria), "rubric:" + self.provider
+        except UncertainVerdict:
+            if path:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = path.with_suffix(".tmp")
+                temporary.write_text(RubricVerdict(criteria=[], uncertain=True).model_dump_json(), encoding="utf-8")
+                temporary.replace(path)
+            return None, "rubric:uncertain"
         except (OSError, ValueError, KeyError, TypeError, IndexError):
             return None, "text_judge_unavailable"
