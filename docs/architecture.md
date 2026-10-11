@@ -65,6 +65,27 @@ services/agents-service      services/verification-engine qgramm-chat (Go bridge
 
 Чаты на QGramm интегрированы в кабинеты обеих ролей: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию, доступ по приглашению и текущее согласие под DB-locks. Системный чат Comit доставляет уведомления платформы.
 
+## Карта репозитория
+
+| Путь | Содержание |
+|---|---|
+| `apps/candidate`, `apps/employer`, `apps/testing`, `apps/welcome` | React 19 + TS + Vite + Tailwind 4 (`apps/testing` в web-образ не входит) |
+| `apps/api` | api-core (Fastify + OpenAPI) |
+| `packages/shared` | домен-типы и контракты (источник истины по типам) |
+| `packages/ui-kit` | дизайн-токены и базовые компоненты (гамма ФСП) |
+| `packages/api-client` | типизированный HTTP-клиент |
+| `services/matching-engine` | Python/FastAPI: подбор и объяснимость |
+| `services/testing-engine` | Python/FastAPI: тестирование (blueprints/, адаптивный контур) |
+| `services/code-judge` | Python/FastAPI: хранение отправок кода и упаковка задач DMOJ (без runner) |
+| `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
+| `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
+| `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
+| `infra/` | docker-compose (production по умолчанию, dev, legacy overlays), Dockerfiles, nginx, QGramm bridge, postgres init, `deploy.py` |
+| `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
+| `tests/` | сквозной smoke-гейт и acceptance-сценарии |
+| `docs/` | живая документация (RU) |
+| `context/` | канон-контекст: ТЗ, исследование hh.ru, видение, механики, план |
+
 ## Auth и ownership
 
 Нормализованный email глобально уникален и навсегда связан с одной ролью:
