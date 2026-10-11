@@ -899,6 +899,10 @@ textarea::placeholder {
 
 /* Shared native checkbox from the established email consent control. */
 .comit-checkbox[type="checkbox"] {
+  min-height: 0;
+  padding: 0;
+  align-self: flex-start;
+  aspect-ratio: 1;
   appearance: none;
   position: relative;
   flex: 0 0 max(24rem, var(--employer-checkbox-min));
@@ -935,8 +939,7 @@ textarea::placeholder {
 }
 
 @media (max-width: 760px) {
-  .comit-checkbox[type="checkbox"] { width: 20rem; height: 20rem; flex-basis: 20rem; }
-  .comit-checkbox[type="checkbox"]:checked::after { left: 6rem; top: 2rem; width: 6rem; height: 10rem; }
+  .comit-checkbox[type="checkbox"] { width: max(20rem, var(--employer-checkbox-min)); height: max(20rem, var(--employer-checkbox-min)); flex-basis: max(20rem, var(--employer-checkbox-min)); }
 }
 
 .account-tools .plain-icon:hover > .icon-search,

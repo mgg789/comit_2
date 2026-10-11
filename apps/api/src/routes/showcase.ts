@@ -6,6 +6,11 @@ import { originAllowed, resolveSession, type SessionIdentity } from "../auth/ses
 import { correlatedFetch } from "../operations/index.js";
 
 const ref = (name: string) => ({ $ref: `urn:comit:public:matching:${name}` });
+const publicTestingSchema = { type: "array", maxItems: 100, items: { type: "object", additionalProperties: false,
+  required: ["subject", "grade", "supervision_badge", "camera_status"], properties: {
+    subject: { type: "string" }, grade: { enum: ["intern", "junior", "middle", "senior"] },
+    supervision_badge: { anyOf: [{ type: "string" }, { type: "null" }] }, camera_status: { enum: ["granted", "denied", "unavailable", "unknown"] } } } };
+const detailResponse = { allOf: [ref("PublicCandidateDetail"), { type: "object", properties: { testing_results: publicTestingSchema } }] };
 const uuid = { type: "string", format: "uuid" };
 
 /** Register under accountRoutes so the generated matching schemas are inherited. */
@@ -89,14 +94,15 @@ export async function showcaseRoutes(app: FastifyInstance, options: AccountGatew
     } catch (error) { return fail(reply, error); }
   });
   app.get<{ Params: { candidate_id: string } }>("/employer/candidates/:candidate_id", {
-    schema: { tags: ["employer-showcase"], security, params, response: { 200: ref("PublicCandidateDetail") } }, onRequest: guard,
+    schema: { tags: ["employer-showcase"], security, params, response: { 200: detailResponse } }, onRequest: guard,
   }, async (request, reply) => {
     const identity = identities.get(request);
     if (!identity || !token || !options.profiles) return reply.code(503).send({ detail: "showcase_unavailable" });
     try {
       const card = await json(request, identity.accountId, `/internal/employer/candidates/${request.params.candidate_id}`, ref("PublicCandidateDetail")) as PublicCandidateDetail;
       if (card.candidate_id !== request.params.candidate_id || !await current([card])) return reply.code(409).send({ detail: "showcase_source_obsolete" });
-      return reply.send({ ...card, resume_url: pdfUrl(card.candidate_id, card.profile_revision) });
+      const testing = await options.profiles.publicTestingResults(card.candidate_id);
+      return reply.send({ ...card, testing_results: testing, resume_url: pdfUrl(card.candidate_id, card.profile_revision) });
     } catch (error) { return fail(reply, error); }
   });
   app.get<{ Params: { candidate_id: string }; Querystring: { profile_revision: string } }>("/employer/candidates/:candidate_id/resume.pdf", {

@@ -1,3 +1,4 @@
+import { testingPresenceLabel, testingSubjectLabel } from "./testing-evidence";
 import { createPortal } from "react-dom";
 import { Dialog } from "@comit/ui-kit/app-shell";
 import { ProcessCommand } from "./communications";
@@ -698,7 +699,8 @@ export function Resume({
             Тесты — переносимые<span>+</span>
           </summary>
           <div className="discovery-accordion-body">
-            <p>Грейд: {gradeLabels[candidate.category.grade]}</p>
+            {candidate.testing_results?.map(result => <article key={result.subject} className="employer-testing-result"><h3>{testingSubjectLabel(result.subject)} · {gradeLabels[result.grade]}</h3><p>Подтверждено тестированием</p><p className="muted">{testingPresenceLabel(result)}</p><p className="muted">Автоматическая отметка присутствия, не заключение о честности.</p></article>)}
+            <p>Общий грейд: {gradeLabels[candidate.category.grade]}</p>
             <p>
               {candidate.category.grade_status === "approved"
                 ? "Подтверждён тестированием"

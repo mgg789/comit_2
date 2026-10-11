@@ -12,6 +12,7 @@ import type {
   CandidateVerificationDocumentUpload,
   InvitationTerms,
   JsonValue,
+  PublicTestingResult,
 } from "@comit/shared";
 import { transaction } from "../auth/database.js";
 import {
@@ -917,7 +918,7 @@ export class CandidateProfileStore {
    */
   public async recordTrustedGrade(candidateId: string, input: {
     sessionId: string; grade: "intern" | "junior" | "middle" | "senior"; specialization: string;
-    supervisionBadge: string | null; tasksAnswered: number;
+    cameraStatus?: "granted" | "denied" | "unavailable"; supervisionBadge: string | null; tasksAnswered: number;
   }): Promise<{ recorded: true; grade: string; decided_at: string }> {
     return transaction(this.pool, async client => {
       const account = await accountFor(client, candidateId, true);
@@ -933,7 +934,7 @@ export class CandidateProfileStore {
         return { recorded: true, grade: previous.grade, decided_at: previous.decided_at.toISOString() };
       }
       const last = (await client.query<{ grade: string; decided_at: Date }>(
-        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 ORDER BY decided_at DESC LIMIT 1", [candidateId])).rows[0];
+        "SELECT grade,decided_at FROM candidate_grade_results WHERE candidate_id=$1 AND specialization=$2 ORDER BY decided_at DESC LIMIT 1", [candidateId,input.specialization])).rows[0];
       if (last) {
         const days = (Date.now() - last.decided_at.getTime()) / 86400000;
         if (days < RETAKE_COOLDOWN_DAYS) throw new ProfileError(409, "retake_cooldown");
@@ -944,20 +945,33 @@ export class CandidateProfileStore {
         (id,candidate_id,session_id,specialization,grade,supervision_badge,tasks_answered,decided_at)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [randomUUID(),candidateId,input.sessionId,input.specialization,
         input.grade,input.supervisionBadge,input.tasksAnswered,decidedAt]);
-      const fields: CandidateProfileFields = { ...profile.fields, declared_grade: input.grade };
+      const isDirection = ["backend", "frontend", "fullstack", "mobile", "devops", "data", "ml", "qa"].includes(input.specialization);
+      const fields: CandidateProfileFields = isDirection ? { ...profile.fields, declared_grade: input.grade } : { ...profile.fields };
       const refreshed = (await client.query<ProfileRow>(`UPDATE candidate_profiles SET revision=revision+1,fields=$2::jsonb,updated_at=now()
         WHERE candidate_id=$1 RETURNING *`, [candidateId,JSON.stringify(fields)])).rows[0]!;
       const inputHash = createHash("sha256").update(canonicalJson({ session_id: input.sessionId, grade: input.grade }), "utf8").digest("hex");
       await client.query(`INSERT INTO candidate_profile_evidence
         (candidate_id,evidence_key,input_hash,status,verified_value,provenance,checked_at)
-        VALUES ($1,'grade:trusted',$2,'confirmed',$3::jsonb,$4::jsonb,$5)
+        VALUES ($1,$6,$2,'confirmed',$3::jsonb,$4::jsonb,$5)
         ON CONFLICT (candidate_id,evidence_key) DO UPDATE SET input_hash=EXCLUDED.input_hash,status=EXCLUDED.status,
           verified_value=EXCLUDED.verified_value,provenance=EXCLUDED.provenance,checked_at=EXCLUDED.checked_at`,
-        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId }),
-          JSON.stringify(["testing-engine: adaptive session"]),decidedAt]);
+        [candidateId,inputHash,JSON.stringify({ grade: input.grade, session_id: input.sessionId, camera_status: input.cameraStatus ?? "unknown", supervision_badge: input.supervisionBadge }),
+          JSON.stringify(["testing-engine: adaptive session"]),decidedAt,isDirection ? "grade:trusted" : `grade:${input.specialization}`]);
       await enqueue(client,account,refreshed,await evidenceFor(client,candidateId));
       return { recorded: true, grade: input.grade, decided_at: decidedAt.toISOString() };
     });
+  }
+
+  /** Return latest accepted subject grades only after the caller validates public profile access. */
+  public async publicTestingResults(candidateId: string): Promise<PublicTestingResult[]> {
+    const rows = (await this.pool.query<{ subject: string; grade: PublicTestingResult["grade"]; supervision_badge: string | null; camera_status: string | null }>(`
+      SELECT DISTINCT ON (g.specialization) g.specialization AS subject,g.grade,g.supervision_badge,
+        CASE WHEN e.verified_value->>'session_id'=g.session_id THEN e.verified_value->>'camera_status' ELSE NULL END AS camera_status
+      FROM candidate_grade_results g LEFT JOIN candidate_profile_evidence e ON e.candidate_id=g.candidate_id
+        AND e.evidence_key='grade:'||g.specialization
+      WHERE g.candidate_id=$1 ORDER BY g.specialization,g.decided_at DESC`, [candidateId])).rows;
+    return rows.map(row => ({ subject: row.subject, grade: row.grade, supervision_badge: row.supervision_badge,
+      camera_status: row.camera_status === "granted" || row.camera_status === "denied" || row.camera_status === "unavailable" ? row.camera_status : "unknown" }));
   }
 
 }

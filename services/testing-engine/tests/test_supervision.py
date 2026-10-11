@@ -3,13 +3,12 @@
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from testing_engine.main import create_testing_app, maintenance
 from testing_engine.supervision import presence_badge
 
 
 def _client(tmp_path: Path) -> TestClient:
-    return TestClient(create_testing_app(data_dir=tmp_path / "testing-data"))
+    return TestClient(create_testing_app(data_dir=tmp_path / "testing-data", allow_unauthenticated=True))
 
 
 def _session(client: TestClient, *, screen: bool = True) -> str:
@@ -40,8 +39,8 @@ def test_supervision_upload_stores_badge(tmp_path: Path) -> None:
     client = _client(tmp_path)
     session_id = _session(client)
     uploaded = client.post(f"/testing/sessions/{session_id}/supervision", json={
-        "total_seconds": 600, "in_frame_seconds": 580,
-        "focus_lost_seconds": 20, "multi_face_events": 0, "camera": "granted"})
+        "total_seconds": 3, "in_frame_seconds": 2.9,
+        "focus_lost_seconds": 0.1, "multi_face_events": 0, "camera": "granted"})
     assert uploaded.json()["badge"] == "хороший"
     result = client.get(f"/testing/sessions/{session_id}/result").json()
     assert result["supervision"] == "хороший"
@@ -62,6 +61,7 @@ def test_supervision_rejects_inflated_counters(tmp_path: Path) -> None:
 
 def test_media_endpoint_is_gated_by_env_and_consent(tmp_path: Path, monkeypatch) -> None:
     """Disabled by default (409); with env on it still requires screen consent."""
+    monkeypatch.setenv("TESTING_RECORDING_MODE", "full")
     client = _client(tmp_path)
     session_id = _session(client)
     monkeypatch.delenv("TESTING_RECORDING_MODE", raising=False)

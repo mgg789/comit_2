@@ -44,7 +44,12 @@ export interface PublicCandidateCard {
   resume_url: string; search_factors: SearchFactors;
 }
 /** Safe profile detail with no owner identity, proofs or contact payloads. */
-export interface PublicCandidateDetail extends PublicCandidateCard { public_profile: PublicProfile; }
+/** Employer-visible accepted grade evidence, without recordings, identifiers or raw counters. */
+export interface PublicTestingResult {
+  subject: string; grade: "intern" | "junior" | "middle" | "senior";
+  supervision_badge: string | null; camera_status: "granted" | "denied" | "unavailable" | "unknown";
+}
+export interface PublicCandidateDetail extends PublicCandidateCard { public_profile: PublicProfile; testing_results?: PublicTestingResult[]; }
 /** Search degradation is explicit; a changed pool invalidates continuation with HTTP 409. */
 export interface SearchPage { items: PublicCandidateCard[]; total: number; limit: number; has_more: boolean; next_cursor: string | null; mode: "browse" | "lexical" | "hybrid"; fallback_reason: string | null; }
 /** Manual like binds the selected open owned vacancy to the displayed profile revision. */

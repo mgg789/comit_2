@@ -157,6 +157,9 @@ def judge_answer(payload: dict, answer: str) -> tuple[bool | None, str]:
     task_type = payload.get("type")
     if task_type == "mcq":
         return check_mcq(payload, answer), "auto"
+    if task_type == "short_answer":
+        normalized = " ".join(answer.strip().casefold().split())
+        return normalized in payload.get("expected_answers", []), "auto"
     if task_type == "code":
         return CodeJudgeClient().judge(payload, answer)
     return None, "manual"

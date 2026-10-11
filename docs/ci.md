@@ -150,3 +150,15 @@ JUnit, публикуются CI как artifacts даже после паден
 
 - Нет кэша pnpm/pip между прогонами (первое время ок; добавить `actions/cache` или registry при замедлении).
 - Образы не публикуются в registry — сборка на месте; при росте времени сборки перейти на GHCR.
+
+## Приёмка браузерного тестирования
+
+`pnpm --filter @comit/web-testing test` проверяет состояния индикаторов, очередь
+записи, восстановление счётчиков и валидацию ответов. API coverage job устанавливает
+настоящий testing-engine и запускает `testing-browser-http.test.ts` с отдельной
+PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, публикация и cooldown.
+`TESTING_ENGINE_TEST_PYTHON` указывает Python с установленным testing-engine;
+`TESTING_BROWSER_TEST_DATABASE_URL` — только disposable PostgreSQL.
+Локальное измерение 11.10.2026: 34 теста testing-engine, 79,74% строк / 69,80%
+ветвей; штатный gate 75% / 60% пройден. Это покрытие этого сервиса, не всего UI
+и не проверка физических устройств пользователя.

@@ -122,3 +122,5 @@ export type * from "./notifications.js";
 export type * from "./employer-profile.js";
 
 export type * from "./testing-history.js";
+
+export type * from "./testing.js";

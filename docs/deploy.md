@@ -2,8 +2,8 @@
 
 `infra/docker-compose.yml` содержит полный production runtime. `docker-compose.prod.yml`
 сохраняет совместимость существующего deploy workflow и содержит тот же стек.
-Наружу публикуется один web: `/`, `/candidate/`, `/employer/`, `/api/`.
-Testing UI исключён; testing-engine остаётся внутренним backend. Его порт, как и
+Наружу публикуется один web: `/`, `/candidate/`, `/employer/`, `/testing/`, `/api/`.
+Testing UI обращается к API от имени кандидата; testing-engine остаётся внутренним backend. Его порт, как и
 порты API/engines, опубликован только на loopback для smoke и диагностики.
 
 ## Подготовка
@@ -80,7 +80,7 @@ Deploy target: `/home/mgg/comit`, пользователь `mgg`, существ
 Приватный `/home/mgg/comit/.env` перед deployment должен быть дополнен указанными
 обязательными настройками. Deploy workflow использует production compatibility file.
 Интерактивные операции на сервере требуют явной команды пользователя.
-Smoke проверяет bounded HTTP readiness, storage showcase, auth boundaries и отсутствие
+Smoke проверяет bounded HTTP readiness, storage showcase, auth boundaries и доступность
 testing UI; curl не проверяет JS userflow, доставку SMTP или реальный AI вызов.
 
 ## CD: exact SHA, backup и rollback
@@ -108,7 +108,7 @@ mode, отключённые dev flags и точные identities `comit_pgdata`
 Миграции должны быть additive и совместимыми с предыдущими app images: проверка
 миграций входит в code review перед `main`, скрипт не доказывает совместимость SQL.
 Во время успешного перехода выполняются local smoke и публичный HTTPS smoke с
-проверкой readiness, showcase, auth boundaries и отсутствия testing UI.
+проверкой readiness, showcase, auth boundaries и доступности testing UI.
 
 При ошибке запуска/smoke CD пытается восстановить предыдущие immutable image IDs
 приложений через предыдущие Compose файлы с `--no-deps --no-build`. PostgreSQL,
@@ -139,7 +139,7 @@ migration containers), без удаления containers/volumes; image rollbac
 База остаётся после additive migrations; прежние образы должны быть совместимы
 с ними. Последующие deployments используют строгий полный snapshot без adoption.
 
-Backend тестирования получает `TESTING_API_URL` и внутренний токен; данные сессий сохраняются в `testing-data`. UI testing-контура не публикуется.
+Backend тестирования получает `TESTING_API_URL` и внутренний токен; данные сессий сохраняются в `testing-data`. UI доступен по `/testing/`; попытки и запись проходят только через авторизованный API.
 
 
 Rollback adoption читает только заранее подготовленный приватный snapshot
@@ -161,4 +161,15 @@ SMTP использует существующий host relay Navix на пор�
 
 После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Laya: он не мешает запуску worker публикации/DeepSeek, а обогащение остаётся недоступным с ручным редактированием.
 
-Статические файлы всех трёх приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
+Статические файлы всех четырёх приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
+
+## Запись тестирования
+
+`TESTING_RECORDING_MODE=off` по умолчанию: камера обрабатывается на устройстве,
+сервер получает агрегаты присутствия и фокуса. Полная запись включается явно
+значением `full` после согласования эксплуатации; затем требуются согласия кандидата.
+Фрагменты экрана и камеры сохраняются только во внутреннем `testing-data`,
+удаляются через 90 дней и не выдаются работодателю. Нельзя публиковать этот volume
+через nginx. Модель определения лица и WASM поставляются в web-образе, внешних
+запросов для обработки камеры нет. Проверка `make smoke` проверяет маршрут UI и
+границу авторизации; разрешения устройств и весь сценарий проверяются браузером.

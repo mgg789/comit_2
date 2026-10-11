@@ -24,6 +24,7 @@ import { CandidateRecommendationsStore } from "../recommendations/store.js";
 import { recommendationsRoutes } from "../recommendations/routes.js";
 import { WeeklyRecommendationWorker } from "../recommendations/worker.js";
 import { CandidateTestingHistoryStore } from "../profiles/testing-history.js";
+import { candidateTestingRoutes } from "../routes/candidate-testing.js";
 import { candidateTestingHistoryRoutes } from "../routes/candidate-testing-history.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
@@ -73,6 +74,7 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
   await app.register(candidateTestingHistoryRoutes, { ...options, testingHistory: new CandidateTestingHistoryStore(pool) });
+  await app.register(candidateTestingRoutes, { ...options, pool });
   await app.register(accountRoutes, options);
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
     (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client),

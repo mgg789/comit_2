@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke gate: every Comit service must answer /healthz and the nginx routes
-# must serve the three product apps. Used by CI (infra/docker-compose.yml with CI ports)
+# must serve the four product apps. Used by CI (infra/docker-compose.yml with CI ports)
 # and by the deploy workflow against the prod stack (docs/ci.md, docs/deploy.md).
 #
 # Checks run against STATIC html (curl does not execute js), so web expectations
@@ -69,13 +69,14 @@ check "welcome logo asset" "http://localhost:${WEB_PORT}/design/comit-mark.svg" 
 check "welcome showcase asset" "http://localhost:${WEB_PORT}/design/showcase-icon.svg" "<svg" || failures=$((failures + 1))
 check "web candidate" "http://localhost:${WEB_PORT}/candidate/"       "кабинет кандидата" || failures=$((failures + 1))
 check "web employer"  "http://localhost:${WEB_PORT}/employer/"        "кабинет работодателя" || failures=$((failures + 1))
-check_status "testing UI excluded" "http://localhost:${WEB_PORT}/testing/" 404 || failures=$((failures + 1))
+check "web testing" "http://localhost:${WEB_PORT}/testing/" "сервис тестирования" || failures=$((failures + 1))
 check_status "internal API hidden" "http://localhost:${WEB_PORT}/api/internal/strict-schema" 404 || failures=$((failures + 1))
 check "api via nginx" "http://localhost:${WEB_PORT}/api/healthz"      '"service":"api-core"' || failures=$((failures + 1))
 check "blueprints"    "http://localhost:${TESTING_PORT}/blueprints"   "algo-hash-lookup" || failures=$((failures + 1))
 check "api ready" "http://localhost:${API_PORT}/ready" '"service":"api-core"' || failures=$((failures + 1))
 check "matching DB/model ready" "http://localhost:${MATCHING_PORT}/ready" '"status":"ok"' || failures=$((failures + 1))
 check_status "candidate auth boundary" "http://localhost:${WEB_PORT}/api/auth/candidate/me" 401 || failures=$((failures + 1))
+check_status "testing auth boundary" "http://localhost:${WEB_PORT}/api/candidate/testing/preflight?specialization=sql" 401 || failures=$((failures + 1))
 check_status "employer auth boundary" "http://localhost:${WEB_PORT}/api/auth/employer/me" 401 || failures=$((failures + 1))
 # The public showcase joins actual matching storage; an empty pool is valid.
 check "candidate showcase" "http://localhost:${WEB_PORT}/api/public/showcase/candidates" '"items"' || failures=$((failures + 1))

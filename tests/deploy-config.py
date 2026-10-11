@@ -23,6 +23,11 @@ class ProductionConfigTests(unittest.TestCase):
                 'postgres': {}, 'qgramm-chat': {}},
             'volumes': {name: {'name': identity} for name, identity in [('pgdata', 'comit_pgdata'), ('chat-data', 'comit_chat-data'), ('harrier_cache', 'comit_harrier_cache')]}}
 
+    def test_testing_ui_is_public_but_attempts_require_auth(self):
+        routes = dict(deploy.PUBLIC_SMOKE_ROUTES)
+        self.assertEqual(routes["/testing/"], "200")
+        self.assertEqual(routes["/api/candidate/testing/preflight?specialization=sql"], "401")
+
     def test_production_accepted(self):
         deploy.validate(self.config, self.url)
 

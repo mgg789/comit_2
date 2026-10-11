@@ -46,7 +46,7 @@ make dev-down             # сохранить данные dev volumes
 | http://localhost:8088/employer/ | Кабинет работодателя |
 | http://localhost:8088/api/docs | OpenAPI (Swagger UI) api-core |
 
-Testing UI в общем приложении не публикуется (`/testing/` возвращает 404). Backend тестирования остаётся отдельным внутренним сервисом. API и остальные service ports доступны через loopback; [deploy.md](docs/deploy.md) описывает HTTPS домен и CD, [ci.md](docs/ci.md) — реальные тесты, измерения покрытия и пороги.
+Testing UI доступен по `/testing/`: подготовка устройств, адаптивный тест и результат. Попытки доступны только авторизованному кандидату через API; backend тестирования остаётся внутренним сервисом. API и остальные service ports доступны через loopback; [deploy.md](docs/deploy.md) описывает HTTPS домен и CD, [ci.md](docs/ci.md) — реальные тесты, измерения покрытия и пороги.
 
 ## Архитектура
 
