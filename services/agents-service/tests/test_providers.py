@@ -62,6 +62,50 @@ def test_deepseek_tools_real_wire_shape():
     assert provider.complete([], [{"type": "function"}])["choices"][0]["message"]["content"] == "ok"
 
 
+@pytest.mark.parametrize("failure", [httpx.ConnectError, httpx.ConnectTimeout])
+def test_deepseek_retries_one_connection_failure_before_request_delivery(failure):
+    """A transient connection failure can recover before the provider accepts any paid request."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        if len(calls) == 1:
+            raise failure("synthetic connection failure", request=request)
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}})
+
+    assert DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])["choices"]
+    assert len(calls) == 2
+    assert calls[0].content == calls[1].content
+
+
+@pytest.mark.parametrize("failure", [httpx.ReadTimeout, httpx.WriteError, httpx.RemoteProtocolError])
+def test_deepseek_never_retries_ambiguous_request_delivery(failure):
+    """A read/write failure may already be billable and must retain the runtime fence."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        raise failure("synthetic transport failure", request=request)
+
+    with pytest.raises(ProviderError):
+        DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])
+    assert len(calls) == 1
+
+
+def test_deepseek_connection_retry_is_bounded():
+    """Persistent connection failure stops after one safe retry."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        raise httpx.ConnectError("synthetic connection failure", request=request)
+
+    with pytest.raises(ProviderError, match="provider_unavailable"):
+        DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])
+    assert len(calls) == 2
+
+
 def test_no_unapproved_provider_endpoint():
     with pytest.raises(ValueError):
         DeepSeekClient(base_url="https://elsewhere.invalid")

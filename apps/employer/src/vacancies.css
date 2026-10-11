@@ -455,3 +455,6 @@
 .weekly-activity-flame:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .weekly-activity-flame [role="tooltip"] { display: none; position: absolute; z-index: 5; right: 0; top: 100%; width: min(260rem, 65vw); padding: var(--employer-gap); border-radius: var(--comit-radius); background: var(--employer-ink); color: var(--comit-text); font: var(--employer-caption-text-min) var(--employer-font); }
 .weekly-activity-flame:hover [role="tooltip"], .weekly-activity-flame:focus-visible [role="tooltip"] { display: block; }
+
+.vacancy-salary-hint { display: grid; gap: 8rem; font-size: 16rem; line-height: 1.45; }
+.vacancy-salary-hint small { font-size: 14rem; color: var(--comit-text-muted); }

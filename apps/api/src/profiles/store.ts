@@ -1,6 +1,7 @@
 /** Candidate-owned source profile store and its transactional projection outbox. */
 import { TEST_SKILL_COORDINATES, TEST_GRADE_LEVELS, type CandidateSkillCatalog, type TestingSpecialization, type TestingGrade } from "@comit/shared";
 import { activeSkillCatalog } from "./skill-catalog.js";
+import { canonicalRepositoryClaimUrl } from "./repository-url.js";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
@@ -341,7 +342,7 @@ function externalEvidenceRows(fields: CandidateProfileFields, previous: Map<stri
     if (!narrative?.link || !narrative.description) return false;
     const value = row.verified_value;
     const verified = typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, JsonValue> : null;
-    return verified?.url === narrative.link && verified.contribution_narrative === narrative.description;
+    return verified?.url === canonicalRepositoryClaimUrl(narrative.link) && verified.contribution_narrative === narrative.description;
   }).map(row => ({ key: row.evidence_key, inputHash: row.input_hash, status: row.status,
     verifiedValue: row.verified_value, provenance: row.provenance, checkedAt: row.checked_at }));
 }
@@ -674,7 +675,7 @@ export class CandidateProfileStore {
       if (binding.kind === "repository") {
         if (!binding.claim_id || !binding.url || !binding.narrative) throw invalid("repository_claim_required");
         const narrative = (current.fields[binding.subject as "projects" | "experience" | "achievements"] ?? []).find(item => item.id === binding.claim_id);
-        if (!narrative || narrative.link !== binding.url || narrative.description !== binding.narrative) throw conflict("repository_claim_not_current");
+        if (!narrative || canonicalRepositoryClaimUrl(narrative.link) !== binding.url || narrative.description !== binding.narrative) throw conflict("repository_claim_not_current");
       }
       if (binding.kind === "hh") {
         if (binding.claim_kind !== "experience" || !binding.claim_id) throw invalid("hh_claim_required");

@@ -11,7 +11,10 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 Управление (без sudo): `systemctl --user status|restart github-runner@mgg-ci-1`; логи: `journalctl --user -u github-runner@<имя>`.
 
-## ci.yml — пул-реквесты и push в dev/main
+## ci.yml — пул-реквесты и push в dev/main/fix/pre-release
+
+Ветка `fix/pre-release` запускает тот же полный CI до интеграции в dev. Это
+дополнительный trigger проверки; deploy по-прежнему привязан к main.
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|

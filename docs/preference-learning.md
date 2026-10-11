@@ -231,3 +231,11 @@ build, scoped Ruff и `make smoke` (12/12) зелёные. Harrier E2E прим�
 ## Исследование предпочтений
 
 Теперь [сопоставимые гипотезы](hypothesis-learning.md) добавляют ограниченные случайные pair/order назначения. Ранние deterministic receipts остаются историческими; новые research receipts имеют условные вероятности. Global propensity неизвестна, learner/gates продолжают оценивать наблюдаемую механику, не causal gain. Status selection_bias допускает legacy deterministic marker и текущий `feedback_unknown_global_propensity`.
+
+## Границы holdout и бюджета
+
+Минимумы train/validation/golden и число новых действий для следующего fit
+используют константы live policy. Первая выборка сохраняет разделение 14/8/8;
+строки validation/golden не попадают в train. Общий grade ceiling остаётся 600,
+а hard benchmark использует отдельный провайдер с разрешённым потолком 720,
+сохраняя накопленный ledger.

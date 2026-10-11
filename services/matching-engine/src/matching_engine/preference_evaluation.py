@@ -15,7 +15,11 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any
 
-from matching_engine.preference_live_policy import MIN_HOLDOUT_ROWS, MIN_TRAIN_ROWS
+from matching_engine.preference_live_policy import (
+    MIN_CLASS_COUNT,
+    MIN_HOLDOUT_ROWS,
+    MIN_TRAIN_ROWS,
+)
 from matching_engine.preference_model import (
     PREFERENCE_PROJECTION_VERSION,
     PREFERENCE_SCHEMA_HASH,
@@ -28,10 +32,8 @@ from matching_engine.rerank_model import validate_artifact
 
 BOOTSTRAP_ITERATIONS = 2000
 BOOTSTRAP_SEED = 2000
-# Train minimum follows the live activation policy so the queue threshold
-# (INITIAL_ACTION_THRESHOLD = train_min + 8 + 8) and the evaluator cannot drift.
 MINIMUMS = {"train": MIN_TRAIN_ROWS, "validation": MIN_HOLDOUT_ROWS, "golden": MIN_HOLDOUT_ROWS}
-MINIMUM_CLASS_COUNT = 2
+MINIMUM_CLASS_COUNT = MIN_CLASS_COUNT
 
 # This is an intentionally small, frozen worker contract.  The model worker
 # may use these values for its own bounded optimizer, but validation must be
@@ -85,7 +87,7 @@ def _decision_time(value: Any) -> datetime | None:
     if not isinstance(value, str):
         return None
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None else None

@@ -10,6 +10,7 @@ import { Action, Checkbox, Field, Icon, InlineSearch, PageTitle, Reveal, Select,
 import { api, errorText, readInvitations, readProfile, salary, useResource } from "./runtime";
 
 import { FspLink } from "./fsp-link";
+import { GithubVerification } from "./github-verification";
 import { AchievementDocuments, uploadAchievementFile, profileFieldsForSave } from "./achievement-documents";
 import { ResumeImport } from "./resume-import";
 import { mergeResumeSuggestions } from "./resume-import-model";
@@ -57,7 +58,7 @@ export function ProfileScreen({ navigate }: { navigate: Navigate }) {
       })}</article> : null)}
       {!(fields.domains?.length || fields.stacks?.length || fields.soft_skills?.length) && <p>Добавьте свои навыки</p>}
     </section>
-    <section className="candidate-profile-section candidate-external-achievements"><h2>Достижения — внешний контур + ФСП</h2><FspLink profile={profile} onSaved={value => { resource.setData(value); setMessage("Достижения демо-ФСП добавлены в резюме"); }} /><article className="panel candidate-profile-row"><h3>GitHub</h3><p className="muted">{fields.projects?.length ? `Указано проектов: ${fields.projects.length}. Проверенные репозитории здесь пока не доступны.` : "Добавьте проекты в резюме. Проверенные репозитории здесь пока не доступны."}</p></article></section>
+    <section className="candidate-profile-section candidate-external-achievements"><h2>ФСП и GitHub</h2><FspLink profile={profile} onSaved={value => { resource.setData(value); setMessage("Достижения демо-ФСП добавлены в резюме"); }} /><GithubVerification profile={profile} onSaved={value => { resource.setData(value); setMessage("Результат проверки репозитория сохранён"); }} edit={() => setEditing(true)} reload={resource.refresh} /></section>
     {narrativeGroups.filter(group => fields[group]?.length).map(group => <NarrativeSection key={group} achievements={group === "achievements"} title={groupLabels[group]} items={fields[group] || []} edit={() => setEditing(true)} />)}
     <ProfileVisibility profile={profile} edit={() => setEditing(true)} reload={resource.refresh} saved={value => { resource.setData(value); setMessage(value.consents.pool ? "Резюме отправлено в подбор" : "Резюме отозвано из подбора"); }} />
     <div className="candidate-profile-actions"><Action onClick={() => navigate("/offers")}>К предложениям</Action><Action variant="primary" onClick={() => setEditing(true)}>Редактировать резюме</Action></div></div>

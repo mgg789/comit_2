@@ -21,6 +21,33 @@ test("public tool narration and final answer share one reply; raw tool results s
   assert.deepEqual(reply.messages.map((item) => item.message_id), ["a", "f"]);
 });
 
+test("generated tool documents remain downloadable without exposing raw tool content", () => {
+  const file = { document_id: "doc", name: "report.md", media_type: "text/markdown", content_hash: "hash", size_bytes: 20, text_length: 20 };
+  const rows = groupAgentMessages([message("u", "user", "Сделай отчёт"),
+    message("a", "assistant", "Сохраню", [{ id: "call" }]),
+    { ...message("t", "tool", "private payload"), attachments: [file] },
+    { ...message("retry", "tool", "private payload"), attachments: [file] },
+    message("f", "assistant", "Отчёт сохранён")]);
+  const reply = rows[1];
+  assert.ok(reply && "messages" in reply);
+  assert.deepEqual(reply.attachments, [file]);
+  const html = renderToStaticMarkup(<AgentReply group={reply} active={false} now={0} reducedMotion onDownload={async () => {}} />);
+  assert.match(html, /report\.md/);
+  assert.equal(html.includes("private payload"), false);
+  assert.equal((html.match(/report\.md/g) || []).length, 1);
+  const active = renderToStaticMarkup(<AgentReply group={reply} active now={0} onDownload={async () => {}} />);
+  assert.equal(active.includes("report.md"), false);
+});
+
+test("failed turns keep saved reports accessible and do not suggest blindly repeating effects", () => {
+  const html = renderToStaticMarkup(<AgentReply group={{ id: "turn", startedAt: null, messages: [], attachments: [
+    { document_id: "doc", name: "saved.md", media_type: "text/markdown", content_hash: "hash", size_bytes: 1, text_length: 1 },
+  ] }} active={false} now={0} failed onDownload={async () => {}} />);
+  assert.match(html, /saved\.md/);
+  assert.match(html, /Проверьте результат перед новым поручением/);
+  assert.equal(html.includes("отправить запрос ещё раз"), false);
+});
+
 test("Markdown renders emphasis/lists/tables but excludes raw HTML and remote images", () => {
   const html = renderToStaticMarkup(<AgentMarkdown text={"**Ответ**\n\n- пункт\n\n| A | B |\n| - | - |\n| 1 | 2 |\n\n<script>alert(1)</script>\n\n![tracker](https://example.invalid/track)"} />);
   assert.match(html, /<strong>Ответ<\/strong>/);

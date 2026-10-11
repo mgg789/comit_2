@@ -17,6 +17,7 @@ import { domainChoices, featureLabel, softChoices, specializationLabel, stackCho
 import "./vacancies.css";
 import "./vacancy-suggestions.css";
 import { changedRequirements, descriptionLength, suggestVacancyRequirements } from "./vacancy-suggestions";
+import { estimateSalaryMarket, salaryMarketSource } from "./salary-market";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
@@ -239,6 +240,7 @@ export function VacancyEditor({
   const [to, setTo] = usePersistentState(`${formKey}to`,
     draft?.fields.zp_max == null ? "" : String(draft.fields.zp_max / 1000),
   );
+  const marketSalary = estimateSalaryMarket(specialization, skills, from, to);
   const [city, setCity] = usePersistentState(`${formKey}city`, draft?.fields.city || "");
   const [work, setWork] = usePersistentState<"onsite" | "remote" | "hybrid">(`${formKey}work`,
     draft?.fields.type || "hybrid",
@@ -669,6 +671,10 @@ export function VacancyEditor({
                     />
                   </Field>
                 </div>
+                {marketSalary && <div className="vacancy-salary-hint" role="status">
+                  <div><strong>{marketSalary.label}</strong> · середина вилки {marketSalary.deviationPercent > 0 ? "+" : ""}{marketSalary.deviationPercent}% к ориентиру</div>
+                  <small>Ориентир ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес; близко к рынку: ±20%. {marketSalary.basis === "direction_and_language" ? "Направление и язык" : "Направление"}, все грейды и регионы. Приблизительно, по медианам <a href={salaryMarketSource} target="_blank" rel="noopener noreferrer">Хабр Карьеры, I полугодие 2026</a>.</small>
+                </div>}
                 <input
                   aria-label="Город"
                   placeholder="Город"

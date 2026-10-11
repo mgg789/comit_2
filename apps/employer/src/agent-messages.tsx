@@ -11,6 +11,7 @@ export interface AgentReplyGroup {
   id: string;
   messages: AgentsOrganizationMessage[];
   startedAt: string | null;
+  attachments?: NonNullable<AgentsOrganizationMessage["attachments"]>;
 }
 
 /**
@@ -33,7 +34,7 @@ export function groupAgentMessages(messages: AgentsOrganizationMessage[]): Array
     .map((item) => [item.turn_id, item.created_at || null]));
   for (const message of messages) {
     if (message.role === "user" && (message.content || message.attachments?.length)) rows.push(message);
-    if (message.role !== "assistant") continue;
+    if (message.role !== "assistant" && !(message.role === "tool" && message.attachments?.length)) continue;
     const id = message.turn_id || message.message_id;
     let group = groups.get(id);
     if (!group) {
@@ -41,7 +42,11 @@ export function groupAgentMessages(messages: AgentsOrganizationMessage[]): Array
       groups.set(id, group);
       rows.push(group);
     }
-    group.messages.push(message);
+    if (message.role === "assistant") group.messages.push(message);
+    for (const file of message.attachments || []) {
+      group.attachments ||= [];
+      if (!group.attachments.some(existing => existing.document_id === file.document_id)) group.attachments.push(file);
+    }
   }
   return rows;
 }
@@ -98,8 +103,9 @@ export function CopyMessage({ text }: { text: string }) {
 }
 
 /** Show a measured non-interactive time pill and the final answer, without intermediate narration. */
-export function AgentReply({ group, active, now, failed = false, reducedMotion = false }: {
+export function AgentReply({ group, active, now, failed = false, reducedMotion = false, onDownload }: {
   group: AgentReplyGroup; active: boolean; now: number; failed?: boolean; reducedMotion?: boolean;
+  onDownload?: (documentId: string) => Promise<void>;
 }) {
   const final = active ? undefined : [...group.messages].reverse().find((item) => !item.tool_calls?.length && item.content);
   const start = group.startedAt ? Date.parse(group.startedAt) : NaN;
@@ -119,6 +125,8 @@ export function AgentReply({ group, active, now, failed = false, reducedMotion =
         <CopyMessage text={final.content || ""} />
       </div>
     </motion.div>}
-    {failed && <p role="status">Не удалось завершить ответ. Можно отправить запрос ещё раз.</p>}
+    {!active && onDownload && group.attachments?.map(file => <button className="message-file" key={file.document_id}
+      onClick={() => { void onDownload(file.document_id); }}>{file.name} ↓</button>)}
+    {failed && <p role="status">Не удалось завершить ответ. Часть действий могла сохраниться. Проверьте результат перед новым поручением.</p>}
   </>;
 }
