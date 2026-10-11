@@ -1,0 +1,2 @@
+.weekly-choice { display: flex; align-items: center; gap: 12px; margin-block: 12px; cursor: pointer; }
+.weekly-choice input[type="radio"] { appearance: auto; min-width: 20px; width: 20px; min-height: 20px; height: 20px; padding: 0; flex: 0 0 20px; }

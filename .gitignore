@@ -1,5 +1,6 @@
 # session/tool state
 .mimosa/
+.zcodeignore
 
 # environment & secrets
 .env
@@ -27,3 +28,11 @@ __pycache__/
 
 # Real-card exports and their private pseudonym keys
 /data/learning/
+
+# Python coverage databases
+.coverage
+.coverage.*
+
+# Local provider credentials; never commit or include in image contexts.
+qwen-token.txt
+qwen_token.txt

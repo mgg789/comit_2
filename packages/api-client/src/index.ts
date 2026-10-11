@@ -1,20 +1,23 @@
+import type { CandidateSkillCatalog } from "@comit/shared";
+import type { TestingPreflight, TestingSpecialization, TestingStartRequest, TestingSession, TestingNextTask, TestingAnswerRequest, TestingAnswerReceipt, TestingSupervision, TestingMediaRequest, TestingResult } from "@comit/shared";
 /**
  * Minimal typed HTTP client for Comit services.
  * All apps talk to api-core through this wrapper so auth headers and error
  * handling stay in one place.
  */
-import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+import type { CandidateTestingHistory, EmployerProfileView, EmployerProfileMutation, SystemChatPage, SystemChatReadRequest, SystemChatReadStatus, SystemChatMessageRequest, ChatUnreadStatus, CandidateRecommendationsResponse, PublicShowcaseQuery, PublicShowcasePage, PublicShowcaseVacancy, PublicShowcaseCandidate, AccountRole, AccountView, AuthenticatedSession, EmailCodeReceipt, EmailCodeVerification,
+  SupportLoginRequest, SupportSessionView, SupportOperatorView, SupportConversationPage, SupportMessagePage, SystemNotification, SupportReadStatus, SystemChatFile, SystemChatFileUpload, SystemChatFileDownload,
   AgentsOrganizationChat, AgentsOrganizationMessagePage, AgentsOrganizationMessageRequest,
   AgentsOrganizationMessagesClearRequest,
   AgentsOrganizationTurn, AgentsOrganizationTask, AgentsOrganizationTaskRequest, AgentsOrganizationBudget,
   AgentsOrganizationContext, AgentsOrganizationMemory, AgentsOrganizationMemoryPatch,
   AgentsDocumentUpload, AgentsDocumentView, AgentsDocumentText, AgentsDocumentDownload,
   AgentsPendingAnswer, AgentsPendingAnswerRequest, AgentsTaskAvailabilityRequest,
-  EmployerStatisticsQuery, EmployerStatistics,
+  EmployerStatisticsQuery, EmployerStatistics, SalaryMarketQuery, SalaryMarketAggregate,
   CandidateProfileView, CandidateProfileMutation, CandidatePipelineStatus, CombineRequest, CombineStatus, RerankStatus, AgentsMatchingStatus, VacancyPipelineStatus, FeedRefillStatus, SelectionPage, VacancyReady, FeedRequest, FeedPage, FeedDecisionRequest, FeedDecision, FeedImpressionRequest, FeedImpression, FeedListPage, SavedCard, VisitedCard, PreferenceStatus, PreferenceCommand, HypothesisStatus,
-  InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
+  DirectContactRequest, InviteRequest, RejectSavedRequest, RecruitmentView, RecruitmentPage, RecruitmentAction, ContactsView, RecruitmentEventPage,
   ChatPage, ChatMessage, ChatReadRequest, ChatReadStatus, ChatEvent, RecruitmentStreamEvent, EventStreamOptions, SendChatMessage, ChatFile, UploadChatFile, DownloadChatFile,
-  AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
+  AgentsJobView, AgentsCapabilityView, AgentsDraftView, AgentsDraftPage, AgentsDraftCreate, AgentsDraftPatch, AgentsCreateRequest, SearchRequest, SearchPage, PublicCandidateDetail, ShowcaseLikeRequest, ShowcaseLikeReceipt } from "@comit/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -33,6 +36,24 @@ export interface ApiClientOptions {
 }
 
 export interface ApiClient {
+  /** Inspect eligibility without creating an attempt. */
+  testingPreflight(specialization: TestingSpecialization, mode?: "retake" | "upgrade"): Promise<TestingPreflight>;
+  /** Create the first attempt only after explicit consent and Start. */
+  startTestingSession(body: TestingStartRequest): Promise<TestingSession>;
+  /** Repeated reads return the same unanswered question. */
+  nextTestingTask(sessionId: string): Promise<TestingNextTask>;
+  /** Submit one choice or a bounded typed answer. */
+  answerTestingTask(sessionId: string, body: TestingAnswerRequest): Promise<TestingAnswerReceipt>;
+  /** Read actual grade publication status and cooldown. */
+  testingResult(sessionId: string): Promise<TestingResult>;
+  /** Finish after recording uploads and final supervision have succeeded. */
+  finishTestingSession(sessionId: string): Promise<TestingResult>;
+  /** Persist locally computed supervision counters. */
+  testingSupervision(sessionId: string, body: TestingSupervision): Promise<{ session_id: string; badge: string }>;
+  /** Upload an idempotent consent-authorized recording chunk. */
+  uploadTestingMedia(sessionId: string, body: TestingMediaRequest): Promise<{ stored: string; retention_days: number }>;
+  /** Stop an attempt without publishing incomplete evidence. */
+  abandonTestingSession(sessionId: string): Promise<TestingSession>;
   /** Read account-owned company settings, including initial revision zero. */
   getEmployerProfile(): Promise<EmployerProfileView>;
   /** Save company settings with revision CAS. */
@@ -41,8 +62,32 @@ export interface ApiClient {
   getSystemChat(role: AccountRole, afterSequence?: number, limit?: number): Promise<SystemChatPage>;
   /** Mark only delivered system notification sequences read. */
   markSystemChatRead(role: AccountRole, body: SystemChatReadRequest): Promise<SystemChatReadStatus>;
+  /** Write into own Comit conversation using a stable UUID retry key. */
+  sendSystemChatMessage(role: AccountRole, body: SystemChatMessageRequest): Promise<SystemNotification>;
+  /** Upload a support-chat attachment owned by the authenticated account. */
+  uploadSystemChatFile(role: AccountRole, body: SystemChatFileUpload): Promise<SystemChatFile>;
+  /** Download a published support-chat attachment for the authenticated account. */
+  downloadSystemChatFile(role: AccountRole, fileId: string): Promise<SystemChatFileDownload>;
   /** Count unread items across every authorized hiring chat and the system inbox. */
   getChatUnread(role: AccountRole): Promise<ChatUnreadStatus>;
+  /** Exchange the operator email and access key for a support session cookie. */
+  supportLogin(body: SupportLoginRequest): Promise<SupportSessionView>;
+  /** Revoke the current support session and clear its cookie. */
+  supportLogout(): Promise<{ ok: true }>;
+  /** Resolve the current operator from the support session cookie or Bearer token. */
+  getSupportMe(): Promise<SupportOperatorView>;
+  /** Offset-page operator conversations ordered by the latest activity. */
+  getSupportConversations(offset?: number, limit?: number): Promise<SupportConversationPage>;
+  /** Page one account's Comit conversation; never mutates the account's own receipts. */
+  getSupportMessages(accountId: string, afterSequence?: number, limit?: number): Promise<SupportMessagePage>;
+  /** Answer an account as Comit using a stable UUID retry key. */
+  sendSupportMessage(accountId: string, body: SystemChatMessageRequest): Promise<SystemNotification>;
+  /** Upload an attachment into an account conversation as the support operator. */
+  uploadSupportFile(accountId: string, body: SystemChatFileUpload): Promise<SystemChatFile>;
+  /** Download an attachment published in an account conversation as the support operator. */
+  downloadSupportFile(accountId: string, fileId: string): Promise<SystemChatFileDownload>;
+  /** Advance the operator read cursor for one conversation. */
+  markSupportConversationRead(accountId: string, body: { read_sequence: number }): Promise<SupportReadStatus>;
   /** Read the latest persisted candidate recommendation without starting provider work. */
   getRecommendationsLatest(): Promise<CandidateRecommendationsResponse>;
   get<T>(path: string): Promise<T>;
@@ -87,6 +132,8 @@ export interface ApiClient {
   downloadOrganizationDocument(documentId: string): Promise<AgentsDocumentDownload>;
   /** Read own aggregate charts over an inclusive UTC period; optional vacancy_id narrows the dashboard. */
   getEmployerStatistics(query?: EmployerStatisticsQuery): Promise<EmployerStatistics>;
+  /** Read the mean midpoint of comparable active published Comit vacancy ranges. */
+  getSalaryMarket(query: SalaryMarketQuery): Promise<SalaryMarketAggregate>;
   /** Request a role-bound code; explicit development delivery may return dev_code. */
   requestLoginCode(role: AccountRole, email: string): Promise<EmailCodeReceipt>;
   /** Verify a code, including account consent only for first registration. */
@@ -95,7 +142,12 @@ export interface ApiClient {
   getAccount(role: AccountRole): Promise<AccountView>;
   /** Revoke this session, or all account sessions when all is true. */
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
+  /** Permanently remove the authenticated candidate account and its private graph. */
+  deleteCandidateAccount(): Promise<{ deleted: true }>;
+  /** Permanently remove the authenticated employer and its source/projection graph. */
+  deleteEmployerAccount(): Promise<{ deleted: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
+  getCandidateSkillCatalog(): Promise<CandidateSkillCatalog>;
   getCandidateProfile(): Promise<CandidateProfileView>;
   /** Read the last 30 Moscow calendar days of own confirmed test results. */
   getCandidateTestingHistory(): Promise<CandidateTestingHistory>;
@@ -115,6 +167,12 @@ export interface ApiClient {
   listVacancies(limit?: number, cursor?: string, offset?: number): Promise<AgentsDraftPage>;
   /** Create an editable source draft without approving or publishing it. */
   createVacancy(body: AgentsDraftCreate): Promise<AgentsDraftView>;
+  /** Queue cached requirement suggestions for the exact owned draft revision. */
+  enrichVacancy(draftId: string, expectedRevision: number): Promise<AgentsJobView>;
+  /** Read the state of an owner-scoped durable agent job. */
+  getAgentJob(jobId: string): Promise<AgentsJobView>;
+  /** Retry an owner-scoped failed job using the server retry policy. */
+  retryAgentJob(jobId: string): Promise<AgentsJobView>;
   /** Read a managed vacancy, including archived audit status. */
   getVacancy(draftId: string): Promise<AgentsDraftView>;
   /** Stage a revision-checked edit; publishing requires a new approved summary. */
@@ -181,6 +239,7 @@ export interface ApiClient {
   /** Invalidate prior hypothesis evidence and reset its budget using a CAS command. */
   resetHypotheses(draftId: string, body: PreferenceCommand): Promise<HypothesisStatus>;
   /** Invite an eligible candidate using immutable vacancy terms and a UUID retry key. */
+  startDirectContact(body: DirectContactRequest): Promise<RecruitmentView>;
   inviteCandidate(draftId: string, body: InviteRequest): Promise<RecruitmentView>;
   /** Close a saved shortlist entry before inviting; this decision is employer-only. */
   rejectSavedCandidate(draftId: string, body: RejectSavedRequest): Promise<RecruitmentView>;
@@ -289,7 +348,19 @@ export function createApiClient({
     updateEmployerProfile: body => request("PATCH", "/employer/profile", body),
     getSystemChat: (role, afterSequence = 0, limit = 50) => request("GET", `/${role}/system-chat?after_sequence=${afterSequence}&limit=${limit}`),
     markSystemChatRead: (role, body) => request("POST", `/${role}/system-chat/read`, body),
+    sendSystemChatMessage: (role, body) => request("POST", `/${role}/system-chat/messages`, body),
+    uploadSystemChatFile: (role, body) => request("POST", `/${role}/system-chat/files`, body),
+    downloadSystemChatFile: (role, fileId) => request("GET", `/${role}/system-chat/files/${encodeURIComponent(fileId)}`),
     getChatUnread: role => request("GET", `/${role}/chat-unread`),
+    supportLogin: body => request("POST", "/support/login", body),
+    supportLogout: () => request("POST", "/support/logout", {}),
+    getSupportMe: () => request("GET", "/support/me"),
+    getSupportConversations: (offset = 0, limit = 50) => request("GET", `/support/conversations?offset=${offset}&limit=${limit}`),
+    getSupportMessages: (accountId, afterSequence = 0, limit = 100) => request("GET", `/support/conversations/${encodeURIComponent(accountId)}/messages?after_sequence=${afterSequence}&limit=${limit}`),
+    sendSupportMessage: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/messages`, body),
+    uploadSupportFile: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/files`, body),
+    downloadSupportFile: (accountId, fileId) => request("GET", `/support/conversations/${encodeURIComponent(accountId)}/files/${encodeURIComponent(fileId)}`),
+    markSupportConversationRead: (accountId, body) => request("POST", `/support/conversations/${encodeURIComponent(accountId)}/read`, body),
     getRecommendationsLatest: () => request("GET", "/candidate/recommendations/latest"),
     getOrganizationChat: () => request("GET", "/employer/organization-agent/chat"),
     getOrganizationMessages: (afterSequence, limit = 50) => request("GET", `/employer/organization-agent/messages?limit=${limit}${afterSequence === undefined ? "" : `&after_sequence=${afterSequence}`}`),
@@ -315,13 +386,30 @@ export function createApiClient({
       for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, value);
       return request("GET", `/employer/statistics${params.size ? `?${params}` : ""}`);
     },
+    getSalaryMarket: query => {
+      const params = new URLSearchParams({ specialization: query.specialization, grade: query.grade });
+      if (query.stacks.length) params.set("stacks", query.stacks.join(","));
+      return request("GET", `/public/salary-market?${params}`);
+    },
     get: (path) => request("GET", path),
     post: (path, body) => request("POST", path, body),
     requestLoginCode: (role, email) => request("POST", `/auth/${role}/code`, { email }),
     verifyLoginCode: (role, body) => request("POST", `/auth/${role}/verify`, body),
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
+    deleteCandidateAccount: () => request("DELETE", "/candidate/account"),
+    deleteEmployerAccount: () => request("DELETE", "/employer/account"),
+    getCandidateSkillCatalog: () => request("GET", "/candidate/skills/catalog"),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
+    testingPreflight: (specialization, mode = "retake") => request("GET", `/candidate/testing/preflight?specialization=${encodeURIComponent(specialization)}&mode=${mode}`),
+    startTestingSession: body => request("POST", "/candidate/testing/sessions", body),
+    nextTestingTask: id => request("GET", `/candidate/testing/sessions/${encodeURIComponent(id)}/next`),
+    answerTestingTask: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/answer`, body),
+    finishTestingSession: id => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/finish`, {}),
+    testingResult: id => request("GET", `/candidate/testing/sessions/${encodeURIComponent(id)}/result`),
+    testingSupervision: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/supervision`, body),
+    uploadTestingMedia: (id, body) => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/media`, body),
+    abandonTestingSession: id => request("POST", `/candidate/testing/sessions/${encodeURIComponent(id)}/abandon`, {}),
     getCandidateTestingHistory: () => request("GET", "/candidate/testing-history"),
     getCandidatePipeline: () => request("GET", "/candidate/pipeline"),
     saveCandidateProfile: (body, replace = false) => request(replace ? "PUT" : "PATCH", "/candidate/profile", body),
@@ -331,6 +419,9 @@ export function createApiClient({
     getAgentCapabilities: () => request("GET", "/employer/agents/capabilities"),
     listVacancies: (limit = 50, cursor, offset = 0) => request("GET", `/employer/vacancies?limit=${limit}&offset=${offset}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),
     createVacancy: body => request("POST", "/employer/vacancies", body),
+    enrichVacancy: (id, revision) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(id)}/enrich`, { expected_revision: revision }),
+    getAgentJob: id => request("GET", `/employer/agents/jobs/${encodeURIComponent(id)}`),
+    retryAgentJob: id => request("POST", `/employer/agents/jobs/${encodeURIComponent(id)}/retry`, {}),
     getVacancy: draftId => request("GET", `/employer/vacancies/${encodeURIComponent(draftId)}`),
     patchVacancy: (draftId, body) => request("PATCH", `/employer/vacancies/${encodeURIComponent(draftId)}`, body),
     approveVacancy: (draftId, expectedRevision) => request("POST", `/employer/vacancies/${encodeURIComponent(draftId)}/approve`, { expected_revision: expectedRevision }),
@@ -374,6 +465,7 @@ export function createApiClient({
     pauseHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/pause`, body),
     resumeHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/resume`, body),
     resetHypotheses: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/hypotheses/reset`, body),
+    startDirectContact: body => request("POST", "/employer/contacts", body),
     inviteCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/invitations`, body),
     rejectSavedCandidate: (draftId, body) => request("POST", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment/reject`, body),
     getEmployerRecruitment: (draftId, limit = 50, offset = 0, cursor) => request("GET", `/employer/vacancy-drafts/${encodeURIComponent(draftId)}/recruitment?limit=${limit}&offset=${offset}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`),

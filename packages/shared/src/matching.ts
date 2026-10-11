@@ -61,7 +61,7 @@ export interface CandidateCard {
   position: number;
   display_name: string;
   city: string;
-  salary: { from_rub: number; to_rub: number };
+  salary: { from_rub: number; to_rub: number | null };
   category: Category;
   rank: number;
   confirmed_strength: number;
@@ -130,6 +130,8 @@ export interface RerankStatus {
 }
 /** Main factors are preserved with explicit scalar R0 score and feature contributions. */
 export interface RerankCard extends CandidateCard {
+  /** Bounded activity/evidence promotion, kept separate from model score contributions. */
+  promotion?: { policy_version: string; mode: "off" | "shadow" | "active"; fsp_bonus: number; weekly_bonus: number; combined_bonus: number; max_base_gap: number; demo_registry: boolean } | null;
   activation_revision?: number;
   approval_receipt_hash?: string | null;
   activation_kind?: "gated" | "manual_override" | "none";
@@ -155,6 +157,8 @@ export interface RerankPage {
 export interface FeedRequest { include_reserve?: boolean; limit?: number; }
 /** An immutable reranked card occurrence, bound to one served exposure. */
 export interface FeedCard extends Omit<RerankCard, "kind" | "mode"> {
+  /** Current server-earned practice reward, refreshed at delivery and expiring next UTC Monday. */
+  weekly_activity_expires_at?: string | null;
   /** A manually acknowledged suitability mismatch never claims strict eligibility. */
   strict_filter_warnings?: string[];
   mismatch_token?: string | null;

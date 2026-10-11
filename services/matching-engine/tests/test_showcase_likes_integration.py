@@ -123,13 +123,28 @@ def test_existing_tinder_coexists_without_preference_control_changes(store):
     assert candidate not in {item.candidate_id for item in CombineStore(store.database_url).selections(vacancy, 100, 0).items}
 
 
-@pytest.mark.parametrize("state", ["visited", "pending", "attractive"])
-def test_manual_like_preserves_vacancy_local_blocking(store, state):
+@pytest.mark.parametrize(("state", "code"), [
+    ("visited", "showcase_candidate_already_visited"),
+    ("pending", "showcase_candidate_invitation_pending"),
+    ("attractive", "showcase_candidate_already_saved"),
+])
+def test_manual_like_preserves_vacancy_local_blocking(store, state, code):
     feed, _, owner, vacancy, candidates = manual_pool(store)
     with connect(store.database_url) as connection:
         connection.execute("INSERT INTO matching_pipeline.selection_states(vacancy_id,candidate_id,state) VALUES(%s,%s,%s)", (vacancy, candidates[0], state))
-    with pytest.raises(ConflictError, match="blocked"):
+    with pytest.raises(ConflictError, match=code):
         feed.showcase_like(owner, vacancy, request(candidates[0]))
+
+
+def test_new_manual_key_for_saved_candidate_does_not_duplicate_selection(store):
+    """A fresh UI operation identifies an existing shortlist instead of writing again."""
+    feed, _, owner, vacancy, candidates = manual_pool(store)
+    original = feed.showcase_like(owner, vacancy, request(candidates[0]))
+    with pytest.raises(ConflictError, match="showcase_candidate_already_saved"):
+        feed.showcase_like(owner, vacancy, request(candidates[0]))
+    assert feed.saved_candidate(owner, vacancy, candidates[0]).card.exposure_id == original.exposure_id
+    with connect(store.database_url) as connection:
+        assert connection.execute("SELECT count(*) AS n FROM feed_pipeline.exposures").fetchone()["n"] == 1
 
 
 def test_manual_like_preserves_an_actually_fitted_active_learner(store):

@@ -121,7 +121,8 @@ export class EmployerStatisticsStore {
             return {category,amount_kopeks:Number(item?.amount ?? 0),events:Number(item?.events ?? 0)};
           }),
           daily: daily.map(item => ({date:item.date,amount_kopeks:Number(expenseDaily.rows.find(value => value.date===item.date)?.amount ?? 0)})),
-          tariffs: {publication_kopeks:19900,invitation_kopeks:4900,deadline_penalty_kopeks:19900,ai_daily_allowance_kopeks:1000,ai_usd_rub:100} } };
+          tariffs: {publication_kopeks:39800,invitation_kopeks:19600,invitation_send_kopeks:4900,invitation_accept_kopeks:14700,
+            deadline_penalty_kopeks:39800,ai_daily_allowance_kopeks:1000,ai_usd_rub:100} } };
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
   }

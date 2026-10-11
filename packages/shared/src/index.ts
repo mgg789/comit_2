@@ -5,6 +5,7 @@
  */
 
 export type { EmployerStatisticsQuery, EmployerStatistics, EmployerExpenses, EmployerExpenseCategory, EmployerStatisticsCounts, EmployerStatisticStage } from "./statistics.js";
+export type { SalaryMarketQuery, SalaryMarketAggregate } from "./salary-market.js";
 
 export type {
   CandidateDeclaredSkill, CandidateDeclaredFacts, CandidateDeclaredNarrative,
@@ -120,5 +121,16 @@ export * from "./business-time.js";
 export * from "./recommendations.js";
 export type * from "./notifications.js";
 export type * from "./employer-profile.js";
+export type * from "./support.js";
 
 export type * from "./testing-history.js";
+
+export type * from "./testing.js";
+
+export type { ResumeImportRequest, ResumeImportResult } from "./resume-import.js";
+
+export type { WeeklyQuestion, WeeklyChallengeView, WeeklyChallengeAnswer } from "./weekly-challenge.js";
+
+export type { FspLinkStatus, FspDemoAuthorization, FspDemoApproval } from "./fsp-link.js";
+
+export * from "./skill-catalog.js";

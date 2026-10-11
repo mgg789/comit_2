@@ -10,34 +10,42 @@
 [Экраны и границы интеграции](candidate-ui.md), [общие компоненты](ui-kit.md).
 Показатели без публичного API отображаются как недоступные, без примерных цифр.
 
-> Статус: backend первого цикла; email auth, account-owned candidate profile и
-> employer owner gateway реализованы, frontend и testing provider подключаются
-> отдельными этапами.
+> Статус (11.10.2026): email auth, account-owned candidate profile, employer
+> owner gateway, кабинеты кандидата/работодателя и общая витрина реализованы и
+> собираются в один web-образ. Testing UI входит в web-образ; сервисный entrypoint
+> запускает авторизованный адаптивный контур и trusted publisher ([testing-engine.md](testing-engine.md)).
 > Канон-контекст: `context/40-architecture.md`; здесь — актуальное состояние кода.
 
 > Цикл 1: реализован серверный путь от собранного upstream-профиля до готового пула.
 > API-core проверяет сервисный токен и проксирует allowlisted internal методы;
 > matching-engine хранит собственную JSONB-проекцию, версии координат, durable jobs,
 > два вектора, PDF и outbox в одной PostgreSQL. Отдельный worker строит артефакты;
-> отдельный migration job запускается перед serve/worker через local overlay.
+> отдельный migration job (`candidate-migrate`) запускается перед serve/worker в
+> основном compose.
 > API-core хранит source profile и durable projection outbox, а matching-engine
 > принимает только exact trusted snapshot. Auth имеет собственную PostgreSQL
 > migration/outbox/session границу; тестовые сессии остаются trusted upstream
-> контуром. UI и production acceptance этим документом не подтверждаются.
+> контуром (`POST /internal/testing/session-result`). Production acceptance
+> выполняется отдельно от этого документа.
 
 ## Контур
 
 ```
-web (nginx, один контейнер: welcome /candidate /employer /testing)
-        │ /api/*
+web (nginx, один контейнер: welcome / , /candidate/, /employer/, /testing/, /support/)
+        │ /api/*  (/api/internal/* → 404)
         ▼
-api-core (Fastify)  ────────────  PostgreSQL 16 + pgvector
-        ▲
+api-core (Fastify, :8080)  ────────────  PostgreSQL 16 + pgvector
+        ▲                                 ▲ workers: candidate/vacancy/combine/rerank/
+        │                                 │ feed-refill/preference, agents, organization,
+        │                                 │ auth-mail, candidate-profile, recommendation
 services/matching-engine     services/testing-engine     services/integration-engine
 (Python/FastAPI, :8101)      (Python/FastAPI, :8102)     (Python/FastAPI, :8103)
-                                                          ▲
-                             services/verification-engine (Python/FastAPI, :8105, только внутри compose)
+services/agents-service      services/verification-engine qgramm-chat (Go bridge, :8080,
+(Python/FastAPI, :8104)      (Python/FastAPI, :8105)      сеть chat-private)
 ```
+
+`services/code-judge` (FastAPI, loopback :8106) запускается отдельным judge compose
+на изолированной VM с TLS ingress ([deploy.md](deploy.md#изолированная-проверка-кода)).
 
 ## Сервисы
 
@@ -45,15 +53,44 @@ services/matching-engine     services/testing-engine     services/integration-en
 |---|---|---|---|
 | `apps/api` | Fastify, TS (NodeNext ESM) | Email OTP auth, custom JWT + revocable DB sessions, account-owned candidate source profile, employer owner gateway, вакансии/приглашения, OpenAPI | Транзакционная логика, целостность |
 | `services/matching-engine` | FastAPI, pgvector | Комбайн: strict filter → hybrid scoring → top-k → реранкер; вектора кандидата/вакансии; тиндер-фидбек; объяснимость выдачи | ML-эксперименты на Python, независимые релизы |
-| `services/testing-engine` | FastAPI | Банк `blueprints/`, seeded-варианты, автопроверка, адаптивный грейд-тест, cooldown смены грейда | Изолированный CPU-интенсивный домен |
+| `services/testing-engine` | FastAPI | Адаптивный грейд-тест, банк семи семейств, ротация, прокторинг-агрегаты и trusted publisher | Изолированный CPU-интенсивный домен |
+| `services/code-judge` | FastAPI | Authenticated broker и ресурсно ограниченные Docker задания в отдельной VM | Недоверенный код кандидата не исполняется в testing-engine |
 | `services/integration-engine` | FastAPI | Мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`, достижения) и демо-привязка (`/fsp/demo/authorize`, `/fsp/demo/token`) | Внешние источники меняются независимо от ядра |
 | `services/verification-engine` | FastAPI | Внутренние `/verify/fsp`, `/verify/repository`, `/verify/hh` под сервисным токеном; без candidate id ([verification.md](verification.md)) | Сетевые проверки внешних провайдеров изолированы от ядра |
-| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
-| `apps/{candidate,employer,testing,welcome}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям + витрина | Один nginx, 4 сборки (`infra/web.Dockerfile`) |
+| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Jev, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
+| `apps/{candidate,employer,testing,welcome,support}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям, общая витрина, тестирование и консоль поддержки | Один nginx, 5 сборок (`infra/web.Dockerfile`) |
 
 Публичная стартовая страница `apps/welcome` и её переходы описаны в [welcome-ui.md](welcome-ui.md); кабинеты — в [employer-ui.md](employer-ui.md) и [candidate-ui.md](candidate-ui.md).
 
 Чаты на QGramm интегрированы в кабинеты обеих ролей: маршруты `/{role}/recruitment/{id}/chat/*` проверяют сессию, доступ по приглашению и текущее согласие под DB-locks. Системный чат Comit доставляет уведомления платформы.
+
+Консоль поддержки (`apps/support`, `/support/`) использует тот же API и системный
+чат Comit. Её оператор входит по отдельной паре `SUPPORT_EMAIL`/`SUPPORT_ACCESS_KEY`;
+сессии и операторские квитанции чтения хранятся в PostgreSQL API. Отсутствующая или
+некорректная конфигурация отключает API поддержки; HTML-приложение остаётся в
+web-образе. Чтение оператором не меняет пользовательские квитанции.
+[Контракт и правила доступа](support-console.md).
+
+## Карта репозитория
+
+| Путь | Содержание |
+|---|---|
+| `apps/candidate`, `apps/employer`, `apps/testing`, `apps/welcome`, `apps/support` | React 19 + TS + Vite + Tailwind 4; все пять входят в web-образ, testing доступен на `/testing/`, консоль поддержки — на `/support/` |
+| `apps/api` | api-core (Fastify + OpenAPI) |
+| `packages/shared` | домен-типы и контракты (источник истины по типам) |
+| `packages/ui-kit` | дизайн-токены и базовые компоненты (гамма ФСП) |
+| `packages/api-client` | типизированный HTTP-клиент |
+| `services/matching-engine` | Python/FastAPI: подбор и объяснимость |
+| `services/testing-engine` | Python/FastAPI: тестирование (blueprints/, адаптивный контур) |
+| `services/code-judge` | Python/FastAPI: authenticated broker, ресурсно ограниченные Docker задания на отдельной VM |
+| `services/integration-engine` | Python/FastAPI: внешние данные и мок ФСП |
+| `services/verification-engine` | Python/FastAPI: проверка ФСП, Git-репозитория и резюме hh.ru |
+| `services/agents-service` | Python/FastAPI: черновик вакансии (форма + агент), глобальный агент работодателя |
+| `infra/` | docker-compose (production по умолчанию, dev, legacy overlays), Dockerfiles, nginx, QGramm bridge, postgres init, `deploy.py` |
+| `data/` | синтетика и сиды (готовых датасетов нет — ТЗ) |
+| `tests/` | сквозной smoke-гейт и acceptance-сценарии |
+| `docs/` | живая документация (RU) |
+| `context/` | канон-контекст: ТЗ, исследование hh.ru, видение, механики, план |
 
 ## Auth и ownership
 
@@ -76,14 +113,14 @@ Public employer draft/agent, candidate profile и candidate pipeline/PDF paths
 Актуальная серверная реализация: candidate worker → dual-vector pool/PDF;
 vacancy worker → ready; combine worker → main top-k; rerank worker → sort-only
 порядок активного R₀ либо явный main_fallback (упакованный hash-pinned артефакт
-активирован ручным решением оператора, quality gate остаётся failed, хвост не
-отсекается). Preference-worker автоматически обучает vacancy-local поправку по
+активирован ручным решением оператора; прохождение quality gate — следующая цель,
+хвост не отсекается). Preference-worker автоматически обучает vacancy-local поправку по
 реакциям ленты и переставляет только непоказанный суффикс; каждый участник
 обучения требует отдельного training-v1 consent. Research-показы гипотез
 (2 карточки на 18 обычных доставок) добавляются после preference refresh;
 feed-refill-worker добирает ленту immutable batch-ами ([feed-refill.md](feed-refill.md)).
 Runtime использует JSON linear artifacts без sklearn/LLM; operator-обучение
-реранкера — отдельный workflow, численный activation gate не пройден.
+реранкера — отдельный workflow; прохождение численного activation gate — следующий этап.
 Контракты и приёмка — [matching.md](matching.md), [runbook.md](runbook.md).
 Перечисленные ниже полные пользовательские потоки включают последующие этапы MVP.
 
@@ -108,15 +145,19 @@ Runtime использует JSON linear artifacts без sklearn/LLM; operator-
 | Сервис | Порт | Env |
 |---|---|---|
 | web (nginx) | 8088 | `WEB_PORT` |
-| api-core | 8080 | `API_PORT` |
-| matching-engine | 8101 | `MATCHING_PORT` |
-| testing-engine | 8102 | `TESTING_PORT` |
-| integration-engine | 8103 | `INTEGRATION_PORT` |
-| agents-service | 8104 внутри compose | `PORT`, opt-in overlay |
-| verification-engine | 8105 внутри compose, без host-порта | `PORT` |
-| postgres | 5433→5432 | `POSTGRES_PORT` |
+| api-core | 127.0.0.1:28080 → 8080 | `API_PORT` |
+| matching-engine | 127.0.0.1:28101 → 8101 | `MATCHING_PORT` |
+| testing-engine | 127.0.0.1:8102 → 8102 | `TESTING_PORT` |
+| integration-engine | 127.0.0.1:8103 → 8103 | `INTEGRATION_PORT` |
+| agents-service | 127.0.0.1:28104 → 8104 | `AGENTS_PORT` |
+| verification-engine | 127.0.0.1:28105 → 8105 | `VERIFICATION_PORT` |
+| qgramm-chat | только сеть `chat-private` (8080) | — |
+| postgres | dev: 127.0.0.1:5433 → 5432; prod: без host-порта | `POSTGRES_PORT` |
 
-В prod (`infra/docker-compose.prod.yml`) наружу публикуется только web; api и engines доступны лишь на `127.0.0.1` сервера (отладка и smoke), БД — только внутренняя сеть. verification-engine пока есть только в dev compose (`infra/docker-compose.yml`), в prod compose его нет.
+Одинаково для `infra/docker-compose.yml` (production по умолчанию),
+`infra/docker-compose.prod.yml` (совместимая копия) и dev-файла: наружу
+публикуется только web (`WEB_PORT`, по умолчанию 8088); api и engines доступны
+лишь на `127.0.0.1` (отладка и smoke), БД в production — только внутренняя сеть.
 
 ## Hiring aggregate после подбора
 
@@ -125,11 +166,12 @@ authDomain инжектирует тот же API Pool/AuthStore/ProfileStore. �
 или внешнего SDK не требуется. Matching владеет saved/grant/exclusions, agents
 — опубликованной вакансией; API читает их через service-auth и сохраняет
 условия предложения. Контакты берутся только из текущего API source profile
-после принятия. Durable participant events отделены от будущих SMTP
-потребителей. [Контур и границы](recruitment.md).
+после принятия. Durable participant events отделены от email-уведомлений
+([email-notifications.md](email-notifications.md)) и системного inbox
+([system-inbox.md](system-inbox.md)). [Контур и границы](recruitment.md).
 
-QGramm подключается отдельным opt-in образом BASIC + files через приватную
-сеть `chat-private`. Go-адаптер использует ядро in-process и не публикует raw
+QGramm (`qgramm-chat`) входит в основной compose: образ BASIC + files в приватной
+сети `chat-private`. Go-адаптер использует ядро in-process и не публикует raw
 QGramm endpoints; api-core проверяет сессию, приглашение и текущее согласие
 под DB-locks на каждый вызов. Постоянные сообщения/файлы принадлежат SQLite
 QGramm, а решения найма — PostgreSQL API. [Контракт и ключи](chat.md).

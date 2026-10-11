@@ -1,0 +1,57 @@
+{
+  "source": "packages/shared/src/skill-catalog.ts",
+  "labels": {
+    "domains": {
+      "ux_userflow": "UX и пользовательские сценарии",
+      "architecture_thinking": "Архитектура систем",
+      "rest_api": "REST API",
+      "sql": "SQL",
+      "doc_databases": "Документные базы данных",
+      "data_analytics_stats": "Аналитика и статистика",
+      "math": "Математика",
+      "algorithms": "Алгоритмы",
+      "lowlevel_optimization": "Низкоуровневая оптимизация",
+      "cybersecurity": "Информационная безопасность",
+      "devops": "DevOps",
+      "ai_agents": "AI-агенты",
+      "nlp_and_arbitrary_data": "NLP и неструктурированные данные",
+      "neural_nets": "Нейронные сети",
+      "classical_ml": "Классическое машинное обучение"
+    },
+    "stacks": {
+      "python": "Python",
+      "node": "Node.js",
+      "go": "Go",
+      "php": "PHP",
+      "react": "React",
+      "vue": "Vue",
+      "angular": "Angular",
+      "html_css_jquery": "HTML / CSS / jQuery",
+      "tailwind": "Tailwind CSS",
+      "electron": "Electron",
+      "figma": "Figma",
+      "postgres": "PostgreSQL",
+      "mongo": "MongoDB",
+      "sqlite": "SQLite",
+      "mysql": "MySQL",
+      "docker": "Docker"
+    },
+    "soft_skills": {
+      "teamwork": "Командная работа",
+      "representation": "Презентация и коммуникация",
+      "leadership": "Лидерство",
+      "project_management": "Управление проектами",
+      "time_management": "Управление временем",
+      "self_organization": "Самоорганизация"
+    }
+  },
+  "levels": [
+    "Intern",
+    "Junior",
+    "Junior+",
+    "Middle",
+    "Middle+",
+    "Senior",
+    "Senior+"
+  ]
+}

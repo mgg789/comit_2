@@ -32,7 +32,7 @@ export function candidateCode(query: string): string | null {
 
 type Sortable = {
   candidate_id: string;
-  salary: { from_rub: number; to_rub: number };
+  salary: { from_rub: number; to_rub: number | null };
   category: { grade: Grade };
 };
 
@@ -43,8 +43,8 @@ type Sortable = {
 export function orderCandidates<T extends Sortable>(items: readonly T[], sort: ShowcaseSort): T[] {
   const rows = items.map((item, index) => ({ item, index }));
   const compare = (a: T, b: T): number => {
-    if (sort === "salary_asc") return a.salary.from_rub - b.salary.from_rub || a.salary.to_rub - b.salary.to_rub;
-    if (sort === "salary_desc") return b.salary.to_rub - a.salary.to_rub || b.salary.from_rub - a.salary.from_rub;
+    if (sort === "salary_asc") return a.salary.from_rub - b.salary.from_rub || (a.salary.to_rub ?? a.salary.from_rub) - (b.salary.to_rub ?? b.salary.from_rub);
+    if (sort === "salary_desc") return (b.salary.to_rub ?? b.salary.from_rub) - (a.salary.to_rub ?? a.salary.from_rub) || b.salary.from_rub - a.salary.from_rub;
     if (sort === "grade_desc") return GRADES.indexOf(b.category.grade) - GRADES.indexOf(a.category.grade);
     return 0;
   };

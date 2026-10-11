@@ -17,6 +17,8 @@ from matching_engine.combine_models import CandidateCard, ScoringPolicy
 from matching_engine.combine_scoring import policy_hash as scoring_policy_hash
 from matching_engine.combine_scoring import score_candidate, strict_filter
 from matching_engine.combine_store import CombineStore, _lock
+from matching_engine.fsp_boost import weekly_activity_deadline
+from matching_engine.models import CandidateProfile
 from matching_engine.database import connect
 from matching_engine.feed_models import (
     FeedCard,
@@ -229,8 +231,11 @@ class FeedStore:
 
     @staticmethod
     def _card(row: dict, decision: str | None = None, badges: list[str] | None = None) -> FeedCard:
-        """Validate an immutable stored rerank card and add exposure identity."""
+        """Add exposure identity and live earned activity to immutable ranking metadata."""
         value = dict(row["card"])
+        # Activity is live server-owned evidence, not an immutable ranking contribution.
+        current = row.get("current_profile")
+        value["weekly_activity_expires_at"] = weekly_activity_deadline(CandidateProfile.model_validate(current)) if current else None
         value.update({"exposure_id": row["exposure_id"], "session_id": row["session_id"],
                       "kind": row["kind"], "served_at": row["served_at"], "decision": decision,
                       "history_badges": badges or [], "change_assessment": row.get("change_assessment"),
@@ -452,10 +457,12 @@ class FeedStore:
         after = _decode_cursor(cursor)
         from matching_engine.hypothesis_store import HypothesisStore
         session = HypothesisStore.prepare(connection, session, after)
-        rows = connection.execute("""SELECT e.*,d.action,
+        rows = connection.execute("""SELECT e.*,d.action,c.profile AS current_profile,
                 COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
                 COALESCE(v.last_assessment,'null'::jsonb) AS change_assessment
             FROM feed_pipeline.exposures e
+            LEFT JOIN candidate_pipeline.candidates c ON c.candidate_id=e.candidate_id
+                AND c.revision=e.profile_revision AND c.state='ready'
             LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id
             LEFT JOIN feed_pipeline.visited v ON v.owner_id=e.owner_id AND v.vacancy_id=e.vacancy_id
                 AND v.candidate_id=e.candidate_id
@@ -528,10 +535,12 @@ class FeedStore:
         """Return a current exposure; durable saved membership keeps PDF access past session expiry."""
         with connect(self.database_url) as connection:
             _lock(connection)
-            row = connection.execute("""SELECT e.*,s.*,d.action,
+            row = connection.execute("""SELECT e.*,s.*,d.action,c.profile AS current_profile,
                     COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
                     COALESCE(v.last_assessment,'null'::jsonb) AS change_assessment
                 FROM feed_pipeline.exposures e JOIN feed_pipeline.sessions s ON s.session_id=e.session_id
+                LEFT JOIN candidate_pipeline.candidates c ON c.candidate_id=e.candidate_id
+                    AND c.revision=e.profile_revision AND c.state='ready'
                 LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id
                 LEFT JOIN feed_pipeline.visited v ON v.owner_id=e.owner_id AND v.vacancy_id=e.vacancy_id
                     AND v.candidate_id=e.candidate_id
@@ -764,8 +773,15 @@ class FeedStore:
                 return prior
             vacancy = self._owner_vacancy(connection, owner_id, vacancy_id)
             self._showcase_authority(connection, request.candidate_id, request.profile_revision)
-            if not self._candidate_ready(connection, vacancy, request.candidate_id, request.profile_revision):
-                raise ConflictError("showcase candidate is stale, withdrawn or already blocked for this vacancy")
+            if not self._candidate_ready(connection, vacancy, request.candidate_id, request.profile_revision,
+                                         allow_blocked=True):
+                raise ConflictError("showcase_source_obsolete")
+            selection = connection.execute("""SELECT state FROM matching_pipeline.selection_states
+                WHERE vacancy_id=%s AND candidate_id=%s""", (vacancy_id, request.candidate_id)).fetchone()
+            if selection and selection["state"] not in {"eligible", "visited_updated"}:
+                conflicts = {"attractive": "showcase_candidate_already_saved",
+                             "pending": "showcase_candidate_invitation_pending"}
+                raise ConflictError(conflicts.get(selection["state"], "showcase_candidate_already_visited"))
             self._profile_snapshot(connection, request.candidate_id, request.profile_revision)
             ready = CombineStore._vacancy(connection, vacancy_id)
             candidates = CombineStore._candidates(connection, request.candidate_id)
@@ -842,10 +858,12 @@ class FeedStore:
                     raise ConflictError("saved listing source changed")
                 snapshot_at = keyset[0]
             where_keyset = "" if keyset is None else " AND (s.saved_at < %s OR (s.saved_at=%s AND s.candidate_id>%s))"
-            rows = connection.execute("""SELECT s.*,e.session_id,e.kind,e.served_at,e.position,e.card,
+            rows = connection.execute("""SELECT s.*,e.session_id,e.kind,e.served_at,e.position,e.card,c.profile AS current_profile,
                     COALESCE(v.history_badges,'[]'::jsonb) AS history_badges,
                     COALESCE(v.last_assessment,'null'::jsonb) AS change_assessment,
                     d.action FROM feed_pipeline.saved s JOIN feed_pipeline.exposures e ON e.exposure_id=s.exposure_id
+                    LEFT JOIN candidate_pipeline.candidates c ON c.candidate_id=e.candidate_id
+                        AND c.revision=e.profile_revision AND c.state='ready'
                     LEFT JOIN feed_pipeline.visited v ON v.owner_id=s.owner_id AND v.vacancy_id=s.vacancy_id AND v.candidate_id=s.candidate_id
                     LEFT JOIN feed_pipeline.decisions d ON d.exposure_id=e.exposure_id WHERE s.owner_id=%s AND s.vacancy_id=%s
                     AND (%s::uuid IS NULL OR s.candidate_id=%s)

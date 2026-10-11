@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
+import type { PurgeChatContext } from "../chat/client.js";
 import {
   advisoryKey,
   createOtp,
@@ -383,6 +384,57 @@ export class AuthStore {
     }
   }
 
+  /** Persist a ten-minute OAuth intent; opaque state doubles as a browser binding cookie. */
+  public async issueOAuthState(role: AccountRole, state: string, consentVersion: string): Promise<void> {
+    if (consentVersion !== this.consentVersion) throw new AuthError(400, "consent_invalid");
+    await this.pool.query("DELETE FROM auth_oauth_states WHERE expires_at <= now()");
+    await this.pool.query("INSERT INTO auth_oauth_states(state_hash, role, consent_version, expires_at) VALUES ($1,$2,$3,now()+interval '10 minutes')",
+      [hashSessionId(state), requireRole(role), consentVersion]);
+  }
+
+  /** Consume before provider I/O: callback replay and concurrent redemption fail across replicas. */
+  public async consumeOAuthState(role: AccountRole, state: string): Promise<boolean> {
+    const result = await this.pool.query("DELETE FROM auth_oauth_states WHERE state_hash=$1 AND role=$2 AND expires_at>now() AND consent_version=$3 RETURNING state_hash",
+      [hashSessionId(state), requireRole(role), this.consentVersion]);
+    return result.rowCount === 1;
+  }
+
+  /** Authenticate a provider subject. Existing email accounts are never silently linked by email. */
+  public async loginYandex(role: AccountRole, subject: string, emailInput: string): Promise<VerificationResult> {
+    const email = requireEmail(emailInput);
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await lockAdvisory(client, [advisoryKey(`email:${email}`), advisoryKey(`yandex:${subject}`)]);
+      const linked = await client.query<AccountRow>(
+        `SELECT a.* FROM auth_oauth_identities i JOIN accounts a ON a.id=i.account_id WHERE i.provider='yandex' AND i.subject=$1 FOR UPDATE OF a`, [subject]);
+      let row = linked.rows[0];
+      if (row && row.role !== role) throw new AuthError(409, "role_mismatch");
+      if (!row) {
+        const existing = await client.query("SELECT id FROM accounts WHERE email=$1", [email]);
+        if (existing.rowCount) throw new AuthError(409, "oauth_email_conflict");
+        const inserted = await client.query<AccountRow>(
+          `INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)
+           VALUES ($1,$2,$3,true,$4,now()) RETURNING *`, [randomUUID(), email, role, this.consentVersion]);
+        row = inserted.rows[0];
+        if (!row) throw new Error("oauth_account_missing");
+        await client.query("INSERT INTO auth_oauth_identities(provider,subject,account_id) VALUES ('yandex',$1,$2)", [subject,row.id]);
+      }
+      // Record the current consent accepted on this OAuth start, including legacy accounts.
+      const accepted = await client.query<AccountRow>(
+        "UPDATE accounts SET processing_consent_version=$2,processing_consent_at=now() WHERE id=$1 RETURNING *", [row.id,this.consentVersion]);
+      row = accepted.rows[0];
+      if (!row) throw new Error("oauth_account_missing");
+      const sessionId = createSessionId();
+      const expiresAt = new Date(Date.now()+AUTH_LIMITS.sessionTtlMs);
+      await client.query("INSERT INTO sessions(id,account_id,role,session_hash,expires_at) VALUES ($1,$2,$3,$4,$5)",
+        [randomUUID(),row.id,role,hashSessionId(sessionId),expiresAt]);
+      await client.query("COMMIT");
+      return { account: account(row), session_id: sessionId, expires_at: expiresAt.toISOString() };
+    } catch (error) { await rollback(client); throw error; }
+    finally { client.release(); }
+  }
+
   /** Resolve a live session to its account, respecting role and database revocation. */
   public async session(roleInput: AccountRole, accountId: string, sessionId: string): Promise<AuthAccount | null> {
     let role: AccountRole;
@@ -421,6 +473,77 @@ export class AuthStore {
       [accountId, role],
     );
     return result.rowCount ?? 0;
+  }
+
+  /** Permanently remove one candidate account and its API-owned private graph in one transaction. */
+  public async deleteCandidateAccount(accountId: string, purge?: (context: PurgeChatContext) => Promise<void>): Promise<boolean> {
+    const client = await this.pool.connect();
+    let committed = false;
+    try {
+      await client.query("BEGIN");
+      const row = await client.query<{ id: string; email: string; role: AccountRole }>(
+        "SELECT id,email,role FROM accounts WHERE id=$1 FOR UPDATE", [accountId],
+      );
+      const account = row.rows[0];
+      if (!account || account.role !== "candidate") {
+        await client.query("ROLLBACK");
+        committed = true;
+        return false;
+      }
+      await this.purgeAccountChats(client, accountId, purge);
+      // Revoke first, then remove all rows whose foreign keys do not cascade.
+      await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
+      await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
+      await client.query("DELETE FROM recruitment_processes WHERE candidate_id=$1 OR owner_id=$1", [accountId]);
+      await client.query("DELETE FROM auth_challenges WHERE email=$1", [account.email]);
+      await client.query("DELETE FROM auth_issue_events WHERE email=$1", [account.email]);
+      const deleted = await client.query("DELETE FROM accounts WHERE id=$1 AND role='candidate'", [accountId]);
+      await client.query("COMMIT");
+      committed = true;
+      return deleted.rowCount === 1;
+    } catch (error) {
+      if (!committed) {
+        try { await client.query("ROLLBACK"); } catch { /* preserve the original error */ }
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Delete employer-owned API records atomically after service projections are fenced. */
+  public async deleteEmployerAccount(accountId: string, purge?: (context: PurgeChatContext) => Promise<void>): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const selected = await client.query<{ email: string }>(
+        "SELECT email FROM accounts WHERE id=$1 AND role='employer' FOR UPDATE", [accountId]);
+      if (!selected.rows[0]) { await client.query("ROLLBACK"); return false; }
+      await this.purgeAccountChats(client, accountId, purge);
+      await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
+      await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
+      await client.query("DELETE FROM recruitment_processes WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM vacancy_lifecycle_commands WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM employer_expenses WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM employer_expense_ai_days WHERE owner_id=$1", [accountId]);
+      // Challenges are role-scoped; preserve a pending candidate login for this email.
+      await client.query("DELETE FROM auth_challenges WHERE email=$1 AND role='employer'", [selected.rows[0].email]);
+      await client.query("DELETE FROM auth_issue_events WHERE email=$1", [selected.rows[0].email]);
+      const result = await client.query("DELETE FROM accounts WHERE id=$1 AND role='employer'", [accountId]);
+      await client.query("COMMIT");
+      return result.rowCount === 1;
+    } catch (error) { await rollback(client); throw error; }
+    finally { client.release(); }
+  }
+
+  /** Hold process locks through external purge; account locks prevent concurrent process creation. */
+  private async purgeAccountChats(client: PoolClient, accountId: string,
+    purge?: (context: PurgeChatContext) => Promise<void>): Promise<void> {
+    const processes = await client.query<PurgeChatContext & QueryResultRow>(
+      `SELECT id AS process_id,owner_id,candidate_id FROM recruitment_processes
+       WHERE owner_id=$1 OR candidate_id=$1 ORDER BY id FOR UPDATE`, [accountId]);
+    if (processes.rows.length && !purge) throw new Error("chat_deletion_unavailable");
+    if (purge) for (const process of processes.rows) await purge(process);
   }
 
   /** Claim one valid mail job with a 120-second lease and recover stale workers. */

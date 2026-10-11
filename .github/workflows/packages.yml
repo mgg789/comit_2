@@ -1,0 +1,44 @@
+name: Publish development containers
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-dev-containers
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: [self-hosted, ci]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Authenticate to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish current dev service images
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          owner=${OWNER,,}
+          for spec in api:api web:web agents:agents-service matching:matching-engine testing:testing-engine integration:integration-engine verification:verification-engine qgramm:qgramm; do
+            name=${spec%%:*}
+            file=${spec#*:}
+            dockerfile="infra/$file.Dockerfile"
+            if [[ $name == qgramm ]]; then dockerfile=infra/qgramm/Dockerfile; fi
+            base="comit-package-base-$name:$REVISION"
+            image="ghcr.io/$owner/comit-$name"
+            docker build -f "$dockerfile" -t "$base" .
+            printf 'FROM %s\nENV NODE_ENV=development APP_ENV=development\nLABEL org.opencontainers.image.source="https://github.com/%s/comit_2" org.opencontainers.image.revision="%s" comit.mode="dev"\n' "$base" "$owner" "$REVISION" > "$RUNNER_TEMP/comit-dev.Dockerfile"
+            docker build -f "$RUNNER_TEMP/comit-dev.Dockerfile" -t "$image:dev" -t "$image:dev-$REVISION" .
+            docker push "$image:dev-$REVISION"
+            docker push "$image:dev"
+          done

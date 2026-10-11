@@ -82,3 +82,16 @@ def test_real_internal_http_requires_token_but_no_owner_and_applies_query(store)
     assert client.get("/internal/public/showcase/candidates?stack=react", headers=headers).json()["items"] == []
     assert client.get("/internal/public/showcase/candidates?limit=51", headers=headers).status_code == 422
     assert client.get("/internal/public/showcase/candidates?owner_id=foreign", headers=headers).status_code == 422
+
+
+def test_anonymous_search_cannot_probe_hidden_profile_text(store):
+    """A hidden biography token must not change the anonymous catalogue result."""
+    identity = UUID(int=99)
+    store.intake(identity, eligible_profile(description="SecretBiographProbe", stacks=[
+        {"key": "python", "level": 3, "status": "confirmed"}]))
+    assert worker(store).process_once()
+    catalogue = PublicShowcaseStore(store.database_url)
+    assert len(catalogue.page(CatalogueQuery(q="python"), candidates=True).items) == 1
+    assert not catalogue.page(CatalogueQuery(q="SecretBiographProbe"), candidates=True).items
+    assert not catalogue.page(CatalogueQuery(q=str(identity)), candidates=True).items
+    assert not catalogue.page(CatalogueQuery(q="Candidate"), candidates=True).items

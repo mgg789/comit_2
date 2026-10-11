@@ -42,6 +42,8 @@ def public_profile(profile: CandidateProfile, candidate_id: UUID) -> dict:
         result[group] = claims
     public_evidence = []
     for evidence in profile.external_evidence:
+        if evidence.kind == "weekly_challenge":
+            continue  # Internal reward is not an externally verified public achievement.
         if evidence.status not in ("confirmed", "partial", "pending"):
             continue
         value = evidence.verified_value

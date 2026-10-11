@@ -40,12 +40,12 @@ export function AppShellHeader({ brandHref, brandLabel, navigationLabel, items, 
       <button className="plain-icon" onClick={toggleMenu} aria-label="Открыть меню аккаунта" aria-expanded={menu}><span className="account-avatar">{email.slice(0, 1).toUpperCase()}</span><Icon name="chevron" /></button>
     </div>
     {overlayContent}
-    <AnimatePresence>{menu && <motion.div ref={menuRef} className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><p>{email}</p>{menuContent}</motion.div>}</AnimatePresence>
+    <AnimatePresence>{menu && <motion.div ref={menuRef} className="account-menu glass" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><p>{email}</p><a className="action glass" href="/help/" target="_blank" rel="noopener noreferrer">Справка</a>{menuContent}</motion.div>}</AnimatePresence>
   </header>;
 }
 
 /** Employer confirmation presentation with optional focus management for apps without a global modal manager. */
-export function Dialog({ title, close, children, manageFocus = true }: { title: string; close: () => void; children: ReactNode; manageFocus?: boolean }) {
+export function Dialog({ title, close, children, manageFocus = true, size = "default" }: { title: string; close: () => void; children: ReactNode; manageFocus?: boolean; size?: "default" | "wide" }) {
   const titleId = useId();
   const panel = useRef<HTMLElement>(null);
   const onClose = useRef(close);
@@ -68,7 +68,7 @@ export function Dialog({ title, close, children, manageFocus = true }: { title: 
     document.addEventListener("keydown", key);
     return () => { document.body.style.overflow = overflow; document.removeEventListener("keydown", key); previous?.focus(); };
   }, [manageFocus]);
-  return <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={event => { if (event.target === event.currentTarget) close(); }}><section ref={panel} className="modal account-confirmation glass" role="dialog" aria-modal="true" aria-labelledby={titleId}><h2 id={titleId}>{title}</h2>{children}</section></motion.div>;
+  return <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={event => { if (event.target === event.currentTarget) close(); }}><section ref={panel} className={`modal account-confirmation glass${size === "wide" ? " modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}><h2 id={titleId}>{title}</h2>{children}</section></motion.div>;
 }
 
 type ShellNavigationProps = {

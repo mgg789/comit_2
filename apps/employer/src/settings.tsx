@@ -3,6 +3,7 @@ import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-st
 import type { AccountView } from "@comit/shared";
 import { api, errorText, useResource } from "./runtime";
 import { useEmployerPreferences } from "./preferences";
+import { Checkbox } from "@comit/ui-kit/design";
 import { Action, Field, PageTitle, Select, State } from "./ui";
 import "./settings.css";
 
@@ -65,7 +66,7 @@ export function Settings({
             <div><dt>Согласие на обработку данных</dt><dd>{date(account.consent.accepted_at)} · версия {account.consent.version}</dd></div>
           </dl>
         </section>
-        <section className="settings-card glass" aria-labelledby="settings-company"><h2 id="settings-company">Компания</h2><p className="settings-description">Это название автоматически подставляется во все новые приглашения. Ранее отправленные приглашения сохраняют прежнее название.</p>{organization.loading || organization.error ? <State loading={organization.loading} error={organization.error} retry={organization.refresh} /> : <form onSubmit={saveCompany}><Field label="Название компании"><input required maxLength={200} value={company} disabled={savingCompany} onChange={event => { setCompanyDraft({ value: event.target.value, dirty: true }); setCompanySaved(false); }} /></Field><Action type="submit" variant="primary" disabled={savingCompany}>{savingCompany ? "Сохраняем…" : "Сохранить название"}</Action>{companyError && <p className="form-error" role="alert">{companyError}</p>}{companySaved && <p role="status">Название компании сохранено.</p>}</form>}</section>
+        <section className="settings-card glass" aria-labelledby="settings-company"><h2 id="settings-company">Компания</h2><p className="settings-description">Это название автоматически подставляется во все новые приглашения. Ранее отправленные приглашения сохраняют прежнее название.</p>{organization.loading || organization.error ? <State loading={organization.loading} error={organization.error} retry={organization.refresh} /> : <form className="settings-company-form" onSubmit={saveCompany}><Field label="Название компании"><input required maxLength={200} value={company} disabled={savingCompany} onChange={event => { setCompanyDraft({ value: event.target.value, dirty: true }); setCompanySaved(false); }} /></Field><Action type="submit" variant="primary" disabled={savingCompany}>{savingCompany ? "Сохраняем…" : "Сохранить название"}</Action>{companyError && <p className="form-error" role="alert">{companyError}</p>}{companySaved && <p role="status">Название компании сохранено.</p>}</form>}</section>
         <section className="settings-card glass" aria-labelledby="settings-ai">
           <h2 id="settings-ai">AI-ассистент</h2>
           <p className="settings-description">Настройки ввода и глубина рассуждений при открытии AI в этом браузере.</p>
@@ -81,11 +82,11 @@ export function Settings({
           </Field>
           <label className="settings-toggle">
             <span><strong>Отправлять по Enter</strong><small>{preferences.submitWithEnter ? "Shift + Enter — новая строка" : "Enter — новая строка; отправка кнопкой"}</small></span>
-            <input type="checkbox" role="switch" checked={preferences.submitWithEnter} onChange={(event) => updatePreferences({ submitWithEnter: event.target.checked })} />
+            <Checkbox role="switch" checked={preferences.submitWithEnter} onChange={(event) => updatePreferences({ submitWithEnter: event.target.checked })} />
           </label>
           <label className="settings-toggle">
             <span><strong>Уменьшить анимацию</strong><small>Меньше движения в интерфейсе</small></span>
-            <input type="checkbox" role="switch" checked={preferences.reducedMotion} onChange={(event) => updatePreferences({ reducedMotion: event.target.checked })} />
+            <Checkbox role="switch" checked={preferences.reducedMotion} onChange={(event) => updatePreferences({ reducedMotion: event.target.checked })} />
           </label>
           <p className="settings-description settings-local">Настройки сохраняются только в этом браузере. Если браузер запрещает хранение, они действуют до перезагрузки страницы.</p>
         </section>

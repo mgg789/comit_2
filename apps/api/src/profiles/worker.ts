@@ -150,7 +150,11 @@ export async function main(argv = process.argv.slice(2), env: NodeJS.ProcessEnv 
   process.once("SIGINT", shutdown);
   process.once("SIGTERM", shutdown);
   try {
-    const worker = new ProfileWorker(new CandidateProfileStore(pool), { token, engineUrl });
+    const store = new CandidateProfileStore(pool);
+    const reconciled = await store.reconcileTrustedSkillResults(100);
+    if (argv.includes("--backfill-only")) console.info(JSON.stringify({ event: "testing_coordinate_backfill", ...reconciled }));
+    if (argv.includes("--backfill-only")) return;
+    const worker = new ProfileWorker(store, { token, engineUrl });
     await runProfileWorker(worker, { once: argv.includes("--once"), stop: stop.signal });
   } finally {
     process.removeListener("SIGINT", shutdown);

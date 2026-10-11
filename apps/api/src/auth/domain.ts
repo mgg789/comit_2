@@ -1,3 +1,4 @@
+import { candidateWeeklyChallengeRoutes } from "../routes/candidate-weekly-challenge.js";
 /** Configure the auth domain while leaving internal/offline services usable when secrets are absent. */
 import type { FastifyInstance } from "fastify";
 import { Pool } from "pg";
@@ -15,15 +16,21 @@ import { registerTestingIntegration } from "../routes/testing-integration.js";
 import { correlatedFetch } from "../operations/index.js";
 import { EmployerStatisticsStore } from "../statistics/store.js";
 import { statisticsRoutes } from "../routes/statistics.js";
+import { SalaryMarketStore } from "../salary-market/store.js";
+import { salaryMarketRoutes } from "../routes/salary-market.js";
 import { organizationAgentToolsRoutes } from "../routes/organization-agent-tools.js";
 import { EmployerProfileStore } from "../employers/store.js";
 import { employerProfileRoutes } from "../routes/employer-profile.js";
 import { SystemNotificationsStore } from "../notifications/system-store.js";
 import { notificationRoutes } from "../routes/notifications.js";
+import { loadSupportConfig, type SupportConfig } from "../support/config.js";
+import { SupportConsoleStore } from "../support/store.js";
+import { supportRoutes } from "../routes/support.js";
 import { CandidateRecommendationsStore } from "../recommendations/store.js";
 import { recommendationsRoutes } from "../recommendations/routes.js";
 import { WeeklyRecommendationWorker } from "../recommendations/worker.js";
 import { CandidateTestingHistoryStore } from "../profiles/testing-history.js";
+import { candidateTestingRoutes } from "../routes/candidate-testing.js";
 import { candidateTestingHistoryRoutes } from "../routes/candidate-testing-history.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 
@@ -39,11 +46,16 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
         response: { 503: { type: "object", required: ["detail"], properties: { detail: { type: "string" } } } } } },
       async (_request, reply) => reply.header("cache-control", "no-store").code(503).send({ detail: "showcase_unavailable" }));
     }
+    app.get("/public/salary-market", { schema: { tags: ["public-showcase"], security: [],
+      response: { 503: { type: "object", required: ["detail"], properties: { detail: { type: "string" } } } } } },
+    async (_request, reply) => reply.header("cache-control", "no-store").code(503).send({ detail: "salary_market_unavailable" }));
     for (const role of ["candidate", "employer"]) {
       for (const path of ["code", "verify", "logout", "logout-all"]) {
         app.post(`/auth/${role}/${path}`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
           reply.code(503).send({ detail: "auth_not_configured" }));
       }
+      app.get(`/auth/${role}/providers`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
+        reply.header("cache-control", "no-store").send({ yandex: false }));
       app.get(`/auth/${role}/me`, { schema: { tags: ["auth"] } }, async (_request, reply) =>
         reply.code(503).send({ detail: "auth_not_configured" }));
     }
@@ -72,13 +84,20 @@ export async function authDomain(app: FastifyInstance): Promise<void> {
   app.addHook("onClose", async () => { clearInterval(interval); });
   await app.register(authRoutes, options);
   await app.register(candidateProfileRoutes, options);
+  await app.register(candidateWeeklyChallengeRoutes, options);
   await app.register(candidateTestingHistoryRoutes, { ...options, testingHistory: new CandidateTestingHistoryStore(pool) });
+  await app.register(candidateTestingRoutes, { ...options, pool });
   await app.register(accountRoutes, options);
+  await app.register(salaryMarketRoutes, { market: new SalaryMarketStore(pool) });
   const recruitment = new RecruitmentStore(pool, chatConfiguration() !== null, config.secret,
     (owner, draftId, client) => vacancyLifecycle.writable(owner, draftId, client),
     { initialWorkingDays: 4, reminderWorkingDays: 3, hireOn: "offer_accept" }, notifications);
   await app.register(employerProfileRoutes, { ...options, employerProfiles });
   await app.register(notificationRoutes, { ...options, notifications });
+  let supportConfig: SupportConfig | null = null;
+  try { supportConfig = loadSupportConfig(); } catch { app.log.warn({ code: "support_config_invalid" }, "Support console disabled: invalid configuration"); }
+  if (supportConfig) await app.register(supportRoutes, { config, support: supportConfig,
+    sessions: new SupportConsoleStore(pool), notifications });
   const recommendations = new CandidateRecommendationsStore(pool, { notifyInTransaction: async (client, candidateId, item) => {
     await notifications.append(client, candidateId, `recommendation:${item.recommendation_id}`, "recommendation.weekly",
       item.state === "ready" ? "Новые рекомендации от платформы готовы. Посмотрите их в статистике." : "Обновлены рекомендации от платформы. Посмотрите их в статистике.",

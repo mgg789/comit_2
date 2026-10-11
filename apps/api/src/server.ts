@@ -32,6 +32,13 @@ export function proxyTrustConfig(value: string | undefined): false | string[] {
   return addresses;
 }
 
+const requiredApiMigrations = ["021_support_console.sql", "021_weekly_challenges.sql", "022_yandex_oauth.sql", "023_system_chat_attachments.sql", "024_direct_contacts.sql"] as const;
+
+/** Admit traffic only when every current API schema branch has been migrated. */
+export function requiredApiMigrationsApplied(names: readonly string[]): boolean {
+  return requiredApiMigrations.every(name => names.includes(name));
+}
+
 /** Build the complete production route graph without listening, enabling registration regressions. */
 export async function createApiServer({ logger = true }: { logger?: boolean } = {}): Promise<FastifyInstance> {
   const app = Fastify({
@@ -64,6 +71,7 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
         bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
         candidateSession: { type: "apiKey", in: "cookie", name: "__Host-comit_candidate_session" },
         employerSession: { type: "apiKey", in: "cookie", name: "__Host-comit_employer_session" },
+        supportSession: { type: "apiKey", in: "cookie", name: "__Host-comit_support_session" },
       } },
     },
   });
@@ -73,8 +81,8 @@ export async function createApiServer({ logger = true }: { logger?: boolean } = 
   await app.register(swaggerUi, { routePrefix: "/docs" });
   await app.register(healthRoutes, { readiness: async () => {
     if (!operationConfig || !operationsPool) return false;
-    const result = await operationsPool.query("SELECT 1 FROM auth_migrations WHERE name=$1", ["020_training_consent_not_null.sql"]);
-    return result.rowCount === 1;
+    const result = await operationsPool.query<{ name: string }>("SELECT name FROM auth_migrations WHERE name = ANY($1::text[])", [requiredApiMigrations]);
+    return requiredApiMigrationsApplied(result.rows.map(row => row.name));
   } });
   await app.register(cookie);
   await app.register(candidatePipelineRoutes);

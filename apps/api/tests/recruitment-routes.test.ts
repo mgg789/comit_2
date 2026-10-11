@@ -158,8 +158,22 @@ test("recruitment HTTP contracts enforce auth, ownership, source freshness, priv
     const rejectedEvents = await app.inject({ url: "/candidate/recruitment-events", headers: pending.headers });
     assert.deepEqual(rejectedEvents.json<RecruitmentEventPage>().items, []);
 
+    await pool.query("UPDATE candidate_profile_outbox SET state='delivered',projected_revision=12,delivered_at=now() WHERE candidate_id=$1 AND source_revision=2", [candidate.id]);
+    const directBody = {candidate_id: candidate.id, profile_revision: 12, idempotency_key: randomUUID(), description: "Direct backend opportunity", salary: {from_rub: 180000, to_rub: 220000}};
+    assert.equal((await app.inject({method: "POST", url: "/employer/contacts", payload: directBody})).statusCode, 401);
+    assert.equal((await app.inject({method: "POST", url: "/employer/contacts", headers: candidate.headers, payload: directBody})).statusCode, 401);
+    const direct = await app.inject({method: "POST", url: "/employer/contacts", headers: employer.headers, payload: directBody});
+    assert.equal(direct.statusCode, 200, direct.body);
+    assert.equal(direct.json<RecruitmentView>().kind, "contact_only");
+    assert.deepEqual(direct.json<RecruitmentView>().allowed_actions, ["contact_close"]);
+    const directReplay = await app.inject({method: "POST", url: "/employer/contacts", headers: employer.headers, payload: directBody});
+    assert.equal(directReplay.statusCode, 200, directReplay.body);
+    assert.deepEqual(directReplay.json(), direct.json());
+    assert.equal((await app.inject({url: `/employer/recruitment/${direct.json<RecruitmentView>().id}`, headers: foreign.headers})).statusCode, 404);
+    assert.equal((await app.inject({url: `/candidate/recruitment/${direct.json<RecruitmentView>().id}`, headers: candidate.headers})).statusCode, 200);
+
     const paths = app.swagger().paths ?? {};
-    for (const path of ["/employer/vacancy-drafts/{draft_id}/invitations", "/employer/vacancy-drafts/{draft_id}/recruitment/reject",
+    for (const path of ["/employer/contacts", "/employer/vacancy-drafts/{draft_id}/invitations", "/employer/vacancy-drafts/{draft_id}/recruitment/reject",
       "/candidate/recruitment/{id}/actions", "/employer/recruitment/{id}/contacts", "/candidate/recruitment-events",
     ]) assert.ok(paths[path], `missing public OpenAPI path ${path}`);
   } finally { await app.close(); await pool.end(); }

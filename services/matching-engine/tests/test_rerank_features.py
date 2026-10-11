@@ -168,3 +168,15 @@ def test_wrong_card_identity_and_nonfinite_score_are_rejected():
     card.profile_revision = 99
     with pytest.raises(ValueError, match="snapshot"):
         build_features(target, value, card, initial_schema())
+
+
+def test_unbounded_salary_pair_features_are_finite_and_vacancy_bounded():
+    import math
+    from matching_engine.models import CandidateSalary, SalaryRange
+    value = candidate(salary=CandidateSalary(from_rub=120000))
+    _, values, _ = features(vacancy(zp_min=250000, zp_max=300000), value)
+    assert all(math.isfinite(part) for part in values.values())
+    assert 0 < values["salary_overlap"] <= 1
+    assert values["salary_midpoint_ratio"] == pytest.approx(420000 / 550000)
+    with pytest.raises(ValidationError):
+        SalaryRange(from_rub=120000, to_rub=None)

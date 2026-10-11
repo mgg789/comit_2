@@ -12,12 +12,21 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGES = {"matching-engine": "matching_engine", "testing-engine": "testing_engine",
             "integration-engine": "integration_engine", "agents-service": "agents_service",
-            "verification-engine": "verification_engine"}
+            "verification-engine": "verification_engine", "code-judge": "code_judge"}
 # These acceptance tests require separately seeded operational cards/consent fixtures.
 ALLOWED_SKIPS = {"test_current_consent_revalidated_without_matching_projection",
                  "test_operational_export_holds_authoritative_consent_until_commit",
                  "test_consent_cannot_commit_during_fit_and_result_write"}
 
+
+
+def unexpected_skips(package: str, skips: list[str], live_acceptance: bool) -> set[str]:
+    """Reject skips except named fixtures and opt-in paid tests in their owning package."""
+    allowed = set(ALLOWED_SKIPS)
+    if package == "agents-service" and not live_acceptance:
+        allowed.update({f"test_live_employer_agent[{scenario}]" for scenario in
+                        ("interface_help", "markdown_report", "background_clarification")})
+    return set(skips) - allowed
 
 
 def prepare_api_schema(database_url: str) -> None:
@@ -70,6 +79,10 @@ def main() -> None:
                f"--cov={PACKAGES[args.package]}", "--cov-branch", "--cov-report=term",
                f"--cov-report=json:{report}", f"--cov-report=xml:{out / (args.package + '-coverage.xml')}",
                f"--junitxml={junit}"]
+    # Docker isolation is a separate explicit acceptance contour, never substituted
+    # by unit tests or silently counted as passing inside generic Python containers.
+    if args.package == "code-judge":
+        command.append("--ignore=services/code-judge/tests/test_docker_acceptance.py")
     # This one cross-service fixture requires the canonical API source schema. Legacy
     # matching-only fixtures intentionally provide their own consent schemas; sharing
     # the canonical schema globally changes their boundary semantics.
@@ -108,7 +121,7 @@ def main() -> None:
     if not args.unit:
         skips = [case.get("name") for path in junit_reports for case in ET.parse(path).iter("testcase")
                  if case.find("skipped") is not None]
-        unexpected = set(skips) - ALLOWED_SKIPS
+        unexpected = unexpected_skips(args.package, skips, env.get("AGENT_LIVE_ACCEPTANCE") == "1")
         if unexpected:
             sys.exit(f"Unexpected skipped backend tests: {sorted(unexpected)}")
         print(f"Explicit acceptance contour exclusions: {skips}", flush=True)

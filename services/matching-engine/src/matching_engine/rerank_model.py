@@ -11,6 +11,7 @@ from pydantic import Field, model_validator
 from matching_engine.combine_models import CandidateCard, MatchCandidate, ScoringPolicy
 from matching_engine.combine_scoring import policy_hash
 from matching_engine.embeddings import EMBEDDING_SPACE_ID
+from matching_engine.fsp_boost import promote, promotion_policy
 from matching_engine.models import Contract, StrictSchema
 from matching_engine.rerank_features import (
     FeatureVector,
@@ -123,7 +124,8 @@ def promotion_eligible(value: dict) -> bool:
 
 def tail_policy_hash(value: dict | None) -> str:
     """Give sort-only and calibrated-tail policies distinct durable identities."""
-    return digest({"version": "tail-gap-v1", "gap": value.get("tail_gap") if value else None})
+    return digest({"version": "tail-gap-v1", "gap": value.get("tail_gap") if value else None,
+                   "promotion": promotion_policy().snapshot()})
 
 
 def scaled_features(vector: FeatureVector, artifact: RerankArtifact) -> list[float]:
@@ -189,7 +191,8 @@ def rerank_cards(vacancy: VacancyReady, candidates: list[MatchCandidate], cards:
     tail_hash = tail_policy_hash(artifact)
     if reason:
         return RerankOutcome("main_fallback", reason, current.schema_hash, tail_hash,
-                             [RerankScore(card.candidate_id, None, {}, "recommended") for card in cards])
+                             promote([RerankScore(card.candidate_id, None, {}, "recommended") for card in cards],
+                                     candidates, cards, promotion_policy()))
     assert model is not None
     inputs = {candidate.candidate_id: candidate for candidate in candidates}
     results = []
@@ -205,7 +208,7 @@ def rerank_cards(vacancy: VacancyReady, candidates: list[MatchCandidate], cards:
         results.append((card, score, contributions))
     results.sort(key=lambda row: (-row[1], -row[0].explanation.score, str(row[0].candidate_id)))
     maximum = results[0][1] if results else 0.0
-    return RerankOutcome("learned", None, current.schema_hash, tail_hash, [
+    return RerankOutcome("learned", None, current.schema_hash, tail_hash, promote([
         RerankScore(card.candidate_id, score, contributions,
                     "reserve" if model.tail_gap is not None and maximum - score > model.tail_gap else "recommended")
-        for card, score, contributions in results])
+        for card, score, contributions in results], candidates, cards, promotion_policy()))

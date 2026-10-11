@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
-import type { AccountRole, SystemChatPage, ChatUnreadStatus } from "@comit/shared";
+import type { AccountRole, SystemChatFile, SystemChatFileDownload, SystemChatPage, SystemNotification, ChatUnreadStatus } from "@comit/shared";
 import { SystemNotificationsStore } from "../src/notifications/system-store.js";
 import { fetchGlobalRecruitmentUnread } from "../src/notifications/unread.js";
 import { EmployerProfileStore } from "../src/employers/store.js";
@@ -64,6 +64,7 @@ test("company CAS, invitation backfill and durable owner-only inbox/read receipt
       await pool.query(`INSERT INTO recruitment_processes(id,owner_id,candidate_id,vacancy_id,draft_id,profile_revision,state,terms,invited_at)
         VALUES($1,$2,$3,$4,$5,1,'sent',$6,now()-$7::interval)`, [id, owner.id, candidate.id, randomUUID(), randomUUID(), { company_name: name }, ago]);
     await pool.query(await readFile(new URL("../migrations/014_employer_system_inbox.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../migrations/023_system_chat_attachments.sql", import.meta.url), "utf8"));
     const company = new EmployerProfileStore(pool), notifications = new SystemNotificationsStore(pool);
     assert.equal((await company.get(owner.id)).company_name, "Current company");
     assert.deepEqual(await company.get(foreign.id), { company_name: null, revision: 0, updated_at: null });
@@ -113,8 +114,91 @@ test("company CAS, invitation backfill and durable owner-only inbox/read receipt
     const ownPage = await app.inject({ url: "/employer/system-chat", headers: foreign.headers });
     assert.equal(ownPage.statusCode, 200); assert.equal(ownPage.json<SystemChatPage>().items.length, 1);
     assert.equal(ownPage.headers["cache-control"], "no-store");
-    assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers, payload: { text: "send" } })).statusCode, 404);
+    const sentMessage = randomUUID();
+    const sent = await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: sentMessage, text: "Опишите проблему." } });
+    assert.equal(sent.statusCode, 200);
+    assert.equal(sent.json<SystemNotification>().type, "support.user_message");
+    const fileBytes = Buffer.from("owner system attachment");
+    const fileUploadKey = randomUUID();
+    const fileUpload = await app.inject({ method: "POST", url: "/employer/system-chat/files", headers: owner.headers,
+      payload: { idempotency_key: fileUploadKey, name: "owner.txt", media_type: "text/plain", data_base64: fileBytes.toString("base64") } });
+    assert.equal(fileUpload.statusCode, 200);
+    const file = fileUpload.json<SystemChatFile>();
+    const fileMessage = await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: randomUUID(), text: "", files: [file] } });
+    assert.equal(fileMessage.statusCode, 200);
+    assert.deepEqual(fileMessage.json<SystemNotification>().files, [file]);
+    const fileDownload = await app.inject({ url: `/employer/system-chat/files/${file.id}`, headers: owner.headers });
+    assert.equal(fileDownload.statusCode, 200);
+    assert.equal(fileDownload.headers["content-disposition"], 'attachment; filename="support-attachment.json"');
+    assert.equal(fileDownload.headers["x-content-type-options"], "nosniff");
+    assert.equal(fileDownload.headers["cache-control"], "private, no-store");
+    assert.deepEqual(Buffer.from(fileDownload.json<SystemChatFileDownload>().data_base64, "base64"), fileBytes);
+    assert.equal((await app.inject({ url: `/employer/system-chat/files/${file.id}`, headers: foreign.headers })).statusCode, 404);
+    assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/files", headers: owner.headers,
+      payload: { idempotency_key: fileUploadKey, name: "invalid.txt", media_type: "text/plain", data_base64: fileBytes.toString("base64") } })).statusCode, 409);
+    // Own message acknowledges delivery: unread counts only what Comit adds next.
+    assert.equal((await app.inject({ url: "/employer/system-chat", headers: owner.headers })).json<SystemChatPage>().unread_count, 0);
+    const replay = await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: sentMessage, text: "Опишите проблему." } });
+    assert.equal(replay.statusCode, 200); assert.equal(replay.json<SystemNotification>().id, sent.json<SystemNotification>().id);
+    assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: randomUUID(), text: "   " } })).statusCode, 422);
     assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/read", headers: owner.headers, payload: { read_sequence: 10000 } })).statusCode, 409);
+
+    // Quota fixtures keep content tiny while exercising the persisted byte counters at their real limits.
+    // The upload path always writes matching content/size; only this isolated test setup uses synthetic metadata
+    // so the concurrency and linked-byte regressions do not allocate 320 MiB per test run.
+    const quotaAccount = await account("employer"), pendingAccount = await account("employer"), linkAccount = await account("candidate");
+    const seedFile = async (accountId: string, size: number, notificationId?: string): Promise<SystemChatFile> => {
+      const file = { id: randomUUID(), name: `seed-${randomUUID()}.txt`, media_type: "text/plain", size,
+        sha256: "b".repeat(64) } satisfies SystemChatFile;
+      await pool.query(`INSERT INTO system_chat_files(id,account_id,idempotency_key,request_hash,name,media_type,size_bytes,sha256,content)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [file.id, accountId, randomUUID(), "a".repeat(64), file.name, file.media_type, size, file.sha256, Buffer.from("seed")]);
+      if (notificationId) await pool.query("INSERT INTO system_notification_files(notification_id,file_id,ordinal) VALUES($1,$2,0)", [notificationId, file.id]);
+      return file;
+    };
+    const retryPayload = { idempotency_key: randomUUID(), name: "quota-retry.txt", media_type: "text/plain", data_base64: Buffer.from("r").toString("base64") };
+    const retryFile = await notifications.uploadFile(quotaAccount.id, retryPayload);
+    const retryMessage = await notifications.publish(quotaAccount.id, `quota-retry-message:${randomUUID()}`, "test.quota_seed", "seed");
+    await pool.query("INSERT INTO system_notification_files(notification_id,file_id,ordinal) VALUES($1,$2,0)", [retryMessage.id, retryFile.id]);
+    for (let index = 0; index < 31; index++) {
+      const message = await notifications.publish(quotaAccount.id, `quota-linked:${index}:${randomUUID()}`, "test.quota_seed", "seed");
+      await seedFile(quotaAccount.id, 8 * 1024 * 1024, message.id);
+    }
+    const lastMessage = await notifications.publish(quotaAccount.id, `quota-linked:last:${randomUUID()}`, "test.quota_seed", "seed");
+    await seedFile(quotaAccount.id, 8 * 1024 * 1024 - 1, lastMessage.id);
+    // Existing idempotent uploads are resolved before quota checks, even after linked+pending reaches 256 MiB.
+    assert.equal((await notifications.uploadFile(quotaAccount.id, retryPayload)).id, retryFile.id);
+    await assert.rejects(notifications.uploadFile(quotaAccount.id, {
+      idempotency_key: randomUUID(), name: "quota-over.txt", media_type: "text/plain", data_base64: Buffer.from("x").toString("base64"),
+    }), error => error instanceof Error && error.message === "system_file_account_limit");
+    const linkedTotal = await pool.query<{ total: string }>("SELECT COALESCE(sum(size_bytes),0)::text AS total FROM system_chat_files WHERE account_id=$1", [quotaAccount.id]);
+    assert.equal(linkedTotal.rows[0]!.total, String(256 * 1024 * 1024));
+
+    // The same inbox lock serializes distinct uploads: at a 64 MiB pending boundary exactly one 1-byte upload fits.
+    for (let index = 0; index < 7; index++) await seedFile(pendingAccount.id, 8 * 1024 * 1024);
+    await seedFile(pendingAccount.id, 8 * 1024 * 1024 - 1);
+    const concurrentUploads = await Promise.allSettled([
+      notifications.uploadFile(pendingAccount.id, { idempotency_key: randomUUID(), name: "concurrent-a.txt", media_type: "text/plain", data_base64: "YQ==" }),
+      notifications.uploadFile(pendingAccount.id, { idempotency_key: randomUUID(), name: "concurrent-b.txt", media_type: "text/plain", data_base64: "Yg==" }),
+    ]);
+    assert.equal(concurrentUploads.filter(result => result.status === "fulfilled").length, 1);
+    assert.equal(concurrentUploads.filter(result => result.status === "rejected" && result.reason?.message === "system_file_storage_limit").length, 1);
+    const pendingTotal = await pool.query<{ total: string }>(`SELECT COALESCE(sum(size_bytes),0)::text AS total FROM system_chat_files f
+      WHERE f.account_id=$1 AND NOT EXISTS(SELECT 1 FROM system_notification_files nf WHERE nf.file_id=f.id)`, [pendingAccount.id]);
+    assert.equal(pendingTotal.rows[0]!.total, String(64 * 1024 * 1024));
+
+    // Linking is also serialized by that lock: one concurrent message may claim an orphan, the other gets a conflict.
+    const linkFile = await notifications.uploadFile(linkAccount.id, { idempotency_key: randomUUID(), name: "link.txt", media_type: "text/plain", data_base64: "bGluaw==" });
+    const concurrentLinks = await Promise.allSettled([
+      notifications.sendMessage("candidate", linkAccount.id, `link-a:${randomUUID()}`, "", [linkFile]),
+      notifications.sendMessage("candidate", linkAccount.id, `link-b:${randomUUID()}`, "", [linkFile]),
+    ]);
+    assert.equal(concurrentLinks.filter(result => result.status === "fulfilled").length, 1);
+    assert.equal(concurrentLinks.filter(result => result.status === "rejected" && result.reason?.message === "system_file_already_attached").length, 1);
+    assert.equal((await pool.query("SELECT count(*) FROM system_notification_files WHERE file_id=$1", [linkFile.id])).rows[0]!.count, "1");
     assert.equal((await app.inject({ method: "PATCH", url: "/employer/profile", headers: owner.headers, payload: { company_name: "Changed", expected_revision: 1, owner_id: foreign.id } })).statusCode, 400);
     assert.equal((await app.inject({ method: "PATCH", url: "/employer/profile", headers: { ...owner.headers, origin: "https://foreign.example.test" }, payload: { company_name: "Blocked", expected_revision: 1 } })).statusCode, 403);
     const updated = await app.inject({ method: "PATCH", url: "/employer/profile", headers: owner.headers, payload: { company_name: " Updated ", expected_revision: 1 } });

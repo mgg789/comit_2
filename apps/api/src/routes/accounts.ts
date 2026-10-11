@@ -5,12 +5,14 @@ import type { ProfileStore } from "../profiles/store.js";
 import agentsSpec from "../contracts/agents.openapi.json" with { type: "json" };
 import engineSpec from "../contracts/candidate-pipeline.openapi.json" with { type: "json" };
 import type { AuthOptions } from "./auth.js";
-import { originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
+import { cookieName, originAllowed, resolveSession, type SessionIdentity } from "../auth/session.js";
 import { showcaseRoutes } from "./showcase.js";
 import { publicShowcaseRoutes } from "./public-showcase.js";
 import { correlatedFetch } from "../operations/index.js";
 import { VacancyLifecycle } from "../recruitment/vacancy-lifecycle.js";
 import { RecruitmentError } from "../recruitment/store.js";
+import { chatConfiguration } from "./chat.js";
+import { purgeChat } from "../chat/client.js";
 
 type Schema = string | number | boolean | null | undefined | Schema[] | { [key: string]: Schema };
 
@@ -35,10 +37,89 @@ export interface AccountGatewayOptions extends AuthOptions {
   agentsToken?: string;
   matchingUrl?: string;
   matchingToken?: string;
+  testingUrl?: string;
+  testingToken?: string;
+  chatUrl?: string;
+  chatToken?: string;
   transport?: typeof fetch;
   profiles?: ProfileStore;
   vacancyLifecycle?: VacancyLifecycle;
 }
+
+/** Reviewed employer operations only; new internal paths or methods require an explicit boundary review. */
+const employerAgentOperations = new Set<string>([
+  "GET /internal/agents/taxonomy",
+  "GET /internal/agents/capabilities",
+  "POST /internal/vacancy-drafts",
+  "GET /internal/vacancy-drafts",
+  "GET /internal/vacancy-drafts/{draft_id}",
+  "PATCH /internal/vacancy-drafts/{draft_id}",
+  "GET /internal/vacancies",
+  "POST /internal/vacancies",
+  "GET /internal/vacancies/{draft_id}",
+  "PATCH /internal/vacancies/{draft_id}",
+  "DELETE /internal/vacancies/{draft_id}",
+  "POST /internal/vacancies/{draft_id}/approve",
+  "POST /internal/vacancies/{draft_id}/publish",
+  "POST /internal/vacancies/{draft_id}/withdraw",
+  "POST /internal/vacancies/{draft_id}/close",
+  "GET /internal/vacancies/{draft_id}/deletion",
+  "GET /internal/vacancies/{draft_id}/lifecycle/{expected_revision}/{action}",
+  "POST /internal/vacancy-drafts/{draft_id}/approve",
+  "POST /internal/vacancy-drafts/{draft_id}/create",
+  "GET /internal/vacancy-drafts/{draft_id}/pipeline",
+  "POST /internal/vacancy-drafts/{draft_id}/enrich",
+  "GET /internal/agents/jobs/{job_id}",
+  "POST /internal/agents/jobs/{job_id}/retry",
+  "POST /internal/agents/sessions",
+  "GET /internal/agents/sessions/{session_id}",
+  "POST /internal/agents/sessions/{session_id}/turns",
+  "POST /internal/agents/sessions/{session_id}/interactions/{interaction_id}",
+  "GET /internal/organization-agent/chat",
+  "GET /internal/organization-agent/messages",
+  "DELETE /internal/organization-agent/messages",
+  "POST /internal/organization-agent/messages",
+  "GET /internal/organization-agent/turns/{turn_id}",
+  "GET /internal/organization-agent/pending-answers",
+  "POST /internal/organization-agent/pending-answers/{answer_id}",
+  "GET /internal/organization-agent/tasks",
+  "POST /internal/organization-agent/tasks",
+  "POST /internal/organization-agent/tasks/{task_id}/availability",
+  "DELETE /internal/organization-agent/tasks/{task_id}",
+  "POST /internal/organization-agent/presence",
+  "PUT /internal/organization-agent/presence",
+  "GET /internal/organization-agent/context",
+  "GET /internal/organization-agent/memory",
+  "PATCH /internal/organization-agent/memory",
+  "GET /internal/organization-agent/budget",
+  "POST /internal/organization-agent/documents",
+  "GET /internal/organization-agent/documents",
+  "GET /internal/organization-agent/documents/{document_id}",
+  "GET /internal/organization-agent/documents/{document_id}/download",
+]);
+
+/** Matching feed/preference operations are reviewed independently of upstream contract growth. */
+const employerMatchingOperations = new Set<string>([
+  "GET /internal/vacancies/{vacancy_id}/preferences",
+  "POST /internal/vacancies/{vacancy_id}/preferences/reset",
+  "POST /internal/vacancies/{vacancy_id}/preferences/rollback",
+  "POST /internal/vacancies/{vacancy_id}/preferences/retry",
+  "GET /internal/vacancies/{vacancy_id}/hypotheses",
+  "POST /internal/vacancies/{vacancy_id}/hypotheses/{action}",
+  "POST /internal/vacancies/{vacancy_id}/showcase-likes",
+  "GET /internal/vacancies/{vacancy_id}/showcase-likes/{idempotency_key}",
+  "POST /internal/vacancies/{vacancy_id}/feed",
+  "POST /internal/vacancies/{vacancy_id}/feed/decisions",
+  "GET /internal/vacancies/{vacancy_id}/feed/decisions/{idempotency_key}",
+  "POST /internal/vacancies/{vacancy_id}/feed/impressions",
+  "GET /internal/vacancies/{vacancy_id}/feed/impressions/{idempotency_key}",
+  "GET /internal/vacancies/{vacancy_id}/feed/exposures/{exposure_id}",
+  "GET /internal/vacancies/{vacancy_id}/feed/{session_id}",
+  "POST /internal/vacancies/{vacancy_id}/feed/{session_id}/refill",
+  "GET /internal/vacancies/{vacancy_id}/saved",
+  "GET /internal/vacancies/{vacancy_id}/visited",
+  "GET /internal/vacancies/{vacancy_id}/saved/{candidate_id}",
+]);
 
 /** Expose employer editorial endpoints and candidate private reads with server-derived UUIDs. */
 export async function accountRoutes(app: FastifyInstance, options: AccountGatewayOptions): Promise<void> {
@@ -48,6 +129,11 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   const agentsToken = options.agentsToken ?? process.env.AGENTS_SERVICE_TOKEN;
   const matchingUrl = options.matchingUrl ?? process.env.MATCHING_ENGINE_URL ?? "http://matching-engine:8101";
   const matchingToken = options.matchingToken ?? process.env.CANDIDATE_PIPELINE_TOKEN;
+  const testingUrl = options.testingUrl ?? process.env.TESTING_ENGINE_URL ?? "http://testing-engine:8102";
+  const testingToken = options.testingToken ?? process.env.TESTING_ENGINE_TOKEN;
+  const chatConfig = chatConfiguration();
+  const purge = (context: Parameters<typeof purgeChat>[0]) => purgeChat(context, transport,
+    options.chatUrl ?? chatConfig?.url, options.chatToken ?? chatConfig?.token);
   const identities = new WeakMap<FastifyRequest, SessionIdentity>();
   for (const [namespace, spec] of [["agents", agentsSpec], ["matching", engineSpec]] as const) {
     for (const [name, value] of Object.entries(spec.components.schemas)) {
@@ -70,7 +156,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
   for (const [path, methods] of Object.entries(agentsSpec.paths)) {
     if (!path.startsWith("/internal/")) continue;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
+      if (!employerAgentOperations.has(`${method.toUpperCase()} ${path}`)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
         responses: Record<string, { content?: { "application/json"?: { schema: Schema } } }> };
@@ -149,6 +235,53 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
       }
     });
   }
+  app.delete<{ Reply: { deleted: true } | { detail: string } }>("/employer/account", {
+    schema: { tags: ["employer-account"], security: [{ bearerAuth: [] }, { employerSession: [] }],
+      response: { 200: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } } } },
+    onRequest: guard("employer"),
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity || !agentsToken || !matchingToken) return reply.code(503).send({ detail: "account_deletion_unavailable" });
+    try {
+      // Stop source workers first; a permanent owner fence also rejects delayed writes.
+      for (const service of [{ url: agentsUrl, token: agentsToken }, { url: matchingUrl, token: matchingToken }]) {
+        const result = await transport(new URL(`/internal/employers/${identity.accountId}`, service.url), {
+          method: "DELETE", headers: { "x-internal-token": service.token, "x-owner-id": identity.accountId },
+          signal: AbortSignal.timeout(10000), redirect: "error",
+        });
+        if (!result.ok) return reply.code(503).send({ detail: "account_deletion_unavailable" });
+      }
+      if (!await store.deleteEmployerAccount(identity.accountId, purge)) return reply.code(401).send({ detail: "unauthenticated" });
+      reply.clearCookie(cookieName("employer", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
+      return reply.header("cache-control", "no-store").send({ deleted: true });
+    } catch { return reply.code(503).send({ detail: "account_deletion_unavailable" }); }
+  });
+  app.delete<{ Reply: { deleted: true } | { detail: string } }>("/candidate/account", {
+    schema: { tags: ["candidate-account"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
+      response: { 200: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } } } },
+    onRequest: guard("candidate"),
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity || !matchingToken) return reply.code(503).send({ detail: "matching_unavailable" });
+    try {
+      const result = await transport(new URL(`/internal/candidates/${identity.accountId}`, matchingUrl), {
+        method: "DELETE", headers: { "x-internal-token": matchingToken },
+        signal: AbortSignal.timeout(10000), redirect: "error",
+      });
+      if (!result.ok) return reply.code(503).send({ detail: "matching_deletion_unavailable" });
+      if (!testingToken) return reply.code(503).send({ detail: "testing_deletion_unavailable" });
+      const testingResult = await transport(new URL(`/internal/candidates/${identity.accountId}`, testingUrl), {
+        method: "DELETE", headers: { "x-internal-token": testingToken },
+        signal: AbortSignal.timeout(10000), redirect: "error",
+      });
+      if (!testingResult.ok) return reply.code(503).send({ detail: "testing_deletion_unavailable" });
+      if (!await store.deleteCandidateAccount(identity.accountId, purge)) return reply.code(401).send({ detail: "unauthenticated" });
+      reply.clearCookie(cookieName("candidate", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
+      return reply.header("cache-control", "no-store").send({ deleted: true });
+    } catch {
+      return reply.code(503).send({ detail: "account_deletion_unavailable" });
+    }
+  });
   app.get<{ Reply: unknown }>("/candidate/taxonomy", {
     schema: { tags: ["candidate-profile"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
       response: { 200: { $ref: "urn:comit:public:matching:StrictSchema" } } }, onRequest: guard("candidate"),
@@ -180,7 +313,7 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
     if (!match) continue;
     const suffix = match[1]!;
     for (const [method, raw] of Object.entries(methods)) {
-      if (!["get", "post"].includes(method)) continue;
+      if (!employerMatchingOperations.has(`${method.toUpperCase()} ${path}`)) continue;
       const operation = raw as { parameters?: Array<{ name: string; in: string; schema: Schema }>;
         requestBody?: { content: { "application/json": { schema: Schema } } };
         responses: { "200"?: { content?: { "application/json"?: { schema: Schema } } } } };

@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [dev, main]
+    branches: [dev, main, fix/pre-release]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -25,13 +25,16 @@ jobs:
         run: pnpm -r typecheck
       - name: Build
         run: pnpm -r build
+      - name: API reference matches all registered operations
+        run: pnpm --filter @comit/api exec tsx scripts/generate-api-reference.ts --check
       - name: Shared package production runtime
         run: node --test apps/api/tests/runtime-shared.test.mjs
       - name: Existing frontend regression tests
         run: |
+          pnpm --filter @comit/web-testing test
           pnpm --filter @comit/ui-kit test
           pnpm --filter @comit/web-employer test
-          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts
+          pnpm --filter @comit/web-employer exec tsx --test ../candidate/tests/testing-activity.test.ts ../candidate/tests/testing-launch.test.ts ../candidate/tests/resume-import-model.test.ts ../candidate/tests/github-verification.test.ts ../candidate/tests/plural.test.ts
 
   python:
     name: Python services tests
@@ -40,6 +43,8 @@ jobs:
       image: python:3.12-bookworm
     steps:
       - uses: actions/checkout@v5
+      - name: Install local OCR runtime
+        run: apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-rus
       - name: Install services with dev deps
         run: |
           pip install --no-cache-dir \
@@ -47,12 +52,15 @@ jobs:
             -e "./services/testing-engine[dev]" \
             -e "./services/integration-engine[dev]" \
             -e "./services/agents-service[dev]" \
-            -e "./services/verification-engine[dev]"
+            -e "./services/verification-engine[dev]" \
+            -e "./services/code-judge[dev]"
+      - name: Demo catalog contracts
+        run: python -m pytest tests/fixtures/test_demo_catalog.py -q
       - name: Coverage gate regression tests
         run: python -m unittest discover -s tests/coverage-gates -p "test_*.py"
       - name: Unit coverage (database skips are reported, no full coverage claim)
         run: |
-          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine code-judge; do
             python tests/coverage-gates/python.py "$service" --unit || exit $?
           done
       - uses: actions/upload-artifact@v4
@@ -61,6 +69,49 @@ jobs:
           name: python-unit-coverage
           path: coverage/unit/
 
+
+  code-judge-isolation:
+    name: Code judge isolation (disposable runner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CODE_JUDGE_IMAGE: python:3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1
+      CODE_JUDGE_DOCKER_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install isolated judge tests
+        run: pip install -e './services/code-judge[dev]'
+      - name: Validate production, dev and actual smoke Compose configuration
+        run: python tests/compose-config.py
+      - name: Public CD response and deployment contract regressions
+        run: python tests/public-smoke.py && python tests/deploy-config.py
+      - name: Preload immutable sandbox image
+        run: docker pull "$CODE_JUDGE_IMAGE"
+      - name: Verify real sandbox constraints and hostile synthetic submissions
+        run: python -m pytest services/code-judge/tests/test_docker_acceptance.py -q
+      - name: Build and verify authenticated broker image
+        env:
+          CODE_JUDGE_TOKEN: synthetic-ephemeral-ci-judge-token
+          CODE_JUDGE_URL: http://127.0.0.1:8106
+        run: |
+          docker build -t comit-code-judge-ci -f infra/code-judge.Dockerfile .
+          docker run -d --name comit-judge-ci --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            -e CODE_JUDGE_TOKEN -e CODE_JUDGE_IMAGE \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -p 127.0.0.1:8106:8106 comit-code-judge-ci
+          trap 'docker rm -f comit-judge-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$CODE_JUDGE_URL/healthz" >/dev/null; then break; fi
+            sleep 1
+          done
+          python services/code-judge/scripts/acceptance.py
 
   regression:
     name: Python regression suite (PostgreSQL)
@@ -86,6 +137,8 @@ jobs:
       COVERAGE_TEST_DATABASE_URL: postgresql://comit:comit-regression@postgres:5432/coverage_test
     steps:
       - uses: actions/checkout@v5
+      - name: Install local OCR runtime
+        run: apt-get update && apt-get install -y --no-install-recommends poppler-utils tesseract-ocr tesseract-ocr-rus
       - name: Install services with dev deps
         run: |
           pip install --no-cache-dir \
@@ -93,10 +146,11 @@ jobs:
             -e "./services/testing-engine[dev]" \
             -e "./services/integration-engine[dev]" \
             -e "./services/agents-service[dev]" \
-            -e "./services/verification-engine[dev]"
+            -e "./services/verification-engine[dev]" \
+            -e "./services/code-judge[dev]"
       - name: Full backend tests and per-package coverage gates
         run: |
-          for service in matching-engine testing-engine integration-engine agents-service verification-engine; do
+          for service in matching-engine testing-engine integration-engine agents-service verification-engine code-judge; do
             python tests/coverage-gates/python.py "$service" || exit $?
           done
       - uses: actions/upload-artifact@v4
@@ -137,10 +191,12 @@ jobs:
       - name: Install agents schema migration dependency
         run: |
           python -m venv /tmp/coverage-schema
-          /tmp/coverage-schema/bin/pip install -e ./services/agents-service
+          /tmp/coverage-schema/bin/pip install -e ./services/agents-service -e ./services/testing-engine -e ./services/integration-engine
       - name: Run API tests and coverage gate
         env:
           COVERAGE_SCHEMA_PYTHON: /tmp/coverage-schema/bin/python
+          TESTING_ENGINE_TEST_PYTHON: /tmp/coverage-schema/bin/python
+          TESTING_BROWSER_TEST_DATABASE_URL: postgresql://comit:comit-coverage@postgres:5432/coverage_test
         run: pnpm coverage:api
       - uses: actions/upload-artifact@v4
         if: always()
@@ -167,6 +223,12 @@ jobs:
       VERIFICATION_PORT: 38105
       POSTGRES_PORT: 38432
       SMOKE_MODE: dev
+      # Generic smoke exercises the unavailable boundary. Real execution is
+      # covered by code-judge-isolation on its disposable GitHub runner.
+      CODE_JUDGE_URL: http://127.0.0.1:1
+      CODE_JUDGE_TOKEN: synthetic-ci-unavailable-judge-token
+      TESTING_ENGINE_TOKEN: synthetic-ci-testing-token
+      TESTING_RECORDING_MODE: 'off'
       AUTH_ALLOWED_ORIGINS: http://localhost:38088
       PUBLIC_SITE_URL: http://localhost:38088
       FSP_DEMO_CALLBACK_URL: http://localhost:38088/api/candidate/profile/fsp/demo/callback
@@ -202,6 +264,45 @@ jobs:
         run: docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev up -d --wait --wait-timeout 180
       - name: Run smoke gate
         run: ./tests/smoke.sh
+      - name: Verify unavailable code judge stays fail-closed
+        run: |
+          docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev exec -T testing-engine python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          base = 'http://127.0.0.1:8102'
+          headers = {'content-type': 'application/json',
+                     'x-internal-token': os.environ['TESTING_ENGINE_TOKEN'],
+                     'x-candidate-id': 'synthetic-ci-unavailable-judge-owner'}
+          def request(path, body=None):
+              call = urllib.request.Request(base + path, headers=headers,
+                  data=json.dumps(body).encode() if body is not None else None)
+              try:
+                  with urllib.request.urlopen(call, timeout=20) as response:
+                      return response.status, json.loads(response.read())
+              except urllib.error.HTTPError as error:
+                  return error.code, json.loads(error.read())
+
+          for specialization in ('python', 'algorithms'):
+              path = '/testing/preflight?specialization=' + specialization
+              status, before = request(path)
+              assert status == 200 and before['eligible'] is False
+              assert before['judges']['code_required'] is True
+              assert before['judges']['code_ready'] is False
+              assert before['unavailable_reason'] == 'code_judge_unavailable'
+              assert 'code' not in before['supported_question_types']
+              status, result = request('/testing/sessions', {
+                  'specialization': specialization,
+                  'consents': {'processing': True, 'screen_recording': False,
+                               'version': 'testing-media-v1'}})
+              assert status == 503 and result['detail'] == 'code_judge_unavailable'
+              status, after = request(path)
+              assert status == 200 and after['active_session_id'] is None
+              assert after['next_attempt_at'] is None
+          print('PASS: unavailable judge blocks both code subjects without consuming attempts')
+          PY
       - name: Tear down
         if: always()
         run: docker compose --env-file /dev/null -p comit-ci -f infra/docker-compose.dev.yml --profile dev down -v --remove-orphans

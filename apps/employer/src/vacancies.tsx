@@ -7,13 +7,18 @@ import type {
   AgentsDraftView,
   FeedCard,
   FeedPage,
+  Grade,
   SavedCard,
 } from "@comit/shared";
 import { api, asset, errorText, salary, useResource } from "./runtime";
 import { Action, Field, Icon, PageTitle, Reveal, Select, State } from "./ui";
 import { candidateName } from "./candidate-name";
+import { WeeklyActivity } from "./weekly-activity";
 import { domainChoices, featureLabel, softChoices, specializationLabel, stackChoices } from "./labels";
 import "./vacancies.css";
+import "./vacancy-suggestions.css";
+import { changedRequirements, descriptionLength, suggestVacancyRequirements } from "./vacancy-suggestions";
+import { estimatePlatformSalaryMarket, estimateSalaryMarket, salaryMarketSource } from "./salary-market";
 import { SkillRadar, gradeLabel } from "./skill-radar";
 import { useEmployerPreferences } from "./preferences";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
@@ -30,6 +35,7 @@ const classes = [
   "qa",
   "ml",
 ] as const;
+const marketGrades: Grade[] = ["intern", "junior", "middle", "senior"];
 const status = (draft: AgentsDraftView) =>
   draft.archived
     ? "В архиве"
@@ -236,6 +242,19 @@ export function VacancyEditor({
   const [to, setTo] = usePersistentState(`${formKey}to`,
     draft?.fields.zp_max == null ? "" : String(draft.fields.zp_max / 1000),
   );
+  const storedGrade = draft?.fields.metadata?.grade;
+  const [marketGrade, setMarketGrade] = usePersistentState<Grade | "">(`${formKey}marketGrade`,
+    typeof storedGrade === "string" && marketGrades.includes(storedGrade as Grade) ? storedGrade as Grade : "",
+    (value): value is Grade | "" => value === "" || marketGrades.includes(value as Grade),
+  );
+  const marketStacks = Object.keys(skills).filter(key => (skills[key] ?? 0) > 0).sort();
+  const marketStacksKey = marketStacks.join(",");
+  const marketData = useResource(() => marketGrade
+    ? api.getSalaryMarket({ specialization, grade: marketGrade, stacks: marketStacks })
+    : Promise.resolve(null), [specialization, marketGrade, marketStacksKey]);
+  const platformSalary = estimatePlatformSalaryMarket(marketData.data, from, to);
+  const externalSalary = estimateSalaryMarket(specialization, skills, from, to);
+  const marketSalary = platformSalary ?? externalSalary;
   const [city, setCity] = usePersistentState(`${formKey}city`, draft?.fields.city || "");
   const [work, setWork] = usePersistentState<"onsite" | "remote" | "hybrid">(`${formKey}work`,
     draft?.fields.type || "hybrid",
@@ -243,12 +262,18 @@ export function VacancyEditor({
   );
   const [daily, setDaily] = usePersistentState(`${formKey}daily`, draft?.fields.daily || "");
   const [bio, setBio] = usePersistentState(`${formKey}bio`, draft?.fields.bio || "");
+  // The unsaved new form survives closing the dialog; remember the server draft its first check
+  // created, so checking again updates that draft instead of adding a duplicate to «Черновики».
+  const [createdId, setCreatedId] = usePersistentState(`${formKey}createdId`, "");
   const [busy, setBusy] = useState(false);
   const [creationUncertain, setCreationUncertain] = useState(false);
+  const [suggestionNote, setSuggestionNote] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const description = descriptionLength(bio);
   const saveLock = useRef(false);
+  const manuallyEditedRequirements = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [published, setPublished] = useState(false);
   const completion = Math.round(
     ([title, from, to, city, daily, bio].filter((value) => value.trim())
       .length /
@@ -262,43 +287,6 @@ export function VacancyEditor({
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [busy, onClose]);
-  useEffect(() => {
-    if (!published || !current) return;
-    let active = true;
-    const poll = async () => {
-      try {
-        await api.getVacancyReady(current.draft_id);
-        if (active) {
-          onSaved(current);
-          onClose();
-          clearDraft(formKey);
-        }
-      } catch {
-        if (active) {
-          try {
-            const next = await api.getVacancy(current.draft_id);
-            if (active) {
-              setCurrent(next);
-              if (next.state === "failed") {
-                setPublished(false);
-                setError(
-                  "Публикация не завершилась. Обновите вакансию и повторите подтверждение.",
-                );
-              }
-            }
-          } catch (reason) {
-            if (active) setError(errorText(reason));
-          }
-        }
-      }
-    };
-    void poll();
-    const timer = setInterval(() => void poll(), 2500);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [published, current?.draft_id, onSaved, onClose]);
   /** Persist the actual three skill maps with the current CAS revision; approval is separate. */
   async function persistFields(): Promise<AgentsDraftView> {
     const min = Number(from) * 1000, max = Number(to) * 1000;
@@ -306,19 +294,28 @@ export function VacancyEditor({
       !Number.isSafeInteger(max) || min < 0 || max < min)
       throw new Error("Проверьте зарплатную вилку: от и до в тысячах рублей.");
     const fields: AgentsDraftFields_Input = {
-      title: title.trim(), class: specialization, stacks: skills,
-      domens: domains, soft_skills: softSkills,
+      title: title.trim(), class: specialization,
+      ...changedRequirements(current, { stacks: skills, domens: domains, soft_skills: softSkills }, manuallyEditedRequirements.current),
       zp_min: min, zp_max: max, city: city.trim(), daily: daily.trim(),
-      type: work, bio: bio.trim(),
+      type: work, bio: bio.trim(), metadata: { ...(current?.fields.metadata ?? {}), grade: marketGrade || null },
     };
     let saved: AgentsDraftView;
     if (current) {
       saved = await api.patchVacancy(current.draft_id, {
         expected_revision: current.revision, fields,
       });
+    } else if (createdId) {
+      // The server identity survives closing this form. A failed read must never create another draft.
+      const reusable = await api.getVacancy(createdId);
+      if (reusable.archived || (reusable.business_status ?? "draft") !== "draft" ||
+        (reusable.state !== "editing" && reusable.state !== "summary")) {
+        throw new Error("Этот черновик уже изменён. Откройте его из списка вакансий.");
+      }
+      saved = await api.patchVacancy(reusable.draft_id, { expected_revision: reusable.revision, fields });
     } else {
       try {
         saved = await api.createVacancy({ fields });
+        setCreatedId(saved.draft_id);
       } catch (reason) {
         // Creation has no idempotency contract: an ambiguous response must never create a duplicate.
         if (!(reason instanceof ApiError) || reason.status >= 500) {
@@ -351,7 +348,17 @@ export function VacancyEditor({
     setError(null);
     try {
       const saved = await persistFields();
-      const approved = await api.approveVacancy(saved.draft_id, saved.revision);
+      setSuggesting(true);
+      setSuggestionNote(null);
+      const result = await suggestVacancyRequirements(api, saved);
+      setCurrent(result.draft);
+      setSkills(selectedRequirements(result.draft.fields.stacks));
+      setDomains(selectedRequirements(result.draft.fields.domens));
+      setSoftSkills(selectedRequirements(result.draft.fields.soft_skills));
+      setSuggestionNote(result.suggested
+        ? "Требования предложены по описанию. Проверьте уровни во вкладках Стек, Хард и Софт. Ваши правки сохранены."
+        : "Автоподбор требований пока недоступен. Укажите навыки и уровни во вкладках Стек, Хард и Софт вручную.");
+      const approved = await api.approveVacancy(result.draft.draft_id, result.draft.revision);
       setCurrent(approved);
       setReviewDirty(false);
       setReviewTab("info");
@@ -361,6 +368,7 @@ export function VacancyEditor({
     } finally {
       saveLock.current = false;
       setBusy(false);
+      setSuggesting(false);
     }
   };
   async function keepDraft() {
@@ -397,8 +405,9 @@ export function VacancyEditor({
         expected_revision: approved.revision,
         summary_hash: approved.summary.summary_hash,
       });
-      setCurrent(result);
-      setPublished(true);
+      onSaved(result);
+      clearDraft(formKey);
+      onClose();
     } catch (reason) {
       showSaveError(reason);
     } finally {
@@ -432,6 +441,10 @@ export function VacancyEditor({
         initial={{ scale: 0.94, y: 25 }}
         animate={{ scale: 1, y: 0 }}
       >
+        {/* Explicit close: on phones the dialog covers the screen, so there is no backdrop to tap. */}
+        <Action className="circle modal-close" disabled={busy} onClick={onClose} aria-label="Закрыть">
+          <Icon name="close" />
+        </Action>
         {confirm ? (
           <>
             <div className="vacancy-review-tabs" role="tablist" aria-label="Проверка вакансии"
@@ -440,7 +453,7 @@ export function VacancyEditor({
                 const next = event.key === "ArrowRight" ? (index + 1) % 4
                   : event.key === "ArrowLeft" ? (index + 3) % 4
                     : event.key === "Home" ? 0 : event.key === "End" ? 3 : null;
-                if (next == null || busy || published) return;
+                if (next == null || busy) return;
                 event.preventDefault();
                 const tab = reviewTabs[next];
                 if (!tab) return;
@@ -452,11 +465,12 @@ export function VacancyEditor({
                   id={`vacancy-tab-${tab.id}`} aria-controls={`vacancy-panel-${tab.id}`}
                   aria-selected={reviewTab === tab.id} tabIndex={reviewTab === tab.id ? 0 : -1}
                   className={reviewTab === tab.id ? "active" : ""}
-                  disabled={busy || published} onClick={() => setReviewTab(tab.id)}>
+                  disabled={busy} onClick={() => setReviewTab(tab.id)}>
                   {tab.label}
                 </button>
               ))}
             </div>
+            {suggestionNote && <p className="vacancy-suggestion-note" role="status">{suggestionNote}</p>}
             <div className="vacancy-review-panels">
               <motion.div className="vacancy-review-panel vacancy-info"
                 id="vacancy-panel-info" role="tabpanel" aria-labelledby="vacancy-tab-info"
@@ -473,19 +487,13 @@ export function VacancyEditor({
                   <div><dt>Описание проекта</dt><dd>{current?.summary?.fields.bio || "Не указано"}</dd></div>
                 </dl>
                 {error && <p role="alert" className="form-error">{error}</p>}
-            {published ? (
-              <div role="status" className="inline-notice">
-                Подготавливаем подбор кандидатов. После готовности окно закроется.
-              </div>
-            ) : (
-              <div className="vacancy-review-actions">
-                <Action className="glass-surface" onClick={() => setConfirm(false)} disabled={busy}>Назад</Action>
-                <Action className="glass-surface" onClick={() => void keepDraft()} disabled={busy}>Черновик</Action>
-                <Action className="review-publish" variant="light" disabled={busy || !current || (!current.summary && !reviewDirty)} onClick={() => void publish()}>
-                  {busy ? "Сохраняем…" : "Подтвердить и опубликовать"}
-                </Action>
-              </div>
-            )}
+                <div className="vacancy-review-actions">
+                  <Action className="glass-surface" onClick={() => setConfirm(false)} disabled={busy}>Назад</Action>
+                  <Action className="glass-surface" onClick={() => void keepDraft()} disabled={busy}>Черновик</Action>
+                  <Action className="review-publish" variant="light" disabled={busy || !current || (!current.summary && !reviewDirty)} onClick={() => void publish()}>
+                    {busy ? "Сохраняем…" : "Подтвердить и опубликовать"}
+                  </Action>
+                </div>
               </motion.div>
               {requirementPanels.map((panel) => {
                 const label = (key: string) => panel.choices.find(([value]) => value === key)?.[1] || key;
@@ -499,22 +507,25 @@ export function VacancyEditor({
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
                     transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
                         if (chosen === undefined) return;
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => ({ ...values, [key]: chosen }));
                         setReviewDirty(true);
                       }}
                       onRemove={(key) => {
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => { const next = { ...values }; delete next[key]; return next; });
                         setReviewDirty(true);
                       }}>
-                    <Select className="radar-add" triggerIcon="plus" placement="right" aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy || published}
+                    <Select className="radar-add" triggerIcon="plus" placement="right" aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy}
                       onChange={(event) => {
                         const choice = panel.choices.find(([key]) => key === event.target.value);
                         if (!choice) return;
+                        manuallyEditedRequirements.current.add(panel.id);
                         panel.setValues((values) => ({ ...values, [choice[0]]: 4 }));
                         setReviewDirty(true);
                       }}>
@@ -592,6 +603,18 @@ export function VacancyEditor({
                     <Icon name="chevron" />
                   </Action>
                 </div>
+                <Field label="Грейд для сравнения зарплаты">
+                  <Select aria-label="Грейд для сравнения зарплаты" value={marketGrade} onChange={event => {
+                    const value = event.target.value;
+                    if (value === "" || marketGrades.includes(value as Grade)) setMarketGrade(value as Grade | "");
+                  }}>
+                    <option value="">Выберите грейд</option>
+                    <option value="intern">Стажёр</option>
+                    <option value="junior">Junior</option>
+                    <option value="middle">Middle</option>
+                    <option value="senior">Senior</option>
+                  </Select>
+                </Field>
                 <AnimatePresence initial={false}>
                 {skillsOpen && (
                   <motion.div className="vacancy-skill-section" initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3 }}>
@@ -604,8 +627,10 @@ export function VacancyEditor({
                         const choice = stackChoices.find(
                           ([key]) => key === event.target.value,
                         );
-                        if (choice)
+                        if (choice) {
+                          manuallyEditedRequirements.current.add("stacks");
                           setSkills((value) => ({ ...value, [choice[0]]: 4 }));
+                        }
                       }}
                     >
                       <option value="" hidden>Добавить навык</option>
@@ -627,11 +652,13 @@ export function VacancyEditor({
                               const chosen = skillLevels.find(
                                 (value) => String(value) === event.target.value,
                               );
-                              if (chosen !== undefined)
+                              if (chosen !== undefined) {
+                                manuallyEditedRequirements.current.add("stacks");
                                 setSkills((value) => ({
                                   ...value,
                                   [key]: chosen,
                                 }));
+                              }
                             }}
                           >
                             {skillLevels.map((value) => (
@@ -647,6 +674,7 @@ export function VacancyEditor({
                           aria-label={`Удалить навык ${skillLabel(key)}`}
                           onClick={() =>
                             setSkills((value) => {
+                              manuallyEditedRequirements.current.add("stacks");
                               const next = { ...value };
                               delete next[key];
                               return next;
@@ -685,6 +713,17 @@ export function VacancyEditor({
                     />
                   </Field>
                 </div>
+                {marketGrade && marketData.loading && <p className="vacancy-salary-hint" role="status">Считаем среднее по активным опубликованным вакансиям Comit…</p>}
+                {(!marketGrade || !marketData.loading) && marketSalary && <div className="vacancy-salary-hint" role="status">
+                    <div><strong>{marketSalary.label}</strong> · середина вилки {marketSalary.deviationPercent > 0 ? "+" : ""}{marketSalary.deviationPercent}% к среднему</div>
+                    {platformSalary
+                      ? <small>Среднее ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес по {marketData.data?.sample_count} активным опубликованным вакансиям Comit с тем же направлением и грейдом{marketStacks.length ? " и всеми выбранными технологиями" : ""}. Сравнение ведётся по серединам вилок; «средняя по рынку» — ±20% от среднего.</small>
+                      : <small>Среднее ≈ {Math.round(marketSalary.referenceRub / 1000)} тыс ₽/мес — внешний ориентир Хабр Карьеры, I полугодие 2026. {marketGrade
+                        ? `На платформе пока недостаточно сопоставимых вакансий${marketData.error ? " или сервис временно недоступен" : ` (${marketData.data?.sample_count ?? 0} из 3 минимум)`}.`
+                        : "Выберите грейд, чтобы получить среднее Comit; этот ориентир учитывает все грейды."} Внешняя оценка учитывает направление и отдельные языки, но не совместное сочетание стека и не регион. <a href={salaryMarketSource} target="_blank" rel="noopener noreferrer">Источник</a>. Сравнение — по серединам вилок, окно «средняя по рынку» ±20%.</small>}
+                  </div>}
+                {marketGrade && !marketData.loading && !marketSalary && <p className="vacancy-salary-hint" role="status">Нет сопоставимых вакансий на платформе и внешнего ориентира для этого направления.</p>}
+                {!marketGrade && !externalSalary && <p className="vacancy-salary-hint" role="status">Выберите грейд для среднего Comit; для этого направления нет внешнего ориентира.</p>}
                 <input
                   aria-label="Город"
                   placeholder="Город"
@@ -716,11 +755,16 @@ export function VacancyEditor({
                 </div>
                 <textarea
                   aria-label="Описание проекта"
+                  aria-describedby="vacancy-description-length"
+                  maxLength={12000}
                   placeholder="Описание проекта"
                   value={bio}
                   onChange={(event) => setBio(event.target.value)}
                   required
                 />
+                <p id="vacancy-description-length" className="vacancy-description-hint" data-tone={description.tone}>
+                  {description.label}
+                </p>
               </fieldset>
               <Action
                 variant="light"
@@ -728,7 +772,7 @@ export function VacancyEditor({
                 disabled={busy || creationUncertain}
                 className="full-width"
               >
-                {busy ? "Проверяем…" : "Проверить вакансию"}
+                {suggesting ? "Подбираем требования…" : busy ? "Сохраняем…" : "Проверить вакансию"}
               </Action>
             </form>
           </>
@@ -988,7 +1032,7 @@ function CandidateDeck({
         <div className={`candidate-stack-card deck-tone-${(index + 1) % 3} stack-near`} style={{ transform: `rotate(${(index + 1) % 2 ? -12 : 9}deg)` }} aria-hidden="true" />
         <motion.div
           key={card.exposure_id}
-          className={`candidate-swipe deck-tone-${index % 3}`}
+          className={`candidate-swipe glass-classic deck-tone-${index % 3}`}
           animate={controls}
           drag={!pending}
           dragMomentum={false}
@@ -1003,7 +1047,7 @@ function CandidateDeck({
             if (bounds) void decide(info.point.x >= bounds.left + bounds.width / 2 ? "like" : "dislike");
           }}
         >
-          <h2>{candidateName(card.display_name)}</h2>
+          <h2>{candidateName(card.display_name)}<WeeklyActivity expiresAt={card.weekly_activity_expires_at} /></h2>
           <div className="tags">
             <span className="tag">{specializationLabel(card.category.specialization)}</span>
             {card.explanation.top_matched_features
@@ -1038,7 +1082,7 @@ function CandidateDeck({
             {card.city} · {salary(card.salary.from_rub, card.salary.to_rub)}
           </div>
           <div className="candidate-description">
-            Рейтинг подбора: {card.explanation.score.toFixed(3)} · ранг{" "}
+            Совпадение {Math.round(Math.max(0, Math.min(1, card.explanation.score)) * 100)}% · место в подборке{" "}
             {card.rank}
           </div>
           <div className="candidate-controls" onPointerDown={(event) => event.stopPropagation()}>

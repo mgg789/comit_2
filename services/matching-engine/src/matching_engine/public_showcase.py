@@ -10,12 +10,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import Field
 
 from matching_engine.database import connect
-from matching_engine.models import Category, Contract, Direction, Grade, SalaryRange
+from matching_engine.models import Category, Contract, Direction, Grade, CandidateSalary
 from matching_engine.page_cursor import decode_cursor, encode_cursor
 from matching_engine.showcase_models import SearchRequest
-from matching_engine.showcase_store import _FTS, _SOURCE, _filter_sql
+from matching_engine.showcase_store import _SOURCE, _filter_sql
 from matching_engine.vacancy_models import VacancyReadyPage
 from matching_engine.vacancy_store import VacancyStore
+
+# Search exactly card-visible values. Full public_profile includes employer-only
+# biography, projects and verification data that must not become a search oracle.
+# Names (including generated Candidate UUID aliases) are hidden on anonymous cards.
+_CATALOGUE_FTS = """to_tsvector('russian', concat_ws(' ',
+    public_profile->>'city', specialization, grade,
+    (SELECT string_agg(skill->>'key', ' ') FROM jsonb_array_elements(
+        COALESCE(public_profile->'stacks','[]'::jsonb)) skill
+        WHERE skill->>'status' IS DISTINCT FROM 'rejected')))"""
 
 
 class CatalogueCandidate(Contract):
@@ -24,7 +33,7 @@ class CatalogueCandidate(Contract):
     profile_revision: int = Field(ge=1)
     display_name: str
     city: str
-    salary: SalaryRange
+    salary: CandidateSalary
     category: Category
     stacks: list[str]
     published_at: datetime
@@ -69,7 +78,7 @@ class PublicShowcaseStore:
                 filters["groups"] = {"stacks": [{"key": query.stack}]}
             where, params = _filter_sql(SearchRequest(filters=filters))
             if query_text:
-                where += f" AND {_FTS} @@ websearch_to_tsquery('russian',%s)"
+                where += f" AND {_CATALOGUE_FTS} @@ websearch_to_tsquery('russian',%s)"
                 params.append(query_text)
             id_column = "candidate_id"
         else:

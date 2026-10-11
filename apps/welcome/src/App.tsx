@@ -30,6 +30,7 @@ function Landing() {
             </article>
           ))}
         </nav>
+        <a className="welcome-help-link" href="/help/">Как пользоваться Comit</a>
       </div>
     </main>
   );

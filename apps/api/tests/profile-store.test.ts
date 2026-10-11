@@ -1,3 +1,4 @@
+import { fixtureSkillCatalog } from "./helpers/skill-catalog.js";
 /** Source-profile CAS, evidence and transactional outbox checks. */
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -22,16 +23,16 @@ test("candidate source profile CAS preserves unchanged evidence and queues exact
     await migrate(pool);
     await pool.query("TRUNCATE candidate_profile_outbox, candidate_profile_evidence, candidate_profiles, accounts CASCADE");
     await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "candidate-profile@example.test"]);
-    const store = new CandidateProfileStore(pool);
+    const store = new CandidateProfileStore(pool, fixtureSkillCatalog);
     const first = await store.save(candidateId, {
       expected_revision: 0,
-      fields: { city: "Москва", domains: [{ key: "python", level: 4 }] },
+      fields: { city: "Москва", domains: [{ key: "sql", level: 4 }] },
     });
     assert.equal(first.revision, 1);
     assert.equal(first.projection.state, "queued");
     await pool.query(
       `UPDATE candidate_profile_evidence SET status='confirmed', verified_value='4'::jsonb, provenance='["test"]'::jsonb
-        WHERE candidate_id=$1 AND evidence_key='domains:python'`, [candidateId],
+        WHERE candidate_id=$1 AND evidence_key='domains:sql'`, [candidateId],
     );
     const second = await store.save(candidateId, {
       expected_revision: 1,
@@ -39,7 +40,7 @@ test("candidate source profile CAS preserves unchanged evidence and queues exact
       consent: { processing: true, pool: true, version: "profile-v1" },
     });
     assert.equal(second.revision, 2);
-    assert.equal(second.evidence["domains:python"]?.status, "confirmed");
+    assert.equal(second.evidence["domains:sql"]?.status, "confirmed");
     assert.equal(second.projection.source_revision, 2);
     assert.equal((await pool.query("SELECT count(*) FROM candidate_profile_outbox WHERE candidate_id=$1 AND state='obsolete'", [candidateId])).rows[0]?.count, "1");
     const payload = (await pool.query("SELECT payload FROM candidate_profile_outbox WHERE candidate_id=$1 AND source_revision=2", [candidateId])).rows[0]?.payload;
@@ -59,12 +60,12 @@ test("candidate source profile CAS preserves unchanged evidence and queues exact
     await assert.rejects(() => store.save(candidateId, { expected_revision: 2, fields: { salary: { from_rub: 10, to_rub: 1 } } }),
       (error: unknown) => error instanceof ProfileError && error.code === "invalid_salary");
     const third = await store.save(candidateId, { expected_revision: 2, fields: {
-      domains: [{ key: "python", level: 5 }], declared_grade: "middle", primary_direction: "backend",
+      domains: [{ key: "sql", level: 5 }], declared_grade: "middle", primary_direction: "backend",
       projects: [{ title: "Synthetic project", facts: { duration_months: 12, role: "developer" } }],
     } });
-    assert.equal(third.evidence["domains:python"]?.status, "self_reported");
-    assert.equal(third.evidence["domains:python"]?.verified_value, null);
-    assert.deepEqual(third.evidence["domains:python"]?.provenance, []);
+    assert.equal(third.evidence["domains:sql"]?.status, "self_reported");
+    assert.equal(third.evidence["domains:sql"]?.verified_value, null);
+    assert.deepEqual(third.evidence["domains:sql"]?.provenance, []);
     const projectId = third.fields.projects?.[0]?.id;
     assert.ok(projectId);
     const nextLease = await store.claimProjection();
@@ -93,7 +94,7 @@ test("training consent is optional, versioned, preserved on field edits and inde
     await migrate(pool);
     await pool.query("TRUNCATE candidate_profiles, accounts CASCADE");
     await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "training-consent@example.test"]);
-    const store = new CandidateProfileStore(pool);
+    const store = new CandidateProfileStore(pool, fixtureSkillCatalog);
     let view = await store.save(candidateId, { expected_revision: 0, fields: {}, consent: { processing: true, pool: true, version: "profile-v1" } });
     assert.equal(view.consents.training, false);
     assert.equal(view.consents.training_accepted_at, null);
@@ -139,7 +140,7 @@ test("demo FSP state is candidate-bound, one-time and bulk imports achievements"
     await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [candidateId, "fsp-demo@example.test"]);
     const otherCandidate = "00000000-0000-4000-8000-000000000002";
     await pool.query("INSERT INTO accounts(id,email,role,email_verified) VALUES ($1,$2,'candidate',true)", [otherCandidate, "fsp-other@example.test"]);
-    const store = new CandidateProfileStore(pool);
+    const store = new CandidateProfileStore(pool, fixtureSkillCatalog);
     const initial = await store.save(candidateId, {
       expected_revision: 0, fields: { achievements: [{ title: "Existing", description: "Keep" }] },
       consent: { processing: true, pool: true, version: "profile-v1" },

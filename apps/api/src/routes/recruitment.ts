@@ -1,6 +1,6 @@
 /** Participant-authenticated post-selection endpoints; chat routes share this domain's invitation grants. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AccountRole, AgentsDraftView, FeedCard, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard, RecruitmentView, RecruitmentPage } from "@comit/shared";
+import type { AccountRole, AgentsDraftView, FeedCard, DirectContactRequest, InviteRequest, RecruitmentAction, RejectSavedRequest, SavedCard, RecruitmentView, RecruitmentPage } from "@comit/shared";
 import type { EmployerProfileStore } from "../employers/store.js";
 import { enrichRecruitmentUnread } from "../chat/unread.js";
 import { chatConfiguration } from "./chat.js";
@@ -9,7 +9,7 @@ import { correlatedFetch } from "../operations/index.js";
 import type { AccountGatewayOptions } from "./accounts.js";
 import { RecruitmentError, recruitmentFingerprint, type RecruitmentStore } from "../recruitment/store.js";
 import {
-  contactsSchema, invitationBodySchema, recruitmentActionSchema, recruitmentEventPageSchema,
+  directContactBodySchema, contactsSchema, invitationBodySchema, recruitmentActionSchema, recruitmentEventPageSchema,
   recruitmentPageSchema, recruitmentViewSchema, rejectSavedBodySchema,
 } from "../recruitment/schemas.js";
 
@@ -88,6 +88,17 @@ export async function recruitmentRoutes(app: FastifyInstance, options: Recruitme
     if (saved.candidate_id !== candidateId || saved.vacancy_id !== vacancyId) return invalid(409, "saved_candidate_mismatch");
     return saved;
   };
+
+  app.post<{ Body: DirectContactRequest }>("/employer/contacts", {
+    schema: { tags: ["recruitment"], security: security("employer"), body: directContactBodySchema, response: {200: recruitmentViewSchema} }, onRequest: guard("employer"),
+  }, (request, reply) => safely(reply, async () => {
+    const owner = actor(request);
+    const prior = await options.recruitment.receipt(owner, request.body.idempotency_key, recruitmentFingerprint("contact", request.body));
+    if (prior) return prior;
+    const company = await options.employerProfiles?.get(owner);
+    if (!company?.company_name) return invalid(409, "employer_company_required");
+    return options.recruitment.startContact(owner, request.body, company.company_name);
+  }));
 
   app.post<{ Params: { draft_id: string }; Body: InviteRequest }>("/employer/vacancy-drafts/:draft_id/invitations", {
     schema: { tags: ["recruitment"], security: security("employer"), params: draftParams, body: invitationBodySchema, response: { 200: recruitmentViewSchema } },

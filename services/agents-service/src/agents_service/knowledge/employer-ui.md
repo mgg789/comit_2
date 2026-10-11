@@ -57,14 +57,14 @@ disabled with an explanation. QGramm attachments allow up to 8 MiB. Sending/uplo
 
 ## Statistics: `/statistics`
 
-Period filters use UTC. Charts show actual owner-scoped counts, current inventory, daily activity and independent recruitment stages. Empty data stays zero; no
+The statistics API uses UTC periods; the current UI has no statistics-period or vacancy filter controls. Charts show actual owner-scoped counts, current inventory, daily activity and independent recruitment stages. Empty data stays zero; no
 market-salary estimates are available. Stage totals are not a nested cohort-conversion funnel. A vacancy's statistics can be read separately by tool.
 
 ## Settings: `/settings`
 
 Account section shows real session data. Browser preferences control initial reasoning depth, Enter-to-send and reduced animation. AI budget shows real remaining/reserved
-usage and refresh. Security offers confirmation for exit from this session or all sessions. Account deletion is unavailable; Об удалении explains the missing coordinated
-backend contract instead of deleting anything. No separate company-profile endpoint, avatar upload, routing-policy selector or assistant-history deletion exists.
+usage and refresh. Company name is editable in settings and is saved through the employer-profile API with revision protection; invitations use this saved name. Security offers confirmation for exit from this session or all sessions. Account deletion is unavailable; Об удалении explains the missing coordinated
+backend contract instead of deleting anything. Avatar upload and routing-policy selection are unavailable. Assistant history can be cleared from the AI overlay after confirmation, only when no turn or active delegation is running; employer memory and documents remain separate.
 
 ## AI overlay, documents and tasks
 
@@ -76,11 +76,15 @@ force scroll-down.
 
 Up to three PDF/TXT/MD files can be selected for a message; each agent document is at most 5 MiB, 100 PDF pages and 200,000 extracted characters. Image-only PDF has no
 OCR. Removing a selected attachment unlinks it from the next message, not from storage. Upload works even when AI is disabled. File contents are untrusted; read in pages.
-Agent can create private Markdown reports in its vault, but generated files are not automatically shown as attachments on the assistant reply. Budget/provider failure is an unavailable state, never a simulated completion.
+Agent can create private Markdown reports in its vault. Generated document metadata from the tool result appears as a download button with the assistant reply after the turn ends. Download is owner-authorized; raw tool payloads and private reasoning remain hidden. Budget/provider failure is an unavailable state, never a simulated completion.
 
 Candidate-chat automation needs an explicit scoped task with permitted process IDs and lease. Inquiry/report tasks and employer-confirmed availability have dedicated
 tools. Stand-in requires explicit authorization and stops on return or revocation. Context is compressed current work; memory retains explicit employer facts but never
 grants authority by itself.
+
+Background delegation is saved before the assistant promises to work offline. Without employer-confirmed interview slots it asks the employer and waits without calling the model repeatedly. Scheduled/completed interviews count only if they match the supplied slot, timezone, duration, format, location and kind. A terminal AI failure creates a readable owner question; an ambiguous paid request is never silently repeated. Inquiry completion, the report and any pending question are stored atomically, and exact retries do not duplicate them.
+
+Pending employer questions appear in the AI overlay. Interview availability uses a structured form: start/end interval in the displayed browser timezone, duration, meeting kind, remote/onsite format and link/address. One interval can be submitted at a time; the task tool supports several confirmed intervals. Other task questions accept a written instruction. A failed submission preserves the draft so the employer can retry after resolving the error. Returning an answer resumes the saved task; it does not confirm that the interview is already scheduled.
 
 ## Assistant capability boundary
 

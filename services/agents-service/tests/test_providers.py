@@ -62,6 +62,50 @@ def test_deepseek_tools_real_wire_shape():
     assert provider.complete([], [{"type": "function"}])["choices"][0]["message"]["content"] == "ok"
 
 
+@pytest.mark.parametrize("failure", [httpx.ConnectError, httpx.ConnectTimeout])
+def test_deepseek_retries_one_connection_failure_before_request_delivery(failure):
+    """A transient connection failure can recover before the provider accepts any paid request."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        if len(calls) == 1:
+            raise failure("synthetic connection failure", request=request)
+        return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            "usage": {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}})
+
+    assert DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])["choices"]
+    assert len(calls) == 2
+    assert calls[0].content == calls[1].content
+
+
+@pytest.mark.parametrize("failure", [httpx.ReadTimeout, httpx.WriteError, httpx.RemoteProtocolError])
+def test_deepseek_never_retries_ambiguous_request_delivery(failure):
+    """A read/write failure may already be billable and must retain the runtime fence."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        raise failure("synthetic transport failure", request=request)
+
+    with pytest.raises(ProviderError):
+        DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])
+    assert len(calls) == 1
+
+
+def test_deepseek_connection_retry_is_bounded():
+    """Persistent connection failure stops after one safe retry."""
+    calls = []
+
+    def handle(request):
+        calls.append(request)
+        raise httpx.ConnectError("synthetic connection failure", request=request)
+
+    with pytest.raises(ProviderError, match="provider_unavailable"):
+        DeepSeekClient(token="synthetic", client=client(handle)).complete([], [])
+    assert len(calls) == 2
+
+
 def test_no_unapproved_provider_endpoint():
     with pytest.raises(ValueError):
         DeepSeekClient(base_url="https://elsewhere.invalid")
@@ -84,3 +128,25 @@ def test_laya_unconfigured_does_not_block_other_worker_jobs(monkeypatch):
         provider.derive({}, {"schema_hash": "a", "coordinates": []})
     assert error.value.retryable is False
     assert calls == []
+
+
+def test_laya_abstains_on_uncertain_or_degraded_provider_results():
+    """A real-model low-confidence response must not silently fill required grades."""
+    schema = {"schema_hash": "a", "coordinates": [{"index": 0, "group": "stack", "key": "python"}]}
+    probabilities = {str(i): (0.4 if i == 2 else 0.075) for i in range(9)}
+    for response, code in [
+        ({"answers": {"0": {"probabilities": probabilities, "confidence": .27}}}, "laya_uncertain_requirements"),
+        ({"degraded": True, "answers": {}}, "laya_degraded_response"),
+    ]:
+        provider = LayaClient(client=client(lambda _, response=response: httpx.Response(200, json=response)))
+        with pytest.raises(ProviderError, match=code):
+            provider.derive({"bio": "Python required; React is not needed"}, schema)
+
+
+def test_laya_rejects_uniform_positive_filling_of_the_entire_registry():
+    """The observed real-provider all-skills grade-3 failure never reaches a draft or cache."""
+    schema = {"schema_hash": "a", "coordinates": [{"index": i, "group": "stack", "key": f"skill{i}"} for i in range(8)]}
+    answers = {str(i): {"probabilities": {str(j): int(j == 4) for j in range(9)}, "confidence": 1} for i in range(8)}
+    provider = LayaClient(client=client(lambda _: httpx.Response(200, json={"answers": answers})))
+    with pytest.raises(ProviderError, match="laya_undifferentiated_requirements"):
+        provider.derive({"bio": "One specific skill is required"}, schema)

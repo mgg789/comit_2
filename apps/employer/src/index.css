@@ -381,8 +381,8 @@
   display: flex;
   flex-direction: column;
   gap: 12rem;
-  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
   border: 1px solid var(--employer-border);
 }
 .candidate-swipe:active {
@@ -655,3 +655,7 @@
   .candidate-swipe { backdrop-filter: url("#glass-refraction") blur(var(--employer-glass-blur)) saturate(1.5); }
 }
 .deck-icon { width: 34rem; height: 34rem; color: var(--comit-text); }
+
+@media (max-width: 760px) {
+  .detail-columns > .selection-stack { order: -1; }
+}

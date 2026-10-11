@@ -1,3 +1,4 @@
+import { testingPresenceLabel, testingSubjectLabel } from "./testing-evidence";
 import { createPortal } from "react-dom";
 import { Dialog } from "@comit/ui-kit/app-shell";
 import { ProcessCommand } from "./communications";
@@ -24,6 +25,7 @@ import { stackChoices } from "./labels";
 import { candidateName } from "./candidate-name";
 import { SHOWCASE_SORTS, candidateCode, isShowcaseSort, orderCandidates } from "./showcase-order";
 import { usePersistentState, useClearPersistentState } from "@comit/ui-kit/ui-state";
+import { ResumeAccordion } from "./resume-accordion";
 import "./discovery.css";
 
 const evidenceLabels: Record<string, string> = {
@@ -299,6 +301,7 @@ export function Showcase({
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<string[]>([]);
   const [choosing, setChoosing] = useState<PublicCandidateCard | null>(null);
+  const [contactCandidate, setContactCandidate] = useState<PublicCandidateCard | null>(null);
   const saveLock = useRef(false);
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
@@ -339,7 +342,14 @@ export function Showcase({
       setSaved(previous => [...previous, `${target}:${candidate.candidate_id}`]);
       setChoosing(null);
       setNotice("Кандидат добавлен в избранное вакансии.");
-    } catch (reason) { setNotice(errorText(reason)); }
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409 && reason.body &&
+          typeof reason.body === "object" && "detail" in reason.body &&
+          reason.body.detail === "showcase_candidate_already_saved") {
+        setChoosing(null);
+        navigate(`/resume/${candidate.candidate_id}?draft=${target}`);
+      } else setNotice(errorText(reason));
+    }
     finally { saveLock.current = false; setBusy(null); }
   }
   const visible = orderCandidates(
@@ -349,7 +359,7 @@ export function Showcase({
   return (
     <Reveal className="discovery-showcase">
       <PageTitle title="Соискатели">
-        <InlineSearch inputRef={searchInput} label="Поиск по имени, роли или стеку" placeholder="Поиск: Имя, роль, стек" value={q} onChange={setQ} onSubmit={() => setQuery(q)} />
+        <InlineSearch inputRef={searchInput} label="Поиск по имени, роли или стеку" placeholder="Имя, роль, стек" value={q} onChange={setQ} onSubmit={() => setQuery(q)} />
       </PageTitle>
       <div className="discovery-filters">
         <Select
@@ -457,7 +467,7 @@ export function Showcase({
                     busy === candidate.candidate_id ||
                     saved.includes(`${draftId}:${candidate.candidate_id}`)
                   }
-                  onClick={() => void save(candidate, draftId)}
+                  onClick={() => { setChoosing(candidate); setNotice(""); }}
                 >
                   <Icon name={saved.includes(`${draftId}:${candidate.candidate_id}`) ? "heart-filled" : "plus"} />
                 </button>
@@ -473,14 +483,16 @@ export function Showcase({
           )}
         </div>
       )}
+      {contactCandidate && <DirectContactInvitation candidate={contactCandidate} navigate={navigate} onClose={() => setContactCandidate(null)} onDone={() => { setContactCandidate(null); setNotice("Чат создан. Откройте его в разделе «Чаты»."); }} />}
       <AnimatePresence>
         {choosing && (
           <motion.div className="modal-shade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <section className="modal discovery-confirm" role="dialog" aria-modal="true" aria-label="Выберите вакансию">
               <h2>Добавить в вакансию</h2>
+              <Action disabled={busy !== null} onClick={() => { setContactCandidate(choosing); setChoosing(null); }}>Без вакансии</Action>
               <p>{candidateName(choosing.display_name)} будет добавлен независимо от требований вакансии.</p>
               {vacancies.loading || vacancies.error ? <State {...vacancies} retry={vacancies.refresh} /> : !open.length ? (
-                <p>Сначала опубликуйте вакансию, чтобы добавлять кандидатов.</p>
+                <p>Открытых вакансий пока нет. Можно начать разговор без вакансии.</p>
               ) : <div className="discovery-targets">
                 {open.map(item => <Action key={item.draft_id} disabled={busy !== null}
                   onClick={() => void save(choosing, item.draft_id)}>{item.fields.title || "Без названия"}</Action>)}
@@ -671,73 +683,58 @@ export function Resume({
           <p className="discovery-bio">{detail.description}</p>
         )}
         {sections.map((section) => (
-          <details className="discovery-accordion" key={section.title}>
-            <summary>
-              {section.title}
-              <span>+</span>
-            </summary>
-            <div className="discovery-accordion-body">
-              {section.entries.length ? (
-                section.entries.map((item, index) => (
-                  <article key={`${item.title}-${index}`}>
-                    <h3>{item.title}</h3>
-                    <p>{item.description}</p>
-                    <small>
-                      Статус: {evidenceLabels[item.status] || item.status}
-                    </small>
-                  </article>
-                ))
-              ) : (
-                <p>Опубликованных данных пока нет.</p>
-              )}
-            </div>
-          </details>
-        ))}
-        <details className="discovery-accordion">
-          <summary>
-            Тесты — переносимые<span>+</span>
-          </summary>
-          <div className="discovery-accordion-body">
-            <p>Грейд: {gradeLabels[candidate.category.grade]}</p>
-            <p>
-              {candidate.category.grade_status === "approved"
-                ? "Подтверждён тестированием"
-                : "Указан кандидатом; подтверждение отсутствует"}
-            </p>
-          </div>
-        </details>
-        <details className="discovery-accordion">
-          <summary>
-            Вектор навыков<span>+</span>
-          </summary>
-          <div className="discovery-accordion-body discovery-skills">
-            {[...detail.domains, ...detail.stacks, ...detail.soft_skills].map(
-              (skill, index) => (
-                <div className="skill-row" key={`${skill.key}-${index}`}>
-                  <header>
-                    <span>{skill.key}</span>
-                    <span>
-                      {skill.level}/7 ·{" "}
-                      {evidenceLabels[skill.status] || skill.status}
-                    </span>
-                  </header>
-                  <div className="skill-track">
-                    <span
-                      style={{
-                        width: `${Math.min(100, Math.max(0, (skill.level / 7) * 100))}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ),
+          <ResumeAccordion title={section.title} key={section.title}>
+            {section.entries.length ? (
+              section.entries.map((item, index) => (
+                <article key={`${item.title}-${index}`}>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <small>
+                    Статус: {evidenceLabels[item.status] || item.status}
+                  </small>
+                </article>
+              ))
+            ) : (
+              <p>Опубликованных данных пока нет.</p>
             )}
-            {!detail.domains.length &&
-              !detail.stacks.length &&
-              !detail.soft_skills.length && (
-                <p>Опубликованных навыков пока нет.</p>
-              )}
-          </div>
-        </details>
+          </ResumeAccordion>
+        ))}
+        <ResumeAccordion title="Тесты — переносимые">
+          {candidate.testing_results?.map(result => <article key={result.subject} className="employer-testing-result"><h3>{testingSubjectLabel(result.subject)} · {gradeLabels[result.grade]}</h3><p>Подтверждено тестированием</p><p className="muted">{testingPresenceLabel(result)}</p><p className="muted">Автоматическая отметка присутствия, не заключение о честности.</p></article>)}
+          <p>Общий грейд: {gradeLabels[candidate.category.grade]}</p>
+          <p>
+            {candidate.category.grade_status === "approved"
+              ? "Подтверждён тестированием"
+              : "Указан кандидатом; подтверждение отсутствует"}
+          </p>
+        </ResumeAccordion>
+        <ResumeAccordion title="Вектор навыков" bodyClassName="discovery-skills">
+          {[...detail.domains, ...detail.stacks, ...detail.soft_skills].map(
+            (skill, index) => (
+              <div className="skill-row" key={`${skill.key}-${index}`}>
+                <header>
+                  <span>{skill.key}</span>
+                  <span>
+                    {skill.level}/7 ·{" "}
+                    {evidenceLabels[skill.status] || skill.status}
+                  </span>
+                </header>
+                <div className="skill-track">
+                  <span
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (skill.level / 7) * 100))}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ),
+          )}
+          {!detail.domains.length &&
+            !detail.stacks.length &&
+            !detail.soft_skills.length && (
+              <p>Опубликованных навыков пока нет.</p>
+            )}
+          </ResumeAccordion>
         {notice && (
           <p className="inline-notice" role="status">
             {notice}
@@ -949,10 +946,12 @@ export function Resumes({ navigate }: Navigation) {
   }, [identity]);
   const pages = useResource(async () => {
     const result: ResumeVacancyPage[] = [];
+    // Never-published drafts have no saved list; withdrawn published vacancies remain readable.
+    const readable = selectedDrafts.filter((vacancy) => vacancy.business_status !== "draft" || !!vacancy.published_at);
     // Keep concurrency bounded while reading every owner vacancy.
-    for (let offset = 0; offset < selectedDrafts.length; offset += 4) {
+    for (let offset = 0; offset < readable.length; offset += 4) {
       const batch = await Promise.all(
-        selectedDrafts.slice(offset, offset + 4).map(async (vacancy) => {
+        readable.slice(offset, offset + 4).map(async (vacancy) => {
           const [saved, processes] = await Promise.all([
             api.getSaved(vacancy.draft_id),
             api.getEmployerRecruitment(vacancy.draft_id),
@@ -1065,7 +1064,7 @@ export function Resumes({ navigate }: Navigation) {
           <div className="resume-vacancy-options">
             <label>
               <input
-                type="checkbox"
+                type="checkbox" className="comit-checkbox"
                 checked={selection === null}
                 onChange={(event) =>
                   setSelection(event.target.checked ? null : [])
@@ -1076,7 +1075,7 @@ export function Resumes({ navigate }: Navigation) {
             {drafts.data?.map((vacancy) => (
               <label key={vacancy.draft_id}>
                 <input
-                  type="checkbox"
+                  type="checkbox" className="comit-checkbox"
                   checked={
                     selection === null || selection.includes(vacancy.draft_id)
                   }
@@ -1573,6 +1572,19 @@ export function Statistics({ navigate }: Navigation) {
             Уникальные пары «вакансия — кандидат» на каждом этапе
           </p>
         </section>
+        <section className="panel statistics-expenses">
+          <div className="statistics-card-heading"><h3>Расходы</h3><span className="statistics-caption">{stats.period.from} — {stats.period.to}</span></div>
+          {stats.expenses ? <>
+            <div className="statistics-expense-total"><strong>{formatExpense(stats.expenses.total_kopeks)}</strong><span>за выбранный период</span></div>
+            <div className="statistics-expense-categories">{stats.expenses.categories.map(item => {
+              const meta = { publication: { label: "Размещение вакансий", icon: "vacancies" as const }, invitation: { label: "Приглашения", icon: "candidates" as const }, ai: { label: "ИИ-агент", icon: "ai" as const }, penalty: { label: "Неустойки", icon: "clock" as const } }[item.category];
+              return <div key={item.category}><div><Icon name={meta.icon} /><span>{meta.label}</span></div><strong>{formatExpense(item.amount_kopeks)}</strong><small>{item.category === "ai" ? `Сверх ${formatExpense(stats.expenses.tariffs.ai_daily_allowance_kopeks)} в день` : item.category === "publication" ? `${formatExpense(stats.expenses.tariffs.publication_kopeks)} за первую публикацию` : item.category === "invitation" ? `${formatExpense(stats.expenses.tariffs.invitation_kopeks)} за принятое приглашение` : `${formatExpense(stats.expenses.tariffs.deadline_penalty_kopeks)} за просрочку или решение поддержки`}</small></div>;
+            })}</div>
+            <div className="statistics-expense-daily" role="img" aria-label="Расходы по дням">{stats.expenses.daily.map(day => <div key={day.date} title={`${day.date}: ${formatExpense(day.amount_kopeks)}`}><span style={{ height: `${Math.max(day.amount_kopeks ? 4 : 0, day.amount_kopeks / Math.max(1, ...stats.expenses.daily.map(item => item.amount_kopeks)) * 100)}%` }} /></div>)}</div>
+            <div className="statistics-axis"><span>{stats.period.from}</span><span>{stats.period.to}</span></div>
+            {!stats.expenses.total_kopeks && <p className="statistics-empty">За этот период расходов пока нет</p>}
+          </> : <State error="Расходы пока не удалось загрузить" retry={data.refresh} />}
+        </section>
         <section className="panel statistics-vacancies">
           <div className="statistics-card-heading">
             <h3>Активность вакансий</h3>
@@ -1606,19 +1618,6 @@ export function Statistics({ navigate }: Navigation) {
               <p>Активности по вакансиям пока нет</p>
             </div>
           )}
-        </section>
-        <section className="panel statistics-expenses">
-          <div className="statistics-card-heading"><h3>Расходы</h3><span className="statistics-caption">{stats.period.from} — {stats.period.to}</span></div>
-          {stats.expenses ? <>
-            <div className="statistics-expense-total"><strong>{formatExpense(stats.expenses.total_kopeks)}</strong><span>за выбранный период</span></div>
-            <div className="statistics-expense-categories">{stats.expenses.categories.map(item => {
-              const meta = { publication: { label: "Размещение вакансий", icon: "vacancies" as const }, invitation: { label: "Приглашения", icon: "candidates" as const }, ai: { label: "ИИ-агент", icon: "ai" as const }, penalty: { label: "Неустойки", icon: "clock" as const } }[item.category];
-              return <div key={item.category}><div><Icon name={meta.icon} /><span>{meta.label}</span></div><strong>{formatExpense(item.amount_kopeks)}</strong><small>{item.category === "ai" ? `Сверх ${formatExpense(stats.expenses.tariffs.ai_daily_allowance_kopeks)} в день` : item.category === "publication" ? `${formatExpense(stats.expenses.tariffs.publication_kopeks)} за размещение` : item.category === "invitation" ? `${formatExpense(stats.expenses.tariffs.invitation_kopeks)} за приглашение` : "Просрочки и решения поддержки"}</small></div>;
-            })}</div>
-            <div className="statistics-expense-daily" role="img" aria-label="Расходы по дням">{stats.expenses.daily.map(day => <div key={day.date} title={`${day.date}: ${formatExpense(day.amount_kopeks)}`}><span style={{ height: `${Math.max(day.amount_kopeks ? 4 : 0, day.amount_kopeks / Math.max(1, ...stats.expenses.daily.map(item => item.amount_kopeks)) * 100)}%` }} /></div>)}</div>
-            <div className="statistics-axis"><span>{stats.period.from}</span><span>{stats.period.to}</span></div>
-            {!stats.expenses.total_kopeks && <p className="statistics-empty">За этот период расходов пока нет</p>}
-          </> : <State error="Расходы пока не удалось загрузить" retry={data.refresh} />}
         </section>
       </div>
       <p className="statistics-period">
@@ -1686,3 +1685,28 @@ function SavedCandidateInvitation({ candidateId, draftId, onClose, onDone, navig
 
 /** Format integer RUB kopeks without mixing provider USD units into the UI. */
 function formatExpense(kopeks: number): string { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", maximumFractionDigits: 2 }).format(kopeks / 100); }
+
+/** Start a contact-only chat with explicit salary terms, charging only the sending tariff. */
+function DirectContactInvitation({candidate, navigate, onClose, onDone}: Navigation & {candidate: PublicCandidateCard; onClose: () => void; onDone: () => void}) {
+  const organization = useResource(() => api.getEmployerProfile());
+  const [description, setDescription] = useState("");
+  const [minimum, setMinimum] = useState("");
+  const [maximum, setMaximum] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const key = useRef(crypto.randomUUID());
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    const from = Number(minimum), to = Number(maximum);
+    if (!description.trim() || !minimum || !maximum || !Number.isSafeInteger(from) || from < 0 || !Number.isSafeInteger(to) || to < from) { setError("Укажите описание и корректную вилку зарплаты в рублях."); return; }
+    setBusy(true); setError("");
+    try {
+      await api.startDirectContact({candidate_id: candidate.candidate_id, profile_revision: candidate.profile_revision, description: description.trim(), salary: {from_rub: from, to_rub: to}, idempotency_key: key.current});
+      onDone();
+    } catch (failure) { setError(errorText(failure)); }
+    finally { setBusy(false); }
+  }
+  const company = organization.data?.company_name;
+  return <Dialog title="Без вакансии" close={() => {if (!busy) onClose();}}><form className="form-grid" onSubmit={event => void submit(event)} onChange={() => {key.current = crypto.randomUUID();}}><p>Начните разговор с кандидатом. Стоимость — 49 ₽. Собеседование и оффер в этом чате недоступны.</p><fieldset disabled={busy}><Field label="Компания"><p>{company || "Укажите название компании в настройках"}</p></Field>{!company && <Action type="button" onClick={() => navigate("/settings")}>Настройки компании</Action>}<Field label="Сообщение кандидату"><textarea required maxLength={10000} value={description} onChange={event => setDescription(event.target.value)} /></Field><Field label="Зарплата от, ₽"><input required type="number" min="0" step="1" value={minimum} onChange={event => setMinimum(event.target.value)} /></Field><Field label="Зарплата до, ₽"><input required type="number" min={minimum || "0"} step="1" value={maximum} onChange={event => setMaximum(event.target.value)} /></Field></fieldset>{organization.error && <p role="alert" className="form-error">{organization.error}</p>}{error && <p role="alert" className="form-error">{error}</p>}<div className="form-actions"><Action type="button" disabled={busy} onClick={onClose}>Отмена</Action><Action type="submit" variant="primary" disabled={busy || !company || organization.loading}>{busy ? "Создаём…" : "Начать чат за 49 ₽"}</Action></div></form></Dialog>;
+}

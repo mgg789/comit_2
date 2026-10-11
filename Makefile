@@ -1,7 +1,7 @@
 COMPOSE := docker compose --env-file .env -f infra/docker-compose.yml
-DEV_COMPOSE := docker compose --env-file /dev/null -p comit-dev -f infra/docker-compose.dev.yml --profile dev
+DEV_COMPOSE := COMIT_LOCAL_PROJECT=comit-dev ./infra/local-dev.sh
 
-.PHONY: up down build logs smoke regression regression-golden-update clean dev-up dev-down dev-logs compose-check
+.PHONY: up down build logs smoke regression regression-golden-update clean dev-up dev-down dev-logs dev-models compose-check
 
 ## Start the production stack (builds images, publishes ports per .env)
 up:
@@ -13,10 +13,18 @@ down:
 
 ## Explicit local development stack with isolated volume namespace
 dev-up:
-	$(DEV_COMPOSE) up -d --build
+	$(DEV_COMPOSE)
+
+## Verify the single-port dev stack through its internal network
+dev-smoke:
+	python3 infra/local-smoke.py --project comit-dev
+
+## Download the exact pinned public model into the isolated dev cache, then verify it
+dev-models:
+	$(DEV_COMPOSE) run --rm --build --no-deps model-cache-init
 
 dev-down:
-	$(DEV_COMPOSE) down
+	$(DEV_COMPOSE) stop
 
 dev-logs:
 	$(DEV_COMPOSE) logs -f --tail=100

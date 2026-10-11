@@ -181,3 +181,49 @@ def test_legacy_baseline_uses_current_source_revision_when_pool_lags(store: Stor
         assert baseline["profile_revision"] == 2
         with pytest.raises(ConflictError):
             feed._profile_snapshot(connection, card.candidate_id, 1)
+
+
+def test_promotion_week_rollover_invalidates_existing_feed(store, monkeypatch):
+    """A stored reward-bearing feed cannot survive the UTC reward week boundary."""
+    from datetime import UTC, datetime, timedelta
+
+    import matching_engine.fsp_boost as boost
+    feed, vacancy_id, owner_id = ready_feed(store)
+    session = feed.open(owner_id, FeedRequest(limit=1), vacancy_id)
+    class NextWeek(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.now(UTC) + timedelta(days=7)
+    monkeypatch.setattr(boost, "datetime", NextWeek)
+    with pytest.raises(ConflictError, match="model identity"):
+        feed.page(owner_id, vacancy_id, session.session_id, session.next_cursor, 10)
+
+
+def test_weekly_activity_is_live_for_legacy_cards_and_old_revisions_are_hidden(store, monkeypatch):
+    """Legacy snapshots use current trusted evidence; changed profiles cannot reuse old exposures."""
+    from datetime import UTC, datetime, timedelta
+    from psycopg.types.json import Jsonb
+    monkeypatch.setenv("MATCHING_PROMOTION_MODE", "shadow")
+    feed, vacancy_id, owner_id = ready_feed(store, 1)
+    session = feed.open(owner_id, FeedRequest(), vacancy_id)
+    card = session.items[0]
+    now = datetime.now(UTC)
+    deadline = (now + timedelta(days=7-now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+    with connect(store.database_url) as connection:
+        profile = connection.execute("SELECT profile FROM candidate_pipeline.candidates WHERE candidate_id=%s", (card.candidate_id,)).fetchone()["profile"]
+        profile["external_evidence"] = [{"kind":"weekly_challenge", "subject":"current", "status":"confirmed", "verified_value":{
+            "provider":"comit_weekly_challenge:v1", "completed_at":now.isoformat(), "expires_at":deadline.isoformat()}}]
+        connection.execute("UPDATE candidate_pipeline.candidates SET profile=%s WHERE candidate_id=%s", (Jsonb(profile),card.candidate_id))
+        # Simulate a legacy persisted snapshot with no current activity metadata.
+        connection.execute("UPDATE feed_pipeline.exposures SET card=card-'weekly_activity_expires_at'-'promotion' WHERE exposure_id=%s", (card.exposure_id,))
+    live = feed.page(owner_id, vacancy_id, session.session_id, None, 10).items[0]
+    assert live.weekly_activity_expires_at == deadline
+    assert live.promotion is None  # The flame does not manufacture a ranking explanation.
+    assert feed.exposure(owner_id, vacancy_id, card.exposure_id).weekly_activity_expires_at == deadline
+    with connect(store.database_url) as connection:
+        profile["external_evidence"][0]["status"] = "rejected"
+        connection.execute("UPDATE candidate_pipeline.candidates SET profile=%s WHERE candidate_id=%s", (Jsonb(profile),card.candidate_id))
+    assert feed.page(owner_id, vacancy_id, session.session_id, None, 10).items[0].weekly_activity_expires_at is None
+    assert feed.exposure(owner_id, vacancy_id, card.exposure_id).weekly_activity_expires_at is None
+    store.intake(card.candidate_id, eligible_profile(source_revision=2, work_types=["remote"]))
+    assert feed.page(owner_id, vacancy_id, session.session_id, None, 10).items == []

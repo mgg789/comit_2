@@ -12,7 +12,7 @@ const object = (properties: Record<string, object>, required = Object.keys(prope
 });
 const enumeration = (values: readonly string[]) => ({ type: "string", enum: values });
 const states = ["sent", "viewed", "accepted", "declined", "rejected", "offer_sent", "hired", "offer_declined", "withdrawn", "expired"];
-const actions = ["view", "accept", "decline", "withdraw", "reject", "interview_propose", "interview_accept", "interview_decline", "interview_cancel", "interview_complete", "offer_send", "offer_accept", "offer_decline"];
+const actions = ["view", "accept", "decline", "withdraw", "reject", "interview_propose", "interview_accept", "interview_decline", "interview_cancel", "interview_complete", "offer_send", "offer_accept", "offer_decline", "contact_close"];
 const salary = object({ from_rub: integer(0), to_rub: integer(0) });
 const interviewFields = {
   kind: enumeration(["technical", "general"]), starts_at: timestamp,
@@ -30,6 +30,9 @@ export const invitationBodySchema = object({
   candidate_id: uuid, idempotency_key: uuid, company_name: nonempty(300), description: nonempty(10000), salary,
 }, ["candidate_id", "idempotency_key", "description"]);
 
+/** Mandatory terms of contact without a published vacancy. */
+export const directContactBodySchema = object({ candidate_id: uuid, idempotency_key: uuid, profile_revision: integer(1), description: nonempty(10000), salary });
+
 const categories = { type: "array", minItems: 1, maxItems: 7, uniqueItems: true, items: enumeration(rejectionReasonCategories) };
 const detailedReason = { ...text(10000, 80), pattern: "\\S" };
 
@@ -39,7 +42,7 @@ export const rejectSavedBodySchema = object({ candidate_id: uuid, idempotency_ke
 /** Each action branch closes additional properties and requires CAS plus a UUID retry key. */
 export const recruitmentActionSchema = { anyOf: [
   command(["view", "accept"]),
-  command(["decline", "withdraw"], { reason: nonempty(10000) }),
+  command(["decline", "withdraw", "contact_close"], { reason: nonempty(10000) }),
   command("reject", { reason: detailedReason, categories }),
   command("interview_propose", interviewFields),
   command("interview_accept", { interview_id: uuid }),
@@ -60,11 +63,11 @@ const offer = object({ id: uuid, state: enumeration(["sent", "accepted", "declin
 
 /** Shared snapshots contain immutable terms and schedule history but no candidate contacts. */
 export const recruitmentViewSchema = object({
-  id: uuid, owner_id: uuid, candidate_id: uuid, vacancy_id: uuid, draft_id: uuid,
+  kind: enumeration(["vacancy", "contact_only"]), id: uuid, owner_id: uuid, candidate_id: uuid, vacancy_id: uuid, draft_id: uuid,
   profile_revision: integer(1), revision: integer(1), state: enumeration(states),
-  terms: nullable(object({ company_name: nonempty(300), description: nonempty(10000), salary,
+  terms: nullable(object({ candidate_display_name: text(300), company_name: nonempty(300), description: nonempty(10000), salary,
     contact_method: enumeration(["platform"]), vacancy_title: nullable(text(300)), city: text(300), daily: text(10000), work_type: text(300),
-  })),
+  }, ["company_name", "description", "salary", "contact_method", "vacancy_title", "city", "daily", "work_type"])),
   invited_at: nullable(timestamp),
   closure: nullable(object({ reason: nonempty(10000), actor: enumeration(["candidate", "employer", "system"]), at: timestamp, categories }, ["reason", "actor", "at"])),
   interviews: { type: "array", items: interview }, offers: { type: "array", items: offer },

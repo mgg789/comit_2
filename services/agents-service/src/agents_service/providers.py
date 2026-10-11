@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import re
 from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -28,9 +29,17 @@ def fingerprint(value: object) -> str:
                                      separators=(",", ":")).encode()).hexdigest()
 
 
-def _request(client: httpx.Client, method: str, url: str, **kwargs: Any) -> dict:
+def _request(client: httpx.Client, method: str, url: str, *, connect_retries: int = 0, **kwargs: Any) -> dict:
     try:
-        response = client.request(method, url, **kwargs)
+        for attempt in range(connect_retries + 1):
+            try:
+                response = client.request(method, url, **kwargs)
+                break
+            except (httpx.ConnectError, httpx.ConnectTimeout):
+                # No HTTP request has been sent yet. Read/write errors and HTTP
+                # responses never authorize replay of a potentially paid call.
+                if attempt == connect_retries:
+                    raise
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
@@ -87,23 +96,39 @@ class MatchingClient:
             raise ProviderError("invalid_matching_status", False) from None
 
 
+def mirror_config() -> tuple[str, str, str]:
+    """Return the pinned Jev mirror endpoint, model and private proxy credential."""
+    url = os.getenv("JEV_API_URL", "https://openrouter.droidje.com/api/alpha/decisions").rstrip("/")
+    if url != "https://openrouter.droidje.com/api/alpha/decisions":
+        raise ValueError("Jev mirror requires the pinned HTTPS decisions endpoint")
+    model = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+    if model != "typesafe/jev-1.13":
+        raise ValueError("Jev mirror requires typesafe/jev-1.13")
+    return url, model, os.getenv("JEV_API_KEY", "")
+
+
 class LayaClient:
     """Form-only Jev Local ordinal decisions, preserving absent versus explicit zero."""
 
     model = "aac6fef/laya-multilingual-mlx"
-    version = "laya-requirements-v1"
+    version = "laya-requirements-v2"
 
     def __init__(self, base_url: str | None = None, client: httpx.Client | None = None):
+        self.mirror = os.getenv("JEV_PROVIDER", "systemone") == "openrouter-mirror"
+        if self.mirror:
+            self.mirror_url, self.model, self.token = mirror_config()
+            self.version = "jev-mirror-requirements-v1"
         self.base_url = (base_url if base_url is not None else os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444")).rstrip("/")
         parsed = urlparse(self.base_url)
-        if self.base_url and parsed.hostname not in ("localhost", "127.0.0.1", "host.docker.internal"):
+        if not self.mirror and self.base_url and parsed.hostname not in ("localhost", "127.0.0.1", "host.docker.internal"):
             raise ValueError("JEV_LOCAL_URL must refer to the local host")
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
 
     def derive(self, fields: dict, schema: dict) -> dict:
         """Evaluate current coordinates; an unconfigured optional provider fails without I/O."""
-        if not self.base_url:
+        if self.mirror and not self.token or not self.mirror and not self.base_url:
             raise ProviderError("laya_not_configured", False)
+        actual_model = self.model
         groups = {"domain": "domens", "stack": "stacks", "soft_skill": "soft_skills"}
         result = {name: {} for name in groups.values()}
         evidence = {}
@@ -121,8 +146,20 @@ class LayaClient:
                 "Используй только явно заданное описание. Не выдумывай навыки из класса. "
                 "Если навык не требуется или не упомянут, выбирай первое значение.", "criteria": rubric}
                 for c in batch}
-            response = _request(self.client, "POST", self.base_url + "/api/v1/decisions",
-                                headers={"Host": "localhost:12444"}, json={"state": state, "questions": questions})
+            if self.mirror:
+                mirror_questions = {key: {**question, "type": "choice",
+                    "criteria": {str(i): point for i, point in enumerate(rubric)}} for key, question in questions.items()}
+                response = _request(self.client, "POST", self.mirror_url,
+                    headers={"X-Proxy-Token": self.token}, json={"model": self.model,
+                    "state": {"text": json.dumps(state, ensure_ascii=False)}, "questions": mirror_questions})
+                actual_model = response.get("model")
+                if not isinstance(actual_model, str) or not re.fullmatch(r"typesafe/jev-1\.13(?:-[0-9]{8})?", actual_model):
+                    raise ProviderError("jev_model_mismatch", False)
+            else:
+                response = _request(self.client, "POST", self.base_url + "/api/v1/decisions",
+                                    headers={"Host": "localhost:12444"}, json={"state": state, "questions": questions})
+            if response.get("degraded") is True or response.get("fallback") is True:
+                raise ProviderError("laya_degraded_response", False)
             answers = response.get("answers")
             if not isinstance(answers, dict) or set(answers) != set(questions):
                 raise ProviderError("invalid_laya_answers", False)
@@ -132,46 +169,88 @@ class LayaClient:
                 try:
                     if not isinstance(probs, dict) or set(probs) != {str(i) for i in range(9)}:
                         raise ValueError()
+                    if any(type(value) not in (int, float) for value in probs.values()):
+                        raise ValueError()
                     values = [float(probs[str(i)]) for i in range(9)]
                     if any(not 0 <= p <= 1 for p in values) or abs(sum(values) - 1) > .02:
                         raise ValueError()
                 except (ValueError, TypeError):
                     raise ProviderError("invalid_laya_probabilities", False) from None
                 selected = max(range(9), key=lambda i: values[i])
+                confidence = answer.get("confidence")
+                if self.mirror and (answer.get("type") != "choice" or answer.get("choice") != str(selected) or confidence is None):
+                    raise ProviderError("invalid_laya_choice", False)
+                # Abstain instead of turning diffuse probabilities into authoritative grades.
+                if (values[selected] < .5 or confidence is not None and
+                        (not isinstance(confidence, (int, float)) or
+                         isinstance(confidence, bool) or not .5 <= confidence <= 1)):
+                    raise ProviderError("laya_uncertain_requirements", False)
                 if selected:
                     result[groups[coordinate["group"]]][coordinate["key"]] = selected - 1
                 evidence[f"{coordinate['group']}:{coordinate['key']}"] = {"selected": selected,
                     "probabilities": probs, "confidence": answer.get("confidence")}
-        return {"fields": result, "provenance": {"model": self.model, "version": self.version,
+        selections = [item["selected"] for item in evidence.values()]
+        if len(selections) >= 8 and len(set(selections)) == 1 and selections[0] > 1:
+            raise ProviderError("laya_undifferentiated_requirements", False)
+        return {"fields": result, "provenance": {"model": actual_model, "version": self.version,
                 "input_hash": fingerprint(state), "schema_hash": schema["schema_hash"], "evidence": evidence}}
 
 
+def llm_config() -> tuple[str, str, str, str, str]:
+    """Validate the selected official completion endpoint without exposing credentials."""
+    provider = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
+    if provider not in {"deepseek", "timeweb"}:
+        raise ValueError("LLM_PROVIDER must be deepseek or timeweb")
+    prefix = provider.upper()
+    base = os.getenv(prefix + "_BASE_URL", "https://api.timeweb.ai/v1" if provider == "timeweb" else "https://api.deepseek.com").rstrip("/")
+    parsed = urlparse(base)
+    host = "api.timeweb.ai" if provider == "timeweb" else "api.deepseek.com"
+    if (parsed.scheme != "https" or parsed.hostname != host or parsed.username or parsed.password
+            or parsed.query or parsed.fragment or parsed.port not in (None, 443)
+            or provider == "timeweb" and parsed.path != "/v1"):
+        raise ValueError("LLM transport requires the official HTTPS endpoint")
+    model = os.getenv(prefix + "_MODEL", "timeweb/gpt-oss-120b" if provider == "timeweb" else "deepseek-flash")
+    effort = os.getenv("TIMEWEB_REASONING_EFFORT", "low")
+    if provider == "timeweb" and effort not in {"low", "medium", "high"}:
+        raise ValueError("TIMEWEB_REASONING_EFFORT must be low, medium or high")
+    return provider, base, model, os.getenv(prefix + "_API_KEY", ""), effort
+
+
 class DeepSeekClient:
-    """Official DeepSeek tool calls; credentials remain only in worker env."""
+    """Configured official completion client; legacy name preserves existing consumers."""
 
     def __init__(self, base_url: str | None = None, model: str | None = None,
                  token: str | None = None, client: httpx.Client | None = None):
-        self.base_url = (base_url or os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")).rstrip("/")
-        self.model = model or os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
-        self.token = token or os.getenv("DEEPSEEK_API_KEY", "")
+        self.provider, configured_base, configured_model, configured_token, self.reasoning_effort = llm_config()
+        self.base_url = (base_url or configured_base).rstrip("/")
+        self.model = model or configured_model
+        self.token = token or configured_token
         parsed = urlparse(self.base_url)
-        if parsed.scheme != "https" or parsed.hostname != "api.deepseek.com" or parsed.username or parsed.password:
-            raise ValueError("DeepSeek transport requires the official HTTPS endpoint")
+        if (parsed.scheme != "https" or parsed.hostname != ("api.timeweb.ai" if self.provider == "timeweb" else "api.deepseek.com")
+                or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.port not in (None, 443)
+                or self.provider == "timeweb" and parsed.path != "/v1"):
+            raise ValueError("LLM transport requires the official HTTPS endpoint")
         self.client = client or httpx.Client(timeout=90, follow_redirects=False)
 
     def complete(self, messages: list[dict], tools: list[dict], max_tokens: int = 1536,
-                 *, reasoning_effort: str = "off") -> dict:
+                 *, reasoning_effort: str | None = None) -> dict:
         """Return a checked response envelope; runtime persists it before executing tools."""
         if not self.token:
-            raise ProviderError("deepseek_not_configured", False)
+            raise ProviderError(self.provider + "_not_configured", False)
+        requested_effort = reasoning_effort
+        reasoning_effort = reasoning_effort or "off"
         if reasoning_effort not in {"off", "medium", "max"}:
             raise ProviderError("invalid_reasoning_effort", False)
         reasoning = ({"reasoning_effort": "high" if reasoning_effort == "medium" else "max"}
                      if reasoning_effort != "off" else {})
+        if self.provider == "timeweb":
+            reasoning = {"reasoning_effort": {"off": "low", "medium": "medium", "max": "high"}[requested_effort] if requested_effort else self.reasoning_effort}
+        else:
+            reasoning["thinking"] = {"type": "disabled" if reasoning_effort == "off" else "enabled"}
         result = _request(self.client, "POST", self.base_url + "/chat/completions",
+                          connect_retries=1,
                           headers={"Authorization": "Bearer " + self.token}, json={"model": self.model,
                           "messages": messages, "tools": tools, "max_tokens": max_tokens,
-                          "thinking": {"type": "disabled" if reasoning_effort == "off" else "enabled"},
                           **reasoning, "stream": False})
         try:
             message = result["choices"][0]["message"]
@@ -184,5 +263,5 @@ class DeepSeekClient:
             if usage["completion_tokens"] > max_tokens:
                 raise ValueError()
         except (KeyError, IndexError, TypeError, ValueError):
-            raise ProviderError("invalid_deepseek_response", False) from None
+            raise ProviderError("invalid_" + self.provider + "_response", False) from None
         return result

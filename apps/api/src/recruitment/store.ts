@@ -2,7 +2,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {
-  AccountRole, CandidateProfileFields, InvitationTerms, InviteRequest, InterviewView,
+  AccountRole, DirectContactRequest, CandidateProfileFields, InvitationTerms, InviteRequest, InterviewView,
   OfferView, RecruitmentAction, ContactsView, RecruitmentEvent, RecruitmentEventPage, RejectSavedRequest,
   RecruitmentPage, RecruitmentState, RecruitmentView,
 } from "@comit/shared";
@@ -20,11 +20,11 @@ export class RecruitmentError extends Error {
 }
 
 interface ProcessRow extends QueryResultRow {
-  id: string; owner_id: string; candidate_id: string; vacancy_id: string; draft_id: string;
+  kind: "vacancy" | "contact_only"; id: string; owner_id: string; candidate_id: string; vacancy_id: string; draft_id: string;
   profile_revision: string; revision: string; state: RecruitmentState; terms: InvitationTerms | null;
   invited_at: Date | null; closure: RecruitmentView["closure"];
   created_at: Date; updated_at: Date; deadline: RecruitmentDeadline | null;
-  deadline_suspended: boolean; vacancy_open?: boolean;
+  deadline_suspended: boolean; vacancy_open?: boolean | null;
   employer_contacted_at: Date | null; reminder_sent_at: Date | null;
 }
 interface ProfileSourceRow extends QueryResultRow {
@@ -34,11 +34,12 @@ interface ProfileRow extends ProfileSourceRow {
   email: string; email_verified: boolean; role: AccountRole;
 }
 const terminal = new Set<RecruitmentState>(["declined", "rejected", "hired", "offer_declined", "withdrawn", "expired"]);
+const exitActions = new Set<RecruitmentAction["action"]>(["reject", "decline", "withdraw", "view", "interview_cancel", "interview_decline", "offer_decline", "contact_close"]);
 const accepted = new Set<RecruitmentState>(["accepted", "offer_sent", "hired"]);
 const fail = (status: number, code: string): never => { throw new RecruitmentError(status, code); };
 
 /** Hash the scoped command, not upstream mutable data, so receipts survive source changes. */
-export function recruitmentFingerprint(scope: string, payload: InviteRequest | RecruitmentAction | RejectSavedRequest): string {
+export function recruitmentFingerprint(scope: string, payload: InviteRequest | DirectContactRequest | RecruitmentAction | RejectSavedRequest): string {
   return createHash("sha256").update(canonicalJson({ scope, payload })).digest("hex");
 }
 
@@ -66,7 +67,7 @@ export function validateRejectionFeedback(reason: string, categories?: Rejection
 export class RecruitmentStore {
   public constructor(private readonly pool: Pool, private readonly chatConfigured = false,
     private readonly cursorSecret = process.env.AUTH_SECRET ?? process.env.JWT_SECRET ?? randomUUID(),
-    private readonly vacancyWritable?: (owner: string, draftId: string, client: PoolClient) => Promise<boolean>,
+    private readonly vacancyWritable?: (owner: string, draftId: string, client: Pool | PoolClient) => Promise<boolean>,
     private readonly policy: RecruitmentPolicy = { initialWorkingDays: 4, reminderWorkingDays: 3, hireOn: "offer_accept" }, private readonly notifications?: SystemNotificationsStore) {}
 
   private cursorScope(role: AccountRole, actorId: string, draftId?: string): string {
@@ -139,6 +140,8 @@ export class RecruitmentStore {
       [randomUUID(), row.id, row.revision, type, row.state]);
     if (this.notifications) {
       const label: Record<string, string> = {
+        "contact.started": "Работодатель начал разговор без вакансии. Откройте чат, чтобы ответить.",
+        "contact.close": "Разговор без вакансии завершён.",
         "invitation.sent": "Работодатель отправил приглашение. Откройте предложение, чтобы ответить.",
         view: "Кандидат просмотрел приглашение.", accept: "Кандидат принял приглашение. Начался срок для следующего действия работодателя.",
         decline: "Кандидат отклонил приглашение.", withdraw: "Кандидат отозвал участие в предложении.",
@@ -164,7 +167,7 @@ export class RecruitmentStore {
         await this.notifications.append(client, row.owner_id, `recruitment:${row.id}:${row.revision}`, type, text,
           { kind: "recruitment", id: row.id, path: `/chat/${row.id}` });
         if (row.invited_at) await this.notifications.append(client, row.candidate_id, `recruitment:${row.id}:${row.revision}`, type, text,
-          { kind: "recruitment", id: row.id, path: `/offer/${row.id}` });
+          { kind: "recruitment", id: row.id, path: row.kind === "contact_only" ? `/chat/${row.id}` : `/offer/${row.id}` });
       }
     }
   }
@@ -194,7 +197,9 @@ export class RecruitmentStore {
 
   private async hiringExpiry(client: PoolClient, row: ProcessRow): Promise<void> {
     if (!this.policy || row.state !== "accepted") return;
-    row.vacancy_open = !this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client);
+    // Unknown authority on a degraded read must not suspend, expire or otherwise mutate clocks.
+    if (row.vacancy_open === null) return;
+    row.vacancy_open ??= !this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client);
     const consent = (await client.query<{ processing_consent: boolean }>("SELECT processing_consent FROM candidate_profiles WHERE candidate_id=$1", [row.candidate_id])).rows[0];
     if (!row.vacancy_open || !consent?.processing_consent) {
       if (!row.deadline_suspended) {
@@ -212,12 +217,19 @@ export class RecruitmentStore {
     }
     const now = await this.clock(client);
     if (!row.deadline) {
-      const meeting = (await client.query<{ starts_at: Date; duration_minutes: number }>(`SELECT starts_at,duration_minutes FROM recruitment_interviews
-        WHERE process_id=$1 AND state IN ('scheduled','completed') ORDER BY starts_at DESC LIMIT 1`, [row.id])).rows[0];
-      if (meeting) {
+      // Legacy rows receive a full grace period at first policy reconciliation, never updated_at.
+      const meeting = (await client.query<{ starts_at: Date; duration_minutes: number; state: string }>(`SELECT starts_at,duration_minutes,state FROM recruitment_interviews
+        WHERE process_id=$1 AND state IN ('proposed','scheduled','completed') ORDER BY (state='proposed'),starts_at DESC LIMIT 1`, [row.id])).rows[0];
+      if (meeting && meeting.state !== "proposed") {
         const end = new Date(meeting.starts_at.getTime() + meeting.duration_minutes * 60_000);
-        await this.setDeadline(client, row, { stage: "interview_wait", due_at: null, remind_at: null, paused_until: end.toISOString(), business_days: 0, time_zone: HIRING_TIME_ZONE });
-      } else await this.setDeadline(client, row, this.deadline("initial", row.updated_at, this.policy.initialWorkingDays));
+        await this.setDeadline(client, row, end > now
+          ? { stage: "interview_wait", due_at: null, remind_at: null, paused_until: end.toISOString(), business_days: 0, time_zone: HIRING_TIME_ZONE }
+          : this.deadline("after_interview", now, 3));
+      } else {
+        const contacted = row.employer_contacted_at || meeting || (await client.query(`SELECT 1 FROM recruitment_events
+          WHERE process_id=$1 AND type IN ('chat.first_employer_message','interview.propose') LIMIT 1`, [row.id])).rowCount;
+        await this.setDeadline(client, row, this.deadline(contacted ? "conversation" : "initial", now, contacted ? 7 : this.policy.initialWorkingDays));
+      }
     }
     let deadline = row.deadline!;
     if (deadline.stage === "interview_wait" && deadline.paused_until && Date.parse(deadline.paused_until) <= now.getTime()) {
@@ -240,15 +252,16 @@ export class RecruitmentStore {
   public async processDeadlines(limit = 100): Promise<number> {
     if (!this.policy) return 0;
     const rows = (await this.pool.query<{ id: string; owner_id: string }>(`SELECT id,owner_id FROM recruitment_processes
-      WHERE (state='offer_sent' AND EXISTS(SELECT 1 FROM recruitment_offers o WHERE o.process_id=recruitment_processes.id AND o.state='sent' AND o.expires_at<=now())) OR (state='accepted' AND NOT deadline_suspended AND (deadline IS NULL OR
+      WHERE kind='vacancy' AND ((state='offer_sent' AND EXISTS(SELECT 1 FROM recruitment_offers o WHERE o.process_id=recruitment_processes.id AND o.state='sent' AND o.expires_at<=now())) OR (state='accepted' AND NOT deadline_suspended AND (deadline IS NULL OR
         (deadline->>'due_at')::timestamptz<=now() OR (deadline->>'paused_until')::timestamptz<=now()
-        OR (reminder_sent_at IS NULL AND (deadline->>'remind_at')::timestamptz<=now())))
+        OR (reminder_sent_at IS NULL AND (deadline->>'remind_at')::timestamptz<=now()))))
       ORDER BY updated_at,id LIMIT $1`, [limit])).rows;
     for (const row of rows) await this.get("employer", row.owner_id, row.id);
     return rows.length;
   }
 
   private async expire(client: PoolClient, row: ProcessRow): Promise<void> {
+    if (row.kind === "contact_only") return;
     await this.hiringExpiry(client, row);
     if (row.state !== "offer_sent") return;
     const result = await client.query("UPDATE recruitment_offers SET state='expired',resolved_at=clock_timestamp() WHERE process_id=$1 AND state='sent' AND expires_at<=clock_timestamp() RETURNING id", [row.id]);
@@ -284,12 +297,14 @@ export class RecruitmentStore {
         if (row.state === "offer_sent") actions.push("offer_accept", "offer_decline");
       }
     }
+    if (row.kind === "contact_only") actions = terminal.has(row.state) ? [] : ["contact_close"];
     // Consent withdrawal closes access to further progression, not the historical record.
     const consent = (await client.query<{ processing_consent: boolean }>("SELECT processing_consent FROM candidate_profiles WHERE candidate_id=$1", [row.candidate_id])).rows[0];
-    if (!consent?.processing_consent) actions = actions.filter(action => ["reject", "decline", "withdraw", "view", "interview_cancel", "interview_decline", "offer_decline"].includes(action));
-    const vacancyOpen = row.vacancy_open ?? (!this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client));
-    if (!vacancyOpen) actions = [];
-    return { id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, vacancy_id: row.vacancy_id, draft_id: row.draft_id,
+    if (!consent?.processing_consent) actions = actions.filter(action => ["reject", "decline", "withdraw", "view", "interview_cancel", "interview_decline", "offer_decline", "contact_close"].includes(action));
+    const vacancyOpen = row.kind === "contact_only" || (row.vacancy_open !== undefined ? row.vacancy_open === true
+      : (!this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client)));
+    if (!vacancyOpen) actions = actions.filter(action => exitActions.has(action));
+    return { kind: row.kind ?? "vacancy", id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, vacancy_id: row.vacancy_id, draft_id: row.draft_id,
       profile_revision: Number(row.profile_revision), revision: Number(row.revision), state: row.state, terms: row.terms,
       interviews, offers: mappedOffers, allowed_actions: actions,
       chat_available: this.chatConfigured && row.invited_at !== null && !!consent?.processing_consent,
@@ -331,6 +346,34 @@ export class RecruitmentStore {
     });
   }
 
+  /** Open a pair-scoped direct chat; no acceptance, contacts disclosure or hiring clock. */
+  public async startContact(ownerId: string, request: DirectContactRequest, companyName: string): Promise<RecruitmentView> {
+    const fingerprint = recruitmentFingerprint("contact", request);
+    return transaction(this.pool, async client => {
+      await this.lockKey(client, ownerId, request.idempotency_key);
+      const receipt = await this.receiptFor(client, ownerId, request.idempotency_key, fingerprint);
+      if (receipt) return receipt;
+      const owner = (await client.query<{role: AccountRole}>("SELECT role FROM accounts WHERE id=$1 FOR SHARE", [ownerId])).rows[0];
+      if (owner?.role !== "employer") return fail(403, "employer_role_required");
+      const profile = await this.profile(client, request.candidate_id);
+      if (!profile.pool_consent) return fail(409, "candidate_pool_consent_required");
+      const source = (await client.query<{projected_revision: string; state: string; source_revision: string}>("SELECT projected_revision,state,source_revision FROM candidate_profile_outbox WHERE candidate_id=$1 ORDER BY source_revision DESC LIMIT 1", [request.candidate_id])).rows[0];
+      if (!source || source.state !== "delivered" || Number(source.source_revision) !== Number(profile.revision) || Number(source.projected_revision) !== request.profile_revision) return fail(409, "candidate_source_obsolete");
+      if (!Number.isSafeInteger(request.salary.from_rub) || request.salary.from_rub < 0 || !Number.isSafeInteger(request.salary.to_rub) || request.salary.to_rub < request.salary.from_rub) return fail(422, "invalid_invitation_salary");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [`direct-contact:${ownerId}:${request.candidate_id}`]);
+      // Stable hidden identity exists only inside this aggregate; it is never published or listed as a vacancy.
+      const internal = ownerId;
+      const row = (await client.query<ProcessRow>(`INSERT INTO recruitment_processes(id,owner_id,candidate_id,vacancy_id,draft_id,profile_revision,state,terms,invited_at,kind)
+        VALUES($1,$2,$3,$2,$2,$4,'accepted',$5,now(),'contact_only') ON CONFLICT(owner_id,vacancy_id,candidate_id) DO NOTHING RETURNING *`,
+        [randomUUID(), internal, request.candidate_id, request.profile_revision, {candidate_display_name: profile.fields.display_name ?? "", company_name: companyName, description: request.description, salary: request.salary, contact_method: "platform", vacancy_title: "Без вакансии", city: "", daily: "", work_type: ""}])).rows[0];
+      if (!row) return fail(409, "recruitment_already_exists");
+      await this.event(client, row, "contact.started");
+      const result = await this.view(client, "employer", row);
+      await this.saveReceipt(client, ownerId, request.idempotency_key, fingerprint, result);
+      return result;
+    });
+  }
+
   private async saveReceipt(client: PoolClient, actorId: string, key: string, fingerprint: string, view: RecruitmentView): Promise<void> {
     await client.query("INSERT INTO recruitment_receipts(actor_id,idempotency_key,fingerprint,result) VALUES($1,$2,$3,$4)", [actorId, key, fingerprint, view]);
   }
@@ -361,13 +404,43 @@ export class RecruitmentStore {
     });
   }
 
-  /** Read one participant-owned aggregate; expired offers transition under the same aggregate lock. */
-  public async get(role: AccountRole, actorId: string, id: string): Promise<RecruitmentView> {
+  /** Fetch each unique source once outside transactions; one failed batch opens the read-only circuit. */
+  private async readAuthorities(rows: Array<{ owner_id: string; draft_id: string; kind?: string }>): Promise<Map<string, boolean | null>> {
+    const unique = [...new Map(rows.map(row => [row.draft_id, row])).values()];
+    const result = new Map<string, boolean | null>();
+    let failed = false;
+    const until = Date.now() + 10_000;
+    for (let index = 0; index < unique.length; index += 4) {
+      await Promise.all(unique.slice(index, index + 4).map(async row => {
+        if (row.kind === "contact_only") { result.set(row.draft_id, true); return; }
+        if (failed || Date.now() >= until) { result.set(row.draft_id, null); return; }
+        try { result.set(row.draft_id, !this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, this.pool)); }
+        catch { failed = true; result.set(row.draft_id, null); }
+      }));
+    }
+    return result;
+  }
+
+  private async readAggregate(role: AccountRole, actorId: string, id: string, authority: boolean | null, checkedAt: Date): Promise<RecruitmentView> {
     return transaction(this.pool, async client => {
       const row = await this.process(client, role, actorId, id);
+      // A local close/withdraw after the remote probe wins under the same lifecycle lock.
+      const changed = (await client.query(`SELECT 1 FROM vacancy_lifecycle_commands WHERE draft_id=$1
+        AND (phase IN ('queued','source_applied') OR (phase='completed' AND updated_at >= $2)) LIMIT 1`, [row.draft_id, checkedAt])).rowCount;
+      row.vacancy_open = row.kind === "contact_only" ? true : changed ? false : authority;
       await this.expire(client, row);
       return this.view(client, role, row);
     });
+  }
+
+  /** Read a participant-owned aggregate without holding a database connection during source I/O. */
+  public async get(role: AccountRole, actorId: string, id: string): Promise<RecruitmentView> {
+    const column = role === "employer" ? "owner_id" : "candidate_id";
+    const source = (await this.pool.query<{ owner_id: string; draft_id: string; kind?: string; checked_at: Date }>(`SELECT owner_id,draft_id,kind,clock_timestamp() AS checked_at
+      FROM recruitment_processes WHERE id=$1 AND ${column}=$2 AND ($3::boolean OR invited_at IS NOT NULL)`, [id, actorId, role === "employer"])).rows[0];
+    if (!source) return fail(404, "recruitment_not_found");
+    const authorities = await this.readAuthorities([source]);
+    return this.readAggregate(role, actorId, id, authorities.get(source.draft_id) ?? null, source.checked_at);
   }
 
   /** Page only the authenticated participant's processes; another owner's draft returns an empty page. */
@@ -378,14 +451,15 @@ export class RecruitmentStore {
     const scope = this.cursorScope(role, actorId, draftId);
     const boundary = cursor ? this.decodeCursor(cursor, scope) : null;
     // Keep PostgreSQL's microseconds intact: a JavaScript Date loses candidates sharing a millisecond.
-    const rows = (await this.pool.query<{ id: string; cursor_created: string }>(`SELECT id,
+    const rows = (await this.pool.query<{ id: string; owner_id: string; draft_id: string; kind?: string; checked_at: Date; cursor_created: string }>(`SELECT id,owner_id,draft_id,kind,clock_timestamp() AS checked_at,
       to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created
       FROM recruitment_processes WHERE ${column}=$1
       AND ($2::uuid IS NULL OR draft_id=$2) AND ($5::boolean OR invited_at IS NOT NULL)
       AND ($6::timestamptz IS NULL OR (created_at,id) < ($6::timestamptz,$7::uuid))
       ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`, [actorId, draftId ?? null, limit + 1, offset, role === "employer", boundary?.created ?? null, boundary?.id ?? null])).rows;
     const items: RecruitmentView[] = [];
-    for (const row of rows.slice(0, limit)) items.push(await this.get(role, actorId, row.id));
+    const authorities = await this.readAuthorities(rows.slice(0, limit));
+    for (const row of rows.slice(0, limit)) items.push(await this.readAggregate(role, actorId, row.id, authorities.get(row.draft_id) ?? null, row.checked_at));
     const last = rows[Math.min(rows.length, limit) - 1];
     return { items, limit, offset, has_more: rows.length > limit,
       next_cursor: rows.length > limit && last ? this.encodeCursor(scope, last.cursor_created, last.id) : null };
@@ -396,7 +470,7 @@ export class RecruitmentStore {
     return transaction(this.pool, async client => {
       const row = await this.process(client, "employer", ownerId, id);
       await this.expire(client, row);
-      if (!accepted.has(row.state)) return fail(403, "invitation_acceptance_required");
+      if (row.kind === "contact_only" || !accepted.has(row.state)) return fail(403, "invitation_acceptance_required");
       const source = await this.profile(client, row.candidate_id);
       return { candidate_id: row.candidate_id, display_name: source.fields.display_name ?? "", email: source.email,
         phone: source.fields.phone ?? null, profile_revision: Number(source.revision) };
@@ -413,9 +487,9 @@ export class RecruitmentStore {
       if (!row.invited_at) return fail(404, "chat_not_found");
       await this.profile(client, row.candidate_id);
       if (write && terminal.has(row.state)) return fail(409, "chat_read_only");
-      if (write && this.vacancyWritable && !await this.vacancyWritable(row.owner_id, row.draft_id, client)) return fail(409, "chat_read_only");
+      if (write && row.kind !== "contact_only" && this.vacancyWritable && !await this.vacancyWritable(row.owner_id, row.draft_id, client)) return fail(409, "chat_read_only");
       const result = await operation({ process_id: row.id, owner_id: row.owner_id, candidate_id: row.candidate_id, actor_id: actorId });
-      if (this.policy && write && messageActivity && role === "employer" && row.state === "accepted" && !row.employer_contacted_at) {
+      if (row.kind !== "contact_only" && this.policy && write && messageActivity && role === "employer" && row.state === "accepted" && !row.employer_contacted_at) {
         const now = await this.clock(client);
         await client.query("UPDATE recruitment_processes SET employer_contacted_at=$2 WHERE id=$1", [row.id, now]);
         if (row.deadline?.stage !== "interview_wait" && row.deadline?.stage !== "after_interview") {
@@ -459,14 +533,19 @@ export class RecruitmentStore {
       const previous = await this.receiptFor(client, actorId, command.idempotency_key, fingerprint);
       if (previous) return previous;
       const row = await this.process(client, role, actorId, id);
+      if (exitActions.has(command.action)) {
+        try { row.vacancy_open = row.kind === "contact_only" || !this.vacancyWritable || await this.vacancyWritable(row.owner_id, row.draft_id, client); }
+        catch { row.vacancy_open = null; }
+      }
       await this.expire(client, row);
       if (Number(row.revision) !== command.expected_revision) return fail(409, "recruitment_revision_conflict");
       const view = await this.view(client, role, row);
       if (!view.allowed_actions.includes(command.action)) return fail(409, "recruitment_action_unavailable");
-      if (!["view", "decline", "withdraw", "reject", "interview_cancel", "interview_decline", "offer_decline"].includes(command.action)) await this.profile(client, row.candidate_id, command.action === "offer_accept" || command.action === "offer_send");
+      if (!["view", "decline", "withdraw", "reject", "interview_cancel", "interview_decline", "offer_decline", "contact_close"].includes(command.action)) await this.profile(client, row.candidate_id, command.action === "offer_accept" || command.action === "offer_send");
       let state = row.state;
       let hireChanged = false;
       switch (command.action) {
+        case "contact_close": state = role === "employer" ? "rejected" : "withdrawn"; break;
         case "view": state = "viewed"; break;
         case "accept": state = "accepted";
           if (this.policy) await this.setDeadline(client, row, this.deadline("initial", await this.clock(client), this.policy.initialWorkingDays));

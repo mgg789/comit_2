@@ -561,6 +561,9 @@ class AgentRuntime:
     def _complete_cached(self, owner_id: UUID, messages: list[dict[str, Any]], tools: list[dict[str, Any]], max_tokens: int) -> dict[str, Any]:
         request_hash = hashlib.sha256((_hash_request(messages, tools, max_tokens) +
             self.definition.definition_hash + str(getattr(self.provider, "model", "unknown"))).encode()).hexdigest()
+        if getattr(self.provider, "provider", "deepseek") != "deepseek":
+            request_hash = hashlib.sha256((request_hash + str(getattr(self.provider, "provider", "")) +
+                str(getattr(self.provider, "base_url", "")) + str(getattr(self.provider, "reasoning_effort", ""))).encode()).hexdigest()
         cached = self.store.cache_get(owner_id, request_hash)
         if cached is not None:
             return cached

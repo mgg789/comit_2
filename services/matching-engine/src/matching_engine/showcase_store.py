@@ -63,7 +63,7 @@ def _filter_sql(request: SearchRequest) -> tuple[str, list]:
         clauses.append("lower(public_profile->>'city')=ANY(%s)")
         params.append([value.strip().lower() for value in filters.cities])
     if filters.salary is not None:
-        clauses.append("(public_profile->'salary'->>'from_rub')::bigint <= %s AND (public_profile->'salary'->>'to_rub')::bigint >= %s")
+        clauses.append("(public_profile->'salary'->>'from_rub')::bigint <= %s AND ((public_profile->'salary'->>'to_rub') IS NULL OR (public_profile->'salary'->>'to_rub')::bigint >= %s)")
         params.extend([filters.salary.to_rub, filters.salary.from_rub])
     if filters.work_types:
         clauses.append("COALESCE(public_profile->'work_types','[]'::jsonb) ?| %s")

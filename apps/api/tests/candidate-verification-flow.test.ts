@@ -23,7 +23,7 @@ test("verification flow is bound to PG state, ledger, outbox and encrypted owner
     const initial = await store.save(candidateId, {
       expected_revision: 0,
       fields: {
-        projects: [{ title: "Public adapter", description: "Implemented adapter", link: "https://github.com/acme/adapter" }],
+        projects: [{ title: "Public adapter", description: "Implemented adapter", link: "https://github.com/acme/adapter.git/" }],
         experience: [{ title: "Backend engineer", organization: "Acme" }],
       },
       consent: { processing: true, pool: true, version: "profile-v1" },

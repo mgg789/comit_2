@@ -1,0 +1,128 @@
+- id: algorithms-reasoning-v1
+  specialization: algorithms
+  topic: algorithms
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Линейный поиск проверяет массив из {a} элементов слева направо. Искомый
+    элемент отсутствует. Сколько сравнений с элементами выполнит алгоритм?
+  answer_operation: a
+- id: python-reasoning-v1
+  specialization: python
+  topic: python
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Чему равен len(range({b}, {stop}, {b})) в Python?
+  answer_operation: a
+- id: sql-reasoning-v1
+  specialization: sql
+  topic: sql
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: В таблице {a} групп, в каждой ровно {b} строк. После GROUP BY выполняется
+    SUM(COUNT(*)) по полученным группам. Каково числовое значение суммы?
+  answer_operation: multiply
+- id: docker-reasoning-v1
+  specialization: docker
+  topic: docker
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Запущено {b} независимых контейнеров, каждый использует {a} МиБ памяти.
+    Других расходов в условии нет. Сколько МиБ памяти использовано суммарно?
+  answer_operation: multiply
+- id: react-reasoning-v1
+  specialization: react
+  topic: react
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Состояние count равно {a}. В одном обработчике React последовательно
+    вызывает {b} раз setCount(c => c + 1). Чему равно count после обработки очереди
+    обновлений?
+  answer_operation: add
+- id: rest_api-reasoning-v1
+  specialization: rest_api
+  topic: rest_api
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Клиент отправляет {b} одинаковых POST-запросов с одним идемпотентным
+    ключом. Сервер хранит результат первого и не выполняет повторные запросы. Первый
+    запрос создаёт {a} записей. Сколько записей создано всего?
+  answer_operation: a
+- id: teamwork-reasoning-v1
+  specialization: teamwork
+  topic: teamwork
+  type: short_answer
+  difficulty:
+    base: 0.5
+  params:
+    a:
+      range:
+      - 11
+      - 999
+    b:
+      range:
+      - 2
+      - 9
+  statement_ru: Команда оценила {b} независимых задач по {a} человеко-часов каждая.
+    Без параллельной работы и дополнительных расходов сколько человеко-часов составляет
+    суммарная оценка?
+  answer_operation: multiply

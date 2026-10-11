@@ -48,7 +48,7 @@ def main() -> None:
     generator = DeepSeekGenerator()
     if not generator.available():
         print(json.dumps({"retired": retired, "deficits": deficits,
-                          "generation": "unavailable: DEEPSEEK_API_KEY not set"},
+                          "generation": "unavailable: configured LLM API key not set"},
                          ensure_ascii=False, indent=1))
         return
     report = refill(store, generator.generate_item, data_dir=args.data_dir,

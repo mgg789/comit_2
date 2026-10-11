@@ -98,7 +98,9 @@ test("showcase public boundary, PDF watermark, ownership and exact manual-like r
     assert.equal(page.statusCode, 200, page.body);
     assert.equal(calls.at(-1)?.owner, owner.id);
     assert.equal(page.json().items[0].resume_url, `/api/employer/candidates/${id}/resume.pdf?profile_revision=1`);
-    assert.equal((await app.inject({ url: `/employer/candidates/${id}`, headers })).statusCode, 200);
+    const visible = await app.inject({ url: `/employer/candidates/${id}`, headers });
+    assert.equal(visible.statusCode, 200);
+    assert.deepEqual(visible.json().testing_results, []);
     malicious = true;
     assert.equal((await app.inject({ url: `/employer/candidates/${id}`, headers })).statusCode, 503);
     malicious = false;

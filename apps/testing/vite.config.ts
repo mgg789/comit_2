@@ -6,5 +6,8 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: process.env.APP_BASE ?? "/testing/",
-  server: { port: 5175 },
+  server: { port: 5175, proxy: { "/api": {
+    target: process.env.COMIT_API_URL ?? "http://127.0.0.1:8080",
+    changeOrigin: false, rewrite: path => path.replace(/^\/api/, ""),
+  } } },
 });

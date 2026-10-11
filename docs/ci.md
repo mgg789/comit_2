@@ -1,4 +1,4 @@
-# CI — GitHub Actions на self-hosted раннерах
+# CI — GitHub Actions на self-hosted и GitHub-hosted раннерах
 
 ## Инфраструктура
 
@@ -6,19 +6,24 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 
 | Раннер | Лейблы | Роль |
 |---|---|---|
-| mgg-ci-1/2/3 | `ci, mgg-server` | все CI-джобы и деплой |
+| mgg-ci-1/2/3 | `ci, mgg-server` | джобы `js`, `python`, `api`, `smoke` и серверный deploy |
 | mgg-regression-1 | `regression, full, mgg-server` | джоба `regression`: полный Python-набор с PostgreSQL |
+| GitHub-hosted `ubuntu-latest` | — | `code-judge-isolation` (CI) и `public-smoke` (после deploy): без production-секретов и доступа к серверу |
 
 Управление (без sudo): `systemctl --user status|restart github-runner@mgg-ci-1`; логи: `journalctl --user -u github-runner@<имя>`.
 
-## ci.yml — пул-реквесты и push в dev/main
+## ci.yml — пул-реквесты и push в dev/main/fix/pre-release
+
+Ветка `fix/pre-release` запускает тот же полный CI до интеграции в dev. Это
+дополнительный trigger проверки; deploy по-прежнему привязан к main.
 
 | Джоба | Контейнер | Шаги |
 |---|---|---|
-| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` |
+| `js` | node:22-bookworm | `pnpm install --frozen-lockfile` → `pnpm -r typecheck` → `pnpm -r build` → `runtime-shared.test.mjs` → тесты ui-kit/employer/candidate/testing |
 | `api` | python:3.12-bookworm + Node 22 + isolated pgvector | все API-тесты, отдельная disposable БД на файл → c8 → line/branch gate |
-| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip |
+| `python` | python:3.12-bookworm | matching/testing/integration/agents/verification/code-judge `[dev]` → отдельный pytest для каждого сервиса, unit coverage и явные причины skip; реальный Docker acceptance вынесен в отдельный ephemeral job |
 | `regression` | python:3.12-bookworm + service `pgvector/pgvector:pg16` | тот же набор сервисов с disposable PostgreSQL → line/branch gates каждого пакета |
+| `code-judge-isolation` | GitHub-hosted Ubuntu | установка judge-тестов → `tests/compose-config.py` (prod/dev/smoke env) → `tests/public-smoke.py` и `tests/deploy-config.py` → pinned sandbox image → реальная Docker-изоляция и враждебные синтетические сабмиты → сборка и HTTP-приёмка broker |
 | `smoke` | хост (нужен docker) | explicit `docker-compose.dev.yml --profile dev`, проект `comit-ci`, порты 38xxx, real pinned Harrier cache → `SMOKE_MODE=dev ./tests/smoke.sh` → `down -v` |
 
 - Джобы `js`, `python`, `api` и `regression` выполняются в контейнерах — хосту не нужны node/python. API использует официальный Python 3.12 image и `setup-node` для Node 22: `setup-python` не поддерживает Debian 12 образ Node и не используется.
@@ -26,6 +31,15 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
 - Smoke-гейт обязателен для мержа (AGENTS §11).
 - Smoke использует `--env-file /dev/null`: defaults только явного dev compose, без `.env` продакшена.
   Все семь опубликованных API/service портов, включая agents/verification, находятся в 38xxx.
+- Generic smoke явно задаёт `CODE_JUDGE_URL=http://127.0.0.1:1` внутри testing-engine
+  и синтетические сервисные токены: этот endpoint недоступен. После обычного smoke
+  отдельный HTTP-шаг проверяет `code_ready=false`, отсутствие типа `code`, отказ
+  старта Python/Algorithms с 503 и отсутствие израсходованной попытки. Это не
+  подтверждение готовности судьи: реальный Docker и HTTP broker проверяет отдельная
+  джоба `Code judge isolation`. `python3 tests/compose-config.py` рендерит dev compose
+  также с фактическими значениями `smoke.env` из workflow, чтобы обязательная новая
+  переменная не могла отсутствовать только в CI. Эта регрессия выполняется в
+  disposable isolation job, где уже доступны Python и Docker Compose.
 - До запуска smoke cache `comit-ci_harrier_cache` получает реальные model files из
   `comit_harrier_cache` через read-only mount, если он существует; копируется только
   `hub/models--microsoft--harrier-oss-v1-270m`, без HF credentials. При отсутствии
@@ -33,14 +47,14 @@ mgg-server (drj-1), 4 self-hosted раннера `mgg789/comit_2` (user-systemd 
   внутри matching image. ID/revision берутся из actual `embeddings.py`; отсутствие
   exact cache ломает CI. Runtime matching остаётся offline. Только isolated CI
   volumes удаляются при teardown; production cache не изменяется.
-- Этот smoke workflow синтаксически проверен; live self-hosted build/provision/smoke
-  проверяется фактическим запуском Actions, не локальным config render.
+- Результат live self-hosted build/provision/smoke подтверждается фактическим
+  запуском Actions.
 
 ## Джоба regression — полный Python-набор с PostgreSQL
 
 Регулярная джоба `python` идёт без базы, поэтому все PostgreSQL-тесты matching-engine
-(durable pipeline, combine-хранилище, гонки публикаций) в ней молча пропускаются.
-Джоба `regression` на `mgg-regression-1` закрывает этот пробел:
+(durable pipeline, combine-хранилище, гонки публикаций) в ней пропускаются.
+Джоба `regression` на `mgg-regression-1` покрывает их полностью:
 
 - Поднимает disposable Postgres 16 с pgvector (`pgvector/pgvector:pg16`, нужен миграциям matching) как GitHub Actions service container; база
   `coverage_test` живёт только внутри джобы, учётка тестовая (`comit`/`comit-regression`).
@@ -75,10 +89,10 @@ consent-таблицы. Runner запускает этот fixture послед�
 `tests/coverage-gates/thresholds.json` хранит нижние пороги **для всего source-пакета**,
 по строкам и ветвям отдельно. Неисполненные модули включены (`c8 --all`,
 `pytest --cov=<package> --cov-branch`); фильтров для искусственного повышения процентов нет.
-Это защита от регрессии покрытия, а не заявление о достаточной полноте тестов.
+Это защита от регрессии покрытия, которая дополняет функциональные проверки.
 Первичные пороги округлены вниз до пяти процентных пунктов от наблюдённой базы;
-новые тесты не понижают эти floors автоматически. Низкое
-покрытие verification остаётся явным техническим долгом. Unit matching отдельно дал
+новые тесты не понижают эти floors автоматически. Рост
+покрытия verification-engine — приоритет следующего этапа. Unit matching отдельно дал
 68.75 / 57.48%, 1098 passed, 142 skipped; unit не заменяет PG gate.
 
 | Пакет | Наблюдённые строки / ветви, 2026-10-11 | Floor строки / ветви | Контур |
@@ -118,8 +132,8 @@ Runner выставляет `COMIT_DISPOSABLE_DATABASE_TESTS=1`; deadline fixtur
 (`invitation chat: two authenticated participants, files, polling, retries, consent and closure`)
 и три matching consent acceptance-теста с отдельно засеиваемыми operational cards
 (`LEARNING_ACCEPTANCE_DATABASE_URL`). Любой новый неожиданный skip ломает gate.
-Эти исключения не являются проверенным покрытием внешнего chat или operational consent:
-для них нужны отдельные acceptance-контуры. Обычная unit-джоба выводит все skips и
+Внешний chat и operational consent проверяются собственными acceptance-контурами,
+вне этого gate. Обычная unit-джоба выводит все skips и
 **не** выдаёт PG acceptance или полный coverage gate.
 
 Локальные команды после установки dev dependencies:
@@ -133,20 +147,67 @@ COVERAGE_TEST_DATABASE_URL=... python tests/coverage-gates/python.py matching-en
 ```
 
 Отчёты: `coverage/unit/` и `coverage/backend/` (git-ignored), JSON + LCOV/XML и
-JUnit, публикуются CI как artifacts даже после падения. Обычный `pnpm -r build`
-не доказывает тестовое покрытие. GitHub Actions workflow описан и синтаксически
-проверен локально; успешный запуск remote CI отдельно подтверждается результатом Actions.
+JUnit, публикуются CI как artifacts даже после падения. Покрытие измеряют
+тестовые джобы, а не `pnpm -r build`. Успешный запуск remote CI подтверждается
+результатом Actions.
 
-## deploy.yml — push в main (и workflow_dispatch)
+## deploy.yml — после успешного CI на push в main (и workflow_dispatch)
 
-Сборка prod-стека (`infra/docker-compose.prod.yml`) прямо на сервере и health-проверка — `docs/deploy.md`.
+Триггер — `workflow_run` workflow CI на ветке `main` с `conclusion == success` и
+событием `push`, либо ручной `workflow_dispatch` (параметр `adopt_legacy` для
+первого перехода со старого стека). `infra/deploy.py` собирает
+`infra/docker-compose.prod.yml` на сервере в immutable release, делает backup БД,
+smoke и откат образов при ошибке — подробности в [deploy.md](deploy.md).
 
 ## Секреты
 
 - Секретов в репозитории нет; на сервере — `/home/mgg/comit/.env` (git-ignored).
 - Если появятся секреты Actions — только GitHub Environment secrets, никогда в коде/логах/памяти.
 
-## Известные упрощения каркаса
+## Следующие шаги CI
 
-- Нет кэша pnpm/pip между прогонами (первое время ок; добавить `actions/cache` или registry при замедлении).
-- Образы не публикуются в registry — сборка на месте; при росте времени сборки перейти на GHCR.
+- Кэш pnpm/pip между прогонами (`actions/cache` или registry) — при росте времени прогонов.
+- Публикация образов в GHCR вместо сборки на месте — при росте времени сборки.
+
+## Приёмка браузерного тестирования
+
+`pnpm --filter @comit/web-testing test` проверяет состояния индикаторов, очередь
+записи, восстановление счётчиков и валидацию ответов. API coverage job устанавливает
+настоящий testing-engine и запускает `testing-browser-http.test.ts` с отдельной
+PostgreSQL схемой: OTP, сессия, MCQ/текст, запись, публикация и cooldown.
+`TESTING_ENGINE_TEST_PYTHON` указывает Python с установленным testing-engine;
+`TESTING_BROWSER_TEST_DATABASE_URL` — только disposable PostgreSQL.
+Локальное измерение 11.10.2026: 34 теста testing-engine, 79,74% строк / 69,80%
+ветвей; штатный gate 75% / 60% пройден. Это покрытие сервиса; UI проверяется
+своими тестами, проверка на физических устройствах — следующий этап.
+
+## Проверки пакета завершения
+
+CI также запускает unit-контракт demo-каталога, frontend merge-resume regression и все `apps/api/tests/*.test.ts`, включая FSP/weekly/import. API coverage runner автоматически создаёт отдельные временные БД для новых `*_TEST_DATABASE_URL`. Полный результат текущего пакета — [package-validation.md](package-validation.md).
+
+
+Пакет `code-judge` входит в Python unit/regression coverage gate: минимум 80%
+строк и 60% ветвей. Реальный Docker sandbox — отдельный явный acceptance-контур;
+общий Python job без Docker не выдаёт его за пройденный. Job `Code judge isolation` запускает эти проверки на одноразовом GitHub-hosted runner без production-секретов и доступа к серверу приложения. Команда и граница VM
+описаны в [deploy.md](deploy.md#изолированная-проверка-кода).
+
+Реальная проверка `Code judge isolation (disposable runner)` выполняется отдельно
+на GitHub-hosted Ubuntu: pinned Python image, Docker isolation и HTTP broker
+acceptance. Generic compose smoke использует явно недоступный judge endpoint и
+проверяет отказ начала code-теста без создания попытки; выполнение кода
+подтверждает отдельная джоба выше. Актуальные результаты нового тестирования —
+[package-validation.md](package-validation.md); таблица выше фиксирует
+checkpoint 2026-10-11, а текущий SHA проверяет собственный прогон CI.
+
+После deploy добавлен отдельный job `public-smoke` на GitHub-hosted runner:
+реальный домен/TLS, health/readiness, JSON API, HTML/SVG и auth/privacy boundaries.
+Регрессии `python tests/public-smoke.py` и `python tests/deploy-config.py`
+выполняются в CI до merge. Порядок и ограничения — [deploy.md](deploy.md#отдельная-внешняя-проверка-после-cd).
+
+API Python HTTP fixtures имеют общий monotonic startup deadline 45 секунд,
+раннее обнаружение exit/signal/spawn error и bounded cleanup TERM 2 с → KILL 2 с.
+Регрессия задержки 16 секунд воспроизвела прежний 15-секундный timeout; проверка
+реального PDF сохранена. Причина медленного старта в прежнем CI
+уточняется; гипотеза CPU contention пока не подтверждена.
+
+Три сценария `test_live_employer_agent` (interface_help, markdown_report, background_clarification) требуют явного `AGENT_LIVE_ACCEPTANCE=1` для платного провайдера. Только их точные имена, только в agents-service и только без opt-in разрешены как пропуски общего PG-gate; другие пропуски по-прежнему завершают gate ошибкой. Пороги покрытия не изменены.

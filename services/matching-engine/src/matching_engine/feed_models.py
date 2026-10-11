@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from matching_engine.combine_models import CandidateCard
+from matching_engine.fsp_boost import PromotionExplanation
 from matching_engine.models import Contract
 
 
@@ -46,6 +47,9 @@ class ShowcaseLikeConflict(Contract):
 class FeedCard(CandidateCard):
     """A served exposure with immutable source identity and feedback metadata."""
 
+    promotion: PromotionExplanation | None = None
+    weekly_activity_expires_at: datetime | None = Field(default=None,
+        description="Current server-earned weekly practice deadline, refreshed from the ready profile at delivery; exclusive UTC Monday.")
     exposure_id: UUID
     session_id: UUID
     kind: Literal["recommended", "reserve", "showcase"]

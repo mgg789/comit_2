@@ -52,8 +52,8 @@ serve этот шаг не выполняет.
 SMTP worker получает plaintext code только в памяти после расшифровки валидного
 outbox job и проверяет challenge/lease непосредственно перед SMTP. Crash между SMTP
 ACK и записью delivery может повторить письмо; это at-least-once delivery, тогда как
-OTP verify остаётся at-most-once. Фактическая доставка и production состояние этой
-схемой не подтверждаются.
+OTP verify остаётся at-most-once. Фактическая доставка и production состояние
+подтверждаются отдельно, при эксплуатации стенда.
 
 ## Source profile кандидата
 
@@ -84,9 +84,9 @@ semantic vectors, PDF или pool-ready.
 
 ## Миграции
 
-- api-core: явный Node/pg runner с checksum/advisory lock; файлы в `apps/api/migrations/`.
-- matching-engine: `python -m matching_engine migrate` (advisory lock, checksum в `candidate_pipeline.migrations`); SQL 001–006 в схемах `candidate_pipeline`, `vacancy_pipeline`, `matching_pipeline`, `rerank_pipeline`; 006 добавляет `pool.grade_status` (approved|self_reported).
-- agents-service: `python -m agents_service migrate`, схема `agents_service` (см. ниже).
+- api-core: явный Node/pg runner с checksum/advisory lock (`pnpm --filter @comit/api auth:migrate`, в compose — `auth-migrate`); файлы `apps/api/migrations/001_accounts.sql` … `020_training_consent_not_null.sql` применяются в лексикографическом порядке. Номер 011 занят дважды (`011_testing_grades.sql`, `011_vacancy_lifecycle.sql`); `011_testing_grades.sql` побайтно совпадает с `019_testing_grades.sql` и использует `IF NOT EXISTS`, поэтому повторное применение безвредно. API `/ready` требует применённой `020_training_consent_not_null.sql`.
+- matching-engine: `python -m matching_engine migrate` (в compose — `candidate-migrate`; advisory lock, checksum в `candidate_pipeline.migrations`); SQL 001–017 в схемах `candidate_pipeline`, `vacancy_pipeline`, `matching_pipeline`, `rerank_pipeline` (005), `feed_pipeline` (007), `learning_pipeline` (008), `preference_pipeline` (009), `hypothesis_pipeline` (012), `recommendation_evidence` (017); 006 добавляет `pool.grade_status` (approved|self_reported). Историческое переименование 012 — [matching-migrations.md](matching-migrations.md).
+- agents-service: `python -m agents_service migrate` (в compose — `agents-migrate`), схема `agents_service`, SQL 001–011 (последние: `010_vacancy_lifecycle.sql`, `011_employer_expense_hooks.sql`; см. ниже).
 
 ## Синтетика
 
@@ -132,7 +132,7 @@ Draft сохраняет своё состояние; у старого проф
 со статусом null (неизвестно, а не подтверждённый нулевой уровень).
 В этот период пул временно меньше/пуст; это осознанная fail-closed миграция,
 несовместимые поколения не сравниваются. При ошибке модель/worker чинятся,
-failed jobs повторяются через retry; отката индексов или данных нет.
+failed jobs повторяются через retry; восстановление идёт вперёд, без отката индексов или данных.
 Cached semantic vectors используются повторно, если текст и модель не менялись.
 
 Полный синтетический вход: `data/seed/candidate-pipeline.json` (4 вымышленных
@@ -281,7 +281,7 @@ offer с точной RUB зарплатой, сроком и immutable history.
 actor/key, fingerprint command включает endpoint. Event sequence сериализован
 до commit и привязан к process revision, payload minimal, polling only participants.
 Хранение историческое без auto deletion; ни001/002, ни engine migrations
-не переписаны. [Подробные переходы и ограничения](recruitment.md).
+не переписаны. [Подробные переходы и правила](recruitment.md).
 
 ## QGramm chat storage
 
@@ -292,6 +292,15 @@ actor/key, fingerprint command включает endpoint. Event sequence сер�
 существующий process UUID и неизменяемую пару участников. Метаданные и
 секреты восстанавливаются вместе с volume; смена derivation key не является
 безопасной ротацией. [Хранение и backup boundary](chat.md).
+
+Удаление кандидатского или работодательского аккаунта вызывает настоящий
+`POST /internal/chat/purge` для каждого связанного процесса до удаления API-графа.
+QGramm удаляет сообщения, события, устройства, uploads и зашифрованные файлы;
+оставляет только tombstone UUID комнаты, запрещающий её повторное создание.
+API удерживает блокировки аккаунта и процессов на время очистки. При ошибке QGramm
+транзакция API откатывается, аккаунт и ссылки сохраняются для повторной попытки;
+уже очищенные комнаты восстанавливать нельзя. Другие процессы не затрагиваются.
+Экспорты и резервные копии требуют отдельного операторского процесса удаления.
 
 ## Теневые модели предпочтений вакансии
 
@@ -348,11 +357,11 @@ Exact outbox snapshots сохраняют все разрешения и сер�
 активная preference-модель и новые операционные export/fit проверяют source
 training_consent и не используют прежнее согласие как разрешение на обучение.
 Экспортированные файлы требуют отдельного контроля оператора; массовое удаление
-профилей/архивов не входит в эту миграцию. [Тексты и ограничения](legal/README.md).
+профилей/архивов не входит в эту миграцию. [Тексты и правила](legal/README.md).
 
 Новые learning samples фиксируют именно training-v1 и training_accepted_at в
 consent_version/consent_accepted_at, а не подменяют их временем profile consent.
-# Внешняя верификация и документы
+## Внешняя верификация и документы
 
 `candidate_profile_evidence` хранит canonical input SHA-256, provider status, verified value и provenance. `candidate_verification_ledger` append-only записывает каждый provider result до замены latest evidence. Каждое подтверждение поднимает source revision и создаёт новый immutable outbox snapshot; профильная правка с изменённым input сбрасывает старый status. `candidate_fsp_demo_auth_states` хранит только hash short-lived state, выбранный fixture, revision и одноразовую отметку consumption. Imported facts несут immutable `provider_version` и server `imported_at`. `candidate_verification_documents` хранит только AES-256-GCM ciphertext и metadata со статусом `pending`; загрузка не является подтверждением.
 
@@ -380,7 +389,7 @@ context/memory, журнал инструментов, вызовы провай
 API миграции `009_organization_agent_tool_receipts.sql` и
 `010_organization_agent_read_receipts.sql` сохраняют immutable hash
 запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
-сохраняют checksum. [Потоки и ограничения](agents.md).
+сохраняют checksum. [Потоки и правила](agents.md).
 
 ## Очередь событий email (API013)
 
@@ -389,7 +398,7 @@ API миграции `009_organization_agent_tool_receipts.sql` и
 Email и приватные имена разрешаются из текущего источника только перед delivery.
 `notification_mail_cutover` исключает исторические matching likes после обновления
 worker. Вставка `recruitment_interviews` и обе записи outbox транзакционны.
-[Типы, согласия, retry и отсутствующий producer ежемесячных заданий](email-notifications.md).
+[Типы, согласия, retry и подключение producer ежемесячных заданий](email-notifications.md).
 
 
 ## Компания, inbox и процессы найма (API014–016)
@@ -409,13 +418,68 @@ worker. Вставка `recruitment_interviews` и обе записи outbox т
 
 API-миграция `018_employer_expenses.sql` добавляет `employer_expenses` (source key, owner, optional vacancy, category, integer kopeks, source time, frozen policy, reason) и `employer_expense_ai_days` (owner/Moscow date, cumulative provider micro-USD and billed kopeks). Категории: publication, invitation, ai, penalty. Данные не содержат контактов кандидатов и текста ОС. Владение в HTTP всегда берётся из сессии.
 
-Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
+Триггеры записывают расходы атомарно с `recruitment_events` (`invitation.sent`, `accept`, `deadline.expired`), подтверждённой `agents_service.drafts.published_at` и settled `organization_usage_ledger`. Миграция 019 применяет `expense-v2` только к новым источникам: 398 ₽ за публикацию, 49 ₽ при отправке приглашения и ещё 147 ₽ при его принятии, 398 ₽ за просрочку и ручное решение поддержки. Снимок тарифа хранится в исходной строке отправки приглашения; доплата при `accept` создаётся только для приглашения с этим снимком. Старые приглашения остаются по `expense-v1` и не получают ретроспективную доплату. Сбой/rollback источника откатывает начисление, повтор source key не удваивает сумму. Дневная строка блокируется перед накоплением стоимости ИИ, включая конкурентные provider settlements. Zero-cost ledger rows сохраняют факт потребления дневной нормы, но не увеличивают число начислений.
 
 Миграция backfill использует только известные даты публикаций и durable события/settlements, сохраняет исходные timestamps и маркирует исторические записи; неизвестные даты не синтезируются. API/agents migrations допускают оба порядка через deployment-only `install_employer_expense_sources()`; agents migration 011 устанавливает hooks, когда API-схема уже существует. Миграции выполняет владелец общих схем; функции не доступны PUBLIC. Функция поддержки сохраняет ссылку на ручное решение, не публикуя пояснение в статистике. Ни HTTP GET, ни агрегирование рекомендаций не создают расходов.
 
 
 ### Подтверждённые результаты тестирования
 
-Миграция `019_testing_grades.sql` добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
+Миграция `019_testing_grades.sql` (дубликат с тем же содержимым — `011_testing_grades.sql`) добавляет `candidate_grade_results`: владелец candidate_id, глобально уникальный session_id, подтверждённая оценка, направление, число решённых заданий, метка наблюдения и decided_at. FK удаляет записи вместе с профилем. Только доверенный producer создаёт эти записи; локальная дата для календаря вычисляется из decided_at в Europe/Moscow. API не считает текущую декларацию оценки тестом и не подменяет историю синтетическими событиями.
 
 Миграция `020_training_consent_not_null.sql` закрывает SQL NULL-обход CHECK: включённое согласие требует явную версию v1/v2 и дату. Недопустимые старые строки не получают выдуманное согласие: миграция отклоняется до ручного исправления.
+
+## Данные браузерного грейд-теста
+
+`candidate_grade_results` хранит доверенный результат конкретного семейства.
+Профиль получает evidence `grade:<семейство>`; результат SQL/React не заменяет
+общий заявленный профессиональный грейд. Работодатель получает только семейство,
+грейд, бейдж присутствия и состояние камеры через защищённый профиль кандидата.
+Сырые счётчики, идентификатор попытки и видео в этот ответ не входят.
+
+Testing-engine хранит попытку, ответы, checkpoint и принятые сервером согласия
+`testing-media-v1` с обязательным processing и отдельным screen_recording во внутреннем `testing-data`. При режиме `full` запись разбита
+на ограниченные фрагменты с последовательностью; повтор тех же байтов безопасен,
+подмена существующего номера отвергается. Срок хранения 90 дней зафиксирован
+в manifest; встроенная очистка удаляет просроченные материалы. Ни этот каталог,
+ни внутренний service token не публикуются браузеру.
+
+## Недельная практика и демо-каталог
+
+Миграция `021_weekly_challenges.sql` хранит единственную попытку кандидата за UTC-неделю. Серверная отметка `external:weekly_challenge:current` и outbox обновляются атомарно. Импорт резюме не хранит исходный файл и не меняет профиль без его обычного сохранения. [Демо-каталог](demo-data.md) импортируется отдельной командой, без уведомлений и подтверждённых доказательств.
+
+### Предметное подтверждение навыков
+
+Accepted `candidate_grade_results.specialization` сопоставляется ровно одной
+канонической координате (`domains`/`stacks`/`soft_skills`); mapping и уровни 1/2/4/6
+описаны в [candidate-profile.md](candidate-profile.md). Coordinate evidence содержит
+hash декларации, измеренный level, session id, серверное время и provenance.
+Старый `grade:<subject>` сохранён как совместимый независимый результат;
+общая `declared_grade` не меняется предметным тестом. Ограниченное восстановление
+проекций использует marker `external:testing_mapping:v1` в evidence, без новой таблицы.
+
+## Идентичности Яндекс OAuth
+
+Миграция `022_yandex_oauth.sql`: `auth_oauth_states` хранит только hash случайного browser-bound состояния, роль, версию принятого согласия и expiry (10 минут); DELETE…RETURNING обеспечивает одноразовое потребление между репликами. `auth_oauth_identities` связывает пару `(provider,subject)` с account UUID с каскадным удалением. Один provider identity не создаёт второй аккаунт; существующий email не связывается автоматически. OAuth-токены и client secret в БД не сохраняются. Просроченные состояния очищаются при новом старте входа.
+
+Удаление candidate выполняется через `DELETE /candidate/account`: matching
+сначала сохраняет `candidate_pipeline.tombstones` и очищает candidate-owned
+projection graph под `PIPELINE_LOCK`, включая pool/PDF, jobs/outbox, feed,
+selection, rerank и hypothesis rows. Затем API transaction блокирует account,
+отзывает все sessions, удаляет recruitment rows без cascade, auth challenges и
+email issue events, после чего удаляет account; остальные account/profile rows
+удаляются обычными `ON DELETE CASCADE`. Tombstone сохраняется для replay fence и
+не содержит профильных данных. Перед API transaction тот же workflow вызывает
+`testing-engine DELETE /internal/candidates/{candidate_id}`: owner tombstone
+блокирует новые попытки, а JSON sessions и raw media удаляются идемпотентно.
+# System inbox attachments
+
+Миграция `023_system_chat_attachments.sql` хранит вложения поддержки в
+`system_chat_files` (owner `accounts`, ограниченный `bytea`, SHA-256 и UUID
+retry key) и связывает опубликованные файлы с `system_notifications` через
+`system_notification_files`. Обе таблицы используют `ON DELETE CASCADE`, поэтому
+удаление аккаунта или уведомления удаляет байты. Непривязанные файлы ограничены
+64 MiB на аккаунт; опубликованные и непривязанные вместе ограничены 256 MiB.
+Обе квоты проверяются под account inbox lock. Orphan-файлы старше суток
+очищаются при следующей загрузке и никогда не выдаются endpoint скачивания до
+публикации в сообщении.

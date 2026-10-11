@@ -114,7 +114,7 @@ calibration. Исправление метаданных записано в н�
 —зелёный; прежние4I001 в нетронутых tests не исправлялись.
 `WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
 INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` —12проверок зелёные.
-Production, remoteCI, image build и полный learned R₀ не проверялись.
+Production, remote CI, image build и полный learned R₀ — следующие этапы проверки.
 
 После rebase на параллельный auth checkpoint `2b513c0` зависимости восстановлены
 через `pnpm install --frozen-lockfile` без правки lockfile. Повтор API:22passed,

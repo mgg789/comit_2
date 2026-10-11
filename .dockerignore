@@ -7,4 +7,10 @@ __pycache__
 *.log
 .env
 context
-docs
+docs/*
+!docs/legal/
+!docs/legal/**
+
+# Local provider credentials; never commit or include in image contexts.
+qwen-token.txt
+qwen_token.txt

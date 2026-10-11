@@ -123,12 +123,13 @@ pnpm --filter @comit/api dev
 pnpm --filter @comit/api auth:mail-worker
 ```
 
-Для контейнеров opt-in `infra/docker-compose.auth.yml` после базового compose и
-нужных pipeline/agents overlays. Он добавляет auth migration/mail worker, без
-нового SMTP сервера. DATABASE_URL указывает только на Comit PostgreSQL.
+В контейнерах `auth-migrate` и `auth-mail-worker` входят в основной compose
+(`make up`; в dev-файле mail worker запускается только с профилем `prod`), без
+нового SMTP сервера; legacy overlay `infra/docker-compose.auth.yml` не нужен. DATABASE_URL указывает только на Comit PostgreSQL.
 
 Env: AUTH_SECRET (либо JWT_SECRET), AUTH_ALLOWED_ORIGINS, AUTH_COOKIE_SECURE,
-AUTH_KEY_ID, ACCOUNT_CONSENT_VERSION, SMTP_HOST/PORT/USER/PASSWORD/FROM/TLS_SERVERNAME.
+AUTH_KEY_ID (по умолчанию `v1`), ACCOUNT_CONSENT_VERSION (`account-v1`), AUTH_ISSUER
+(`comit`), AUTH_AUDIENCE (`comit-api`), SMTP_HOST/PORT/USER/PASSWORD/FROM/TLS_SERVERNAME.
 Без auth-конфигурации login endpoints возвращают 503; остальные internal контуры
 продолжают работать. Без SMTP-конфигурации code возвращает 503.
 

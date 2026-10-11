@@ -1136,6 +1136,66 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "candidate-pipeline"
+        ],
+        "summary": "Delete",
+        "description": "Delete one candidate projection idempotently and leave a replay tombstone.",
+        "operationId": "delete_internal_candidates__candidate_id__delete",
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "x-internal-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Internal-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Delete Internal Candidates  Candidate Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/internal/candidates/{candidate_id}/retry": {
@@ -4065,7 +4125,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -4203,7 +4263,7 @@
           "salary": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SalaryRange"
+                "$ref": "#/components/schemas/CandidateSalary"
               },
               {
                 "type": "null"
@@ -4333,6 +4393,34 @@
         "title": "CandidateProfile",
         "description": "Complete or draft input; contacts remain private until downstream acceptance."
       },
+      "CandidateSalary": {
+        "properties": {
+          "from_rub": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "From Rub"
+          },
+          "to_rub": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Rub"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "from_rub"
+        ],
+        "title": "CandidateSalary",
+        "description": "Candidate minimum in RUB; null upper bound means no salary ceiling."
+      },
       "CandidateStatus": {
         "properties": {
           "candidate_id": {
@@ -4433,7 +4521,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -5009,7 +5097,8 @@
             "enum": [
               "fsp",
               "repository",
-              "hh"
+              "hh",
+              "weekly_challenge"
             ],
             "title": "Kind"
           },
@@ -5075,7 +5164,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -5101,6 +5190,29 @@
           },
           "explanation": {
             "$ref": "#/components/schemas/ScoreBreakdown"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromotionExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "weekly_activity_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekly Activity Expires At",
+            "description": "Current server-earned weekly practice deadline, refreshed from the ready profile at delivery; exclusive UTC Monday."
           },
           "exposure_id": {
             "type": "string",
@@ -6659,7 +6771,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -6920,6 +7032,56 @@
         "title": "PreferenceStatus",
         "description": "Operational state without coefficients, personal feature payloads or participant identifiers."
       },
+      "PromotionExplanation": {
+        "properties": {
+          "policy_version": {
+            "type": "string",
+            "title": "Policy Version"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "off",
+              "shadow",
+              "active"
+            ],
+            "title": "Mode"
+          },
+          "fsp_bonus": {
+            "type": "number",
+            "title": "Fsp Bonus"
+          },
+          "weekly_bonus": {
+            "type": "number",
+            "title": "Weekly Bonus"
+          },
+          "combined_bonus": {
+            "type": "number",
+            "title": "Combined Bonus"
+          },
+          "max_base_gap": {
+            "type": "number",
+            "title": "Max Base Gap"
+          },
+          "demo_registry": {
+            "type": "boolean",
+            "title": "Demo Registry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "policy_version",
+          "mode",
+          "fsp_bonus",
+          "weekly_bonus",
+          "combined_bonus",
+          "max_base_gap",
+          "demo_registry"
+        ],
+        "title": "PromotionExplanation",
+        "description": "Public bounded ordering factors, separate from additive model contributions."
+      },
       "PublicCandidateCard": {
         "properties": {
           "candidate_id": {
@@ -6940,7 +7102,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7004,7 +7166,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7209,7 +7371,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "description": {
             "type": "string",
@@ -7451,7 +7613,7 @@
             "title": "City"
           },
           "salary": {
-            "$ref": "#/components/schemas/SalaryRange"
+            "$ref": "#/components/schemas/CandidateSalary"
           },
           "category": {
             "$ref": "#/components/schemas/Category"
@@ -7526,6 +7688,16 @@
             },
             "type": "object",
             "title": "Rerank Contributions"
+          },
+          "promotion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PromotionExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "artifact_hash": {
             "anyOf": [

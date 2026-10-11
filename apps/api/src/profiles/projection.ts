@@ -1,4 +1,6 @@
 /** Pure source-profile projection helpers. Matching receives only this snapshot. */
+import { createHash } from "node:crypto";
+import { TEST_SKILL_COORDINATES, TEST_GRADE_LEVELS, type TestingSpecialization, type TestingGrade } from "@comit/shared";
 import type { CandidateClaimEvidence, CandidateDeclaredNarrative, CandidateIntake, CandidateProfileFields, ClaimStatus, JsonValue } from "@comit/shared";
 
 type ProjectionSkill = NonNullable<CandidateIntake["domains"]>[number];
@@ -49,6 +51,31 @@ export function projectionTimestamp(value: Date | string | null): string | null 
   return value === null ? null : value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
 
+/** Read compatibility for accepted subject results predating coordinate evidence.
+ * Trusted measurements stay separate from declarations; browser level changes cannot forge a result.
+ * The same adapter feeds private reads and matching retries, so old grades enter the actual vector.
+ */
+export function withTrustedSkillResults(fields: CandidateProfileFields, rows: ProfileEvidenceRow[]): { fields: CandidateProfileFields; rows: ProfileEvidenceRow[] } {
+  const mappedFields = { ...fields };
+  const mappedRows = new Map(rows.map(row => [row.evidence_key, row]));
+  for (const [subject, coordinate] of Object.entries(TEST_SKILL_COORDINATES)) {
+    if (mappedRows.has(`external:testing_removed:${subject}`)) continue;
+    const result = mappedRows.get(`grade:${subject}`);
+    const value = result?.verified_value;
+    if (result?.status !== "confirmed" || !result.provenance.some(item => item.startsWith("testing-engine:"))
+      || !value || typeof value !== "object" || Array.isArray(value) || typeof value.grade !== "string"
+      || !Object.hasOwn(TEST_GRADE_LEVELS, value.grade)) continue;
+    const level = TEST_GRADE_LEVELS[value.grade as TestingGrade];
+    const skills = mappedFields[coordinate.group] ?? [];
+    let skill = skills.find(item => item.key === coordinate.key);
+    if (!skill) { skill = { key: coordinate.key, level }; mappedFields[coordinate.group] = [...skills, skill]; }
+    mappedRows.set(`${coordinate.group}:${coordinate.key}`, { ...result, evidence_key: `${coordinate.group}:${coordinate.key}`,
+      input_hash: createHash("sha256").update(canonicalJson(skill), "utf8").digest("hex"),
+      verified_value: { ...value, key: coordinate.key, level, subject: subject as TestingSpecialization } });
+  }
+  return { fields: mappedFields, rows: [...mappedRows.values()] };
+}
+
 function evidenceMap(rows: ProfileEvidenceRow[]): Map<string, ProfileEvidenceRow> {
   return new Map(rows.map(row => [row.evidence_key, row]));
 }
@@ -87,12 +114,13 @@ function provenance(map: Map<string, ProfileEvidenceRow>, key: string): string[]
 }
 
 function skillList(fields: CandidateProfileFields, group: "domains" | "stacks" | "soft_skills", map: Map<string, ProfileEvidenceRow>): ProjectionSkill[] {
-  return (fields[group] ?? []).map(skill => ({
-    key: skill.key,
-    level: skill.level,
-    status: status(map, `${group}:${skill.key}`, skill),
-    provenance: provenance(map, `${group}:${skill.key}`),
-  }));
+  return (fields[group] ?? []).map(skill => {
+    const key = `${group}:${skill.key}`, row = map.get(key), value = row?.verified_value;
+    const measured = row?.status === "confirmed" && row.provenance.some(item => item.startsWith("testing-engine:"))
+      && value && typeof value === "object" && !Array.isArray(value) && typeof value.level === "number" ? value.level : null;
+    return { key: skill.key, level: measured ?? skill.level, status: measured === null ? status(map, key, skill) : "confirmed",
+      provenance: provenance(map, key) };
+  });
 }
 
 function factValue<T>(map: Map<string, ProfileEvidenceRow>, key: string, value: T): ProjectionValue<T> {
@@ -174,15 +202,17 @@ export function projectCandidateIntake(
   revision: number,
   consent: ProjectionConsent,
 ): CandidateIntake {
+  const trusted = withTrustedSkillResults(fields, evidenceRows);
+  fields = trusted.fields; evidenceRows = trusted.rows;
   const map = evidenceMap(evidenceRows);
   const declaredGrade = fields.declared_grade ?? null;
   const externalEvidence = evidenceRows.flatMap(row => {
-    const match = /^(external:(?:fsp|repository|hh)):(.+)$/.exec(row.evidence_key);
+    const match = /^(external:(?:fsp|repository|hh|weekly_challenge)):(.+)$/.exec(row.evidence_key);
     if (!match) return [];
     const subject = match[2];
     const prefix = match[1];
     if (!subject || !prefix) return [];
-    return [{ kind: prefix.slice("external:".length) as "fsp" | "repository" | "hh", subject,
+    return [{ kind: prefix.slice("external:".length) as "fsp" | "repository" | "hh" | "weekly_challenge", subject,
       // External input is kept in the evidence hash, while the provider result is already server-bound.
       status: row.status, verified_value: row.verified_value }];
   });

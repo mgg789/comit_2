@@ -41,6 +41,9 @@
   --employer-glass: linear-gradient(145deg, rgb(52 53 54 / 82%), rgb(34 35 36 / 94%));
   --employer-composer-glass: linear-gradient(145deg, rgb(49 50 51 / 98%), rgb(37 38 39 / 98%));
   --employer-glass-blur: 48rem;
+  --comit-glass-frost: linear-gradient(135deg, rgb(255 255 255 / 12%), rgb(255 255 255 / 4%) 42%, rgb(255 255 255 / 8%));
+  --comit-glass-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), inset 0 -1px 0 rgb(255 255 255 / 8%), inset 0 0 12rem rgb(255 255 255 / 6%), 0 8rem 24rem rgb(0 0 0 / 12%);
+  --comit-glass-fallback: rgb(30 31 32 / 82%);
   --employer-deck-neutral-start: rgb(198 190 214 / 82%);
   --employer-deck-neutral-end: rgb(183 153 100 / 70%);
   --employer-card: rgb(255 255 255 / 5%);
@@ -49,7 +52,9 @@
   --employer-gradient: linear-gradient(173.6267465362488deg, #397ee4 4.5062%, #9663c3 112.06%);
   --employer-success: #69cd55;
   --employer-warning: #ffc655;
+  --employer-weekly-activity: #f59e0b;
   --employer-danger: #ff7789;
+  --comit-testing-danger: #ff383c;
   --employer-font: "Inter", sans-serif;
   --employer-display: "Murs Gothic", sans-serif;
   --employer-logo: "Moon Walk", sans-serif;

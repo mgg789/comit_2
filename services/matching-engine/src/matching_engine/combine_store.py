@@ -90,6 +90,7 @@ class CombineStore:
                     jsonb_build_object('projects',c.profile->'projects',
                         'experience',c.profile->'experience','achievements',c.profile->'achievements') AS narratives,
                     c.profile->'relocation_ready' AS relocation_ready,
+                    c.profile->'external_evidence' AS trusted_external_evidence,
                     c.profile->'relocation_cities' AS relocation_cities,
                     row_number() OVER (PARTITION BY p.specialization
                         ORDER BY p.grade_rank DESC,p.confirmed_strength DESC,p.candidate_id) AS rank,
@@ -125,7 +126,9 @@ class CombineStore:
             narrative_facts=project_narrative_facts({key: [NarrativeClaim.model_validate(claim)
                 for claim in (claims or [])] for key, claims in row["narratives"].items()}),
             external_evidence=[ExternalEvidence.model_validate(item)
-                for item in (row["public_profile"].get("external_evidence", []) or [])],
+                for item in [*row["public_profile"].get("external_evidence", []),
+                    *(entry for entry in (row["trusted_external_evidence"] or [])
+                      if entry.get("kind") == "weekly_challenge")]],
         ) for row in rows]
 
     @staticmethod

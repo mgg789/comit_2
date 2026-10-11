@@ -81,6 +81,7 @@ class VacancyStore:
         missing = missing_requirements(profile)
         with connect(self.database_url) as connection:
             connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            self._require_live_owner(connection, profile.owner_id)
             if connection.execute("SELECT 1 FROM vacancy_pipeline.tombstones WHERE vacancy_id=%s", (vacancy_id,)).fetchone():
                 raise ConflictError("vacancy_deleted")
             fence = connection.execute("SELECT * FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
@@ -141,6 +142,7 @@ class VacancyStore:
         """Durably stop matching/refill before the source lifecycle CAS, preserving all history."""
         with connect(self.database_url) as connection:
             connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            self._require_live_owner(connection, request.owner_id)
             deleted = connection.execute("SELECT * FROM vacancy_pipeline.tombstones WHERE vacancy_id=%s", (vacancy_id,)).fetchone()
             if deleted:
                 raise ConflictError("vacancy_deleted")
@@ -198,6 +200,38 @@ class VacancyStore:
             connection.execute("DELETE FROM vacancy_pipeline.vacancies WHERE vacancy_id=%s", (vacancy_id,))
             connection.execute("DELETE FROM vacancy_pipeline.lifecycle_fences WHERE vacancy_id=%s", (vacancy_id,))
             return VacancyDeleteReceipt(vacancy_id=vacancy_id, source_revision=request.source_revision)
+
+    @staticmethod
+    def _require_live_owner(connection: psycopg.Connection, owner_id: UUID | None) -> None:
+        """Reject delayed projections and lifecycle fences for permanently deleted owners."""
+        if owner_id is not None and connection.execute(
+            "SELECT 1 FROM vacancy_pipeline.employer_tombstones WHERE owner_id=%s", (owner_id,),
+        ).fetchone():
+            raise ConflictError("employer_deleted")
+
+    def delete_employer(self, owner_id: UUID) -> dict[str, object]:
+        """Purge every owner vacancy, including active ones, atomically and fence delayed intake."""
+        with connect(self.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(%s)", (PIPELINE_LOCK,))
+            connection.execute(
+                "INSERT INTO vacancy_pipeline.employer_tombstones(owner_id) VALUES (%s) ON CONFLICT DO NOTHING",
+                (owner_id,),
+            )
+            # Keep UUID fences even if a stale source message supplies another owner later.
+            connection.execute("""INSERT INTO vacancy_pipeline.tombstones(vacancy_id,owner_id,source_revision)
+                SELECT vacancy_id,owner_id,max(source_revision) FROM (
+                    SELECT vacancy_id,owner_id,source_revision FROM vacancy_pipeline.vacancies WHERE owner_id=%s
+                    UNION ALL
+                    SELECT vacancy_id,owner_id,source_revision FROM vacancy_pipeline.lifecycle_fences WHERE owner_id=%s
+                ) owned GROUP BY vacancy_id,owner_id ON CONFLICT DO NOTHING""", (owner_id, owner_id))
+            for table in ("delivery_errors", "inbox"):
+                connection.execute(f"""DELETE FROM matching_pipeline.{table} WHERE source='vacancy' AND event_id IN (
+                    SELECT o.id FROM vacancy_pipeline.outbox o JOIN vacancy_pipeline.vacancies v
+                    USING(vacancy_id) WHERE v.owner_id=%s)""", (owner_id,))
+            # Migration 016 cascades only the vacancy graph, preserving candidates and shared registries.
+            connection.execute("DELETE FROM vacancy_pipeline.vacancies WHERE owner_id=%s", (owner_id,))
+            connection.execute("DELETE FROM vacancy_pipeline.lifecycle_fences WHERE owner_id=%s", (owner_id,))
+            return {"owner_id": str(owner_id), "deleted": True}
 
     @staticmethod
     def _enqueue(connection, vacancy_id: UUID, revision: int, schema_version: int) -> None:

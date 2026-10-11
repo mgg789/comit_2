@@ -46,7 +46,7 @@ def strict_filter(vacancy: VacancyReady, candidate: MatchCandidate, *, excluded:
         reasons.append("selection_state_excluded")
     if vacancy.class_key is not None and candidate.category.specialization != vacancy.class_key:
         reasons.append("class_mismatch")
-    if max(vacancy.zp_min, candidate.salary.from_rub) > min(vacancy.zp_max, candidate.salary.to_rub):
+    if max(vacancy.zp_min, candidate.salary.from_rub) > min(vacancy.zp_max, candidate.salary.to_rub if candidate.salary.to_rub is not None else vacancy.zp_max):
         reasons.append("salary_disjoint")
     if candidate.work_types is None:
         reasons.append("work_type_unknown")

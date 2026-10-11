@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field
 
 from matching_engine.combine_models import CandidateCard
+from matching_engine.fsp_boost import PromotionExplanation
 from matching_engine.models import Contract
 
 
@@ -50,6 +51,7 @@ class RerankCard(CandidateCard):
     kind: Literal["recommended", "reserve"]
     rerank_score: float | None
     rerank_contributions: dict[str, float] = Field(default_factory=dict)
+    promotion: PromotionExplanation | None = None
     artifact_hash: str | None
     activation_revision: int = Field(default=0, ge=0)
     approval_receipt_hash: str | None = None

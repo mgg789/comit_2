@@ -37,6 +37,10 @@ services:
       AUTH_ALLOWED_ORIGINS: "${AUTH_ALLOWED_ORIGINS:?Set explicit browser origins}"
       AUTH_COOKIE_SECURE: 'true'
       AUTH_KEY_ID: "${AUTH_KEY_ID:-v1}"
+      YANDEX_OAUTH_ENABLED: "${YANDEX_OAUTH_ENABLED:-false}"
+      YANDEX_OAUTH_CLIENT_ID: "${YANDEX_OAUTH_CLIENT_ID:-}"
+      YANDEX_OAUTH_CLIENT_SECRET: "${YANDEX_OAUTH_CLIENT_SECRET:-}"
+      YANDEX_OAUTH_SITE_ORIGIN: "${YANDEX_OAUTH_SITE_ORIGIN:-}"
       ACCOUNT_CONSENT_VERSION: "${ACCOUNT_CONSENT_VERSION:-account-v1}"
       TRUST_PROXY: "${TRUST_PROXY:?Set explicit trusted nginx IP addresses or CIDRs}"
       SMTP_HOST: "${SMTP_HOST:-host.docker.internal}"
@@ -54,7 +58,10 @@ services:
       VERIFICATION_ENGINE_TOKEN: "${VERIFICATION_ENGINE_TOKEN:?Set VERIFICATION_ENGINE_TOKEN}"
       VERIFICATION_DOCUMENT_KEY: "${VERIFICATION_DOCUMENT_KEY:?Set VERIFICATION_DOCUMENT_KEY}"
       FSP_DEMO_ENABLED: 'false'
+      TESTING_ENGINE_URL: http://testing-engine:8102
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
+      SUPPORT_EMAIL: "${SUPPORT_EMAIL:-}"
+      SUPPORT_ACCESS_KEY: "${SUPPORT_ACCESS_KEY:-}"
       PUBLIC_SITE_URL: "${PUBLIC_SITE_URL:?Set HTTPS public site URL}"
     depends_on:
       postgres:
@@ -93,6 +100,9 @@ services:
       context: ".."
       dockerfile: infra/matching-engine.Dockerfile
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       PORT: 8101
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private service
@@ -126,9 +136,27 @@ services:
     environment:
       PORT: 8102
       BLUEPRINT_DIR: "/app/blueprints"
+      TESTING_ENABLED: "${TESTING_ENABLED:-true}"
       TESTING_API_URL: http://api:8080
       TESTING_ENGINE_TOKEN: "${TESTING_ENGINE_TOKEN:?Set TESTING_ENGINE_TOKEN}"
       TESTING_DATA_DIR: /data/testing
+      TESTING_RECORDING_MODE: "${TESTING_RECORDING_MODE:-off}"
+      CODE_JUDGE_URL: "${CODE_JUDGE_URL:-}"
+      CODE_JUDGE_TOKEN: "${CODE_JUDGE_TOKEN:-}"
+      CODE_JUDGE_CA_PEM: "${CODE_JUDGE_CA_PEM:-}"
+      JEV_PROVIDER: "${JEV_PROVIDER:-systemone}"
+      JEV_PRICING_VERSION: "${JEV_PRICING_VERSION:-user-2026-10-07}"
+      JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
+      JEV_API_KEY: "${JEV_API_KEY:-}"
+      JEV_MODEL: "${JEV_MODEL:-kev-latest}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-timeweb}"
+      TIMEWEB_BASE_URL: "${TIMEWEB_BASE_URL:-https://api.timeweb.ai/v1}"
+      TIMEWEB_MODEL: "${TIMEWEB_MODEL:-timeweb/gpt-oss-120b}"
+      TIMEWEB_API_KEY: "${TIMEWEB_API_KEY:-}"
+      TIMEWEB_REASONING_EFFORT: "${TIMEWEB_REASONING_EFFORT:-low}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
     ports:
     - 127.0.0.1:${TESTING_PORT:-8102}:8102
     volumes:
@@ -175,7 +203,7 @@ services:
       api:
         condition: service_healthy
     ports:
-    - "${WEB_PORT:-8088}:80"
+    - "127.0.0.1:${WEB_PORT:-8088}:80"
     restart: unless-stopped
   candidate-migrate:
     build:
@@ -187,6 +215,9 @@ services:
     - matching_engine
     - migrate
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
     depends_on:
       postgres:
@@ -201,6 +232,9 @@ services:
     - matching_engine
     - worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       HF_HOME: "/models"
       PIPELINE_MAX_ATTEMPTS: 5
@@ -221,6 +255,9 @@ services:
     - matching_engine
     - vacancy-worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       HF_HOME: "/models"
       PIPELINE_MAX_ATTEMPTS: 5
@@ -241,6 +278,9 @@ services:
     - matching_engine
     - combine-worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -258,6 +298,9 @@ services:
     - matching_engine
     - rerank-worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -275,6 +318,9 @@ services:
     - matching_engine
     - feed-refill-worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -292,6 +338,9 @@ services:
     - matching_engine
     - preference-worker
     environment:
+      APP_ENV: production
+      MATCHING_PROMOTION_MODE: "${MATCHING_PROMOTION_MODE:-shadow}"
+      MATCHING_PROMOTION_ALLOW_DEMO: "${MATCHING_PROMOTION_ALLOW_DEMO:-false}"
       DATABASE_URL: postgres://comit:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/comit
       PIPELINE_MAX_ATTEMPTS: 5
       PIPELINE_LEASE_SECONDS: 300
@@ -313,13 +362,21 @@ services:
       CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
         token}"
       JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-timeweb}"
+      TIMEWEB_BASE_URL: "${TIMEWEB_BASE_URL:-https://api.timeweb.ai/v1}"
+      TIMEWEB_MODEL: "${TIMEWEB_MODEL:-timeweb/gpt-oss-120b}"
+      TIMEWEB_API_KEY: "${TIMEWEB_API_KEY:-}"
+      TIMEWEB_REASONING_EFFORT: "${TIMEWEB_REASONING_EFFORT:-low}"
       DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
       DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
-      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       ORGANIZATION_API_URL: http://api:8080
-      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
-      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
-      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_PRICING_VERSION: "${AGENT_PRICING_VERSION:-user-2026-10-07}"
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-}"
+      JEV_PROVIDER: "${JEV_PROVIDER:-systemone}"
+      JEV_PRICING_VERSION: "${JEV_PRICING_VERSION:-user-2026-10-07}"
       JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
       JEV_MODEL: "${JEV_MODEL:-kev-latest}"
       JEV_API_KEY: "${JEV_API_KEY:-}"
@@ -377,13 +434,21 @@ services:
       CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
         token}"
       JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-timeweb}"
+      TIMEWEB_BASE_URL: "${TIMEWEB_BASE_URL:-https://api.timeweb.ai/v1}"
+      TIMEWEB_MODEL: "${TIMEWEB_MODEL:-timeweb/gpt-oss-120b}"
+      TIMEWEB_API_KEY: "${TIMEWEB_API_KEY:-}"
+      TIMEWEB_REASONING_EFFORT: "${TIMEWEB_REASONING_EFFORT:-low}"
       DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
       DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
-      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       ORGANIZATION_API_URL: http://api:8080
-      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
-      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
-      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_PRICING_VERSION: "${AGENT_PRICING_VERSION:-user-2026-10-07}"
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-}"
+      JEV_PROVIDER: "${JEV_PROVIDER:-systemone}"
+      JEV_PRICING_VERSION: "${JEV_PRICING_VERSION:-user-2026-10-07}"
       JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
       JEV_MODEL: "${JEV_MODEL:-kev-latest}"
       JEV_API_KEY: "${JEV_API_KEY:-}"
@@ -414,13 +479,21 @@ services:
       CANDIDATE_PIPELINE_TOKEN: "${CANDIDATE_PIPELINE_TOKEN:?Set a private matching
         token}"
       JEV_LOCAL_URL: "${JEV_LOCAL_URL:-}"
+      LLM_PROVIDER: "${LLM_PROVIDER:-timeweb}"
+      TIMEWEB_BASE_URL: "${TIMEWEB_BASE_URL:-https://api.timeweb.ai/v1}"
+      TIMEWEB_MODEL: "${TIMEWEB_MODEL:-timeweb/gpt-oss-120b}"
+      TIMEWEB_API_KEY: "${TIMEWEB_API_KEY:-}"
+      TIMEWEB_REASONING_EFFORT: "${TIMEWEB_REASONING_EFFORT:-low}"
       DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
       DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-flash}"
-      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:?Set DEEPSEEK_API_KEY}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       ORGANIZATION_API_URL: http://api:8080
-      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-0.2}"
-      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-0.7}"
-      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-0.2}"
+      AGENT_PRICING_VERSION: "${AGENT_PRICING_VERSION:-user-2026-10-07}"
+      AGENT_INPUT_USD_PER_MILLION: "${AGENT_INPUT_USD_PER_MILLION:-}"
+      AGENT_OUTPUT_USD_PER_MILLION: "${AGENT_OUTPUT_USD_PER_MILLION:-}"
+      AGENT_CACHED_INPUT_USD_PER_MILLION: "${AGENT_CACHED_INPUT_USD_PER_MILLION:-}"
+      JEV_PROVIDER: "${JEV_PROVIDER:-systemone}"
+      JEV_PRICING_VERSION: "${JEV_PRICING_VERSION:-user-2026-10-07}"
       JEV_API_URL: "${JEV_API_URL:-https://ai.sverk.tech/v1/systemone}"
       JEV_MODEL: "${JEV_MODEL:-kev-latest}"
       JEV_API_KEY: "${JEV_API_KEY:-}"

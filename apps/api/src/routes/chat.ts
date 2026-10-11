@@ -29,8 +29,10 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
   const config = chatConfiguration();
   const chatUrl = options.chatUrl ?? config?.url, chatToken = options.chatToken ?? config?.token;
   const transport = correlatedFetch(options.chatTransport ?? fetch);
-  // Production shares a ten-connection pool with accounts/profiles: chat may retain at most three clients.
+  // Reserve separate bounded budgets for interactive requests and background polls.
+  // At most six chat operations share the production ten-connection pool.
   let activeOperations = 0;
+  let activePolls = 0;
   const streams = new Map<string, number>();
   const enterStream = (actorId: string): boolean => {
     if ([...streams.values()].reduce((total, value) => total + value, 0) >= 32 || (streams.get(actorId) ?? 0) >= 2) return false;
@@ -118,9 +120,12 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
       try { cursor = streamCursor(request.headers["last-event-id"], request.query.after_sequence); }
       catch { return reply.code(400).send({ detail: "recruitment_cursor_invalid" }); }
       if (!enterStream(identity.accountId)) return reply.code(429).header("retry-after", "1").send({ detail: "chat_stream_busy" });
-      const poll = async (after: number) => {
-        if (activeOperations >= 3) throw new RecruitmentError(429, "chat_busy");
-        activeOperations++;
+      const poll = async (after: number, _signal?: AbortSignal, initial = false) => {
+        if (activePolls >= 3) {
+          if (initial) throw new RecruitmentError(429, "chat_busy");
+          return { events: [], next_sequence: after };
+        }
+        activePolls++;
         try {
           const current = await resolveSession(request, role, options.config, options.store);
           if (!current || current.accountId !== identity.accountId) throw new RecruitmentError(401, "session_revoked");
@@ -132,10 +137,10 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
             previous = item.sequence;
           }
           return { events: page.items.map(event => ({ sequence: event.sequence, type: "recruitment.changed", event })), next_sequence: page.next_sequence };
-        } finally { activeOperations--; }
+        } finally { activePolls--; }
       };
       try {
-        const initial = await poll(cursor);
+        const initial = await poll(cursor, shutdown.signal, true);
         await serveStream(request, reply, initial, poll, { lifetimeMs, pollMs, signal: shutdown.signal, afterSequence: cursor }, error =>
           error instanceof RecruitmentError ? { status: error.status, code: error.code } : { status: 503, code: "recruitment_unavailable" });
       } catch (error) {
@@ -157,9 +162,12 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
       if (!enterStream(identity.accountId)) {
         return reply.code(429).header("retry-after", "1").send({ detail: "chat_stream_busy" });
       }
-      const poll = async (after: number, signal: AbortSignal = shutdown.signal): Promise<ChatEventPage> => {
-        if (activeOperations >= 3) throw new RecruitmentError(429, "chat_busy");
-        activeOperations++;
+      const poll = async (after: number, signal: AbortSignal = shutdown.signal, initial = false): Promise<ChatEventPage> => {
+        if (activePolls >= 3) {
+          if (initial) throw new RecruitmentError(429, "chat_busy");
+          return { events: [], next_sequence: after };
+        }
+        activePolls++;
         try {
           const current = await resolveSession(request, role, options.config, options.store);
           if (!current || current.accountId !== identity.accountId) throw new RecruitmentError(401, "chat_session_revoked");
@@ -191,10 +199,10 @@ export async function chatRoutes(app: FastifyInstance, options: ChatOptions): Pr
             if (result.next_sequence < previous) throw new RecruitmentError(503, "chat_invalid_response");
             return result;
           });
-        } finally { activeOperations--; }
+        } finally { activePolls--; }
       };
       try {
-        const initial = await poll(cursor);
+        const initial = await poll(cursor, shutdown.signal, true);
         await serveStream(request, reply, initial, poll, { lifetimeMs, pollMs, signal: shutdown.signal, afterSequence: cursor }, error =>
           error instanceof RecruitmentError ? { status: error.status, code: error.code } : { status: 503, code: "chat_unavailable" });
       } catch (error) {

@@ -39,5 +39,5 @@ API и matching запускались из текущего дерева; nginx
 
 Независимый финальный reviewer/inspector не запустился из-за лимита агентских
 потоков; итоговый diff проверен основным агентом. UI, нагрузочная приёмка и
-server deployment не проводились. Ограничения privacy/free-text и исключение
+server deployment — следующие этапы. Правила privacy/free-text и исключение
 manual реакций из learned-cohort изложены в [контракте](candidate-showcase.md).

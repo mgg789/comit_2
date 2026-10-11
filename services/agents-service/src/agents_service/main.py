@@ -74,6 +74,13 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     async def conflict(_request, error):
         return JSONResponse(status_code=409, content={"detail": str(error)})
 
+    @app.delete("/internal/employers/{owner_id}")
+    def delete_employer(owner_id: UUID, own: Owner, db: Database) -> dict[str, object]:
+        """Purge the authenticated internal owner; retries retain permanent replay fences."""
+        if owner_id != own:
+            raise HTTPException(403, "owner_id_mismatch")
+        return db.delete_employer(own)
+
     @app.get("/healthz")
     def health() -> dict[str, str]:
         """Report liveness without claiming model or database readiness."""
@@ -236,4 +243,6 @@ def create_app(store: Store | None = None, matching: MatchingClient | None = Non
     register_organization_routes(app, owner, database, capability_check=require_optional)
     from agents_service.organization_documents import register_document_routes
     register_document_routes(app, owner, database)
+    from agents_service.resume_import import register_resume_routes
+    register_resume_routes(app, owner)
     return app

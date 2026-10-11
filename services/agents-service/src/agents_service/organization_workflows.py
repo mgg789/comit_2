@@ -60,7 +60,9 @@ class MemoryWriteArgs(OrganizationContract):
 
 _WORKFLOW_TOOLS = {
     "task_list": (TaskListArgs, "List owner tasks and pending employer questions to find a task to resume."),
-    "task_start": (TaskStartArgs, "Start an explicitly requested candidate inquiry, interview negotiation, or offline stand-in."),
+    "task_start": (TaskStartArgs, ("Persist an explicitly requested candidate inquiry, interview negotiation, or offline stand-in. "
+                   "A supplied process_id can be saved without recruitment_get; process access is checked before candidate actions. "
+                   "For schedule_interview, availability may be empty: the worker asks the employer for slots and waits before contacting candidates.")),
     "task_status": (TaskIdArgs, "Read current task scope, progress and unresolved questions."),
     "task_stop": (TaskIdArgs, "Revoke a candidate-chat delegation."),
     "task_availability": (TaskAvailabilityArgs, "Resume a waiting task with employer-confirmed availability."),
@@ -134,14 +136,18 @@ class WorkflowToolRegistry:
             if name == "memory_write":
                 self._employer_turn(owner)
                 return {"result": self.store.patch_memory(owner, args.expected_revision, args.value).model_dump(mode="json")}
-            if self.turn is None or self.turn.task_id is None:
+            if self.turn is None or self.turn.task_id is None or self.turn.owner_id != owner:
                 raise OrganizationToolError("delegated_task_required", status=403)
             task = self.store.get_task(owner, self.turn.task_id)
+            # An exact durable completion receipt is safe to read after the task
+            # transitions. The store rejects changed arguments and revoked tasks.
+            if idempotency_key in (task.result or {}).get("completion_receipts", {}):
+                return self.store.complete_task(self.turn, process_id=args.process_id, outcome=args.outcome,
+                                                report=args.report, idempotency_key=idempotency_key)
             if task.lease_token != self.turn.task_lease_token or not self.store.task_lease_valid(task):
                 raise OrganizationToolError("delegation_lease_lost", status=409)
             if args.outcome == "completed" and task.kind != "inquiry":
                 raise OrganizationToolError("interview_completion_requires_candidate_acceptance", status=409)
-            status = "succeeded" if args.outcome == "completed" else "waiting_employer"
             progress = dict(task.result or {})
             process_id = str(args.process_id)
             if process_id not in task.conversation_refs["process_ids"]:
@@ -157,20 +163,8 @@ class WorkflowToolRegistry:
                     "text": "[AI-агент работодателя] Мне необходимо проконсультироваться с работодателем; вернёмся к вам после уточнения.",
                     "idempotency_key": idempotency_key,
                 }, str(uuid5(NAMESPACE_URL, idempotency_key + ":consult")), str(task.task_id))
-            state.update({"completed": args.outcome == "completed", "report": args.report})
-            processes[process_id] = state
-            progress["processes"] = processes
-            if args.outcome == "completed" and not all(processes.get(value, {}).get("completed") for value in task.conversation_refs["process_ids"]):
-                status = "processing"
-            progress.update({"report": args.report, "outcome": args.outcome})
-            self.store.update_task(owner, task.task_id, status=status, result=progress, lease_token=task.lease_token)
-            self.store.append_message(owner, role="assistant", content=args.report,
-                                      idempotency_key=f"task:{task.task_id}:report:{idempotency_key}",
-                                      task_id=task.task_id, task_lease_token=task.lease_token)
-            if status == "waiting_employer":
-                self.store.ask_owner(self.store.get_task(owner, task.task_id), args.report[:2000],
-                                     availability=task.kind == "schedule_interview")
-            return {"result": {"status": status, "report": args.report}}
+            return self.store.complete_task(self.turn, process_id=args.process_id, outcome=args.outcome,
+                                            report=args.report, idempotency_key=idempotency_key)
         args = dict(arguments)
         if name in {"candidate_chat_read", "candidate_chat_send", "interview_propose"}:
             if self.turn is None or self.turn.task_id is None:
@@ -198,13 +192,15 @@ class WorkflowToolRegistry:
 
     @staticmethod
     def _check_availability(task: OrganizationTask, args: dict) -> None:
-        start = datetime.fromisoformat(str(args.get("starts_at", "")).replace("Z", "+00:00"))
+        start = datetime.fromisoformat(str(args.get("starts_at", "")))
         if start.tzinfo is None:
             raise OrganizationToolError("interview_timezone_required", status=422)
         end = start + timedelta(minutes=int(args.get("duration_minutes", 0)))
         slots = [AvailabilitySlot.model_validate(value) for value in task.conversation_refs["availability"]]
         if not any(slot.starts_at <= start < end <= slot.ends_at and args.get("location") == slot.location
-                   and args.get("format") == slot.format and args.get("kind") == slot.kind for slot in slots):
+                   and args.get("format") == slot.format and args.get("kind") == slot.kind
+                   and args.get("duration_minutes") == slot.duration_minutes
+                   and args.get("time_zone") == slot.time_zone for slot in slots):
             raise OrganizationToolError("interview_outside_employer_availability", status=409)
 
 
@@ -218,6 +214,42 @@ class OrganizationWorkflows:
     def _read(self, task: OrganizationTask, name: str, args: dict):
         key = str(uuid5(NAMESPACE_URL, f"task:{task.task_id}:{task.lease_token}:read:{name}:{args}"))
         return _unwrap(self.registry.base.dispatch(str(task.owner_id), name, args, key, str(task.task_id)))
+
+    @staticmethod
+    def _interview_matches(task: OrganizationTask, interview: dict) -> bool:
+        """Accept only candidate-confirmed meetings matching this delegation's supplied slot."""
+        if interview.get("state") not in {"scheduled", "completed"}:
+            return False
+        try:
+            WorkflowToolRegistry._check_availability(task, interview)
+        except (OrganizationToolError, ValueError, TypeError):
+            return False
+        return True
+
+    def _escalate_failure(self, task: OrganizationTask, turn: OrganizationTurn) -> None:
+        """Persist a human-readable question immediately; ambiguous paid calls remain fenced."""
+        code = turn.error_code or "organization_workflow_failed"
+        if code in {"provider_call_ambiguous", "provider_call_in_flight", "provider_usage_missing", "provider_usage_invalid"}:
+            prompt = "Не удалось подтвердить результат обращения к AI. Автоматический повтор остановлен, чтобы избежать повторного расхода. Проверьте результат и уточните, как продолжить поручение."
+        elif code.startswith("budget_"):
+            prompt = "Не удалось продолжить поручение из-за ограничения бюджета AI. Проверьте расходы в настройках и уточните, как продолжить."
+        else:
+            prompt = "AI не смог продолжить поручение. Проверьте текущий результат и уточните дальнейшие действия; задача пока не завершена."
+        self.store.ask_owner(task, prompt)
+        self.store.update_task(task.owner_id, task.task_id, status="waiting_employer", error_code=code,
+                               lease_token=task.lease_token)
+
+    def _run_process_turn(self, task: OrganizationTask, turn: OrganizationTurn) -> bool:
+        """Run a candidate turn and return whether its task can still advance in this wake."""
+        self.runtime.run_turn(turn)
+        current = self.store.get_task(task.owner_id, task.task_id)
+        if current.status != "processing":
+            return False
+        completed = self.store.get_turn(task.owner_id, turn.turn_id)
+        if completed and completed.status == "failed":
+            self._escalate_failure(task, completed)
+            return False
+        return True
 
     def process(self, task: OrganizationTask) -> None:
         """Advance one claimed task without replacing consent, source state or candidate acceptance."""
@@ -251,8 +283,8 @@ class OrganizationWorkflows:
             if state.get("completed"):
                 continue
             process = self._read(task, "recruitment_get", {"process_id": process_id})
-            if task.kind == "schedule_interview" and any(item.get("state") in {"scheduled", "completed"}
-                    for item in process.get("interviews", []) if item.get("kind") in {slot["kind"] for slot in refs["availability"]}):
+            if task.kind == "schedule_interview" and any(self._interview_matches(task, item)
+                    for item in process.get("interviews", [])):
                 processes[process_id] = {**processes.get(process_id, {}), "scheduled": True}
                 continue
             all_scheduled = False
@@ -261,13 +293,13 @@ class OrganizationWorkflows:
             if pending_id:
                 previous = self.store.get_turn(task.owner_id, UUID(pending_id))
                 if previous and previous.status == "failed":
-                    self.store.ask_owner(task, f"Не удалось продолжить задачу: {previous.error_code}. Проверьте задачу {task.task_id}.")
-                    self.store.update_task(task.owner_id, task.task_id, status="waiting_employer", lease_token=task.lease_token)
+                    self._escalate_failure(task, previous)
                     return
                 if previous and previous.status in {"queued", "processing", "retrying"}:
                     turn = self.store.claim_turn_by_id(task.owner_id, previous.turn_id)
                     turn = self.store.bind_task_turn(turn, task)
-                    self.runtime.run_turn(turn)
+                    if not self._run_process_turn(task, turn):
+                        return
                     current = self.store.get_task(task.owner_id, task.task_id)
                     if current.status != "processing":
                         return
@@ -292,6 +324,9 @@ class OrganizationWorkflows:
                        "candidate_data_untrusted": {"process": process, "messages": candidate_messages},
                        "rules": "Communicate using candidate_chat_send. Do not invent availability. "
                                 "Only propose an interview after agreeing a supplied slot; the candidate must accept. "
+                                "Do not invoke interview_accept: acceptance belongs to the candidate session. "
+                                "After interview_propose, tell the candidate to accept in their own interface and end this turn. "
+                                "The worker will observe the real scheduled state and report completion. "
                                 "If no slot works, tell the candidate you will consult the employer, then task_complete needs_employer. "
                                 "For inquiry, task_complete completed with this process_id only once you have sufficient answers. "
                                 "For stand_in answer the new message and leave the delegation running."}
@@ -312,7 +347,8 @@ class OrganizationWorkflows:
             if turn.status != "succeeded":
                 turn = self.store.claim_turn_by_id(task.owner_id, turn.turn_id)
                 turn = self.store.bind_task_turn(turn, task)
-                self.runtime.run_turn(turn)
+                if not self._run_process_turn(task, turn):
+                    return
             current = self.store.get_task(task.owner_id, task.task_id)
             if current.status != "processing":
                 return

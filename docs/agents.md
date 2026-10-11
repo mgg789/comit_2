@@ -7,7 +7,9 @@
 неизвестные исторические даты остаются `null`. Обновление текста не меняет даты.
 
 Ручная форма и чат редактируют **один** черновик в `agents-service`.
-UI в этот проход не входит. `owner_id` — UUID для учёта владельца;
+Кабинет работодателя работает с ним через `/employer/vacancies`
+([vacancy-crud.md](vacancy-crud.md)) и глобальный AI-чат
+(`/employer/organization-agent/*`). `owner_id` — UUID для учёта владельца;
 он не подтверждает личность. Вызовы доступны доверенным сервисам с
 `AGENTS_SERVICE_TOKEN` и `X-Owner-ID`; токен нельзя отдавать браузеру.
 Браузер работает через employer gateway API-core (`/employer/vacancy-drafts`,
@@ -26,7 +28,7 @@ UI в этот проход не входит. `owner_id` — UUID для учё
 `agent_temporarily_unavailable`, HTTP401/403 — non-retryable `agent_provider_rejected`.
 Проверка отправки не зависит от доступности enrichment. Локальная проверка 2026-10-08:
 отдельный synthetic DeepSeek turn принят HTTP202, завершился succeeded, сохранён один
-ответ. Это не проверка бизнес-инструментов или production.
+ответ. Проверка бизнес-инструментов и production-контура — следующий этап.
 
 `GET /employer/organization-agent/chat` идемпотентно создаёт один чат;
 `POST /messages` ставит turn в очередь, `GET /turns/{id}` показывает результат.
@@ -44,7 +46,7 @@ DeepSeek получает thinking disabled для `off`, enabled с `reasoning_
 turn после перезапуска и не возвращается в публичном receipt или истории сообщений.
 Старые редакционные сессии и фоновые поручения используют `off`.
 Требуется миграция `008_organization_reasoning.sql`; реальный provider smoke
-для включённого thinking в этом проходе не выполнялся.
+для включённого thinking — следующий шаг проверки.
 
 Каталог инструментов доступен полностью. Модель сначала читает краткие названия,
 затем раскрывает выбранные JSON-схемы через `discover_tools` и вызывает `call_tool`.
@@ -114,8 +116,8 @@ scope агента; `vacancy` — отдельный редакторский wo
 
 Глобальный registry предоставляет list/get/create/edit/approve/publish вакансии.
 Снятие, закрытие и удаление доступны в UI/API через координированный lifecycle,
-но `vacancy_withdraw`, `vacancy_close`, `vacancy_delete` пока отсутствуют в registry.
-Агент объясняет ручной путь и не объявляет эти действия выполненными. Прямая
+а регистрация `vacancy_withdraw`, `vacancy_close`, `vacancy_delete` как инструментов
+ассистента — следующий шаг. Агент объясняет ручной путь и не объявляет эти действия выполненными. Прямая
 архивация Store не заменяет lifecycle API с matching/recruitment последствиями.
 
 Доверенный bridge API-core — `POST /internal/organization-agent/tools/{tool}`,
@@ -171,7 +173,7 @@ employer account с согласием; сведения и карточки п�
 координаты используется 9 вариантов: отсутствует и уровни 0–7. Выбирается максимум
 вероятности, а не округление ожидаемой оценки. Пакеты содержат не более 24 вопросов.
 Сохраняются модель, версия рубрики, hash исходных полей и реестра, вероятности.
-Ручные и агентские правки групп имеют приоритет над повторной Laya-деривацией.
+Ручные и агентские правки групп имеют приоритет над повторной Jev-деривацией.
 Результат устаревшей ревизии не применяется. Это редактируемое заполнение требований,
 а не решение о найме; качество оценок требует продуктовой калибровки.
 
@@ -218,9 +220,21 @@ python -m agents_service organization-worker
 
 Env: `DATABASE_URL`, `AGENTS_SERVICE_TOKEN`, `MATCHING_ENGINE_URL`,
 `CANDIDATE_PIPELINE_TOKEN`, `JEV_LOCAL_URL`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`,
-`DEEPSEEK_API_KEY`. Секреты передаются процессу/контейнеру извне.
-Для Docker используется opt-in overlay `infra/docker-compose.agents.yml` после
-`docker-compose.candidate-pipeline.yml`. Laya остаётся локальным host-сервисом;
+`DEEPSEEK_API_KEY`, а также `ORGANIZATION_API_URL`, `AGENTS_LEASE_SECONDS`/
+`AGENTS_POLL_SECONDS`, лимиты `AGENT_MAX_*`/`AGENT_CONTEXT_COMPACTION_BYTES`,
+тарифы `AGENT_*_USD_PER_MILLION` и необязательный провайдер `JEV_API_URL`/
+`JEV_MODEL`/`JEV_API_KEY`/`JEV_PROVIDER` (полный список со значениями по умолчанию —
+[deploy.md](deploy.md#необязательные-настройки-окружения)). Секреты передаются
+процессу/контейнеру извне.
+
+`JEV_LOCAL_URL`: если переменная не задана, используется
+`http://127.0.0.1:12444`; пустое значение (так в production compose) отключает
+Jev без сетевых обращений (`laya_not_configured`); непустое значение допускает
+только хосты `localhost`, `127.0.0.1`, `host.docker.internal`.
+
+В Docker `agents-service`, `agents-migrate`, `agents-worker` и
+`organization-agent-worker` входят в основной compose (`make up`); legacy overlay
+`infra/docker-compose.agents.yml` больше не нужен. Jev остаётся локальным host-сервисом;
 в контейнере нет MLX. Jev слушает loopback: доступ из контейнера зависит от
 топологии Docker/хоста. При недоступности enrich показывает ошибку,
 ручное заполнение продолжает работать. Не открывать jev наружу ради этого потока.
@@ -236,7 +250,8 @@ pnpm -r typecheck
 
 PG-тесты требуют `AGENTS_TEST_DATABASE_URL` с **отдельной одноразовой** БД: тесты
 очищают только схему agents_service. Реальные модели проверяются отдельно от
-unit-тестов; `/healthz` не доказывает корректность provider workflow.
+unit-тестов; `/healthz` сообщает liveness, а корректность provider workflow подтверждают
+отдельные проверки реальных моделей.
 
 См. также: [API](api.md), [данные](data.md), [архитектура](architecture.md),
 [продуктовый контекст](../context/40-architecture.md).
@@ -244,30 +259,102 @@ unit-тестов; `/healthz` не доказывает корректность
 
 ### Сверка 16 требований организации (2026-10-08)
 
-Это сверка исходников и доступных тестов, не подтверждение полного живого сценария.
+Это сверка исходников и доступных тестов; полный живой сценарий — следующий этап приёмки.
 
 | № | Контур | Текущий статус |
 |---|---|---|
-| 1 | Создание/редактирование вакансии | Есть list/get/create/edit/approve/publish. Withdraw/close/delete отсутствуют в registry, хотя есть в UI/API. |
+| 1 | Создание/редактирование вакансии | Есть list/get/create/edit/approve/publish. Withdraw/close/delete доступны в UI/API; их регистрация как tools ассистента — следующий шаг. |
 | 2 | Статистика вакансии/организации | Есть owner-scoped tools. |
-| 3 | Переговоры об интервью | Есть availability-first task, несколько процессов, предложения, ожидание принятия кандидатом и отчёт/эскалация владельцу. PG integration не запущены. |
+| 3 | Переговоры об интервью | Есть availability-first task, несколько процессов, предложения, ожидание принятия кандидатом и отчёт/эскалация владельцу. Запуск PG integration — следующий шаг проверки. |
 | 4 | Офлайн-дублёр | Есть явный stand-in task, lease и свежий offline heartbeat; возвращение владельца прекращает отправку. |
-| 5 | Опрос кандидата и отчёт | Есть inquiry task, процессные отчёты и завершение/эскалация. Живые переговоры не проверены. |
+| 5 | Опрос кандидата и отчёт | Есть inquiry task, процессные отчёты и завершение/эскалация. Живые переговоры — следующий этап приёмки. |
 | 6 | Контекст кандидатов/вакансий | Есть scoped read/search/detail. |
 | 7 | Jev свайпы | Есть count 1..50 + comment, vacancy/cards context, guarded decisions и учёт usage. |
 | 8 | Общая витрина | Есть search/detail и работа с vacancy feed; scope и фильтры проверяет API. |
-| 9 | Документы | TXT/MD/PDF сохраняются приватно; create_md есть. Созданный MD не прикрепляется автоматически к видимому ответу: метаданные на tool message, UI скрывает tool rows. |
-| 10 | Context/memory | Есть compaction и отдельная revision-controlled memory; memory_write доступен, автоматического обновления memory при compaction нет. |
+| 9 | Документы | TXT/MD/PDF сохраняются приватно; create_md есть. Созданный MD хранится с метаданными на tool message (UI скрывает tool rows); автоматическое прикрепление к видимому ответу — возможное улучшение. |
+| 10 | Context/memory | Есть compaction и отдельная revision-controlled memory; memory обновляется явным memory_write, независимо от compaction. |
 | 11 | Справка по UI | Добавлена packaged employer-ui + безопасный knowledge_pages_list; runtime читает справку перед UI-ответами. Справка поддерживается вручную. |
 | 12 | Фон | Есть durable очередь, worker, tasks и leases; inquiry/schedule не зависят от открытой вкладки. |
-| 13 | $1 / rolling 7 days | Реализованы measured LLM/Jev usage, ledger/reservations и окно now()-7days; бесплатные локальные/cached actions сами по себе не создают расход LLM. Полное живое billing не проверено. |
-| 14 | Нет интернета у клиента | Нет отдельного navigator.onLine/online/offline UI gate; сетевой запрос завершается ошибкой. Provider unavailable обрабатывается отдельно. |
+| 13 | $1 / rolling 7 days | Реализованы measured LLM/Jev usage, ledger/reservations и окно now()-7days; бесплатные локальные/cached actions сами по себе не создают расход LLM. Полная живая проверка billing — следующий этап. |
+| 14 | Нет интернета у клиента | Офлайн-состояние клиента проявляется как ошибка сетевого запроса; отдельный navigator.onLine-индикатор — возможное улучшение. Provider unavailable обрабатывается отдельно. |
 | 15 | Постепенное раскрытие | Сначала discover_tools/call_tool, затем каталог/выбранные схемы; документы читаются порциями. |
 | 16 | Все tools доступны | Каталог содержит base+workflow tools. Выполнение сохраняет owner ACL, явную delegation, lease и candidate-owned acceptance. |
 
-Проверки: Python `pytest` tools/runtime/workflows/jev/billing/documents/availability с `-m 'not integration'`: 35 passed, 5 skipped, 9 deselected. API bridge `pnpm --filter @comit/api exec tsx --test tests/organization-agent-tools.test.ts`: 9 passed. PG integration, реальные кандидатские переговоры и production-контур не проверены.
+Проверки: Python `pytest` tools/runtime/workflows/jev/billing/documents/availability с `-m 'not integration'`: 35 passed, 5 skipped, 9 deselected. API bridge `pnpm --filter @comit/api exec tsx --test tests/organization-agent-tools.test.ts`: 9 passed. PG integration, реальные кандидатские переговоры и production-контур — следующие этапы проверки.
 
 Для нетехнических вопросов system prompt просит отвечать простым русским языком. Внутренние имена инструментов и переменных, UUID, номера задач и ревизий не следует показывать, пока работодатель прямо не попросит технические подробности. В provider-контекст включается авторитетная ревизия context, в том числе после compaction: очистка истории меняет hash нового запроса и не позволяет воскресить старый кэшированный ответ.
 
 
-Локальная диагностика 2026-10-09: воркеры AI завершались при разрыве PostgreSQL-соединения в polling/claim. Оба долгоживущих режима теперь повторяют подключение с задержкой 1–30 секунд и прекращают ожидание при shutdown; режим `--once` сохраняет диагностическое завершение с ошибкой. Тесты проверяют восстановление, остановку и отсутствие retry для ошибок программирования. Matching worker отдельно был завершён OOM (exit137); это подтверждает нехватку памяти Docker VM, но исторический пик и конкретный потребитель не восстановлены. Локальный worker запущен повторно; настройки Docker и production не менялись.
+Локальная диагностика 2026-10-09: воркеры AI завершались при разрыве PostgreSQL-соединения в polling/claim. Оба долгоживущих режима теперь повторяют подключение с задержкой 1–30 секунд и прекращают ожидание при shutdown; режим `--once` сохраняет диагностическое завершение с ошибкой. Тесты проверяют восстановление, остановку и отсутствие retry для ошибок программирования. Matching worker отдельно был завершён OOM (exit137); это указывает на нехватку памяти Docker VM; исторический пик и конкретный потребитель остаются предметом дальнейшей диагностики. Локальный worker запущен повторно; настройки Docker и production не менялись.
+
+
+## Надёжность поручений и ответов — 11.10.2026
+
+История активного хода дочитывается через границы страниц до следующего
+пользовательского хода. Сжатие заменяет старый system context актуальным
+summary/revision вместо дублирования полного исходного контекста. Успешные и
+неуспешные receipts инструментов возвращаются из журнала без повторения эффекта.
+Некорректные JSON и аргументы возвращаются модели как исправимая ошибка с
+выбранной схемой, без приватных входных значений и диагностических подробностей.
+
+Пустой ответ, `length` и `content_filter` не считаются успешным итогом. Завершение
+inquiry и эскалация сохраняют прогресс, отчёт, вопрос и receipt одной транзакцией
+с проверкой owner, task/turn lease, процесса и срока полномочий. Точный повтор
+возвращает сохранённый receipt, изменённый запрос отклоняется. Успех интервью
+требует совпадения с подтверждённым работодателем слотом, включая timezone,
+duration, kind, format и location. Ошибка AI сразу создаёт вопрос работодателю,
+без ожидания ещё одного цикла worker.
+
+Сохранить явно порученное согласование с известным process_id можно без
+интервалов и предварительного `recruitment_get`. Без интервалов worker спрашивает
+владельца до чтения процесса и контакта с кандидатом. Доступ и право отправки
+проверяются перед действиями. Недоступный bridge не даёт права придумать результат.
+
+Для DeepSeek completion разрешён один повтор только при `ConnectError` или
+`ConnectTimeout`, до отправки HTTP-запроса. Read/write timeout, HTTP-ошибки и
+неопределённые платные результаты не повторяются. Область transport retry
+соответствует [документации HTTPX](https://www.python-httpx.org/advanced/transports/).
+Публичные DTO и миграции в этом изменении не менялись.
+
+После успешного task_start foreground проверяет durable receipt владельца и
+исходного хода, записывает идемпотентное подтверждение и завершает ход. Действия
+с кандидатами выполняет background worker; независимые вызовы того же batch
+сохраняются. При восстановлении успешные receipts не повторяют бизнес-эффекты.
+
+### Провайдер Timeweb
+
+`LLM_PROVIDER=timeweb` переключает completion-клиент на `TIMEWEB_BASE_URL`
+(по умолчанию `https://api.timeweb.ai/v1`), `TIMEWEB_MODEL`
+(`timeweb/gpt-oss-120b`) и `TIMEWEB_API_KEY`. Допускается только официальный
+HTTPS endpoint. `TIMEWEB_REASONING_EFFORT=low|medium|high` задаёт режим обычных
+completion-вызовов; по умолчанию `low`. Режимы организации сохраняются:
+`off → low`, `medium → medium`, `max → high`. Поле DeepSeek `thinking` в
+Timeweb не передаётся. Проверка доступности использует `/v1/models`.
+
+Для Timeweb обязательны явные `AGENT_INPUT_USD_PER_MILLION` и
+`AGENT_OUTPUT_USD_PER_MILLION`; отсутствующие тарифы запрещают платный вызов.
+`AGENT_CACHED_INPUT_USD_PER_MILLION` по умолчанию равен входному тарифу,
+`AGENT_PRICING_VERSION` фиксирует версию тарифа в receipt. Хеш и ledger
+содержат фактический провайдер и модель. Неоднозначный платный вызов сохраняет
+существующий durable fence. `LLM_PROVIDER=deepseek` сохраняет старую конфигурацию.
+
+### Jev через OpenRouter Mirror
+
+`JEV_PROVIDER=openrouter-mirror` подключает enrichment к закреплённому
+`JEV_API_URL=https://openrouter.droidje.com/api/alpha/decisions` и
+`JEV_MODEL=typesafe/jev-1.13`. Ключ `JEV_API_KEY` передаётся только в
+`X-Proxy-Token`. Ordinal вопросы идут пакетами до 24 как `choice` с
+критериями `0..8`; результат проверяется по вероятностям и confidence.
+Выбранное значение обязано совпадать с максимумом вероятностей. Provenance
+хранит фактическую модель ответа. Capability проверяет `/api/v1/models`.
+
+
+## Удаление работодателя
+
+`DELETE /internal/employers/{owner_id}` доступен только API с внутренним токеном.
+Миграция `012_employer_lifecycle.sql` сохраняет минимальный UUID tombstone и
+блокирует поздние owner-scoped записи. Удаление очищает черновики, чаты,
+организационные задания, provider/cache receipts и usage ledger. API затем удаляет
+matching-проекции и собственные данные аккаунта; при частичном сбое остаётся
+возможность повторить идемпотентное удаление. Аккаунты и данные других владельцев
+сохраняются. См. [API](api.md) и [matching](matching.md).

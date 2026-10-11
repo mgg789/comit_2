@@ -126,3 +126,46 @@ test("PostgreSQL auth flow is atomic, single-use and revocable", { skip: !databa
     await pool.end();
   }
 });
+
+const candidateDeleteDatabaseUrl = process.env.CANDIDATE_DELETE_TEST_DATABASE_URL;
+test("candidate account deletion removes source graph, recruitment references and sessions", { skip: !candidateDeleteDatabaseUrl }, async () => {
+  const pool = new Pool({ connectionString: candidateDeleteDatabaseUrl });
+  try {
+    await migrate(pool);
+    const store = new AuthStore(pool, secret, { accountConsentVersion: "account-v1" });
+    const candidateId = randomUUID(), emptyCandidateId = randomUUID(), employerId = randomUUID(), processId = randomUUID(), vacancyId = randomUUID(), draftId = randomUUID();
+    await pool.query(`INSERT INTO accounts(id,email,role,email_verified,processing_consent_version,processing_consent_at)
+      VALUES ($1,$2,'candidate',true,'account-v1',now()),($3,$4,'candidate',true,'account-v1',now()),($5,$6,'employer',true,'account-v1',now())`,
+    [candidateId, `delete-${candidateId}@example.test`, emptyCandidateId, `empty-${emptyCandidateId}@example.test`, employerId, `owner-${employerId}@example.test`]);
+    await pool.query(`INSERT INTO candidate_profiles(candidate_id,revision,processing_consent,pool_consent,consent_version,consent_accepted_at)
+      VALUES ($1,1,true,true,'account-v1',now())`, [candidateId]);
+    await pool.query(`INSERT INTO sessions(id,account_id,role,session_hash,expires_at)
+      VALUES ($1,$2,'candidate',$3,now()+interval '1 day'),($4,$2,'candidate',$5,now()+interval '1 day')`,
+    [randomUUID(), candidateId, Buffer.from(`session-${candidateId}-1`), randomUUID(), Buffer.from(`session-${candidateId}-2`)]);
+    await pool.query(`INSERT INTO recruitment_processes(id,owner_id,candidate_id,vacancy_id,draft_id,profile_revision,state)
+      VALUES ($1,$2,$3,$4,$5,1,'rejected')`, [processId, employerId, candidateId, vacancyId, draftId]);
+    await pool.query(`INSERT INTO recruitment_receipts(actor_id,idempotency_key,fingerprint,result)
+      VALUES ($1,$2,repeat('a',64)::text,'{}')`, [candidateId, randomUUID()]);
+    await pool.query(`INSERT INTO auth_challenges(id,email,role,ip_hmac,expires_at)
+      VALUES ($1,$2,'candidate',$3,now()+interval '10 minutes')`, [randomUUID(), `delete-${candidateId}@example.test`, Buffer.from("ip")]);
+    await pool.query(`INSERT INTO auth_issue_events(email,ip_hmac) VALUES ($1,$2)`, [`delete-${candidateId}@example.test`, Buffer.from("ip")]);
+
+    await assert.rejects(store.deleteCandidateAccount(candidateId, async () => { throw new Error("QGramm unavailable"); }), /QGramm unavailable/);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [candidateId])).rowCount, 1);
+    assert.equal((await pool.query("SELECT 1 FROM recruitment_processes WHERE id=$1", [processId])).rowCount, 1);
+    assert.equal(await store.deleteCandidateAccount(candidateId, async context => {
+      assert.deepEqual(context, { process_id: processId, owner_id: employerId, candidate_id: candidateId });
+    }), true);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [candidateId])).rowCount, 0);
+    assert.equal((await pool.query("SELECT 1 FROM sessions WHERE account_id=$1", [candidateId])).rowCount, 0);
+    assert.equal((await pool.query("SELECT 1 FROM candidate_profiles WHERE candidate_id=$1", [candidateId])).rowCount, 0);
+    assert.equal((await pool.query("SELECT 1 FROM recruitment_processes WHERE id=$1", [processId])).rowCount, 0);
+    assert.equal((await pool.query("SELECT 1 FROM recruitment_receipts WHERE actor_id=$1", [candidateId])).rowCount, 0);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [employerId])).rowCount, 1);
+    assert.equal(await store.deleteCandidateAccount(candidateId), false);
+    assert.equal(await store.deleteCandidateAccount(emptyCandidateId), true);
+    assert.equal((await pool.query("SELECT 1 FROM accounts WHERE id=$1", [emptyCandidateId])).rowCount, 0);
+  } finally {
+    await pool.end();
+  }
+});

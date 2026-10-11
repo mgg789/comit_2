@@ -1,1 +1,76 @@
 @import "tailwindcss";
+@import "@comit/ui-kit/design.css";
+@import "@comit/ui-kit/auth.css";
+.testing-app { min-height: 100dvh; position: relative; isolation: isolate; overflow: hidden; color: var(--comit-text); background: var(--comit-bg); font: 22rem/1.4 var(--employer-font); padding: 87rem 0; }
+.testing-art { position: absolute; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
+.testing-art img { position: absolute; object-fit: contain; opacity: .6; }
+.testing-band-one { width: 1300rem; height: 1500rem; left: -550rem; bottom: -950rem; transform: rotate(55deg); }
+.testing-band-two { width: 1300rem; height: 1500rem; right: -480rem; top: -700rem; transform: rotate(10deg); }
+.testing-shell { width: min(1470rem, calc(100% - 64rem)); min-height: 906rem; margin: auto; border-radius: 24rem; border: 1px solid var(--employer-border); background: var(--employer-paint-000); position: relative; padding: 85rem 83rem 50rem; }
+.testing-panel-art { position: absolute; inset: 0; z-index: 0; border-radius: inherit; pointer-events: none; background: url("/testing/design/panel-halftone.png") center / cover; opacity: .25; }
+.testing-shell > :not(.testing-panel-art) { position: relative; }
+.testing-shell h1 { text-align: center; font-size: 48rem; line-height: 1.2; margin: 0 0 52rem; }
+.testing-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0,529rem)); justify-content: space-between; gap: 36rem; }
+.testing-preview { height: 308rem; background: var(--employer-paint-191918); border-radius: 16rem; padding: 24rem 30rem; display: flex; flex-direction: column; overflow: hidden; }
+.testing-preview h2 { font: 600 28rem/1.3 var(--employer-font); margin-bottom: 14rem; }
+.testing-preview p { color: var(--comit-text-muted); margin: auto; font-size: 20rem; text-align: center; }
+.testing-preview video { width: 100%; height: 220rem; min-height: 0; object-fit: contain; border-radius: 8rem; }
+.testing-preview-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 16rem; margin-top: 24rem; }
+.testing-app .action { min-height: 62rem; padding: 16rem 26rem; border-radius: 20rem; font: 600 22rem/1.3 var(--employer-font); }
+.testing-app .testing-danger { background: var(--comit-testing-danger); color: var(--comit-text); border: 0; }
+.testing-consents { margin-top: 42rem; padding: 22rem 28rem; border-radius: 20rem; background: var(--employer-paint-2f2f2d); display: grid; gap: 18rem; font-size: 20rem; }
+.testing-consents label { display: flex; align-items: start; gap: 14rem; cursor: pointer; }
+.testing-legal { border: 0; background: transparent; color: var(--employer-blue); text-align: left; cursor: pointer; font: inherit; text-decoration: underline; }
+.testing-fullscreen-action { display: flex; justify-content: center; }
+.testing-safe-exit { font-size: 18rem; color: var(--comit-text-muted); margin: 20rem 0; text-align: center; }
+.testing-footer, .testing-dialog-actions { display: flex; gap: 24rem; justify-content: center; margin-top: 28rem; flex-wrap: wrap; }
+.testing-footer .action { min-width: 250rem; }
+.testing-question { width: min(1010rem,100%); min-height: 572rem; margin: 65rem auto 0; padding: 34rem 54rem 24rem; border-radius: 30rem; display: flex; flex-direction: column; align-items: center; gap: 24rem; background: var(--employer-card); backdrop-filter: blur(100rem); }
+.testing-question h2 { font: 800 24rem/1.4 var(--employer-font); text-align: center; white-space: pre-wrap; }
+.testing-answers { width: min(609rem, 100%); display: grid; gap: 16rem; margin: 12rem 0; }
+.testing-answers label { background: var(--employer-paint-2f2f2d); border: 2rem solid transparent; padding: 16rem 22rem; border-radius: 20rem; cursor: pointer; display: flex; align-items: center; gap: 12rem; min-height: 62rem; font-size: 20rem; }
+.testing-answers label.selected { border-color: var(--employer-blue); background: var(--employer-ink); }
+.testing-answers label { position: relative; justify-content: center; text-align: center; }
+/* Keep native radio keyboard semantics while the whole answer is the visible control. */
+.testing-answers input[type="radio"] { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; margin: 0; opacity: 0; cursor: pointer; }
+.testing-answers label:has(input:focus-visible) { outline: 2px solid var(--employer-blue); outline-offset: 4rem; }
+.testing-written { width: min(660rem,100%); margin: 20rem 0; }
+.testing-written textarea { width: 100%; min-height: 176rem; max-height: 500rem; resize: vertical; background: var(--employer-paint-2f2f2d); border: 1px solid var(--employer-border); border-radius: 20rem; padding: 22rem; font: 22rem/1.5 var(--employer-font); color: var(--comit-text); }
+.testing-code { width: min(1200rem,100%); }
+.testing-code .testing-written { width: 100%; }
+.testing-code textarea { min-height: 360rem; font-family: ui-monospace,monospace; font-size: 20rem; tab-size: 4; }
+.testing-written header { display: flex; justify-content: space-between; color: var(--comit-text-muted); padding: 12rem; font-size: 18rem; }
+.testing-question .testing-continue { margin-top: auto; background: transparent; border: 0; }
+.testing-question progress { width: 264rem; height: 10rem; appearance: none; border: 0; border-radius: 10rem; }
+.testing-question progress::-webkit-progress-bar { background: var(--employer-paint-2f2f2d); border-radius: 10rem; }
+.testing-question progress::-webkit-progress-value { background: var(--employer-gradient); border-radius: 10rem; }
+.testing-question progress::-moz-progress-bar { background: var(--employer-violet); border-radius: 10rem; }
+.testing-shell .testing-system { position: fixed; right: 34rem; bottom: 32rem; width: 286rem; min-height: 349rem; padding: 22rem; border-radius: 24rem; background: var(--employer-paint-191918); display: flex; flex-direction: column; gap: 10rem; overflow: hidden; z-index: 2; }
+.testing-system > div:first-child { display: flex; justify-content: space-between; align-items: start; }
+.testing-system strong { font-size: 24rem; }
+.testing-system b { font-size: 44rem; line-height: 1.1; }
+.testing-system p, .testing-system time { font-size: 20rem; }
+.testing-system > .action { margin-top: auto; z-index: 1; }
+.testing-indicators { display: flex; flex-direction: column; gap: 12rem; }
+.signal { border: none; padding: 0; background: transparent; width: 35rem; height: 35rem; cursor: pointer; position: relative; }
+.signal .fragment { position: absolute; background: currentColor; mask-repeat: no-repeat; mask-position: center; mask-size: contain; }
+.signal.green { color: var(--employer-success); }
+.signal.yellow { color: var(--employer-warning); }
+.signal.red { color: var(--employer-danger); }
+.testing-system-art { position: absolute; width: 250rem; height: 170rem; object-fit: contain; right: -50rem; bottom: 55rem; opacity: .9; }
+.testing-errors { color: var(--employer-danger); margin-top: 24rem; font-size: 20rem; }
+.testing-capture-alert { margin: 24rem auto; padding: 24rem; border: 1px solid var(--employer-danger); border-radius: 20rem; }
+.testing-introduction, .testing-finishing { display: flex; flex-direction: column; align-items: center; gap: 28rem; margin: 100rem auto; max-width: 800rem; text-align: center; }
+.testing-notice { margin-bottom: 20rem; color: var(--employer-blue); }
+.testing-result-grade { font: 900 48rem/1.3 var(--employer-display); padding: 20rem 0; color: var(--employer-blue); }
+.testing-app .modal { max-width: min(850rem,calc(100vw - 32px)); font-size: 22rem; }
+.testing-app .modal p { margin: 18rem 0; }
+@media (max-width: 900px) { html { font-size: .7px; } .testing-app { padding: 24px 0; } .testing-shell { width: calc(100% - 32px); padding: 32rem 24rem; min-height: calc(100dvh - 48px); } .testing-shell h1 { font-size: 34rem; margin-bottom: 32rem; } .testing-preview-grid { gap: 24rem; } .testing-shell .testing-system { position: relative; width: min(1010rem,100%); min-height: 0; margin: 24rem auto 0; } .testing-system-art { display: none; } .testing-indicators { flex-direction: row; } .testing-system > div:first-child { align-items: center; } .testing-question { padding: 28rem; margin-top: 24rem; } .testing-system b { font-size: 30rem; } .testing-system > .action { margin-top: 16rem; } }
+@media (max-width: 540px) { .testing-preview-grid { grid-template-columns: minmax(0,1fr); } .testing-footer .action { min-width: 0; flex: 1; } .testing-app .modal { width: calc(100vw - 32px); padding: 24px; } .testing-question h2 { font-size: 24rem; } .testing-dialog-actions .action { width: 100%; } }
+
+.testing-art img { filter: blur(20rem); }
+.testing-panel-art { opacity: .7; background-image: radial-gradient(ellipse at left top,var(--comit-primary),transparent 36%),radial-gradient(ellipse at right bottom,var(--comit-primary-dark),transparent 36%),url("/testing/design/panel-halftone.png"); }
+.testing-shell .testing-system { min-height: 410rem; }
+.testing-system-art { width: 220rem; height: 130rem; bottom: 66rem; }
+.testing-system > :not(.testing-system-art) { z-index: 1; position: relative; }
+@media (max-width: 900px) { .testing-shell .testing-system { min-height: 0; } }
