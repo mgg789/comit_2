@@ -270,3 +270,24 @@ release; эти проверки подключения сами по себе �
 | `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`, `CODE_JUDGE_CA_PEM` | testing | `off`; judge задаётся оператором | режим записи, адрес изолированного judge, отдельный token и optional частный CA ([testing-engine.md](testing-engine.md)) |
 | `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106, `/data`, GID socket задаётся оператором | отдельный judge compose на disposable VM |
 | `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |
+
+### Отдельная внешняя проверка после CD
+
+После успешного server deploy job `public-smoke` выполняется на GitHub-hosted
+Ubuntu, вне mgg. Адрес берётся из repository variable `PUBLIC_SITE_URL`, по
+умолчанию `https://comit.droidje.com`. Он использует системные CA и проверку
+hostname, не следует redirects и не передаёт cookies или секреты.
+
+`infra/public-smoke.py` проверяет четыре HTML-приложения, SVG assets, публичные
+`/api/healthz` и `/api/ready` (JSON service/status), обе витрины (pagination
+contract), три границы входа (401 + JSON unauthenticated), скрытый internal
+маршрут (404). Ответы ограничены 2 MiB и 15 секундами; до трёх попыток.
+HTTP 200 с HTML вместо API JSON, неверный service или неправильная структура
+считаются ошибкой. Содержимое профилей и response bodies в журнал не выводятся.
+
+Ошибка внешнего job делает workflow CD красным, но не запускает автоматический
+rollback уже проверенного сервером release: оператор проверяет домен/gateway и
+следует штатной инструкции rollback. Серверный deploy сохраняет прежние локальные
+и публичные status-проверки до переключения current. Этот job проверяет HTTP
+контракты, а не браузерный JS userflow, SMTP-доставку или пользовательский вход.
+Проверка вручную: `python3 infra/public-smoke.py https://comit.droidje.com`.

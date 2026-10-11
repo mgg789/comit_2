@@ -88,6 +88,8 @@ jobs:
         run: pip install -e './services/code-judge[dev]'
       - name: Validate production, dev and actual smoke Compose configuration
         run: python tests/compose-config.py
+      - name: Public CD response and deployment contract regressions
+        run: python tests/public-smoke.py && python tests/deploy-config.py
       - name: Preload immutable sandbox image
         run: docker pull "$CODE_JUDGE_IMAGE"
       - name: Verify real sandbox constraints and hostile synthetic submissions

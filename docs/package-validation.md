@@ -123,3 +123,11 @@ smoke и реальную изоляцию judge, прошли ([run 38105242686
 второй вопрос всегда code, реальный TLS judge принимает решение, reload и
 идентичный retry сохраняют вопрос и answered=2. Production testing container
 в этой проверке не изменялся.
+
+Дополнительный post-CD job проверяет публичные HTTP-контракты с внешнего
+GitHub runner. Локально его восемь регрессий и 26 deployment-contract тестов
+проходят. Проба старого публичного release дала 12/14 PASS: отсутствуют только
+новые testing UI и testing preflight, которые ещё не развёрнуты. Run38110896831
+прошёл JS/build, judge и compose smoke, но API PDF fixture не запустился за 15 с.
+Задержка 16 с воспроизведена red → green с bounded startup 45 с и cleanup;
+PDF assertions не ослаблены. Итоговый новый SHA требует отдельного CI.

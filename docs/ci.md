@@ -193,3 +193,14 @@ acceptance. Generic compose smoke использует явно недоступ
 подтверждает. Актуальные результаты нового тестирования —
 [package-validation.md](package-validation.md); таблица выше описывает прежний
 checkpoint и не заменяет проверки текущего SHA.
+
+После deploy добавлен отдельный job `public-smoke` на GitHub-hosted runner:
+реальный домен/TLS, health/readiness, JSON API, HTML/SVG и auth/privacy boundaries.
+Регрессии `python tests/public-smoke.py` и `python tests/deploy-config.py`
+выполняются в CI до merge. Порядок и ограничения — [deploy.md](deploy.md#отдельная-внешняя-проверка-после-cd).
+
+API Python HTTP fixtures имеют общий monotonic startup deadline 45 секунд,
+раннее обнаружение exit/signal/spawn error и bounded cleanup TERM 2 с → KILL 2 с.
+Регрессия задержки 16 секунд воспроизвела прежний 15-секундный timeout; проверка
+реального PDF сохранена. Конкретная причина медленного старта в прежнем CI
+не установлена, CPU contention не объявляется доказанным.
