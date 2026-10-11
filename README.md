@@ -1,8 +1,17 @@
 # Comit — джобборд следующего поколения
 
-![Comit — платформа найма с обратной механикой](docs/assets/comit-cover.jpg)
+<p align="center">
+  <img src="docs/assets/comit-cover.jpg" alt="Comit — платформа найма с обратной механикой" width="100%">
+</p>
 
-[![CI](https://github.com/mgg789/comit_2/actions/workflows/ci.yml/badge.svg)](https://github.com/mgg789/comit_2/actions/workflows/ci.yml) [![release](https://img.shields.io/badge/release-v0.5-orange)](https://github.com/mgg789/comit_2/releases/tag/v0.5) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![deploy](https://img.shields.io/badge/deploy-Docker-2496ED?logo=docker&logoColor=white)](docs/deploy.md) [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev) [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)](docs/data.md)
+<p align="center">
+  <a href="https://github.com/mgg789/comit_2/actions/workflows/ci.yml"><img src="https://github.com/mgg789/comit_2/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/mgg789/comit_2/releases/tag/v0.5"><img src="https://img.shields.io/badge/release-v0.5-orange" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="license"></a>
+  <a href="docs/deploy.md"><img src="https://img.shields.io/badge/deploy-Docker-2496ED?logo=docker&logoColor=white" alt="deploy"></a>
+  <a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
+  <a href="docs/data.md"><img src="https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
+</p>
 
 Веб-платформа найма ИТ-специалистов с **обратной механикой** (LHH-модель): не кандидат
 рассылает резюме в никуда, а работодатель просматривает объективно категоризированные пулы
