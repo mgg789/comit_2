@@ -1,3 +1,5 @@
+# Runbook — типовые операции
+
 ## Полный runtime и режимы
 
 Production запускается `make up`, dev явно `make dev-up`; конфигурация и обязательные
@@ -6,9 +8,9 @@ Production запускается `make up`, dev явно `make dev-up`; кон�
 provision точную модель Harrier. При 503 `/ready` matching сначала проверить cache и
 успешное завершение migration jobs; не заменять модель fake embeddings.
 
-# Runbook — типовые операции
+## Rerank и real-card learning
 
-Candidate-pipeline overlay теперь запускает `rerank-worker`. На ещё не активированной
+Основной compose запускает `rerank-worker` вместе с остальными matching worker. На ещё не активированной
 БД worker применяет упакованное hash-pinned ручное решение пользователя для R₀;
 последующее отключение не отменяется restart. Нужна миграция008 до запуска нового
 кода. Несовместимость модели оставляет явный fallback без отсечения.
@@ -64,19 +66,12 @@ AUTH_ROUTE_TEST_DATABASE_URL='postgres://...' \
 DATABASE_URL='postgres://...' pnpm --filter @comit/api auth:migrate
 ```
 
-Для локального opt-in контура с уже настроенным PostgreSQL можно использовать
-`infra/docker-compose.profiles.yml` после candidate-pipeline и auth overlays:
-`candidate-profile-worker` запускает собранный `dist/profiles/worker.js` с
-`MATCHING_ENGINE_URL` и `CANDIDATE_PIPELINE_TOKEN`, после API и engine миграций.
-Рабочий процесс профиля не получает SMTP credentials. Для полного контура
-создания вакансии также подключается agents overlay:
-
-```bash
-docker compose -f infra/docker-compose.yml \
-  -f infra/docker-compose.candidate-pipeline.yml \
-  -f infra/docker-compose.agents.yml -f infra/docker-compose.auth.yml \
-  -f infra/docker-compose.profiles.yml up -d
-```
+Основной compose (`make up` / `make dev-up`) уже включает `candidate-profile-worker`:
+он запускает собранный `dist/profiles/worker.js` с `MATCHING_ENGINE_URL` и
+`CANDIDATE_PIPELINE_TOKEN` после API и engine миграций и не получает SMTP
+credentials. Legacy overlays (`docker-compose.candidate-pipeline.yml`,
+`agents.yml`, `auth.yml`, `profiles.yml`, `chat.yml`) остаются в репозитории, но
+для полного контура не нужны.
 
 Source profile API работает под candidate JWT/session и принимает только
 `expected_revision`, editable fields и явное profile consent. `accepted_at` ставится
@@ -105,9 +100,11 @@ vectors, PDF или `pool.state=ready`. Ошибка одного кандида
 
 Self reported grade может попасть в пул после выполнения остальных требований;
 public PDF обязан показать badge. В `main-v2` коэффициент 0.6 уменьшает только
-rating contribution self reported. Контракт будущего trusted testing source
-предусматривает approved grade с реальными `test_session_id` и `approved_at`; этот
-producer пока не интегрирован в browser/API contour. UUID самоотчёту не создаётся.
+rating contribution self reported. Trusted testing source
+(`POST /internal/testing/session-result`) реализован в API и даёт approved grade с
+реальными `test_session_id` и `approved_at`, если подтверждённый грейд совпадает с
+заявленным; publisher testing-engine есть в коде, но развёрнутый entrypoint его не
+запускает ([testing-engine.md](testing-engine.md)). UUID самоотчёту не создаётся.
 
 Эти команды описывают локальный контур. Фактический PostgreSQL/Harrier acceptance,
 production deployment и пользовательский runtime требуют отдельного свежего
@@ -139,21 +136,20 @@ Runtime использует `local_files_only=True`, не требует вне
 модель. `HF_HOME`/`HF_HUB_CACHE` могут задавать каталог кэша. Шрифты DejaVu для
 кириллицы включены в пакет, лицензия рядом; системные шрифты не нужны.
 
-Опциональный **локальный** compose-overlay включает миграции перед серверами и
+Основной compose (`make up`) включает `candidate-migrate` перед серверами и
 отдельные candidate-, vacancy-, combine-, rerank-, feed-refill- и preference-worker
-(см. «Baseline R₀», [feed-refill.md](feed-refill.md), [preference-learning.md](preference-learning.md));
-базовый `make up` сам по себе worker не запускает:
+(см. «Baseline R₀», [feed-refill.md](feed-refill.md), [preference-learning.md](preference-learning.md)).
+Модель Harrier подготавливается в volume заранее:
 
 ```bash
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml build
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml run --rm candidate-worker python -c 'from huggingface_hub import snapshot_download; snapshot_download("microsoft/harrier-oss-v1-270m", revision="31de22b673913c7d658c0f03f792d77c2dcf8ebd")'
-docker compose -f infra/docker-compose.yml -f infra/docker-compose.candidate-pipeline.yml up -d
+make build
+docker compose --env-file .env -f infra/docker-compose.yml run --rm candidate-worker python -c 'from huggingface_hub import snapshot_download; snapshot_download("microsoft/harrier-oss-v1-270m", revision="31de22b673913c7d658c0f03f792d77c2dcf8ebd")'
+make up
 ```
 
-В overlay используются текущая БД и persistent `harrier_cache`; volume не удалять.
+Используются текущая БД и persistent `harrier_cache`; volume не удалять.
 Build/подготовка модели требуют доступных пакетов/артефактов, обработка работает
-офлайн. Prod compose и сервер в этом цикле не изменялись: подключение runtime
-на сервере — отдельная явная операция с его секретами и путями.
+офлайн. На сервере стек поднимает deploy workflow ([deploy.md](deploy.md)).
 
 Без Docker, в отдельных терминалах с уже настроенными `DATABASE_URL`,
 `CANDIDATE_PIPELINE_TOKEN`, `MATCHING_ENGINE_URL=http://127.0.0.1:38101`:
@@ -213,7 +209,7 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 ## Проверки vacancy pipeline
 
 Перед запуском обновлённых серверов применить migration 002; оба worker работают
-от одной DATABASE_URL, каждый в отдельном процессе. Локальный overlay включает
+от одной DATABASE_URL, каждый в отдельном процессе. Основной compose включает
 candidate-worker и vacancy-worker с общим persistent кэшем. `/ready` проверяет
 обе схемы. Бизнес-статус open не заменяет техническую готовность артефактов.
 
@@ -256,16 +252,16 @@ CANDIDATE_PIPELINE_TOKEN="$CANDIDATE_PIPELINE_TOKEN" services/matching-engine/.v
 | Поднять стек | `make up` |
 | Smoke-гейт | `make smoke` |
 | Логи | `make logs` |
-| Остановить и снести | `make down` |
+| Остановить (volumes сохраняются) | `make down` |
 | Пересобрать всё | `make build` |
 | JS typecheck/build | `pnpm -r typecheck && pnpm -r build` |
-| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests` (agents-service — см. agents.md) |
+| Python-тесты | `pip install -e 'services/matching-engine[dev]' -e 'services/testing-engine[dev]' -e 'services/integration-engine[dev]' && pytest services/matching-engine/tests services/testing-engine/tests services/integration-engine/tests` (agents-service, verification-engine и code-judge — аналогично из своих каталогов; см. [ci.md](ci.md)) |
 | Dev-сервер одного аппа | `pnpm --filter @comit/web-candidate dev` |
-| OpenAPI api-core | http://localhost:8080/docs (или `/api/docs` через nginx) |
+| OpenAPI api-core | http://127.0.0.1:28080/docs (`API_PORT`) или `/api/docs` через nginx |
 
 ## Создание вакансий: локальные проверки
 
-Сервис и opt-in контейнер описаны в [agents.md](agents.md). Перед запуском явно
+Сервис и его контейнеры (`agents-service`, `agents-migrate`, workers в основном compose) описаны в [agents.md](agents.md). Перед запуском явно
 применить миграции `python -m agents_service migrate`; `/ready` проверяет таблицы.
 Для smoke дополнительного контура задать `AGENTS_PORT` — проверяются liveness и БД.
 При ошибке публикации повторять job через `/agents/jobs/{id}/retry`: снимок после
@@ -301,7 +297,7 @@ summary/edit/Create, ownership, вектора, события и карточк
 
 | Симптом | Причина / решение |
 |---|---|
-| `make smoke` красный по web | nginx отдаёт 404 на `/candidate/` — проверь, что `pnpm -r build` собрал все аппы (Dockerfile собирает 4) |
+| `make smoke` красный по web | nginx отдаёт 404 на `/candidate/` — проверь, что `pnpm -r build` собрал все аппы (Dockerfile собирает welcome/candidate/employer) |
 | Контейнер engines перезапускается | смотри `docker logs`; чаще всего отсутствие `DATABASE_URL`/порта |
 | CI-джоба висит в `queued` | раннеры заняты или офлайн: `gh api repos/mgg789/comit_2/actions/runners` |
 | Smoke конфликтует с деплоем | один `smoke-host` concurrency на все прогоны; не убирай его |
@@ -328,7 +324,7 @@ Retry сохраняет идемпотентность и не возвраща
 1. `python tests/rerank_pilot.py`:5 профилей/20 сравнений, без расхода grade-бюджета.
 2. `python -m matching_engine.rerank_experiment manifest`, затем `generate`.
    Последняя команда отказывает после проваленного пилота. Лимиты с учётом
-   повторов:60 семейств/600 профилей/3000 pair/700 grade (grade поднят 600 → 700 07.10.2026); cache/usage сохраняются.
+   повторов:60 семейств/600 профилей/3000 pair/600 grade (временный подъём до 700 от 07.10.2026 откатан 10.10.2026, коммит 86ac7da; hard benchmark — 720); cache/usage сохраняются.
 3. `python -m matching_engine.rerank_experiment train`: только cached данные.
    Source/семейства фиксированы, нормализация train-only, C выбирается по validation.
    Dataset/code seals запрещают настройку по уже раскрытому golden; максимум2
@@ -473,11 +469,12 @@ CASCADE только в явно выделенной тестовой БД. HTT
 и предварительно собранный API; реальные worker вызовы используют локальный
 Harrier cache. Нельзя направлять harness или test env на production.
 После offer expiry GET обновляет revision и event; при CAS409 перечитать процесс.
-Email delivery не включён: новые события читаются participant polling.
+Email о новых собеседованиях отправляет `auth-mail-worker`
+([email-notifications.md](email-notifications.md)); остальные события читаются participant polling.
 [Контракт](recruitment.md).
 
-Чат включается отдельным `infra/docker-compose.chat.yml`, постоянными
-секретами и volume `chat-data`; см. [запуск и ограничения](chat.md).
+Чат (`qgramm-chat`) входит в основной compose и требует постоянных
+секретов и volume `chat-data`; см. [запуск и ограничения](chat.md).
 Без конфигурации приглашения работают, а chat routes возвращают503.
 После503 повторить тот же UUID команды; provisioning восстанавливается при
 следующем обращении. Нельзя удалять volume/генерировать новые crypto keys

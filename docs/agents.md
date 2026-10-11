@@ -7,7 +7,9 @@
 неизвестные исторические даты остаются `null`. Обновление текста не меняет даты.
 
 Ручная форма и чат редактируют **один** черновик в `agents-service`.
-UI в этот проход не входит. `owner_id` — UUID для учёта владельца;
+Кабинет работодателя работает с ним через `/employer/vacancies`
+([vacancy-crud.md](vacancy-crud.md)) и глобальный AI-чат
+(`/employer/organization-agent/*`). `owner_id` — UUID для учёта владельца;
 он не подтверждает личность. Вызовы доступны доверенным сервисам с
 `AGENTS_SERVICE_TOKEN` и `X-Owner-ID`; токен нельзя отдавать браузеру.
 Браузер работает через employer gateway API-core (`/employer/vacancy-drafts`,
@@ -218,9 +220,21 @@ python -m agents_service organization-worker
 
 Env: `DATABASE_URL`, `AGENTS_SERVICE_TOKEN`, `MATCHING_ENGINE_URL`,
 `CANDIDATE_PIPELINE_TOKEN`, `JEV_LOCAL_URL`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`,
-`DEEPSEEK_API_KEY`. Секреты передаются процессу/контейнеру извне.
-Для Docker используется opt-in overlay `infra/docker-compose.agents.yml` после
-`docker-compose.candidate-pipeline.yml`. Laya остаётся локальным host-сервисом;
+`DEEPSEEK_API_KEY`, а также `ORGANIZATION_API_URL`, `AGENTS_LEASE_SECONDS`/
+`AGENTS_POLL_SECONDS`, лимиты `AGENT_MAX_*`/`AGENT_CONTEXT_COMPACTION_BYTES`,
+тарифы `AGENT_*_USD_PER_MILLION` и необязательный провайдер `JEV_API_URL`/
+`JEV_MODEL`/`JEV_API_KEY`/`JEV_PROVIDER` (полный список со значениями по умолчанию —
+[deploy.md](deploy.md#необязательные-настройки-окружения)). Секреты передаются
+процессу/контейнеру извне.
+
+`JEV_LOCAL_URL`: если переменная не задана, используется
+`http://127.0.0.1:12444`; пустое значение (так в production compose) отключает
+Laya без сетевых обращений (`laya_not_configured`); непустое значение допускает
+только хосты `localhost`, `127.0.0.1`, `host.docker.internal`.
+
+В Docker `agents-service`, `agents-migrate`, `agents-worker` и
+`organization-agent-worker` входят в основной compose (`make up`); legacy overlay
+`infra/docker-compose.agents.yml` больше не нужен. Laya остаётся локальным host-сервисом;
 в контейнере нет MLX. Jev слушает loopback: доступ из контейнера зависит от
 топологии Docker/хоста. При недоступности enrich показывает ошибку,
 ручное заполнение продолжает работать. Не открывать jev наружу ради этого потока.

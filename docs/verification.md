@@ -4,7 +4,7 @@
 
 ## Провайдеры
 
-`services/verification-engine` (внутренний порт `8105`, без host публикации) предоставляет:
+`services/verification-engine` (внутренний порт `8105`; на хосте только loopback `127.0.0.1:${VERIFICATION_PORT:-28105}`) предоставляет:
 
 - `POST /verify/fsp` — demo origin `mock` обращается к существующему integration-engine FSP registry. `live_unbound` возвращает `pending` с `fsp_origin_unbound`: реальный FSP identity binding не выдумывается.
 - Demo authorization flow использует только fixture identities `fsp-001`/`fsp-002`: code short-lived и одноразовый, state связан с candidate account и выбранным fixture на стороне API, callback allowlist фиксирован. Token exchange требует отдельный `FSP_DEMO_INTERNAL_TOKEN`; registry bulk импортирует stable achievement claim IDs с immutable `provider_version`. Импортированный achievement получает `confirmed` только внутри synthetic demo registry, отдельный FSP binding остаётся `partial`; карточка помечает это как `Демо-реестр ФСП`, а ownership реального FSP аккаунта остаётся `false`.
