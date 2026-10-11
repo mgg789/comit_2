@@ -187,3 +187,4 @@ SMTP использует существующий host relay Navix на пор�
 | `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `TESTING_LOCAL_JUDGE`, `TESTING_CONSENT_STAMP` | testing (адаптивный контур, пока не обслуживается entrypoint) | `off`, пусто, выключено, пусто | контур полной записи, адрес code-judge, офлайн-судья для фикстур, метка согласия ([testing-engine.md](testing-engine.md)) |
 | `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `DMOJ_JUDGE_ADDRESS` | code-judge | 8105, `./data/code-judge`, пусто | вне compose |
 | `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |
+| `SUPPORT_EMAIL`, `SUPPORT_ACCESS_KEY` | api | пусто — консоль отключена | оператор службы поддержки ([support-console.md](support-console.md)); пара не задана — маршруты отсутствуют, задана наполовину — предупреждение при старте |

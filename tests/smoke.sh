@@ -69,6 +69,7 @@ check "welcome logo asset" "http://localhost:${WEB_PORT}/design/comit-mark.svg" 
 check "welcome showcase asset" "http://localhost:${WEB_PORT}/design/showcase-icon.svg" "<svg" || failures=$((failures + 1))
 check "web candidate" "http://localhost:${WEB_PORT}/candidate/"       "кабинет кандидата" || failures=$((failures + 1))
 check "web employer"  "http://localhost:${WEB_PORT}/employer/"        "кабинет работодателя" || failures=$((failures + 1))
+check "web support"   "http://localhost:${WEB_PORT}/support/"         "служба поддержки" || failures=$((failures + 1))
 check_status "testing UI excluded" "http://localhost:${WEB_PORT}/testing/" 404 || failures=$((failures + 1))
 check_status "internal API hidden" "http://localhost:${WEB_PORT}/api/internal/strict-schema" 404 || failures=$((failures + 1))
 check "api via nginx" "http://localhost:${WEB_PORT}/api/healthz"      '"service":"api-core"' || failures=$((failures + 1))

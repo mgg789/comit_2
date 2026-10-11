@@ -25,6 +25,8 @@ export interface SystemChatPage {
 }
 /** Advance the receipt only through a sequence previously delivered to this account. */
 export interface SystemChatReadRequest { read_sequence: number }
+/** Send a message into the Comit conversation with a stable UUID retry key. */
+export interface SystemChatMessageRequest { idempotency_key: string; text: string }
 /** Monotonic system inbox receipt and exact unread item count. */
 export interface SystemChatReadStatus { read_sequence: number; unread_count: number }
 /** Global badge includes every authorized hiring chat; null means private chat unavailable. */

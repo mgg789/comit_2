@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
-import type { AccountRole, SystemChatPage, ChatUnreadStatus } from "@comit/shared";
+import type { AccountRole, SystemChatPage, SystemNotification, ChatUnreadStatus } from "@comit/shared";
 import { SystemNotificationsStore } from "../src/notifications/system-store.js";
 import { fetchGlobalRecruitmentUnread } from "../src/notifications/unread.js";
 import { EmployerProfileStore } from "../src/employers/store.js";
@@ -113,7 +113,18 @@ test("company CAS, invitation backfill and durable owner-only inbox/read receipt
     const ownPage = await app.inject({ url: "/employer/system-chat", headers: foreign.headers });
     assert.equal(ownPage.statusCode, 200); assert.equal(ownPage.json<SystemChatPage>().items.length, 1);
     assert.equal(ownPage.headers["cache-control"], "no-store");
-    assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers, payload: { text: "send" } })).statusCode, 404);
+    const sentMessage = randomUUID();
+    const sent = await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: sentMessage, text: "Опишите проблему." } });
+    assert.equal(sent.statusCode, 200);
+    assert.equal(sent.json<SystemNotification>().type, "support.user_message");
+    // Own message acknowledges delivery: unread counts only what Comit adds next.
+    assert.equal((await app.inject({ url: "/employer/system-chat", headers: owner.headers })).json<SystemChatPage>().unread_count, 0);
+    const replay = await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: sentMessage, text: "Опишите проблему." } });
+    assert.equal(replay.statusCode, 200); assert.equal(replay.json<SystemNotification>().id, sent.json<SystemNotification>().id);
+    assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/messages", headers: owner.headers,
+      payload: { idempotency_key: randomUUID(), text: "   " } })).statusCode, 422);
     assert.equal((await app.inject({ method: "POST", url: "/employer/system-chat/read", headers: owner.headers, payload: { read_sequence: 10000 } })).statusCode, 409);
     assert.equal((await app.inject({ method: "PATCH", url: "/employer/profile", headers: owner.headers, payload: { company_name: "Changed", expected_revision: 1, owner_id: foreign.id } })).statusCode, 400);
     assert.equal((await app.inject({ method: "PATCH", url: "/employer/profile", headers: { ...owner.headers, origin: "https://foreign.example.test" }, payload: { company_name: "Blocked", expected_revision: 1 } })).statusCode, 403);

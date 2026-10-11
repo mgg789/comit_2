@@ -9,7 +9,11 @@ import { Action, Backdrop, Icon, PageTitle, State } from "@comit/ui-kit/design";
 import { EmailLogin } from "@comit/ui-kit/email-login";
 import { api, errorText, useRoute } from "./runtime";
 import { ProfileScreen, OffersScreen, OfferScreen, StatisticsScreen, ChatsScreen, ChatScreen, RecommendationConsentSettings } from "./screens";
-const candidateInboxTransport: SystemInboxTransport = { getPage: (after, limit) => api.getSystemChat("candidate", after, limit), markRead: read_sequence => api.markSystemChatRead("candidate", { read_sequence }) };
+const candidateInboxTransport: SystemInboxTransport = {
+  getPage: (after, limit) => api.getSystemChat("candidate", after, limit),
+  markRead: read_sequence => api.markSystemChatRead("candidate", { read_sequence }),
+  sendMessage: text => api.sendSystemChatMessage("candidate", { idempotency_key: crypto.randomUUID(), text }),
+};
 const candidateUnread = () => api.getChatUnread("candidate");
 const navigation = [
   { path: "/resume", label: "Резюме", icon: "resumes" },

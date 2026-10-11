@@ -1,0 +1,126 @@
+/* Support console layout on top of the shared kit (tokens/design/conversation). */
+
+.support-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 16rem;
+  padding: 24rem clamp(16rem, 4vw, 48rem) 48rem;
+  box-sizing: border-box;
+  color: var(--comit-text);
+  font-family: var(--employer-font, inherit);
+  font-size: 22rem;
+  line-height: 1.35;
+  background: var(--comit-bg);
+}
+
+.support-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rem;
+  padding: 14rem 20rem;
+  border-radius: var(--employer-radius, 30px);
+}
+
+.support-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rem;
+  font-family: var(--font-display, inherit);
+  font-size: 20rem;
+  letter-spacing: 0.02em;
+}
+
+.support-brand svg,
+.support-brand img {
+  width: 28rem;
+  height: 28rem;
+}
+
+.support-login {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.support-login-card {
+  width: min(420rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18rem;
+  padding: 32rem 28rem;
+  border-radius: var(--employer-radius, 30px);
+}
+
+.support-login-card h1 {
+  margin: 0;
+  font-size: 26rem;
+}
+
+.support-login-card .anonymous-avatar {
+  width: 56rem;
+  height: 56rem;
+}
+
+.support-login-note {
+  margin: 0;
+  opacity: 0.7;
+}
+
+.support-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18rem;
+  width: min(720rem, 100%);
+  margin: 0 auto;
+}
+
+.support-screen-header h1 {
+  margin: 0;
+  font-size: 34rem;
+  font-weight: 700;
+  letter-spacing: -1rem;
+}
+
+/* Tile previews are longer than cabinet process states: keep the label in charge. */
+.support-screen .chat-tile-state {
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Conversation screen reuses the kit chat-page system: the thread fills the
+   viewport below the console header, the absolute chat-back keeps its own band. */
+.support-app.chat-page {
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 24rem;
+}
+
+.support-app.chat-page .recruitment-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.support-app.chat-page .recruitment-thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(964rem, 100%);
+  margin: 0 auto;
+  padding-top: 84rem;
+}
+
+.support-app.chat-page .chat-history-viewport {
+  flex: 1;
+  min-height: 0;
+  margin-bottom: 24rem;
+}
