@@ -54,12 +54,15 @@ SMOKE_MODE=dev make smoke
 make dev-down              # данные dev-volumes сохраняются
 ```
 
-- Приложение: http://localhost:8088 (`/`, `/candidate/`, `/employer/`).
+- Приложение: http://localhost:8088 (`/`, `/candidate/`, `/employer/`, `/testing/`, `/support/`).
 - Вход: любой email, код на форме появляется сам (`dev_code` в ответе API);
   в этом режиме письма не отправляются и mail outbox не пишется.
 - Мок ФСП доступен, сценарий демо-привязки работает end-to-end.
-- Production `.env` не читается: все dev-секреты имеют безопасные значения по
-  умолчанию. Свой dev-env передавайте отдельным `--env-file`.
+- Production `.env` не читается: dev-секреты имеют безопасные значения по
+  умолчанию. Исключение — `CODE_JUDGE_URL` и `CODE_JUDGE_TOKEN` изолированного judge:
+  их нужно экспортировать в shell перед `make dev-up`, иначе compose остановится
+  ([подключение](deploy.md#изолированная-проверка-кода)). Свой dev-env передавайте
+  отдельным `--env-file`.
 - Если production-стек запущен одновременно, разведите порты через переменные
   `WEB_PORT`, `API_PORT` и т.д.
 
@@ -71,18 +74,21 @@ pnpm --filter @comit/api auth:migrate      # миграции API
 pnpm --filter @comit/api dev               # api-core на http://127.0.0.1:8080
 pnpm --filter @comit/web-candidate dev     # vite :5173, /api проксируется на 8080
 pnpm --filter @comit/web-employer dev      # :5174
+pnpm --filter @comit/web-testing dev       # :5175
 pnpm --filter @comit/web-welcome dev       # :5176
+pnpm --filter @comit/web-support dev       # :5177
 ```
 
 `DEV_AUTH_EXPOSE_CODE=true NODE_ENV=development` даёт тот же автоподставляемый
 код; вне development флаг отвергается конфигурацией. Engines запускаются своими
-`python -m` entrypoints; чат QGramm без Docker недоступен — кабинеты честно
-покажут `503` в чатах, остальное работает.
+`python -m` entrypoints. Чат QGramm работает в Docker-контуре; без него кабинеты
+показывают в чатах понятный статус `503`, а остальные функции работают как обычно.
 
 ## Проверки контуров
 
-- `make smoke` — production-проверка: `/healthz` всех сервисов, публичные
-  маршруты, границы auth, отсутствие testing UI, `503` ФСП-мока.
+- `make smoke` — production-проверка: `/healthz` всех сервисов, `/ready` API,
+  matching и agents, все пять web-приложений (включая `/testing/` и `/support/`),
+  скрытие `/api/internal/*`, границы auth (401), публичная витрина, `503` ФСП-мока.
 - `SMOKE_MODE=dev make smoke` — то же с ожиданиями dev-режима (ФСП-фикстуры 200).
 - `make compose-check` — валидация resolved compose-файлов.
 - CD дополнительно проверяет HTTPS origins, secure cookies, отключённые dev
@@ -95,5 +101,5 @@ pnpm --filter @comit/web-welcome dev       # :5176
 - **Одновременный запуск двух контуров на одних портах.** Задайте разные
   `WEB_PORT`/`API_PORT`/... одному из них.
 - **`down -v` без явного разрешения** — удаляет volumes вместе с данными демо.
-- **Смена ключей QGramm при живом `chat-data`** не поддерживается: ключи и
-  volume резервируются и меняются только вместе ([chat.md](chat.md)).
+- **Смена ключей QGramm при живом `chat-data`.** Ключи и volume резервируются
+  и меняются только вместе ([chat.md](chat.md)).

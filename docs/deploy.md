@@ -16,7 +16,7 @@ Compose намеренно останавливается при пустом pr
 `VERIFICATION_DOCUMENT_KEY`, `TESTING_ENGINE_TOKEN`, `CHAT_SERVICE_TOKEN`,
 `CHAT_DEVICE_SECRET`, `CHAT_SIGNING_KEY`, `QGRAMM_MANAGEMENT_SECRET`,
 `QGRAMM_MASTER_KEY`, `QGRAMM_HPKE_KEY`, `SMTP_USER`, `SMTP_PASSWORD`,
-`DEEPSEEK_API_KEY`. `JEV_API_KEY` и `JEV_LOCAL_URL` — дополнительные провайдеры: без них соответствующие ИИ-возможности явно недоступны, ручное редактирование остаётся доступным.
+`DEEPSEEK_API_KEY`. `JEV_API_KEY` и `JEV_LOCAL_URL` — дополнительные провайдеры: они включают соответствующие ИИ-возможности, а без них интерфейс показывает статус и предлагает ручное редактирование.
 Ключи QGramm сохранять неизменными вместе с `chat-data`; base64 ключи должны
 декодироваться в 32 байта. Значения API pricing должны соответствовать реальным тарифам.
 
@@ -39,9 +39,10 @@ snapshot. `/ready` matching возвращает 503 при отсутствии
 только через приватное server env. `SMTP_TLS_SERVERNAME=mail.droidje.com` сохраняет
 проверку сертификата при STARTTLS. Проверка TLS обязательна, relay и его конфигурация
 этой интеграцией не изменяются.
-Отсутствующий `HH_API_TOKEN` оставляет HH verification явно недоступной.
-Production выключает OTP code exposure и FSP demo fixtures. Реального FSP registry
-контракта пока нет: 503 означает недоступную интеграцию, а не подтверждённую историю.
+`HH_API_TOKEN` включает HH verification; без него интерфейс показывает её статус.
+Production выключает OTP code exposure и FSP demo fixtures. Подключение реального
+FSP registry — следующий этап: ответ 503 сообщает, что интеграция ещё не подключена,
+и не трактуется как подтверждённая история.
 
 ## Порядок и данные
 
@@ -51,7 +52,8 @@ Migration jobs сериализованы: PostgreSQL healthy → candidate-migr
 API дополнительно ждёт готовые engines/chat, web ждёт API readiness.
 Работают auth/notification mail worker, candidate profile и recommendation workers,
 candidate/vacancy/combine/rerank/feed-refill/preference workers и оба agents workers
-(`agents-worker`, `organization-agent-worker`). `services/code-judge` в compose не входит.
+(`agents-worker`, `organization-agent-worker`). `services/code-judge` намеренно
+вынесен в отдельный judge compose на изолированной VM (см. ниже).
 
 Project name `comit`, volumes `pgdata`, `harrier_cache`, `chat-data` и `testing-data` сохранены.
 `make down` сохраняет volumes. `down -v` запрещён без отдельного разрешения пользователя.
@@ -72,8 +74,8 @@ make dev-down
 production уже работает. Здесь разрешены localhost HTTP cookies, synthetic
 non-secret service keys, локальная выдача OTP и FSP demo. Mail worker по умолчанию исключён из dev
 (профиль `prod` в dev-файле требует реального SMTP); OTP не создаёт mail outbox.
-Уведомления доступны в системном inbox, внешняя email доставка dev не включена. AI providers остаются
-реальными; без их конфигурации запросы явно недоступны. Harrier provision необходим
+Уведомления доступны в системном inbox; внешняя email-доставка в dev выключена намеренно. AI providers остаются
+реальными; без их конфигурации интерфейс показывает статус «недоступно». Harrier provision необходим
 и для dev (те же run/build команды с dev файлом, project `comit-dev`, `--profile dev`).
 
 ## Сервер
@@ -83,7 +85,7 @@ Deploy target: `/home/mgg/comit`, пользователь `mgg`, существ
 обязательными настройками. Deploy workflow использует production compatibility file.
 Интерактивные операции на сервере требуют явной команды пользователя.
 Smoke проверяет bounded HTTP readiness, storage showcase, auth boundaries и доступность
-testing UI; curl не проверяет JS userflow, доставку SMTP или реальный AI вызов.
+testing UI; JS userflow, доставка SMTP и реальные AI-вызовы проверяются отдельными browser/acceptance-сценариями.
 
 ## CD: exact SHA, backup и rollback
 
@@ -95,7 +97,7 @@ testing UI; curl не проверяет JS userflow, доставку SMTP ил
 в checkout/release и не выводится в лог. Требуются Python 3, Docker Compose v2
 с `--wait`, существующие production volumes и доступные исходные Compose файлы
 текущего runtime. Первый bootstrap и исправление неполного предыдущего snapshot
-требуют отдельной подготовки: CD останавливается до изменения работающих сервисов.
+выполняются отдельной подготовкой: CD аккуратно останавливается до изменения работающих сервисов.
 
 До перехода проверяются resolved Compose, HTTPS origins, secure cookies, production
 mode, отключённые dev flags и точные identities `comit_pgdata`, `comit_chat-data`,
@@ -106,19 +108,19 @@ mode, отключённые dev flags и точные identities `comit_pgdata`
 
 Перед migration jobs создаётся PostgreSQL custom-format backup с правами 600 в
 `/home/mgg/comit/backups`; `pg_restore --list` проверяет читаемость архива.
-Это проверка структуры архива, не практическая проверка восстановления данных.
-Миграции должны быть additive и совместимыми с предыдущими app images: проверка
-миграций входит в code review перед `main`, скрипт не доказывает совместимость SQL.
+Это проверка структуры архива; учебное восстановление данных — следующий шаг
+эксплуатации. Миграции должны быть additive и совместимыми с предыдущими app images:
+их совместимость проверяется на code review перед `main`.
 Во время успешного перехода выполняются local smoke и публичный HTTPS smoke с
 проверкой readiness, showcase, auth boundaries и доступности testing UI.
 
 При ошибке запуска/smoke CD пытается восстановить предыдущие immutable image IDs
 приложений через предыдущие Compose файлы с `--no-deps --no-build`. PostgreSQL,
-volumes и migration jobs rollback не запускает; downgrade/restore базы автоматически
-не выполняется. Rollback при несовместимой миграции не гарантируется; требуется
-ручной план восстановления. Служебный manifest содержит SHA, backup path и image
+volumes и migration jobs rollback не трогает — база восстанавливается только
+осознанным решением оператора из backup. Для несовместимой миграции оператор
+готовит ручной план восстановления. Служебный manifest содержит SHA, backup path и image
 IDs, но не environment. `/home/mgg/comit/current` переключается только после smoke.
-Не выполняются `down`, удаление volumes или image prune.
+CD бережёт данные: `down`, удаление volumes и image prune не выполняются.
 
 Локальная регрессия preflight: `python3 tests/deploy-config.py`.
 
@@ -189,8 +191,8 @@ Docker socket приложению не передаётся.
 `infra/docker-compose.judge.yml` запускается **только на отдельной disposable VM**,
 где нет приложения, пользовательских данных и посторонних секретов. Broker
 получает socket выделенного Docker daemon и потому является доверенной частью
-этой VM: компрометация broker равносильна компрометации VM. Этот compose нельзя
-запускать на сервере приложения. Перед запуском оператор загружает образ Python
+этой VM: компрометация broker равносильна компрометации VM. Этот compose
+запускается только вне сервера приложения. Перед запуском оператор загружает образ Python
 по digest из compose и задаёт отдельный token и `DOCKER_SOCKET_GID` (группа socket).
 После загрузки образов исходящий доступ VM закрывают сетевой политикой; дочерние
 контейнеры дополнительно запускаются с `--network=none` и `--pull=never`.
@@ -203,8 +205,8 @@ judge; проверка цепочки и hostname остаётся обязат
 в SAN сертификата. Неверный CA закрывает readiness и не расходует попытку.
 Token хранится в
 серверном окружении и ротируется отдельно от остальных сервисов. Liveness
-`/healthz` не подтверждает изоляцию: authenticated `/ready` запускает реальную
-проверку UID, capabilities, read-only FS, сети и действующих CPU/memory/PID limits.
+`/healthz` сообщает только о живом процессе; изоляцию подтверждает authenticated
+`/ready`, который запускает реальную проверку UID, capabilities, read-only FS, сети и действующих CPU/memory/PID limits.
 При провале проверки новые попытки блокируются. Сбой при отправке ответа
 возвращает 503 и сохраняет возможность повторить тот же ответ.
 
@@ -244,8 +246,8 @@ bootstrap cleanup проверен отдельно в образе `:3`.
 Проверены реальная готовность и выполнение кода из сети приложения, отказ при
 неверном CA/SAN/токене, блокировка исходящих TCP/DNS и повтор полного сценария
 после перезапуска VM. Основной стек приложения и SMTP не перезапускались.
-Следующий CD должен подхватить три judge env и пройти smoke до переключения
-release; эти проверки подключения сами по себе не подтверждают deployment UI.
+Следующий CD подхватывает три judge env и проходит smoke до переключения
+release; UI на стенде подтверждается этим smoke.
 
 ## Необязательные настройки окружения
 
@@ -268,9 +270,13 @@ release; эти проверки подключения сами по себе �
 | `HH_API_TOKEN`, `HH_USER_AGENT` | verification | пусто, `comit-verification/0.1` (compose) | HH-проверка; без токена — `hh_token_unavailable`, без user agent — `hh_user_agent_unavailable` |
 | `BLUEPRINT_DIR`, `TESTING_DATA_DIR`, `TESTING_API_URL` | testing | `/app/blueprints`, `/data/testing`, `http://api:8080` (compose) | blueprint-каталог, хранилище и адрес publisher адаптивного контура |
 | `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`, `CODE_JUDGE_CA_PEM` | testing | `off`; judge задаётся оператором | режим записи, адрес изолированного judge, отдельный token и optional частный CA ([testing-engine.md](testing-engine.md)) |
-| `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106, `/data`, GID socket задаётся оператором | отдельный judge compose на disposable VM |
+| `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `CODE_JUDGE_IMAGE`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106; код — `data/code-judge`, judge compose — `/data/judge`; `python:3.12-slim` (judge compose фиксирует digest); GID socket задаётся оператором | отдельный judge compose на disposable VM |
+| `TESTING_ENGINE_URL` | api | `http://testing-engine:8102` | адрес приватного testing-engine для прокси `/candidate/testing/*` |
+| `JEV_API_KEY`, `JEV_API_URL`, `JEV_MODEL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | testing | пусто, `https://ai.sverk.tech/v1/systemone`, `kev-latest`, пусто, `https://api.deepseek.com`, `deepseek-flash` | судья развёрнутых ответов: Jev при заданном ключе, иначе DeepSeek |
+| `MATCHING_PROMOTION_MODE`, `MATCHING_PROMOTION_ALLOW_DEMO` | matching и его workers | `shadow` (production compose), `active` (dev compose); `false` / `true` | режим `off`/`shadow`/`active` продвижения по ФСП и недельной активности; демо-факты учитываются только при `APP_ENV=development` ([matching.md](matching.md)) |
+| `AUTH_KEY_ID`, `ACCOUNT_CONSENT_VERSION`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `JWT_SECRET` | api | `v1`, `account-v1`, `comit`, `comit-api`, пусто | идентификатор ключа и claims JWT, версия согласия аккаунта; `JWT_SECRET` — устаревший запасной вариант для `AUTH_SECRET` ([auth.md](auth.md)) |
 | `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |
-| `SUPPORT_EMAIL`, `SUPPORT_ACCESS_KEY` | api | пусто — консоль отключена | оператор службы поддержки ([support-console.md](support-console.md)); пара не задана — маршруты отсутствуют, задана наполовину — предупреждение при старте |
+| `SUPPORT_EMAIL`, `SUPPORT_ACCESS_KEY` | api | пусто — консоль отключена | оператор службы поддержки ([support-console.md](support-console.md)); пара не задана — маршруты отсутствуют, задана наполовину или некорректно — предупреждение `support_config_invalid` при старте и консоль выключена |
 
 ### Отдельная внешняя проверка после CD
 
@@ -290,5 +296,5 @@ HTTP 200 с HTML вместо API JSON, неверный service или непр
 rollback уже проверенного сервером release: оператор проверяет домен/gateway и
 следует штатной инструкции rollback. Серверный deploy сохраняет прежние локальные
 и публичные status-проверки до переключения current. Этот job проверяет HTTP
-контракты, а не браузерный JS userflow, SMTP-доставку или пользовательский вход.
+контракты; браузерный JS userflow, SMTP-доставка и вход проверяются отдельными сценариями.
 Проверка вручную: `python3 infra/public-smoke.py https://comit.droidje.com`.

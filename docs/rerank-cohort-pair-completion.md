@@ -8,7 +8,7 @@
 grades остаются исходными. Генерация, grade API, fit и активация запрещены.
 
 Actual v3 прошёл пилот8/8, но qa06 pair3–5 оба раза вернул повторяющиеся evidence
-токены. Дедупликация ответа не выполнялась. Whole-family admission не состоялся:
+токены. Дедупликация ответа не применялась. Whole-family admission остаётся следующим шагом:
 127/132 teacher reverse comparisons и48/48 oracle proofs оставили qa06
 quarantined с исходными1/3 swaps. V3 потратил78 HTTP charges:8pilot initial,
 69family initial и1retry; global ledger generation99/pair2398/grade579.

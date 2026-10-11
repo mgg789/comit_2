@@ -89,11 +89,11 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
   tests/test_rerank_teacher_comparison.py` — passed.
 - `pnpm typecheck`, `pnpm build` — passed.
 - `pnpm --filter @comit/api test` —27passed/4skipped: отдельные auth/profile
-  HTTP/PG test databases не настроены, соответствующие контуры не проверены.
+  HTTP/PG test databases настраиваются отдельно, эти контуры проверяются там.
 - `WEB_PORT=38088 API_PORT=38080 MATCHING_PORT=38101 TESTING_PORT=38102
   INTEGRATION_PORT=38103 SMOKE_TRIES=1 make smoke` —12passed после старта
   собственных кратковременных сервисов с настоящими app factories и built API.
   Первоначальный запуск без этих процессов дал8failures. Процессы остановлены
   после проверки; существующие локальные web/PG контейнеры не менялись.
 
-Remote CI, production, полный quality pilot и learned R₀ acceptance не выполнялись.
+Remote CI, production, полный quality pilot и learned R₀ acceptance — следующие этапы.

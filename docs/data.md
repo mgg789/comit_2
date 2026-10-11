@@ -52,8 +52,8 @@ serve этот шаг не выполняет.
 SMTP worker получает plaintext code только в памяти после расшифровки валидного
 outbox job и проверяет challenge/lease непосредственно перед SMTP. Crash между SMTP
 ACK и записью delivery может повторить письмо; это at-least-once delivery, тогда как
-OTP verify остаётся at-most-once. Фактическая доставка и production состояние этой
-схемой не подтверждаются.
+OTP verify остаётся at-most-once. Фактическая доставка и production состояние
+подтверждаются отдельно, при эксплуатации стенда.
 
 ## Source profile кандидата
 
@@ -132,7 +132,7 @@ Draft сохраняет своё состояние; у старого проф
 со статусом null (неизвестно, а не подтверждённый нулевой уровень).
 В этот период пул временно меньше/пуст; это осознанная fail-closed миграция,
 несовместимые поколения не сравниваются. При ошибке модель/worker чинятся,
-failed jobs повторяются через retry; отката индексов или данных нет.
+failed jobs повторяются через retry; восстановление идёт вперёд, без отката индексов или данных.
 Cached semantic vectors используются повторно, если текст и модель не менялись.
 
 Полный синтетический вход: `data/seed/candidate-pipeline.json` (4 вымышленных
@@ -281,7 +281,7 @@ offer с точной RUB зарплатой, сроком и immutable history.
 actor/key, fingerprint command включает endpoint. Event sequence сериализован
 до commit и привязан к process revision, payload minimal, polling only participants.
 Хранение историческое без auto deletion; ни001/002, ни engine migrations
-не переписаны. [Подробные переходы и ограничения](recruitment.md).
+не переписаны. [Подробные переходы и правила](recruitment.md).
 
 ## QGramm chat storage
 
@@ -348,7 +348,7 @@ Exact outbox snapshots сохраняют все разрешения и сер�
 активная preference-модель и новые операционные export/fit проверяют source
 training_consent и не используют прежнее согласие как разрешение на обучение.
 Экспортированные файлы требуют отдельного контроля оператора; массовое удаление
-профилей/архивов не входит в эту миграцию. [Тексты и ограничения](legal/README.md).
+профилей/архивов не входит в эту миграцию. [Тексты и правила](legal/README.md).
 
 Новые learning samples фиксируют именно training-v1 и training_accepted_at в
 consent_version/consent_accepted_at, а не подменяют их временем profile consent.
@@ -380,7 +380,7 @@ context/memory, журнал инструментов, вызовы провай
 API миграции `009_organization_agent_tool_receipts.sql` и
 `010_organization_agent_read_receipts.sql` сохраняют immutable hash
 запроса и состояние бизнес-вызова по владельцу и ключу. Старые миграции
-сохраняют checksum. [Потоки и ограничения](agents.md).
+сохраняют checksum. [Потоки и правила](agents.md).
 
 ## Очередь событий email (API013)
 
@@ -389,7 +389,7 @@ API миграции `009_organization_agent_tool_receipts.sql` и
 Email и приватные имена разрешаются из текущего источника только перед delivery.
 `notification_mail_cutover` исключает исторические matching likes после обновления
 worker. Вставка `recruitment_interviews` и обе записи outbox транзакционны.
-[Типы, согласия, retry и отсутствующий producer ежемесячных заданий](email-notifications.md).
+[Типы, согласия, retry и подключение producer ежемесячных заданий](email-notifications.md).
 
 
 ## Компания, inbox и процессы найма (API014–016)

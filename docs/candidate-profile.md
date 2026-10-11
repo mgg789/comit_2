@@ -50,7 +50,7 @@ UUID: существующий ID можно вернуть для обновл�
 `candidate_id` не являются editable полями. Claim нужен для адресации отдельных
 facts/evidence. Поля `facts` (домены, стеки,
 duration, role, production support) структурированы отдельно от текста. Ссылка
-сама по себе ничего не подтверждает.
+служит контекстом, а подтверждение даёт отдельное evidence.
 
 Evidence — отдельный read-only канал ответа. Для каждого ключа хранятся:
 
@@ -167,10 +167,10 @@ PYTHONPATH=services/matching-engine/src:services/agents-service/src \
 запускается. Результат без секретов сохраняется в игнорируемом
 `tests/artifacts/candidate-profile-acceptance.json`.
 
-Полный backend-путь до main top-k замкнут. Future verification producers и их
-подключение к evidence/outbox остаются отдельным контуром. UI, production deploy,
-реальная доставка email в этом прогоне и качество обученного ML-реранкера здесь
-не проверяются.
+Полный backend-путь до main top-k замкнут. Новые verification producers и их
+подключение к evidence/outbox развиваются отдельным контуром. UI, production deploy,
+реальная доставка email и качество обученного ML-реранкера проверяются в своих
+отдельных приёмках.
 
 ## Добровольное обучение моделей
 

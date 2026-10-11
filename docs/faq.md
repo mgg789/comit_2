@@ -1,0 +1,104 @@
+# Частые вопросы
+
+Ответы основаны на текущем коде и конфигурации `dev`. Если ответ ссылается на
+переменную окружения, её полное описание есть в [deploy.md](deploy.md).
+
+## Запуск и окружение
+
+**`make dev-up` сразу останавливается с ошибкой про code judge.**
+Dev-compose требует `CODE_JUDGE_URL` и `CODE_JUDGE_TOKEN` изолированного judge.
+Экспортируйте их в shell перед запуском ([quickstart.md](quickstart.md),
+[deploy.md](deploy.md#изолированная-проверка-кода)).
+
+**Не приходит код входа.**
+В dev код не отправляется письмом: API возвращает `dev_code`, и форма подставляет
+его сама. В production код уходит через SMTP (`auth-mail-worker`), API его не
+возвращает ([auth.md](auth.md)).
+
+**`/ready` matching-engine отвечает 503.**
+Нужен подготовленный snapshot модели Harrier в кэше `harrier_cache`; команда
+подготовки — в [deploy.md](deploy.md).
+
+**`/ready` api-core отвечает 503.**
+Проверьте конфигурацию авторизации, доступность БД и применённые миграции
+`021_support_console.sql` и `021_weekly_challenges.sql` ([api.md](api.md)).
+
+**Можно ли поднять production и dev одновременно?**
+Да, если развести порты переменными `WEB_PORT`, `API_PORT` и т.д.; у контуров
+разные compose-проекты и volumes ([environments.md](environments.md)).
+
+**Где посмотреть все маршруты API?**
+Swagger UI — `/api/docs` (локально — `/docs` api-core), перечень — [api-reference.md](api-reference.md).
+
+**Почему `/api/internal/...` отвечает 404?**
+Это намеренно: nginx не проксирует внутренние маршруты, они доступны только
+между сервисами по `X-Internal-Token`.
+
+**Что значит `429 rate_limited`?**
+Сработала квота api-core: по умолчанию 240 запросов на IP за 60 секунд
+(`API_RATE_LIMIT`, `API_RATE_WINDOW_SECONDS`); ответ содержит `Retry-After`
+([api-operations.md](api-operations.md)).
+
+## Кандидат
+
+**Почему меня нет в подборках?**
+Проверьте согласие на обработку и показ в подборе и статус проекции
+`GET /candidate/pipeline`; при ошибке — `POST /candidate/profile/projection/retry`.
+Дальше работает строгий фильтр вакансии: класс, зарплатные границы, формат,
+город и переезд ([candidate-profile.md](candidate-profile.md), [matching.md](matching.md)).
+
+**Как часто можно проходить тест?**
+Повторная попытка — через 7 дней, повышение оценки — через 30 дней. Доступность
+и дату следующей попытки показывает `GET /candidate/testing/preflight`.
+
+**Перезаписывает ли тест мой заявленный грейд?**
+Нет. Тест подтверждает конкретный навык и его измеренный уровень (`grade:trusted`),
+общий заявленный грейд профиля остаётся вашим ([testing-engine.md](testing-engine.md)).
+
+**Почему тест по algorithms/python недоступен, а в других нет развёрнутых ответов?**
+Для направлений `algorithms` и `python` задания с кодом обязательны: пока
+изолированный code-judge не готов, preflight возвращает `code_judge_unavailable`
+и попытка не начинается. Развёрнутые ответы включаются, когда настроен Jev или
+DeepSeek; без них тест использует вопросы с выбором и короткие ответы.
+
+**Можно ли не давать согласие на обучение моделей?**
+Да. Согласие на обучение отдельное и необязательное; отказ не влияет на обычный
+подбор ([legal/README.md](legal/README.md)).
+
+**Когда работодатель увидит мои контакты?**
+Только после того, как вы примете приглашение, и только пока действует согласие
+на обработку ([recruitment.md](recruitment.md)).
+
+## Работодатель
+
+**Почему не отправляется приглашение (409 `employer_company_required`)?**
+Сначала укажите название компании в профиле работодателя (`PATCH /employer/profile`).
+
+**Вакансия создана, но её нет в подборе.**
+Создание и правки не публикуют вакансию. Пройдите approve → summary → publish;
+готовность подборки показывает `GET /employer/vacancy-drafts/{id}/ready`
+([vacancy-crud.md](vacancy-crud.md)).
+
+**AI-агент недоступен.**
+`GET /employer/agents/capabilities` показывает, что доступно. В режиме
+`AGENTS_MODE=manual` или без ключа провайдера работает ручная форма
+([agents-offline.md](agents-offline.md)).
+
+**Чат процесса отвечает 503.**
+Чат QGramm не настроен или недоступен; приглашения и остальной найм при этом
+работают ([chat.md](chat.md)).
+
+## Поддержка и эксплуатация
+
+**`/support/` пишет «Консоль поддержки не настроена на этом стенде».**
+Задайте `SUPPORT_EMAIL` и `SUPPORT_ACCESS_KEY` (16–200 символов). Без них
+маршруты `/support/*` не регистрируются ([support-console.md](support-console.md)).
+
+**ФСП в production отвечает 503.**
+Мок-реестр ФСП включается только в dev (`APP_ENV=development`,
+`FSP_DEMO_ENABLED=true`) ([integration.md](integration.md)).
+
+**Как проверить стенд после выкладки?**
+`make smoke` (или `SMOKE_MODE=dev make smoke` для dev) проверяет health/readiness,
+все пять web-приложений, скрытость `/api/internal`, границы авторизации, витрины
+и поведение ФСП ([ci.md](ci.md), [runbook.md](runbook.md)).

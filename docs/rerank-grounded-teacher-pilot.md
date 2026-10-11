@@ -63,15 +63,15 @@ PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/pytho
 идентичности нового учителя: прежний набор нельзя незаметно доразметить другим
 контрактом. Отдельные оценки пригодности, обучение, golden-метрики и непересекающиеся
 20+20 ручных проверок остаются следующими этапами. Эти диагностические пары
-не являются обучающим набором; teacher promotion и активация R₀ не выполнялись.
+не являются обучающим набором; teacher promotion и активация R₀ — следующие этапы.
 Публичные контракты и backend runtime не изменены.
 
 Проверено: `PYTHONPATH=services/matching-engine/src services/matching-engine/.venv/bin/python -m pytest services/matching-engine/tests -q`
 с настроенной отдельной PostgreSQL test DB — 610 passed; scoped Ruff из каталога
 matching-engine, `pnpm typecheck`, `pnpm build`, `make smoke` — зелёные.
 `pnpm --filter @comit/api test`: 27 passed, 4 skipped из-за отдельных ненастроенных
-auth/profile test DB. Production, удалённый CI и полная learned R₀ приёмка
-не проверялись.
+auth/profile test DB. Production, удалённый CI и полная learned R₀ приёмка —
+следующие этапы проверки.
 
 После интеграции параллельного employer feed из `dev` (`c0d6b7c`) повторены
 проверки объединённого дерева: 636 Python/PostgreSQL tests passed, scoped Ruff,
