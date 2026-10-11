@@ -509,6 +509,30 @@ export class AuthStore {
     }
   }
 
+  /** Delete employer-owned API records atomically after service projections are fenced. */
+  public async deleteEmployerAccount(accountId: string): Promise<boolean> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const selected = await client.query<{ email: string }>(
+        "SELECT email FROM accounts WHERE id=$1 AND role='employer' FOR UPDATE", [accountId]);
+      if (!selected.rows[0]) { await client.query("ROLLBACK"); return false; }
+      await client.query("UPDATE sessions SET revoked_at=now() WHERE account_id=$1 AND revoked_at IS NULL", [accountId]);
+      await client.query("DELETE FROM recruitment_receipts WHERE actor_id=$1", [accountId]);
+      await client.query("DELETE FROM recruitment_processes WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM vacancy_lifecycle_commands WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM employer_expenses WHERE owner_id=$1", [accountId]);
+      await client.query("DELETE FROM employer_expense_ai_days WHERE owner_id=$1", [accountId]);
+      // Challenges are role-scoped; preserve a pending candidate login for this email.
+      await client.query("DELETE FROM auth_challenges WHERE email=$1 AND role='employer'", [selected.rows[0].email]);
+      await client.query("DELETE FROM auth_issue_events WHERE email=$1", [selected.rows[0].email]);
+      const result = await client.query("DELETE FROM accounts WHERE id=$1 AND role='employer'", [accountId]);
+      await client.query("COMMIT");
+      return result.rowCount === 1;
+    } catch (error) { await rollback(client); throw error; }
+    finally { client.release(); }
+  }
+
   /** Claim one valid mail job with a 120-second lease and recover stale workers. */
   public async claimMail(): Promise<MailJob | null> {
     await this.purgeAuthExpired();

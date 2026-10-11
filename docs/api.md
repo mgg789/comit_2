@@ -122,6 +122,17 @@ sessions/media under its owner tombstone, и только после этого 
 notifications и account. При недоступном matching-engine source account остаётся,
 чтобы публичная projection не пережила удаление источника.
 
+`DELETE /employer/account` требует employer session и разрешённый Origin для cookie
+запроса. После подтверждения UI gateway последовательно удаляет employer-owned
+данные agents-service (вакансии, документы, диалоги, jobs, runtime и usage),
+matching-engine (projection, feed и learning graph), затем API-owned recruitment,
+expenses, профиль, уведомления, OAuth identities и все сессии в одной транзакции.
+В сервисах остаются только UUID tombstones, защищающие от поздних worker writes
+и replay. Активные вакансии также удаляются. Ошибка сервиса возвращает 503;
+API account сохраняется для повторения, уже выполненная очистка не откатывается.
+Повторный запрос продолжает идемпотентную очистку. Email challenges удаляются
+только для employer роли, не затрагивая незавершённый вход в candidate роли с тем же email.
+
 `GET /candidate/skills/catalog` возвращает `{version, schema_hash, skills}`.
 Каждый элемент `skills`: `{group, key, label, test_subject, confirmed_level,
 next_attempt_at, upgrade_at}`; даты — UTC ISO8601 или null, группа — `domains`,

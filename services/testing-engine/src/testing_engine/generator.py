@@ -5,7 +5,7 @@ Per docs/testing-design.md §3: generation runs offline-batch into the bank
 validator, the daily budget is a cumulative day-keyed ledger (rerank pattern),
 and served instances rotate out via the store moratorium.
 
-The provider is DeepSeek (same key/infra as the extended-answer judge). Every
+The provider is selected by LLM_PROVIDER (same fallback as the rubric judge). Every
 failure degrades to "generation unavailable" - the seed bank keeps the contour
 fully functional without any network access.
 """
@@ -13,12 +13,12 @@ fully functional without any network access.
 from __future__ import annotations
 
 import json
-import os
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
 from testing_engine.judge import CodeJudgeClient
+from testing_engine.llm_config import completion_config
 
 MIN_STOCK_PER_SLOT = 5
 FAMILY_BLUEPRINTS = {
@@ -69,11 +69,12 @@ class GenerationUnavailable(RuntimeError):
 
 
 class DeepSeekGenerator:
-    """Minimal DeepSeek chat-completions client bound to one item request."""
+    """Configured completion client; the legacy class name preserves batch callers."""
 
-    def __init__(self, *, api_key: str | None = None, model: str = "deepseek-chat") -> None:
-        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY", "")
-        self.model = model
+    def __init__(self, *, api_key: str | None = None, model: str | None = None) -> None:
+        self.provider, self.url, configured_model, token, self.options = completion_config()
+        self.api_key = api_key or token
+        self.model = model or configured_model
 
     def available(self) -> bool:
         return bool(self.api_key)
@@ -81,7 +82,7 @@ class DeepSeekGenerator:
     def generate_item(self, family: str, level: int, task_type: str) -> dict:
         """Ask for one item and return the parsed payload; raise on any failure."""
         if not self.available():
-            raise GenerationUnavailable("DEEPSEEK_API_KEY is not set")
+            raise GenerationUnavailable("llm_not_configured")
         topic, artifact = FAMILY_BLUEPRINTS[family]
         grade_word = ("intern", "junior", "middle", "senior")[level - 1]
         type_rules = {
@@ -95,19 +96,27 @@ class DeepSeekGenerator:
             "Не повторяй дословно пример; конкретные числа, названия и сценарии придумай сам."
         )
         request = urllib.request.Request(
-            "https://api.deepseek.com/chat/completions",
+            self.url,
             data=json.dumps({
-                "model": self.model, "temperature": 0.8,
+                "model": self.model, "temperature": 0.8, **self.options,
                 "messages": [{"role": "system", "content": system},
                              {"role": "user", "content": "Сгенерируй задание."}],
                 "response_format": {"type": "json_object"},
             }).encode("utf-8"),
             headers={"content-type": "application/json",
                      "authorization": f"Bearer {self.api_key}"}, method="POST")
-        with urllib.request.urlopen(request, timeout=60) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        content = body["choices"][0]["message"]["content"]
-        item = json.loads(content)
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                raw = response.read(262145)
+                if len(raw) > 262144:
+                    raise ValueError("response_too_large")
+                body = json.loads(raw.decode("utf-8"))
+            content = body["choices"][0]["message"]["content"]
+            item = json.loads(content)
+            if not isinstance(item, dict):
+                raise TypeError("invalid_item")
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            raise GenerationUnavailable("llm_generation_unavailable") from None
         item.update({"family": family, "level": level, "type": task_type})
         return item
 

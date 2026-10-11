@@ -16,9 +16,9 @@ Compose намеренно останавливается при пустом pr
 `VERIFICATION_DOCUMENT_KEY`, `TESTING_ENGINE_TOKEN`, `CHAT_SERVICE_TOKEN`,
 `CHAT_DEVICE_SECRET`, `CHAT_SIGNING_KEY`, `QGRAMM_MANAGEMENT_SECRET`,
 `QGRAMM_MASTER_KEY`, `QGRAMM_HPKE_KEY`, `SMTP_USER`, `SMTP_PASSWORD`,
-`DEEPSEEK_API_KEY`. `JEV_API_KEY` и `JEV_LOCAL_URL` — дополнительные провайдеры: они включают соответствующие ИИ-возможности, а без них интерфейс показывает статус и предлагает ручное редактирование.
+`TIMEWEB_API_KEY` при `LLM_PROVIDER=timeweb`. Для явно выбранного legacy `deepseek` нужен `DEEPSEEK_API_KEY`. `JEV_API_KEY` и `JEV_LOCAL_URL` — дополнительные провайдеры: они включают соответствующие ИИ-возможности, а без них интерфейс показывает статус и предлагает ручное редактирование.
 Ключи QGramm сохранять неизменными вместе с `chat-data`; base64 ключи должны
-декодироваться в 32 байта. Значения API pricing должны соответствовать реальным тарифам.
+декодироваться в 32 байта. Значения API pricing должны соответствовать реальным тарифам выбранного провайдера; production не подставляет старые тарифы DeepSeek для Timeweb.
 
 Перед первым запуском provision точную Harrier revision в `harrier_cache`:
 
@@ -163,7 +163,7 @@ SMTP использует существующий host relay Navix на пор�
 При первом переходе автоматический CD main заранее отклоняет legacy-стек, не занимая каталог SHA; тот же проверенный SHA затем можно выкатить ручным dispatch с `adopt_legacy=true`. Повтор после ошибки сборки существующего release требует сначала осмотреть его состояние; deployment не перезаписывает release автоматически.
 
 
-После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Jev: он не мешает запуску worker публикации/DeepSeek, а обогащение остаётся недоступным с ручным редактированием.
+После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Jev: он не мешает запуску worker публикации/выбранного LLM, а обогащение остаётся недоступным с ручным редактированием.
 
 Статические файлы всех пяти приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
 
@@ -216,8 +216,8 @@ socket. Проверка реального sandbox выполняется от�
 `CODE_JUDGE_DOCKER_TESTS=1 python -m pytest services/code-judge/tests/test_docker_acceptance.py -q`.
 
 Развёрнутые ответы проверяются Jev (`JEV_API_KEY`, `JEV_API_URL`, `JEV_MODEL`,
-по умолчанию `kev-latest`); если ключ Jev не задан — DeepSeek
-(`DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL`). Сбой настроенного Jev
+модель зависит от `JEV_PROVIDER`); если ключ Jev не задан — выбранный `LLM_PROVIDER`
+с его приватным API key и настройками модели. Сбой настроенного Jev
 не подменяется молча другим провайдером: ответ остаётся доступен для повтора.
 Провайдер оценивает заданные сервером критерии; итоговый грейд рассчитывает движок.
 
@@ -261,9 +261,9 @@ release; UI на стенде подтверждается этим smoke.
 | `PIPELINE_MAX_ATTEMPTS`, `PIPELINE_LEASE_SECONDS`, `PIPELINE_RETRY_BASE_SECONDS`, `PIPELINE_POLL_SECONDS` | matching workers | 5, 300, 30, 2 | попытки, lease, backoff и опрос очередей (compose задаёт 5/300) |
 | `AGENTS_LEASE_SECONDS`, `AGENTS_POLL_SECONDS` | agents workers | 300, 2 | lease и опрос очередей агентов |
 | `AGENT_MAX_ROUNDS`, `AGENT_MAX_OUTPUT_TOKENS`, `AGENT_MAX_INPUT_TOKENS`, `AGENT_CONTEXT_COMPACTION_BYTES` | organization-worker | 8, 1024, 128000, 90000 | лимиты глобального агента работодателя |
-| `AGENT_INPUT_USD_PER_MILLION`, `AGENT_OUTPUT_USD_PER_MILLION`, `AGENT_CACHED_INPUT_USD_PER_MILLION` | agents | 0.2, 0.7, 0.2 (compose) | тарифы DeepSeek для учёта расходов |
+| `AGENT_INPUT_USD_PER_MILLION`, `AGENT_OUTPUT_USD_PER_MILLION`, `AGENT_CACHED_INPUT_USD_PER_MILLION` | agents | production требует явных ставок | тарифы выбранного LLM для учёта расходов; Timeweb: 0.2, 0.83, 0.2 |
 | `JEV_API_URL`, `JEV_MODEL`, `JEV_PROVIDER`, `JEV_MAX_OUTPUT_TOKENS`, `JEV_PRICING_VERSION`, `JEV_INPUT_USD_PER_MILLION`, `JEV_OUTPUT_USD_PER_MILLION` | agents | `https://ai.sverk.tech/v1/systemone`, `kev-latest`, `systemone`, 0, `user-2026-10-07`, 0.042, 0 | необязательный провайдер Jev/SystemOne для свайпов агента |
-| `JEV_LOCAL_URL` | agents | production compose — пусто, dev — `http://host.docker.internal:12444`, вне compose — `http://127.0.0.1:12444` | Jev; пустое значение отключает обогащение (`laya_not_configured`), непустое допускает только `localhost`, `127.0.0.1`, `host.docker.internal` |
+| `JEV_LOCAL_URL` | agents | production compose — пусто, dev — `http://host.docker.internal:12444`, вне compose — `http://127.0.0.1:12444` | локальный Jev для legacy режима; зеркало использует `JEV_API_URL` и `JEV_API_KEY` без локального URL; непустое допускает только `localhost`, `127.0.0.1`, `host.docker.internal` |
 | `ORGANIZATION_API_URL` | agents | `http://api:8080` (compose) | API bridge инструментов агента |
 | `CHAT_SERVICE_URL` | api | `http://qgramm-chat:8080` (compose) | приватный адрес QGramm bridge |
 | `FSP_DEMO_ENABLED`, `FSP_DEMO_INTERNAL_TOKEN`, `FSP_DEMO_CALLBACK_URL`, `FSP_DEMO_PUBLIC_URL`, `APP_ENV` | api, integration, verification | выключено; dev-файл включает | демо-привязка ФСП работает только при `NODE_ENV=development`/`APP_ENV=development` и `FSP_DEMO_ENABLED=true`; интерфейс маркирует demo |
@@ -272,7 +272,7 @@ release; UI на стенде подтверждается этим smoke.
 | `TESTING_RECORDING_MODE`, `CODE_JUDGE_URL`, `CODE_JUDGE_TOKEN`, `CODE_JUDGE_CA_PEM` | testing | `off`; judge задаётся оператором | режим записи, адрес изолированного judge, отдельный token и optional частный CA ([testing-engine.md](testing-engine.md)) |
 | `CODE_JUDGE_PORT`, `CODE_JUDGE_DATA_DIR`, `CODE_JUDGE_IMAGE`, `DOCKER_SOCKET_GID` | изолированный code-judge | 8106; код — `data/code-judge`, judge compose — `/data/judge`; `python:3.12-slim` (judge compose фиксирует digest); GID socket задаётся оператором | отдельный judge compose на disposable VM |
 | `TESTING_ENGINE_URL` | api | `http://testing-engine:8102` | адрес приватного testing-engine для прокси `/candidate/testing/*` |
-| `JEV_API_KEY`, `JEV_API_URL`, `JEV_MODEL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | testing | пусто, `https://ai.sverk.tech/v1/systemone`, `kev-latest`, пусто, `https://api.deepseek.com`, `deepseek-flash` | судья развёрнутых ответов: Jev при заданном ключе, иначе DeepSeek |
+| `JEV_API_KEY`, `JEV_API_URL`, `JEV_MODEL`, `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, `DEEPSEEK_MODEL` | testing | пусто, `https://ai.sverk.tech/v1/systemone`, `kev-latest`, пусто, `https://api.deepseek.com`, `deepseek-flash` | судья развёрнутых ответов: выбранный Jev при заданном ключе, иначе выбранный `LLM_PROVIDER` |
 | `MATCHING_PROMOTION_MODE`, `MATCHING_PROMOTION_ALLOW_DEMO` | matching и его workers | `shadow` (production compose), `active` (dev compose); `false` / `true` | режим `off`/`shadow`/`active` продвижения по ФСП и недельной активности; демо-факты учитываются только при `APP_ENV=development` ([matching.md](matching.md)) |
 | `AUTH_KEY_ID`, `ACCOUNT_CONSENT_VERSION`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `JWT_SECRET` | api | `v1`, `account-v1`, `comit`, `comit-api`, пусто | идентификатор ключа и claims JWT, версия согласия аккаунта; `JWT_SECRET` — устаревший запасной вариант для `AUTH_SECRET` ([auth.md](auth.md)) |
 | `DEV_AUTH_EXPOSE_CODE` | api | `false` | только dev: OTP в ответе ([auth.md](auth.md)) |
@@ -382,3 +382,41 @@ Production web port теперь только `127.0.0.1:${WEB_PORT:-8088}` и �
 host TLS proxy. Базовый dev bind не изменён; local launcher уже использует loopback.
 Это изменения repository templates, без live nginx reload или изменения сервера.
 Реальный браузерный CSP/camera/glass сценарий требует отдельной проверки после build.
+
+
+## Провайдеры ближайшего релиза: Timeweb и существующее зеркало Jev
+
+Production Compose выбирает `LLM_PROVIDER=timeweb`; dev сохраняет `deepseek`, если
+провайдер не выбран явно. Настройки: `TIMEWEB_BASE_URL=https://api.timeweb.ai/v1`,
+`TIMEWEB_MODEL=timeweb/gpt-oss-120b`, приватный `TIMEWEB_API_KEY`,
+`TIMEWEB_REASONING_EFFORT=low|medium|high` (обычные вызовы — `low`).
+Сохранённые режимы глобального агента `off/medium/max` отображаются в
+`low/medium/high` без изменения старых записей и публичного контракта.
+Timeweb не получает поле DeepSeek `thinking`. Probe проверяет `/v1/models` выбранного
+провайдера. Ключи и полные provider responses не попадают в логи.
+Все потребители LLM, включая генерацию вопросов и fallback проверки развёрнутых
+ответов testing-engine, используют выбранный провайдер. Тарифы
+`AGENT_INPUT_USD_PER_MILLION`, `AGENT_OUTPUT_USD_PER_MILLION`,
+`AGENT_CACHED_INPUT_USD_PER_MILLION` и `AGENT_PRICING_VERSION` задаются отдельно:
+ставки подтверждены пользователем 11.10.2026: вход $0.20/млн, выход $0.83/млн;
+cached input — полная входная ставка без выдуманного дисконта. Версия:
+`user-timeweb-2026-10-11`. Отсутствующие ставки блокируют платное действие.
+
+Jev подключается к существующему SMTP-host зеркалу Navix:
+`JEV_PROVIDER=openrouter-mirror`,
+`JEV_API_URL=https://openrouter.droidje.com/api/alpha/decisions`,
+`JEV_MODEL=typesafe/jev-1.13`, `JEV_API_KEY` — приватный proxy token.
+В запросе отправляется `X-Proxy-Token`, upstream OpenRouter key остаётся на зеркале.
+Протокол: `state.text`, вопросы `choice`, словарь `criteria`; ответы с проверенными
+`probabilities/choice/confidence`. Обогащение вакансии и rubric используют этот же
+протокол, а изменения ленты дополнительно требуют точный usage/cost receipt.
+Для проверенного decision-тарифа: `JEV_INPUT_USD_PER_MILLION=0.042`,
+`JEV_OUTPUT_USD_PER_MILLION=0`, `JEV_PRICING_VERSION=openrouter-2026-10-11`.
+Несогласованная стоимость или отсутствие usage запрещает изменение ленты.
+
+Подготовка приватного `/home/mgg/comit/.env` сама по себе не перезапускает сервисы;
+настройки прочтёт следующий обычный CD-релиз. Зеркало, SMTP, Navix, его токены и
+OpenRouter upstream configuration этой интеграцией не изменяются.
+Проверка 11.10.2026: Timeweb `/models` вернул требуемую модель; существующее зеркало
+вернуло корректный synthetic decision и receipt. Это не проверка пользовательского
+найма после rollout; она выполняется отдельно на развёрнутом релизе.

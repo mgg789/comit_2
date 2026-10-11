@@ -73,6 +73,20 @@ def _uuid(value: UUID | str) -> UUID:
 class Store:
     """PostgreSQL repository for one owner-scoped draft and its durable worker jobs."""
 
+    def delete_employer(self, owner_id: UUID) -> dict[str, object]:
+        """Fence and purge all employer content, including active worker leases, atomically."""
+        with connect(self.database_url) as connection:
+            connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 714012))", (str(owner_id),))
+            connection.execute("INSERT INTO agents_service.employer_tombstones(owner_id) VALUES (%s) ON CONFLICT DO NOTHING", (owner_id,))
+            connection.execute("""INSERT INTO agents_service.vacancy_tombstones(vacancy_id,owner_id,source_revision)
+                SELECT vacancy_id,owner_id,revision FROM agents_service.drafts WHERE owner_id=%s
+                ON CONFLICT DO NOTHING""", (owner_id,))
+            # Chat/session descendants cascade; standalone caches and journals are private too.
+            for table in ("organization_provider_calls", "organization_tool_receipts", "organization_documents",
+                          "agent_external_cache", "jobs", "organization_chats", "drafts"):
+                connection.execute(f"DELETE FROM agents_service.{table} WHERE owner_id=%s", (owner_id,))
+        return {"owner_id": str(owner_id), "deleted": True}
+
     def __init__(self, database_url: str, *, migrate_schema: bool = False) -> None:
         """Create a repository; migration is opt-in so API startup controls lifecycle."""
         self.database_url = database_url

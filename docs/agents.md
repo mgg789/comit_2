@@ -320,3 +320,41 @@ duration, kind, format и location. Ошибка AI сразу создаёт в
 исходного хода, записывает идемпотентное подтверждение и завершает ход. Действия
 с кандидатами выполняет background worker; независимые вызовы того же batch
 сохраняются. При восстановлении успешные receipts не повторяют бизнес-эффекты.
+
+### Провайдер Timeweb
+
+`LLM_PROVIDER=timeweb` переключает completion-клиент на `TIMEWEB_BASE_URL`
+(по умолчанию `https://api.timeweb.ai/v1`), `TIMEWEB_MODEL`
+(`timeweb/gpt-oss-120b`) и `TIMEWEB_API_KEY`. Допускается только официальный
+HTTPS endpoint. `TIMEWEB_REASONING_EFFORT=low|medium|high` задаёт режим обычных
+completion-вызовов; по умолчанию `low`. Режимы организации сохраняются:
+`off → low`, `medium → medium`, `max → high`. Поле DeepSeek `thinking` в
+Timeweb не передаётся. Проверка доступности использует `/v1/models`.
+
+Для Timeweb обязательны явные `AGENT_INPUT_USD_PER_MILLION` и
+`AGENT_OUTPUT_USD_PER_MILLION`; отсутствующие тарифы запрещают платный вызов.
+`AGENT_CACHED_INPUT_USD_PER_MILLION` по умолчанию равен входному тарифу,
+`AGENT_PRICING_VERSION` фиксирует версию тарифа в receipt. Хеш и ledger
+содержат фактический провайдер и модель. Неоднозначный платный вызов сохраняет
+существующий durable fence. `LLM_PROVIDER=deepseek` сохраняет старую конфигурацию.
+
+### Jev через OpenRouter Mirror
+
+`JEV_PROVIDER=openrouter-mirror` подключает enrichment к закреплённому
+`JEV_API_URL=https://openrouter.droidje.com/api/alpha/decisions` и
+`JEV_MODEL=typesafe/jev-1.13`. Ключ `JEV_API_KEY` передаётся только в
+`X-Proxy-Token`. Ordinal вопросы идут пакетами до 24 как `choice` с
+критериями `0..8`; результат проверяется по вероятностям и confidence.
+Выбранное значение обязано совпадать с максимумом вероятностей. Provenance
+хранит фактическую модель ответа. Capability проверяет `/api/v1/models`.
+
+
+## Удаление работодателя
+
+`DELETE /internal/employers/{owner_id}` доступен только API с внутренним токеном.
+Миграция `012_employer_lifecycle.sql` сохраняет минимальный UUID tombstone и
+блокирует поздние owner-scoped записи. Удаление очищает черновики, чаты,
+организационные задания, provider/cache receipts и usage ledger. API затем удаляет
+matching-проекции и собственные данные аккаунта; при частичном сбое остаётся
+возможность повторить идемпотентное удаление. Аккаунты и данные других владельцев
+сохраняются. См. [API](api.md) и [matching](matching.md).

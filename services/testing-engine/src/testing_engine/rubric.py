@@ -4,10 +4,13 @@ import hashlib
 import json
 import math
 import os
+import re
 import urllib.request
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, StrictBool
+
+from testing_engine.llm_config import completion_config
 
 
 class CriterionVerdict(BaseModel):
@@ -30,14 +33,21 @@ class RubricVerdict(BaseModel):
 
 
 class RubricJudge:
-    """Prefer configured Jev; otherwise use DeepSeek's JSON completion endpoint."""
+    """Prefer configured Jev; otherwise use the selected JSON completion provider."""
 
     def __init__(self, cache_dir: Path | None = None) -> None:
-        self.provider = "jev" if os.getenv("JEV_API_KEY") else "deepseek"
-        self.token = os.getenv("JEV_API_KEY" if self.provider == "jev" else "DEEPSEEK_API_KEY", "")
-        self.model = os.getenv("JEV_MODEL", "kev-latest") if self.provider == "jev" else os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
-        self.url = (os.getenv("JEV_API_URL", "https://ai.sverk.tech/v1/systemone") if self.provider == "jev"
-                    else os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions")
+        self.options = {}
+        if os.getenv("JEV_API_KEY"):
+            self.provider = "jev-mirror" if os.getenv("JEV_PROVIDER") == "openrouter-mirror" else "jev"
+            self.token = os.getenv("JEV_API_KEY", "")
+            self.model = os.getenv("JEV_MODEL", "kev-latest")
+            self.url = os.getenv("JEV_API_URL", "https://openrouter.droidje.com/api/alpha/decisions" if self.provider == "jev-mirror" else "https://ai.sverk.tech/v1/systemone")
+            if self.provider == "jev-mirror":
+                self.model = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+                if self.url != "https://openrouter.droidje.com/api/alpha/decisions" or self.model != "typesafe/jev-1.13":
+                    raise ValueError("Jev mirror requires the pinned endpoint and model")
+        else:
+            self.provider, self.url, self.model, self.token, self.options = completion_config()
         self.cache_dir = cache_dir
 
     def configured(self) -> bool:
@@ -46,7 +56,8 @@ class RubricJudge:
 
     def _request(self, payload: dict, key: str) -> dict:
         request = urllib.request.Request(self.url, data=json.dumps(payload).encode(),
-            headers={"Content-Type": "application/json", "Authorization": "Bearer " + self.token,
+            headers={"Content-Type": "application/json",
+                     **({"X-Proxy-Token": self.token} if self.provider == "jev-mirror" else {"Authorization": "Bearer " + self.token}),
                      "Idempotency-Key": key}, method="POST")
         with urllib.request.urlopen(request, timeout=45) as response:
             return json.loads(response.read(262145))
@@ -62,17 +73,26 @@ class RubricJudge:
                  "equivalent paraphrases. Do not invent missing facts. Do not require exact wording.")
         trusted = {"question": payload["prompt"], "rubric": rubric}
         fingerprint = {"version": 1, "owner": owner, "provider": self.provider, "url": self.url,
-                       "model": self.model, "trusted": trusted, "answer": answer}
+                       "model": self.model, "options": self.options, "trusted": trusted, "answer": answer}
         key = hashlib.sha256(json.dumps(fingerprint, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         path = self.cache_dir / (key + ".json") if self.cache_dir else None
         try:
             if path and path.exists():
                 verdict = RubricVerdict.model_validate_json(path.read_text())
-            elif self.provider == "jev":
-                body = self._request({"model": self.model,
+            elif self.provider in {"jev", "jev-mirror"}:
+                jev_request = {"model": self.model,
                     "state": json.dumps({"question": payload["prompt"], "untrusted_candidate_answer": answer}, ensure_ascii=False),
                     "questions": {str(i): {"type": "score", "instructions": rules + " Criterion: " + point,
-                        "criteria": ["not_met", "met"]} for i, point in enumerate(rubric)}}, key)
+                        "criteria": ["not_met", "met"]} for i, point in enumerate(rubric)}}
+                if self.provider == "jev-mirror":
+                    jev_request["state"] = {"text": jev_request["state"]}
+                    jev_request["questions"] = {key: {**question, "type": "choice",
+                        "criteria": {"not_met": "not_met", "met": "met"}} for key, question in jev_request["questions"].items()}
+                body = self._request(jev_request, key)
+                if self.provider == "jev-mirror":
+                    actual_model = body.get("model")
+                    if not isinstance(actual_model, str) or not re.fullmatch(r"typesafe/jev-1\.13(?:-[0-9]{8})?", actual_model):
+                        raise ValueError("jev_model_mismatch")
                 answers = body["answers"]
                 if set(answers) != {str(i) for i in range(len(rubric))}:
                     raise ValueError("criterion_count")
@@ -81,7 +101,7 @@ class RubricJudge:
                     result = answers[str(i)]
                     if not isinstance(result, dict):
                         raise TypeError("invalid_criterion")
-                    probabilities = result.get("classprobs", result.get("class_probs"))
+                    probabilities = result.get("probabilities") if self.provider == "jev-mirror" else result.get("classprobs", result.get("class_probs"))
                     if not isinstance(probabilities, dict):
                         raise TypeError("missing_probabilities")
                     if set(probabilities) == {"0", "1"}:
@@ -94,12 +114,19 @@ class RubricJudge:
                         raise ValueError("invalid_probability")
                     if not 0.99 <= sum(scores) <= 1.01:
                         raise ValueError("invalid_probability_sum")
+                    if self.provider == "jev-mirror":
+                        confidence = result.get("confidence")
+                        if (result.get("type") != "choice" or result.get("choice") != ("met" if scores[1] > scores[0] else "not_met")
+                                or type(confidence) not in (int, float) or not math.isfinite(confidence) or not 0 <= confidence <= 1):
+                            raise ValueError("invalid_choice")
+                        if confidence < 0.8:
+                            raise UncertainVerdict("uncertain_verdict")
                     if max(scores) < 0.8:
                         raise UncertainVerdict("uncertain_verdict")
                     criteria.append(CriterionVerdict(met=scores[1] > scores[0]))
                 verdict = RubricVerdict(criteria=criteria)
             else:
-                body = self._request({"model": self.model, "temperature": 0,
+                body = self._request({"model": self.model, "temperature": 0, **self.options,
                     "max_tokens": 600, "response_format": {"type": "json_object"},
                     "messages": [{"role": "system", "content": rules +
                         ' Return JSON exactly {"criteria":[{"met":true|false},...]} in rubric order. Trusted task: ' +

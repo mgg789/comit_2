@@ -1,5 +1,5 @@
 import { useChatUnread } from "@comit/ui-kit/system-inbox";
-import { PersistentStateScope } from "@comit/ui-kit/ui-state";
+import { clearPersistentState, PersistentStateScope } from "@comit/ui-kit/ui-state";
 import { chatReturnRoute } from "@comit/ui-kit/chat-navigation";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
@@ -64,11 +64,18 @@ export default function App() {
     setAccountAction(action);
   }
   async function logoutConfirmed() {
-    if (accountBusy || !accountAction || accountAction === "delete") return;
+    if (accountBusy || !accountAction) return;
     setAccountBusy(true);
     setAccountActionError(null);
     try {
-      await api.logout("employer", accountAction === "logout-all");
+      if (accountAction === "delete") {
+        await api.deleteEmployerAccount();
+        if (account) {
+          clearPersistentState("guest", `employer:${account.id}`);
+          clearPersistentState(`employer:${account.id}`, "");
+        }
+        navigate("/showcase");
+      } else await api.logout("employer", accountAction === "logout-all");
       setAccount(null);
       setAgent(false);
       setEditor(null);
@@ -333,7 +340,7 @@ export default function App() {
                 <Dialog manageFocus={false} close={() => { if (!accountBusy) setAccountAction(null); }} title={accountAction === "delete" ? "Удалить аккаунт?" : accountAction === "logout-all" ? "Выйти на всех устройствах?" : "Выйти из аккаунта?"}>
                     <p>
                       {accountAction === "delete"
-                        ? "Удаление аккаунта пока недоступно: сервисы ещё не поддерживают удаление связанных вакансий, переписки и данных подбора. Аккаунт и его данные сохранятся."
+                        ? "Аккаунт, вакансии, переписка, документы и данные подбора будут удалены. Все сессии завершатся. Восстановить данные будет нельзя."
                         : accountAction === "logout-all"
                           ? "Все сессии будут завершены. Для возвращения понадобится код из письма."
                           : "Для возвращения понадобится код из письма."}
@@ -342,10 +349,10 @@ export default function App() {
                       <p role="alert" className="form-error">{accountActionError}</p>
                     )}
                     <div className="account-confirmation-actions">
-                      <Action disabled={accountBusy} onClick={() => setAccountAction(null)}>{accountAction === "delete" ? "Закрыть" : "Отмена"}</Action>
-                      {accountAction !== "delete" && (
+                      <Action disabled={accountBusy} onClick={() => setAccountAction(null)}>Отмена</Action>
+                      {(
                         <Action variant="primary" disabled={accountBusy} onClick={() => void logoutConfirmed()}>
-                          {accountBusy ? "Выходим…" : "Выйти"}
+                          {accountBusy ? (accountAction === "delete" ? "Удаляем…" : "Выходим…") : (accountAction === "delete" ? "Удалить навсегда" : "Выйти")}
                         </Action>
                       )}
                     </div>

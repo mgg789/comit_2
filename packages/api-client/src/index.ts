@@ -144,6 +144,8 @@ export interface ApiClient {
   logout(role: AccountRole, all?: boolean): Promise<{ ok: true }>;
   /** Permanently remove the authenticated candidate account and its private graph. */
   deleteCandidateAccount(): Promise<{ deleted: true }>;
+  /** Permanently remove the authenticated employer and its source/projection graph. */
+  deleteEmployerAccount(): Promise<{ deleted: true }>;
   /** Read the private editable source profile, including proof and delivery states. */
   getCandidateSkillCatalog(): Promise<CandidateSkillCatalog>;
   getCandidateProfile(): Promise<CandidateProfileView>;
@@ -395,6 +397,7 @@ export function createApiClient({
     getAccount: role => request("GET", `/auth/${role}/me`),
     logout: (role, all = false) => request("POST", `/auth/${role}/${all ? "logout-all" : "logout"}`),
     deleteCandidateAccount: () => request("DELETE", "/candidate/account"),
+    deleteEmployerAccount: () => request("DELETE", "/employer/account"),
     getCandidateSkillCatalog: () => request("GET", "/candidate/skills/catalog"),
     getCandidateProfile: () => request("GET", "/candidate/profile"),
     testingPreflight: (specialization, mode = "retake") => request("GET", `/candidate/testing/preflight?specialization=${encodeURIComponent(specialization)}&mode=${mode}`),

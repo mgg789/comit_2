@@ -116,7 +116,7 @@ class OrganizationRuntime:
         return self.store.update_turn(turn.owner_id, turn.turn_id, expected_lease_token=turn.lease_token, **values)
 
     def _run(self, turn: OrganizationTurn) -> OrganizationTurn:
-        pricing = Pricing.from_env(model=str(getattr(self.provider, "model", "deepseek-chat")))
+        pricing = Pricing.from_env(provider=str(getattr(self.provider, "provider", "deepseek")), model=str(getattr(self.provider, "model", "deepseek-chat")))
         messages = self._messages(turn, pricing)
         # A worker can die after the provider receipt was committed but before the
         # assistant/tool journal was written.  Resume that exact receipt first;
@@ -137,9 +137,12 @@ class OrganizationRuntime:
                 request = {"messages": messages, "tools": tools, "max_tokens": max_tokens,
                            "model": getattr(self.provider, "model", "unknown"),
                            "reasoning_effort": turn.reasoning_effort}
+                if pricing.provider != "deepseek":
+                    request["provider"] = pricing.provider
+                    request["base_url"] = getattr(self.provider, "base_url", "")
                 request_hash = hashlib.sha256(json.dumps(request, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
                 legacy_request_hash = None
-                if turn.reasoning_effort == "off":
+                if turn.reasoning_effort == "off" and pricing.provider == "deepseek":
                     legacy_request = {key: value for key, value in request.items() if key != "reasoning_effort"}
                     legacy_request_hash = hashlib.sha256(json.dumps(legacy_request, sort_keys=True, ensure_ascii=False,
                                                                    separators=(",", ":")).encode()).hexdigest()
@@ -156,7 +159,7 @@ class OrganizationRuntime:
                     if not self.store.lease_valid(turn):
                         raise OrganizationRuntimeError("lease_lost", retryable=True)
                     try:
-                        if turn.reasoning_effort == "off":
+                        if turn.reasoning_effort == "off" and pricing.provider == "deepseek":
                             raw = self.provider.complete(messages, tools, max_tokens=max_tokens)
                         else:
                             raw = self.provider.complete(messages, tools, max_tokens=max_tokens,

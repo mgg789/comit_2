@@ -10,9 +10,10 @@ import psycopg
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 
+from matching_engine.candidate_routes import candidate_router
 from matching_engine.combine_routes import combine_router
 from matching_engine.combine_store import CombineStore
-from matching_engine.candidate_routes import candidate_router
+from matching_engine.employer_routes import employer_router
 from matching_engine.feed_routes import feed_router
 from matching_engine.feed_store import FeedStore
 from matching_engine.hypothesis_routes import hypothesis_router
@@ -26,10 +27,10 @@ from matching_engine.models import (
 )
 from matching_engine.preference_routes import preference_router
 from matching_engine.preference_store import PreferenceStore
+from matching_engine.public_showcase import PublicShowcaseStore, public_showcase_router
 from matching_engine.rerank_routes import rerank_router
 from matching_engine.rerank_store import RerankStore
 from matching_engine.showcase_routes import showcase_router
-from matching_engine.public_showcase import PublicShowcaseStore, public_showcase_router
 from matching_engine.showcase_store import ShowcaseStore
 from matching_engine.store import ConflictError, NotFoundError, Store
 from matching_engine.vacancy_routes import vacancy_router
@@ -80,6 +81,7 @@ def create_app(*, store: Store | None = None, internal_token: str | None = None,
     app.include_router(preference_router(PreferenceStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
     app.include_router(candidate_router(pipeline_store, require_internal))
+    app.include_router(employer_router(vacancy_repository, require_internal))
     app.include_router(hypothesis_router(HypothesisStore(pipeline_store.database_url) if pipeline_store else None,
                                          require_internal))
 

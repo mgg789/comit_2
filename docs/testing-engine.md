@@ -217,3 +217,21 @@ Code-judge считает лимит времени кандидата отде�
 Broker сериализует только одинаковые `(owner,idempotency_key)`, сохраняя durable replay и conflict. Разные решения ограничиваются семафором `CODE_JUDGE_CONCURRENCY` (по умолчанию 2, допустимая величина 1–4). При занятых слотах после короткого ожидания возвращается 503 `runner_busy`; очередь не удерживает HTTP-клиента бесконечно. `/ready` выполняет независимый реальный probe без lock всех решений. File-backed broker по-прежнему предполагает один процесс на data directory.
 
 Публикация результата выполняется вне event loop. `urllib.HTTPError` сохраняет `api_status:<HTTP code>`, безопасный `detail` и дату `retry_at`. Для `grade_upgrade_cooldown`/`retake_cooldown` API передаёт точную дату от последнего принятого результата; UI объясняет отказ и сохраняет прежний грейд. Постоянные HTTP 4xx терминальны (кроме 408/429). Сетевые ошибки, HTTP 5xx/408/429 имеют не более трёх попыток с минимальной паузой 5 и 10 секунд; после исчерпания UI не предлагает бесконечный повтор. Не принятый результат остаётся сохранённым для поддержки, алгоритм оценки и сроки 7/30 дней не меняются.
+
+### Timeweb для генерации и rubric fallback
+
+Генератор банка и fallback rubric judge используют `LLM_PROVIDER=timeweb`,
+`TIMEWEB_API_KEY`, `TIMEWEB_BASE_URL=https://api.timeweb.ai/v1`,
+`TIMEWEB_MODEL=timeweb/gpt-oss-120b` и `TIMEWEB_REASONING_EFFORT=low|medium|high`
+(по умолчанию `low`). При настроенном `JEV_API_KEY` rubric сохраняет приоритет
+Jev. Seed bank остаётся доступен при ошибке генерации. Ошибки провайдера
+возвращают ограниченный код без тела upstream-ответа. DeepSeek остаётся
+совместимым вариантом по умолчанию для локальных тестов.
+
+Для rubric judge `JEV_PROVIDER=openrouter-mirror` задаёт протокол
+`choice` через закреплённый
+`JEV_API_URL=https://openrouter.droidje.com/api/alpha/decisions` с
+`JEV_MODEL=typesafe/jev-1.13` и заголовком `X-Proxy-Token` (`JEV_API_KEY`).
+Каждый rubric point получает критерии `not_met`/`met`; проверяются число
+ответов, распределение вероятностей, совпадение choice и confidence ≥ 0.8.
+Низкая уверенность возвращает неопределённость, а не ошибочную оценку кандидату.

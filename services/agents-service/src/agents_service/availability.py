@@ -5,7 +5,7 @@ import time
 
 import httpx
 
-from agents_service.providers import ProviderError
+from agents_service.providers import ProviderError, llm_config, mirror_config
 
 _lock = threading.Lock()
 _cache: dict[str, tuple[float, bool, bool]] = {}
@@ -14,16 +14,22 @@ _cache: dict[str, tuple[float, bool, bool]] = {}
 def _reachable(feature: str) -> bool:
     """Check only configured provider endpoints with a bounded read-only probe."""
     if feature == "agent":
-        token = os.getenv("DEEPSEEK_API_KEY", "")
+        _provider, base, _model, token, _effort = llm_config()
         if not token:
             return False
-        url = "https://api.deepseek.com/models"
+        url = base + "/models"
         headers = {"Authorization": "Bearer " + token}
+    elif os.getenv("JEV_PROVIDER") == "openrouter-mirror":
+        _url, _model, token = mirror_config()
+        if not token:
+            return False
+        url = "https://openrouter.droidje.com/api/v1/models"
+        headers = {"X-Proxy-Token": token}
     else:
         url = os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444").rstrip("/") + "/health"
         headers = {"Host": "localhost:12444"}
     with _lock:
-        cached = _cache.get(feature)
+        cached = _cache.get(url)
         if cached and time.monotonic() < cached[0]:
             return cached[1]
     rejected = False
@@ -35,7 +41,7 @@ def _reachable(feature: str) -> bool:
         available = False
     with _lock:
         # A brief network failure must not disable a configured provider for 30 seconds.
-        _cache[feature] = (time.monotonic() + (30 if available or rejected else 3), available, rejected)
+        _cache[url] = (time.monotonic() + (30 if available or rejected else 3), available, rejected)
     return available
 
 
@@ -51,11 +57,14 @@ def require_capability(feature: str) -> None:
     """Reject disabled work before enqueue; callers keep the draft editable."""
     if feature not in ("agent", "enrichment"):
         raise ValueError("unknown capability")
-    if os.getenv("AGENTS_MODE", "auto") == "manual" or (feature == "agent" and not os.getenv("DEEPSEEK_API_KEY")):
+    if os.getenv("AGENTS_MODE", "auto") == "manual" or (feature == "agent" and not llm_config()[3]):
         raise ProviderError("agent_disabled_manual_available", False)
     if not _reachable(feature):
         with _lock:
-            cached = _cache.get(feature)
+            url = llm_config()[1] + "/models" if feature == "agent" else os.getenv("JEV_LOCAL_URL", "http://127.0.0.1:12444").rstrip("/") + "/health"
+            if feature == "enrichment" and os.getenv("JEV_PROVIDER") == "openrouter-mirror":
+                url = "https://openrouter.droidje.com/api/v1/models"
+            cached = _cache.get(url)
             rejected = bool(cached and cached[2])
         if rejected:
             raise ProviderError(f"{feature}_provider_rejected", False)

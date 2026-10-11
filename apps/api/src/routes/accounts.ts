@@ -228,6 +228,27 @@ export async function accountRoutes(app: FastifyInstance, options: AccountGatewa
       }
     });
   }
+  app.delete<{ Reply: { deleted: true } | { detail: string } }>("/employer/account", {
+    schema: { tags: ["employer-account"], security: [{ bearerAuth: [] }, { employerSession: [] }],
+      response: { 200: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } } } },
+    onRequest: guard("employer"),
+  }, async (request, reply) => {
+    const identity = identities.get(request);
+    if (!identity || !agentsToken || !matchingToken) return reply.code(503).send({ detail: "account_deletion_unavailable" });
+    try {
+      // Stop source workers first; a permanent owner fence also rejects delayed writes.
+      for (const service of [{ url: agentsUrl, token: agentsToken }, { url: matchingUrl, token: matchingToken }]) {
+        const result = await transport(new URL(`/internal/employers/${identity.accountId}`, service.url), {
+          method: "DELETE", headers: { "x-internal-token": service.token, "x-owner-id": identity.accountId },
+          signal: AbortSignal.timeout(10000), redirect: "error",
+        });
+        if (!result.ok) return reply.code(503).send({ detail: "account_deletion_unavailable" });
+      }
+      if (!await store.deleteEmployerAccount(identity.accountId)) return reply.code(401).send({ detail: "unauthenticated" });
+      reply.clearCookie(cookieName("employer", config), { path: "/", httpOnly: true, secure: config.secureCookies, sameSite: "lax" });
+      return reply.header("cache-control", "no-store").send({ deleted: true });
+    } catch { return reply.code(503).send({ detail: "account_deletion_unavailable" }); }
+  });
   app.delete<{ Reply: { deleted: true } | { detail: string } }>("/candidate/account", {
     schema: { tags: ["candidate-account"], security: [{ bearerAuth: [] }, { candidateSession: [] }],
       response: { 200: { type: "object", additionalProperties: false, required: ["deleted"], properties: { deleted: { const: true } } } } },

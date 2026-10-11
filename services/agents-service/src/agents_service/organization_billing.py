@@ -37,17 +37,20 @@ class Pricing:
 
     @classmethod
     def from_env(cls, *, provider: str = "deepseek", model: str = "deepseek-chat") -> Pricing:
-        """Load the user-supplied DeepSeek tariffs with finite positive decimals."""
+        """Load finite positive tariffs; Timeweb rates require explicit configuration."""
+        if provider == "timeweb" and not all(os.getenv(name) for name in ("AGENT_INPUT_USD_PER_MILLION", "AGENT_OUTPUT_USD_PER_MILLION")):
+            raise BillingError("usage_pricing_not_configured")
         raw_input = os.getenv("AGENT_INPUT_USD_PER_MILLION", "0.2")
         raw_output = os.getenv("AGENT_OUTPUT_USD_PER_MILLION", "0.7")
-        raw_cached = os.getenv("AGENT_CACHED_INPUT_USD_PER_MILLION", raw_input)
+        raw_cached = os.getenv("AGENT_CACHED_INPUT_USD_PER_MILLION") or raw_input
         try:
             values = [Decimal(raw_input), Decimal(raw_output), Decimal(raw_cached)]
         except (InvalidOperation, ValueError) as error:
             raise BillingError("usage_pricing_invalid") from error
         if any(not value.is_finite() or value <= 0 for value in values):
             raise BillingError("usage_pricing_invalid")
-        return cls(values[0], values[1], values[2], provider=provider, model=model)
+        return cls(values[0], values[1], values[2], provider=provider, model=model,
+                   version=os.getenv("AGENT_PRICING_VERSION", "user-2026-10-07"))
 
     @property
     def rate_hash(self) -> str:

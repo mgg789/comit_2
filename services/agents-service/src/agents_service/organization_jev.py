@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import uuid
@@ -198,6 +199,70 @@ class SystemOneJevClient(LocalJevClient):
         return body
 
 
+class OpenRouterMirrorJevClient:
+    """Use the existing Navix mirror; verify choices and exact provider cost receipts."""
+
+    def __init__(self, *, token: str | None = None, client: httpx.Client | None = None) -> None:
+        self.base_url = os.getenv("JEV_API_URL", "https://openrouter.droidje.com/api/alpha/decisions")
+        if self.base_url != "https://openrouter.droidje.com/api/alpha/decisions":
+            raise ValueError("JEV_API_URL must refer to the fixed OpenRouter mirror decisions endpoint")
+        self.model = os.getenv("JEV_MODEL", "typesafe/jev-1.13")
+        if self.model != "typesafe/jev-1.13":
+            raise ValueError("JEV_MODEL must be the configured decision model")
+        self.token = token or os.getenv("JEV_API_KEY", "")
+        self.client = client or httpx.Client(timeout=90, follow_redirects=False)
+
+    def decide(self, vacancy: Mapping[str, Any], cards: Sequence[Mapping[str, Any]], comment: str) -> Mapping[str, Any]:
+        """Normalize only server-owned binary choices; ambiguous calls are never retried."""
+        if not self.token:
+            raise JevUsageUnavailable
+        questions = {str(i): {"type": "choice", "instructions":
+            "Choose like only if explicit candidate facts meet the vacancy requirements; otherwise dislike. Do not invent facts.",
+            "criteria": {"0": "dislike", "1": "like"}} for i in range(len(cards))}
+        state = json.dumps({"vacancy": dict(vacancy), "cards": [dict(c) for c in cards], "comment": comment}, ensure_ascii=False)
+        try:
+            response = self.client.post(self.base_url, headers={"X-Proxy-Token": self.token},
+                json={"model": self.model, "state": {"text": state}, "questions": questions})
+            response.raise_for_status()
+            body = response.json()
+            returned_model = body["model"]
+            if returned_model != self.model and not re.fullmatch(re.escape(self.model) + r"-\d{8}", returned_model):
+                raise ValueError()
+            answers = body["answers"]
+            if set(answers) != set(questions):
+                raise ValueError()
+            normalized = {}
+            for key, answer in answers.items():
+                probabilities = answer["probabilities"]
+                if set(probabilities) != {"0", "1"} or answer["choice"] not in probabilities:
+                    raise ValueError()
+                values = list(probabilities.values())
+                confidence = answer.get("confidence")
+                if (any(type(v) not in (int, float) or not math.isfinite(v) or not 0 <= v <= 1 for v in values)
+                        or abs(sum(values) - 1) > 0.02
+                        or type(confidence) not in (int, float) or not math.isfinite(confidence) or not 0.5 <= confidence <= 1
+                        or max(values) <= 0.5 or answer["choice"] != max(probabilities, key=probabilities.get)):
+                    raise ValueError()
+                normalized[key] = {"classprobs": probabilities, "confidence": confidence}
+            usage = body["usage"]
+            if type(usage["input_tokens"]) is not int or type(usage["output_tokens"]) is not int:
+                raise ValueError()
+            if min(usage["input_tokens"], usage["output_tokens"]) < 0:
+                raise ValueError()
+            pricing = OrganizationJev._pricing()
+            input_cost = Decimal(usage["input_tokens"]) * pricing.input_usd_per_million
+            output_cost = Decimal(usage["output_tokens"]) * pricing.output_usd_per_million
+            total = Decimal(str(usage["cost"])) * Decimal(1_000_000)
+            if not total.is_finite() or total != input_cost + output_cost:
+                raise ValueError()
+            return {"answers": normalized, "usage": {"input_tokens": usage["input_tokens"],
+                "output_tokens": usage["output_tokens"], "input_micro_usd": str(input_cost),
+                "output_micro_usd": str(output_cost), "total_micro_usd": str(total),
+                "rate_config": {"source": "openrouter_provider_receipt", "model": returned_model}}}
+        except (httpx.HTTPError, ArithmeticError, ValueError, KeyError, TypeError):
+            raise JevUsageUnavailable from None
+
+
 class _StoreUsageBackend:
     """Adapter around the existing owner budget reservation and ledger tables."""
 
@@ -252,6 +317,8 @@ class OrganizationJev:
             self.client = client
         elif os.getenv("JEV_PROVIDER", "systemone").lower() == "local":
             self.client = LocalJevClient()
+        elif os.getenv("JEV_PROVIDER", "systemone").lower() == "openrouter-mirror":
+            self.client = OpenRouterMirrorJevClient()
         else:
             self.client = SystemOneJevClient()
         bound = upper_bound_micro_usd
@@ -274,8 +341,11 @@ class OrganizationJev:
             raise JevUsageUnavailable from None
         if not input_rate.is_finite() or not output_rate.is_finite() or input_rate <= 0 or output_rate < 0:
             raise JevUsageUnavailable
-        return Pricing(input_rate, output_rate, input_rate, provider="systemone", model="kev-latest",
-                       version=os.getenv("JEV_PRICING_VERSION", "user-2026-10-07"))
+        mirror = os.getenv("JEV_PROVIDER", "systemone").lower() == "openrouter-mirror"
+        return Pricing(input_rate, output_rate, input_rate,
+                       provider="openrouter-mirror" if mirror else "systemone",
+                       model="typesafe/jev-1.13" if mirror else "kev-latest",
+                       version=os.getenv("JEV_PRICING_VERSION", "openrouter-2026-10-11" if mirror else "user-2026-10-07"))
 
     @staticmethod
     def _args(arguments: Mapping[str, Any]) -> JevSwipeArgs:
@@ -369,7 +439,8 @@ class OrganizationJev:
         # key is an explicit request for a new feed snapshot; only a retry with
         # the same key may replay the original provider result and deck.
         request_hash = fingerprint({"vacancy_id": str(args.vacancy_id), "count": args.count,
-                                    "comment": args.comment, "idempotency_key": idempotency_key})
+                                    "comment": args.comment, "idempotency_key": idempotency_key,
+                                    "provider": self._pricing().provider, "model": self._pricing().model})
         response: Mapping[str, Any] | None = None
         reservation: Any = None
         pricing = self._pricing()
@@ -429,7 +500,7 @@ class OrganizationJev:
                 # output tariff is zero unless the deployment overrides it.
                 input_rate = pricing.input_usd_per_million
                 protocol = {
-                    "model": "kev-latest",
+                    "model": pricing.model,
                     "state": context,
                     "questions": {str(index): {"type": "score", "criteria": ["dislike", "like"]}
                                   for index in range(len(cards))},

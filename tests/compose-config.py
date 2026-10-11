@@ -123,3 +123,18 @@ assert 'add_header Strict-Transport-Security "max-age=15552000" always;' in host
 assert "style-src 'self' 'unsafe-inline'" in nginx_gateway and "script-src 'self' 'wasm-unsafe-eval'" in nginx_gateway
 assert "media-src 'self' blob:" in nginx_gateway
 print('PASS: compatible web security headers, private metrics, loopback production gateway')
+
+
+# Provider changes must reach every runtime sharing the completion clients.
+provider_services = ['testing-engine', 'agents-service', 'agents-worker', 'organization-agent-worker']
+for name in provider_services:
+    production_env = s[name]['environment']
+    assert production_env['LLM_PROVIDER'] == 'timeweb', name
+    assert production_env['TIMEWEB_MODEL'] == 'timeweb/gpt-oss-120b', name
+    assert production_env['TIMEWEB_REASONING_EFFORT'] == 'low', name
+    assert production_env['JEV_PROVIDER'] == 'systemone', name
+    assert d['services'][name]['environment']['LLM_PROVIDER'] == 'deepseek', name
+for name in ['agents-service', 'agents-worker', 'organization-agent-worker']:
+    assert s[name]['environment']['AGENT_INPUT_USD_PER_MILLION'] == '', 'No legacy tariff for Timeweb'
+    assert s[name]['environment']['AGENT_OUTPUT_USD_PER_MILLION'] == '', 'No legacy tariff for Timeweb'
+print('PASS: provider selection reaches all workers; Timeweb never inherits a legacy tariff')
