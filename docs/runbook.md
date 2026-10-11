@@ -276,9 +276,9 @@ PYTHONPATH=services/agents-service/src:services/matching-engine/src \
 ```
 
 Требуются отдельная `AGENTS_ACCEPTANCE_DATABASE_URL`, работающие API/agents/matching,
-локальный Laya и Harrier; адреса и внутренние токены передаются через env.
+локальный Jev и Harrier; адреса и внутренние токены передаются через env.
 Файл провайдера читается только в память процесса. Скрипт пишет игнорируемый протокол
-`tests/artifacts/vacancy-creation-acceptance.json`, проверяет manual/Laya/DeepSeek,
+`tests/artifacts/vacancy-creation-acceptance.json`, проверяет manual/Jev/DeepSeek,
 summary/edit/Create, ownership, вектора, события и карточки. Для продолжения
 проверки уже созданных вакансий использовать `--resume-report` с этим протоколом.
 Это проверка интеграции; качество выведенных моделью уровней требует калибровки.

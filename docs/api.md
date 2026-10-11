@@ -378,7 +378,7 @@ cookie и сам передаёт его upstream; клиентский owner he
 | GET `/internal/vacancy-drafts?limit=50&offset=0` | Owner-scoped DraftView[], limit 1–100 |
 | GET `/internal/vacancy-drafts/{id}` | Общий черновик, provenance, missing, summary, publication |
 | PATCH `/internal/vacancy-drafts/{id}` | `{expected_revision,fields}`: частичный патч, группы заменяются целиком |
-| POST `/internal/vacancy-drafts/{id}/enrich` | `{expected_revision}` → JobView; только форма/Laya |
+| POST `/internal/vacancy-drafts/{id}/enrich` | `{expected_revision}` → JobView; только форма/Jev |
 | POST `/internal/vacancy-drafts/{id}/approve` | `{expected_revision}` → DraftView в summary |
 | POST `/internal/vacancy-drafts/{id}/create` | `{expected_revision,summary_hash}` → создаваемая/созданная публикация |
 | GET `/internal/vacancy-drafts/{id}/pipeline` | MatchingStatus после принятия intake |

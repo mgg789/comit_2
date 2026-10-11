@@ -57,7 +57,7 @@ services/agents-service      services/verification-engine qgramm-chat (Go bridge
 | `services/code-judge` | FastAPI | Authenticated broker и ресурсно ограниченные Docker задания в отдельной VM | Недоверенный код кандидата не исполняется в testing-engine |
 | `services/integration-engine` | FastAPI | Мок-реестр ФСП (`/fsp/participants/{id}`, `/fsp/verify`, достижения) и демо-привязка (`/fsp/demo/authorize`, `/fsp/demo/token`) | Внешние источники меняются независимо от ядра |
 | `services/verification-engine` | FastAPI | Внутренние `/verify/fsp`, `/verify/repository`, `/verify/hh` под сервисным токеном; без candidate id ([verification.md](verification.md)) | Сетевые проверки внешних провайдеров изолированы от ядра |
-| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Laya, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
+| `services/agents-service` | FastAPI, PostgreSQL | Общий черновик формы/чата, Jev, durable turns, summary → Create; глобальный агент работодателя (`/employer/organization-agent`, `organization-worker`, [agents.md](agents.md)) | Отдельные знания, инструменты и провайдеры |
 | `apps/{candidate,employer,testing,welcome,support}` | React 19, Vite, Tailwind 4 | Кабинеты по ролям, общая витрина, тестирование и консоль поддержки | Один nginx, 5 сборок (`infra/web.Dockerfile`) |
 
 Публичная стартовая страница `apps/welcome` и её переходы описаны в [welcome-ui.md](welcome-ui.md); кабинеты — в [employer-ui.md](employer-ui.md) и [candidate-ui.md](candidate-ui.md).

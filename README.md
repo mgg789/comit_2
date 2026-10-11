@@ -1,4 +1,8 @@
-# Comit — работа настигает сама
+# Comit — джобборд следующего поколения
+
+![Comit — платформа найма с обратной механикой](docs/assets/comit-cover.jpg)
+
+[![CI](https://github.com/mgg789/comit_2/actions/workflows/ci.yml/badge.svg)](https://github.com/mgg789/comit_2/actions/workflows/ci.yml) [![release](https://img.shields.io/badge/release-v0.5-orange)](https://github.com/mgg789/comit_2/releases/tag/v0.5) [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![deploy](https://img.shields.io/badge/deploy-Docker-2496ED?logo=docker&logoColor=white)](docs/deploy.md) [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev) [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org) [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)](docs/data.md)
 
 Веб-платформа найма ИТ-специалистов с **обратной механикой** (LHH-модель): не кандидат
 рассылает резюме в никуда, а работодатель просматривает объективно категоризированные пулы
@@ -19,6 +23,7 @@
 | [comit.droidje.com/employer/](https://comit.droidje.com/employer/) | Кабинет работодателя: вакансии, подборка с объяснением, лента, найм |
 | [comit.droidje.com/api/docs](https://comit.droidje.com/api/docs) | OpenAPI (Swagger UI) |
 | [comit.droidje.com/support/](https://comit.droidje.com/support/) | Консоль службы поддержки (вход оператора) |
+| [comit.droidje.com/help/](https://comit.droidje.com/help/) | Справка по платформе |
 
 Testing UI доступен по `/testing/`: подготовка устройств, адаптивный тест и результат. Попытки доступны только авторизованному кандидату через API; backend тестирования остаётся внутренним сервисом. API и остальные service ports доступны через loopback; [deploy.md](docs/deploy.md) описывает HTTPS домен и CD, [ci.md](docs/ci.md) — реальные тесты, измерения покрытия и пороги.
 
@@ -49,10 +54,21 @@ Testing UI доступен по `/testing/`: подготовка устрой�
 - Зарплата «от–до» обязательна и в вакансии, и в приглашении — кандидат видит условия до начала общения. Контакты раскрываются только после принятия приглашения; статусы видны обеим сторонам.
 - Чаты найма на [QGramm](https://github.com/mgg789/QGramm): серверное шифрование сообщений и вложений.
 - Системный чат Comit в обоих кабинетах: уведомления платформы и живая служба поддержки.
-- Агент работодателя (DeepSeek/Laya): черновик вакансии из свободного описания, глобальный чат-ассистент с фоновыми поручениями и учётом бюджета.
+- Агент работодателя (DeepSeek/Jev): черновик вакансии из свободного описания, глобальный чат-ассистент с фоновыми поручениями и учётом бюджета.
 - Статистика найма у работодателя, публичная витрина вакансий и согласившихся соискателей с обязательными зарплатными вилками, email-уведомления о событиях.
 - 152-ФЗ: раздельные согласия на обработку, публикацию в пуле и обучение моделей; отказ от обучения не ломает обычный подбор.
 - Внешние вызовы кэшируются; недоступность провайдера явно отражается в интерфейсе. Проверка кода требует доступного изолированного judge, развёрнутого ответа — Jev/DeepSeek; сбой сохраняет ответ для повтора и не превращается в неверный результат.
+
+## Особенно интересно
+
+Шесть фич, которых не было в ТЗ, — то, что превращает прототип в продукт:
+
+1. **Лента работодателя, которая учится.** Свайпы обучают vacancy-local preference-модель: сходимость за ~20 реакций на синтетических работодателях, исследовательские карточки гипотез, добор из резерва того же run — подбор становится точнее от каждого действия ([preference-convergence](docs/preference-convergence.md), [feed-refill](docs/feed-refill.md)).
+2. **AI-агент работодателя** (Jev/DeepSeek): черновик вакансии из свободного описания и глобальный чат-ассистент с фоновыми поручениями и явным бюджетом токенов ([agents.md](docs/agents.md)).
+3. **Честное тестирование под наблюдением.** Код кандидата исполняется только в одноразовых Docker-песочницах на отдельной VM (fail-closed без judge), а прокторинг считает агрегаты детекции лица локально в браузере — кадры не покидают устройство ([judge-agents](docs/judge-agents.md), [testing-design](docs/testing-design.md)).
+4. **Верификация фактов из внешних источников:** история ФСП (мок-реестр), публичный Git-репозиторий (clone --bare, без запуска кода) и резюме hh.ru — с ledger очков подтверждённых полей ([verification.md](docs/verification.md)).
+5. **Чаты найма с серверным шифрованием** на [QGramm](https://github.com/mgg789/QGramm) в изолированной сети плюс системный чат Comit с живой службой поддержки в обоих кабинетах ([chat.md](docs/chat.md), [support-console.md](docs/support-console.md)).
+6. **Экономика найма под учётом:** воронка delivered → … → hired со сравнением периодов и durable журнал расходов — публикации, приглашения, неустойки за просрочки, бюджет ИИ ([employer-statistics.md](docs/employer-statistics.md)).
 
 ## Как запустить локально
 
@@ -80,7 +96,7 @@ Production-контур, отличия dev/prod и запуск без Docker �
 - **integration-engine** — хостит учебный реестр ФСП и демо-привязку ФСП-профиля; на хакатоне он выступает источником данных ФСП вместо внешнего API.
 - **code-judge** — изолированная проверка кода на отдельной VM: каждый testcase в собственном Docker-контейнере (128 MiB, 0.5 CPU, 16 pids, UID 65534); testing-engine обращается к нему по `CODE_JUDGE_URL` ([services.md](docs/services.md)).
 - **verification-engine** — проверка внешних фактов профиля: ФСП (через мок integration-engine), публичный Git-репозиторий, резюме hh.ru; порт 8105, на хосте только loopback `VERIFICATION_PORT` (28105).
-- **agents-service** — общий черновик вакансии для формы и чата (Laya/DeepSeek) и глобальный агент работодателя (один чат на аккаунт, фоновые поручения через `organization-worker`); входит в основной compose вместе с `agents-worker` и `organization-agent-worker`.
+- **agents-service** — общий черновик вакансии для формы и чата (Jev/DeepSeek) и глобальный агент работодателя (один чат на аккаунт, фоновые поручения через `organization-worker`); входит в основной compose вместе с `agents-worker` и `organization-agent-worker`.
 
 Подробности: [обзор сервисов](docs/services.md), [диаграммы](docs/architecture-diagrams.md), `docs/architecture.md`, `docs/matching.md`, `docs/testing-engine.md`, `docs/integration.md`, `docs/verification.md`.
 
@@ -136,7 +152,7 @@ GitHub Actions на self-hosted раннерах `mgg-server` (`mgg-ci-1..3`, л
 
 Исключение — безопасность: уязвимости (включая zero-day), утечки и чувствительные
 данные в публичные issues не выносятся. Напишите в телеграм техподдержки сервисов
-droidje — [@droidje](https://t.me/droidje) — или напрямую CTO проекта (Михаил);
+droidje — [@droidje](https://t.me/droidje) — или напрямую CTO проекта ([Михаил](https://t.me/mschail));
 процедура и ожидания описаны в [SECURITY.md](SECURITY.md).
 
 ## Документация

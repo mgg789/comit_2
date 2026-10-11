@@ -163,7 +163,7 @@ SMTP использует существующий host relay Navix на пор�
 При первом переходе автоматический CD main заранее отклоняет legacy-стек, не занимая каталог SHA; тот же проверенный SHA затем можно выкатить ручным dispatch с `adopt_legacy=true`. Повтор после ошибки сборки существующего release требует сначала осмотреть его состояние; deployment не перезаписывает release автоматически.
 
 
-После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Laya: он не мешает запуску worker публикации/DeepSeek, а обогащение остаётся недоступным с ручным редактированием.
+После `compose up --wait` CD дополнительно проверяет все фоновые workers дважды с интервалом 20 секунд: контейнер должен работать, иметь нужный образ и метку релиза, не иметь перезапусков и проходить healthcheck, если он задан. Перезапуск worker приводит к откату приложения. Пустой `JEV_LOCAL_URL` означает отключённую необязательную Jev: он не мешает запуску worker публикации/DeepSeek, а обогащение остаётся недоступным с ручным редактированием.
 
 Статические файлы всех пяти приложений в web-образе получают права чтения для nginx worker. Это обязательно при сборке приватного immutable release (`umask 077`): Vite сохраняет права копируемых public assets. Smoke проверяет содержимое SVG логотипа и иконки витрины, чтобы HTTP 403 или SPA fallback не маскировались успешной загрузкой главной.
 
@@ -263,7 +263,7 @@ release; UI на стенде подтверждается этим smoke.
 | `AGENT_MAX_ROUNDS`, `AGENT_MAX_OUTPUT_TOKENS`, `AGENT_MAX_INPUT_TOKENS`, `AGENT_CONTEXT_COMPACTION_BYTES` | organization-worker | 8, 1024, 128000, 90000 | лимиты глобального агента работодателя |
 | `AGENT_INPUT_USD_PER_MILLION`, `AGENT_OUTPUT_USD_PER_MILLION`, `AGENT_CACHED_INPUT_USD_PER_MILLION` | agents | 0.2, 0.7, 0.2 (compose) | тарифы DeepSeek для учёта расходов |
 | `JEV_API_URL`, `JEV_MODEL`, `JEV_PROVIDER`, `JEV_MAX_OUTPUT_TOKENS`, `JEV_PRICING_VERSION`, `JEV_INPUT_USD_PER_MILLION`, `JEV_OUTPUT_USD_PER_MILLION` | agents | `https://ai.sverk.tech/v1/systemone`, `kev-latest`, `systemone`, 0, `user-2026-10-07`, 0.042, 0 | необязательный провайдер Jev/SystemOne для свайпов агента |
-| `JEV_LOCAL_URL` | agents | production compose — пусто, dev — `http://host.docker.internal:12444`, вне compose — `http://127.0.0.1:12444` | Laya; пустое значение отключает обогащение (`laya_not_configured`), непустое допускает только `localhost`, `127.0.0.1`, `host.docker.internal` |
+| `JEV_LOCAL_URL` | agents | production compose — пусто, dev — `http://host.docker.internal:12444`, вне compose — `http://127.0.0.1:12444` | Jev; пустое значение отключает обогащение (`laya_not_configured`), непустое допускает только `localhost`, `127.0.0.1`, `host.docker.internal` |
 | `ORGANIZATION_API_URL` | agents | `http://api:8080` (compose) | API bridge инструментов агента |
 | `CHAT_SERVICE_URL` | api | `http://qgramm-chat:8080` (compose) | приватный адрес QGramm bridge |
 | `FSP_DEMO_ENABLED`, `FSP_DEMO_INTERNAL_TOKEN`, `FSP_DEMO_CALLBACK_URL`, `FSP_DEMO_PUBLIC_URL`, `APP_ENV` | api, integration, verification | выключено; dev-файл включает | демо-привязка ФСП работает только при `NODE_ENV=development`/`APP_ENV=development` и `FSP_DEMO_ENABLED=true`; интерфейс маркирует demo |
