@@ -1179,7 +1179,7 @@ textarea::placeholder {
 .rejection-feedback legend { font-size: 20rem; margin-bottom: 14rem; }
 .rejection-categories { display: flex; flex-wrap: wrap; gap: 16rem 24rem; }
 .rejection-categories label { display: flex; gap: 10rem; align-items: center; font-size: 18rem; }
-.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-181816); color: var(--comit-text); margin: 20rem 0; }
+.recruitment-deadline { border-radius: 20rem; padding: 18rem 24rem; background: var(--employer-paint-2f2f2d); color: var(--comit-text); margin: 20rem 0; }
 .recruitment-deadline p { margin: 8rem 0; font-size: 18rem; }
 .recruitment-deadline small { color: var(--comit-text-muted); }
 
@@ -1191,14 +1191,14 @@ textarea::placeholder {
   --comit-glass-backdrop: blur(12rem) saturate(1.4) brightness(1.04);
 }
 :root[data-comit-glass="refractive"] { --comit-glass-backdrop: url("#glass-refraction") saturate(1.4); }
-:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe, .testing-question) {
+:root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel, .candidate-process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe:not(.glass-classic), .testing-question) {
   background: var(--comit-glass-frost);
   backdrop-filter: var(--comit-glass-backdrop);
   -webkit-backdrop-filter: var(--comit-glass-backdrop);
   box-shadow: var(--comit-glass-shadow);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe, .testing-question) { background: var(--comit-glass-fallback); }
+  :root[data-comit-glass]:not([data-comit-glass="classic"]) :is(.glass:not(.glass-surface):not(.communication-composer):not(.action-danger):not(:is(.modal, [role="dialog"], [role="tooltip"], .account-menu, .notifications-menu, .agent-tools, .agent-reasoning, .agent-budget, .communication-modal > .panel, .process-menu > .panel, .candidate-process-menu > .panel)), .glass.glass-surface::before, .candidate-offer-card, .candidate-swipe:not(.glass-classic), .testing-question) { background: var(--comit-glass-fallback); }
 }
 
 .legal-text { display: grid; gap: 24rem; }
@@ -1212,3 +1212,6 @@ textarea::placeholder {
 :root[data-comit-glass]:not([data-comit-glass="classic"]) .nav-item.selected .icon { color: var(--comit-text); }
 :root[data-comit-glass]:not([data-comit-glass="classic"]) .nav-item.selected { border: 1px solid var(--employer-blue); }
 .action.action-danger { background: var(--employer-danger); color: var(--employer-ink); }
+
+/* Leave breathing room before confirmation actions at the foot of dialogs. */
+[role="dialog"] :is(.form-actions, .candidate-offer-actions) { margin-top: 40rem; }

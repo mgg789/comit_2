@@ -314,3 +314,7 @@ body:has(.chat-page) { overflow: hidden; }
 .chat-history-viewport::before, .chat-history-viewport::after { content: ""; position: absolute; left: 0; right: 0; height: 48rem; z-index: 2; pointer-events: none; backdrop-filter: blur(4rem); }
 .chat-history-viewport::before { top: 0; mask-image: linear-gradient(black, transparent); }
 .chat-history-viewport::after { bottom: 0; mask-image: linear-gradient(transparent, black); }
+
+/* A non-message tail clears the fixed, expanding composer when history is scrolled. */
+.chat-tail-space { flex: 0 0 max(180rem, 35dvh); min-height: max(180rem, 35dvh); pointer-events: none; }
+.system-inbox .message-bubble > .system-message-open { margin-top: 32rem; margin-bottom: 8rem; background: var(--employer-gradient); color: var(--comit-text); }

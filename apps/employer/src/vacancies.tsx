@@ -255,7 +255,6 @@ export function VacancyEditor({
   const manuallyEditedRequirements = useRef(new Set<string>());
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [published, setPublished] = useState(false);
   const completion = Math.round(
     ([title, from, to, city, daily, bio].filter((value) => value.trim())
       .length /
@@ -269,43 +268,6 @@ export function VacancyEditor({
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [busy, onClose]);
-  useEffect(() => {
-    if (!published || !current) return;
-    let active = true;
-    const poll = async () => {
-      try {
-        await api.getVacancyReady(current.draft_id);
-        if (active) {
-          onSaved(current);
-          onClose();
-          clearDraft(formKey);
-        }
-      } catch {
-        if (active) {
-          try {
-            const next = await api.getVacancy(current.draft_id);
-            if (active) {
-              setCurrent(next);
-              if (next.state === "failed") {
-                setPublished(false);
-                setError(
-                  "Публикация не завершилась. Обновите вакансию и повторите подтверждение.",
-                );
-              }
-            }
-          } catch (reason) {
-            if (active) setError(errorText(reason));
-          }
-        }
-      }
-    };
-    void poll();
-    const timer = setInterval(() => void poll(), 2500);
-    return () => {
-      active = false;
-      clearInterval(timer);
-    };
-  }, [published, current?.draft_id, onSaved, onClose]);
   /** Persist the actual three skill maps with the current CAS revision; approval is separate. */
   async function persistFields(): Promise<AgentsDraftView> {
     const min = Number(from) * 1000, max = Number(to) * 1000;
@@ -415,8 +377,9 @@ export function VacancyEditor({
         expected_revision: approved.revision,
         summary_hash: approved.summary.summary_hash,
       });
-      setCurrent(result);
-      setPublished(true);
+      onSaved(result);
+      clearDraft(formKey);
+      onClose();
     } catch (reason) {
       showSaveError(reason);
     } finally {
@@ -458,7 +421,7 @@ export function VacancyEditor({
                 const next = event.key === "ArrowRight" ? (index + 1) % 4
                   : event.key === "ArrowLeft" ? (index + 3) % 4
                     : event.key === "Home" ? 0 : event.key === "End" ? 3 : null;
-                if (next == null || busy || published) return;
+                if (next == null || busy) return;
                 event.preventDefault();
                 const tab = reviewTabs[next];
                 if (!tab) return;
@@ -470,7 +433,7 @@ export function VacancyEditor({
                   id={`vacancy-tab-${tab.id}`} aria-controls={`vacancy-panel-${tab.id}`}
                   aria-selected={reviewTab === tab.id} tabIndex={reviewTab === tab.id ? 0 : -1}
                   className={reviewTab === tab.id ? "active" : ""}
-                  disabled={busy || published} onClick={() => setReviewTab(tab.id)}>
+                  disabled={busy} onClick={() => setReviewTab(tab.id)}>
                   {tab.label}
                 </button>
               ))}
@@ -492,19 +455,13 @@ export function VacancyEditor({
                   <div><dt>Описание проекта</dt><dd>{current?.summary?.fields.bio || "Не указано"}</dd></div>
                 </dl>
                 {error && <p role="alert" className="form-error">{error}</p>}
-            {published ? (
-              <div role="status" className="inline-notice">
-                Подготавливаем подбор кандидатов. После готовности окно закроется.
-              </div>
-            ) : (
-              <div className="vacancy-review-actions">
-                <Action className="glass-surface" onClick={() => setConfirm(false)} disabled={busy}>Назад</Action>
-                <Action className="glass-surface" onClick={() => void keepDraft()} disabled={busy}>Черновик</Action>
-                <Action className="review-publish" variant="light" disabled={busy || !current || (!current.summary && !reviewDirty)} onClick={() => void publish()}>
-                  {busy ? "Сохраняем…" : "Подтвердить и опубликовать"}
-                </Action>
-              </div>
-            )}
+                <div className="vacancy-review-actions">
+                  <Action className="glass-surface" onClick={() => setConfirm(false)} disabled={busy}>Назад</Action>
+                  <Action className="glass-surface" onClick={() => void keepDraft()} disabled={busy}>Черновик</Action>
+                  <Action className="review-publish" variant="light" disabled={busy || !current || (!current.summary && !reviewDirty)} onClick={() => void publish()}>
+                    {busy ? "Сохраняем…" : "Подтвердить и опубликовать"}
+                  </Action>
+                </div>
               </motion.div>
               {requirementPanels.map((panel) => {
                 const label = (key: string) => panel.choices.find(([value]) => value === key)?.[1] || key;
@@ -518,7 +475,7 @@ export function VacancyEditor({
                     aria-hidden={reviewTab !== panel.id} inert={reviewTab !== panel.id}
                     initial={false} animate={{ opacity: reviewTab === panel.id ? 1 : 0, x: reviewTab === panel.id ? 0 : 12 }}
                     transition={{ duration: reduceMotion ? 0 : 0.35, ease: [0.22, 1, 0.36, 1] }}>
-                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy || published}
+                    <SkillRadar removeIcon={<span className="radar-remove-mark"><Icon name="radar-remove" /></span>} ariaLabel={`Требования: ${panel.label}`} disabled={busy}
                       axes={ordered.map(([key, value]) => ({ key, label: label(key), value }))}
                       onChange={(key, value) => {
                         const chosen = skillLevels.find((level) => level === value);
@@ -532,7 +489,7 @@ export function VacancyEditor({
                         panel.setValues((values) => { const next = { ...values }; delete next[key]; return next; });
                         setReviewDirty(true);
                       }}>
-                    <Select className="radar-add" triggerIcon="plus" placement="right" aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy || published}
+                    <Select className="radar-add" triggerIcon="plus" placement="right" aria-label={`Добавить требование: ${panel.label}`} value="" disabled={busy}
                       onChange={(event) => {
                         const choice = panel.choices.find(([key]) => key === event.target.value);
                         if (!choice) return;
@@ -751,7 +708,7 @@ export function VacancyEditor({
                   required
                 />
                 <p id="vacancy-description-length" className="vacancy-description-hint" data-tone={description.tone}>
-                  {description.label} · {description.length} символов
+                  {description.label}
                 </p>
               </fieldset>
               <Action
@@ -1020,7 +977,7 @@ function CandidateDeck({
         <div className={`candidate-stack-card deck-tone-${(index + 1) % 3} stack-near`} style={{ transform: `rotate(${(index + 1) % 2 ? -12 : 9}deg)` }} aria-hidden="true" />
         <motion.div
           key={card.exposure_id}
-          className={`candidate-swipe deck-tone-${index % 3}`}
+          className={`candidate-swipe glass-classic deck-tone-${index % 3}`}
           animate={controls}
           drag={!pending}
           dragMomentum={false}

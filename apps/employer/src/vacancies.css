@@ -1,6 +1,10 @@
 .vacancy-editor .form-grid {
   gap: 16rem;
 }
+/* The input step needs room for paired fields; the review width remains 726rem. */
+.modal.vacancy-editor:not(.is-review) {
+  width: 640rem;
+}
 .vacancy-editor .form-error {
   margin-top: 16rem;
 }
@@ -245,6 +249,10 @@
   transform: rotate(0deg);
 }
 @media (max-width: 760px) {
+  .modal.vacancy-editor:not(.is-review) {
+    width: 100%;
+    max-width: 484rem;
+  }
   .vacancy-editor .invite-fields > input,
   .vacancy-editor .form-row > input,
   .vacancy-editor .field > input,
@@ -420,6 +428,21 @@
 .vacancy-editor .action.stack-toggle .icon {
   width: 18rem;
   height: 18rem;
+}
+
+/* Preserve the original front-card surface without changing the new glass controls inside it. */
+.candidate-swipe.glass-classic {
+  backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--employer-glass-blur)) saturate(1.5);
+}
+.candidate-swipe.glass-classic.deck-tone-0 {
+  background: linear-gradient(145deg, var(--employer-deck-neutral-start), var(--employer-deck-neutral-end));
+}
+.candidate-swipe.glass-classic.deck-tone-1 {
+  background: linear-gradient(150deg, var(--employer-paint-aaa0dd), var(--employer-paint-212938));
+}
+.candidate-swipe.glass-classic.deck-tone-2 {
+  background: linear-gradient(150deg, var(--employer-paint-73744b), var(--employer-paint-384851));
 }
 
 /* Cards have a fixed Figma height: tags stay on one line instead of pushing the footer out. */

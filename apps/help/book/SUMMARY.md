@@ -25,4 +25,5 @@
 * [Подбирать кандидатов](employer/feed.md)
 * [От лайка до приёма](employer/recruitment.md)
 * [Помощник работодателя](employer/assistant.md)
+* [Цены](general/prices.md)
 * [Статистика и расходы](employer/statistics.md)

@@ -350,7 +350,7 @@ export function Showcase({
   return (
     <Reveal className="discovery-showcase">
       <PageTitle title="Соискатели">
-        <InlineSearch inputRef={searchInput} label="Поиск по имени, роли или стеку" placeholder="Поиск: Имя, роль, стек" value={q} onChange={setQ} onSubmit={() => setQuery(q)} />
+        <InlineSearch inputRef={searchInput} label="Поиск по имени, роли или стеку" placeholder="Имя, роль, стек" value={q} onChange={setQ} onSubmit={() => setQuery(q)} />
       </PageTitle>
       <div className="discovery-filters">
         <Select
@@ -1575,6 +1575,19 @@ export function Statistics({ navigate }: Navigation) {
             Уникальные пары «вакансия — кандидат» на каждом этапе
           </p>
         </section>
+        <section className="panel statistics-expenses">
+          <div className="statistics-card-heading"><h3>Расходы</h3><span className="statistics-caption">{stats.period.from} — {stats.period.to}</span></div>
+          {stats.expenses ? <>
+            <div className="statistics-expense-total"><strong>{formatExpense(stats.expenses.total_kopeks)}</strong><span>за выбранный период</span></div>
+            <div className="statistics-expense-categories">{stats.expenses.categories.map(item => {
+              const meta = { publication: { label: "Размещение вакансий", icon: "vacancies" as const }, invitation: { label: "Приглашения", icon: "candidates" as const }, ai: { label: "ИИ-агент", icon: "ai" as const }, penalty: { label: "Неустойки", icon: "clock" as const } }[item.category];
+              return <div key={item.category}><div><Icon name={meta.icon} /><span>{meta.label}</span></div><strong>{formatExpense(item.amount_kopeks)}</strong><small>{item.category === "ai" ? `Сверх ${formatExpense(stats.expenses.tariffs.ai_daily_allowance_kopeks)} в день` : item.category === "publication" ? `${formatExpense(stats.expenses.tariffs.publication_kopeks)} за первую публикацию` : item.category === "invitation" ? `${formatExpense(stats.expenses.tariffs.invitation_kopeks)} за принятое приглашение` : `${formatExpense(stats.expenses.tariffs.deadline_penalty_kopeks)} за просрочку или решение поддержки`}</small></div>;
+            })}</div>
+            <div className="statistics-expense-daily" role="img" aria-label="Расходы по дням">{stats.expenses.daily.map(day => <div key={day.date} title={`${day.date}: ${formatExpense(day.amount_kopeks)}`}><span style={{ height: `${Math.max(day.amount_kopeks ? 4 : 0, day.amount_kopeks / Math.max(1, ...stats.expenses.daily.map(item => item.amount_kopeks)) * 100)}%` }} /></div>)}</div>
+            <div className="statistics-axis"><span>{stats.period.from}</span><span>{stats.period.to}</span></div>
+            {!stats.expenses.total_kopeks && <p className="statistics-empty">За этот период расходов пока нет</p>}
+          </> : <State error="Расходы пока не удалось загрузить" retry={data.refresh} />}
+        </section>
         <section className="panel statistics-vacancies">
           <div className="statistics-card-heading">
             <h3>Активность вакансий</h3>
@@ -1608,19 +1621,6 @@ export function Statistics({ navigate }: Navigation) {
               <p>Активности по вакансиям пока нет</p>
             </div>
           )}
-        </section>
-        <section className="panel statistics-expenses">
-          <div className="statistics-card-heading"><h3>Расходы</h3><span className="statistics-caption">{stats.period.from} — {stats.period.to}</span></div>
-          {stats.expenses ? <>
-            <div className="statistics-expense-total"><strong>{formatExpense(stats.expenses.total_kopeks)}</strong><span>за выбранный период</span></div>
-            <div className="statistics-expense-categories">{stats.expenses.categories.map(item => {
-              const meta = { publication: { label: "Размещение вакансий", icon: "vacancies" as const }, invitation: { label: "Приглашения", icon: "candidates" as const }, ai: { label: "ИИ-агент", icon: "ai" as const }, penalty: { label: "Неустойки", icon: "clock" as const } }[item.category];
-              return <div key={item.category}><div><Icon name={meta.icon} /><span>{meta.label}</span></div><strong>{formatExpense(item.amount_kopeks)}</strong><small>{item.category === "ai" ? `Сверх ${formatExpense(stats.expenses.tariffs.ai_daily_allowance_kopeks)} в день` : item.category === "publication" ? `${formatExpense(stats.expenses.tariffs.publication_kopeks)} за размещение` : item.category === "invitation" ? `${formatExpense(stats.expenses.tariffs.invitation_kopeks)} за приглашение` : "Просрочки и решения поддержки"}</small></div>;
-            })}</div>
-            <div className="statistics-expense-daily" role="img" aria-label="Расходы по дням">{stats.expenses.daily.map(day => <div key={day.date} title={`${day.date}: ${formatExpense(day.amount_kopeks)}`}><span style={{ height: `${Math.max(day.amount_kopeks ? 4 : 0, day.amount_kopeks / Math.max(1, ...stats.expenses.daily.map(item => item.amount_kopeks)) * 100)}%` }} /></div>)}</div>
-            <div className="statistics-axis"><span>{stats.period.from}</span><span>{stats.period.to}</span></div>
-            {!stats.expenses.total_kopeks && <p className="statistics-empty">За этот период расходов пока нет</p>}
-          </> : <State error="Расходы пока не удалось загрузить" retry={data.refresh} />}
         </section>
       </div>
       <p className="statistics-period">

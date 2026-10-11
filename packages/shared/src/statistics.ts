@@ -31,5 +31,5 @@ export interface EmployerExpenses {
   total_kopeks: number;
   categories: Array<{ category: EmployerExpenseCategory; amount_kopeks: number; events: number }>;
   daily: Array<{ date: string; amount_kopeks: number }>;
-  tariffs: { publication_kopeks: number; invitation_kopeks: number; deadline_penalty_kopeks: number; ai_daily_allowance_kopeks: number; ai_usd_rub: number };
+  tariffs: { publication_kopeks: number; invitation_kopeks: number; invitation_send_kopeks: number; invitation_accept_kopeks: number; deadline_penalty_kopeks: number; ai_daily_allowance_kopeks: number; ai_usd_rub: number };
 }

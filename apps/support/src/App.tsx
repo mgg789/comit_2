@@ -153,6 +153,7 @@ function ConversationScreen({ accountId, navigate }: { accountId: string; naviga
           {(item.files ?? []).map(file => <button className="message-file" key={file.id} type="button" onClick={() => void download(file)}>{file.name} · {(file.size / 1024).toFixed(0)} КБ ↓</button>)}
           <time dateTime={item.created_at}>{time(item.created_at)}</time>
         </article>)}
+        <div className="chat-tail-space" aria-hidden="true" />
       </div></div>
       <div className="communication-composer-wrap">
         {error && <p className="communication-error" role="alert">{error}</p>}

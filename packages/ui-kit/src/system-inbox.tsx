@@ -63,7 +63,9 @@ export function SystemInbox({ transport, errorText, navigate }: { transport: Sys
   const [items, setItems] = useState<SystemNotification[]>([]);
   const [loading, setLoading] = useState(true), [error, setError] = useState<string | null>(null);
   const [more, setMore] = useState(false), [visibleSequence, setVisibleSequence] = useState(0);
-  const [text, setText] = useState(""), [sending, setSending] = useState(false);
+  // Complaint links fill a draft only; sending still requires the user's action.
+  const draft = new URLSearchParams(window.location.hash.split("?")[1] || "").get("draft")?.slice(0, 2000) || "";
+  const [text, setText] = useState(draft), [sending, setSending] = useState(false);
   const [files, setFiles] = useState<SystemChatFile[]>([]), [uploading, setUploading] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const cursor = useRef(0), read = useRef(0), fetching = useRef(false), history = useRef<HTMLDivElement>(null), input = useRef<HTMLInputElement>(null);
@@ -149,15 +151,16 @@ export function SystemInbox({ transport, errorText, navigate }: { transport: Sys
       {!loading && !error && !items.length && <p className="empty-note">Здесь появятся уведомления платформы. Напишите нам — отвечаем в этом чате.</p>}
       {items.map(item => {
         const path = item.target ? systemNotificationPath(item.target.path) : null;
-        return <article className={`message-bubble ${isOwnSystemMessage(item) ? "outgoing" : "incoming"}`} data-sequence={item.sequence} key={item.id}><p>{item.text}</p>{(item.files ?? []).map(file => <button className="message-file" key={file.id} type="button" onClick={() => void download(file)}>{file.name} · {(file.size / 1024).toFixed(0)} КБ ↓</button>)}{path && !isOwnSystemMessage(item) && <Action onClick={() => navigate(path)}>Открыть</Action>}<time dateTime={item.created_at}>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.created_at))}</time></article>;
+        return <article className={`message-bubble ${isOwnSystemMessage(item) ? "outgoing" : "incoming"}`} data-sequence={item.sequence} key={item.id}><p>{item.text}</p>{(item.files ?? []).map(file => <button className="message-file" key={file.id} type="button" onClick={() => void download(file)}>{file.name} · {(file.size / 1024).toFixed(0)} КБ ↓</button>)}{path && !isOwnSystemMessage(item) && <Action className="system-message-open" variant="primary" onClick={() => navigate(path)}>Открыть</Action>}<time dateTime={item.created_at}>{new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.created_at))}</time></article>;
       })}
       {more && <Action disabled={loading} onClick={() => window.dispatchEvent(new Event("comit:system-load-more"))}>Другие уведомления</Action>}
+      <div className="chat-tail-space" aria-hidden="true" />
     </div></div>
     {transport.sendMessage && <div className="communication-composer-wrap">
       {error && <p className="communication-error" role="alert">{error}</p>}
       {!!files.length && <div className="pending-files">{files.map(file => <button key={file.id} type="button" onClick={() => setFiles(current => current.filter(item => item.id !== file.id))}>{file.name} ×</button>)}</div>}
       <ChatComposer text={text} onTextChange={value => { setText(value); setError(null); }} onSubmit={event => void submit(event)}
-        messageLabel="Сообщение в поддержку" sendLabel="Отправить в Comit" placeholder="Напишите в поддержку Comit" maxLength={2000}
+        autoFocus={!!draft} messageLabel="Сообщение в поддержку" sendLabel="Отправить в Comit" placeholder="Напишите в поддержку Comit" maxLength={2000}
         canSubmit={!sending && !uploading && (!!text.trim() || !!files.length)} sending={sending} uploading={uploading}
         attachDisabled={!transport.uploadFile || uploading || sending || files.length >= 8} onAttach={() => input.current?.click()}
         attachLabel={transport.uploadFile ? "Прикрепить файл до 8 МБ" : "Вложения в чате поддержки недоступны"}>

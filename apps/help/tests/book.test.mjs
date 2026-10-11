@@ -17,7 +17,8 @@ async function pages(directory) {
 test("HonKit builds all guidance pages and same-origin assets under /help/", async () => {
   const summary = await readFile(path.join(root, "book/SUMMARY.md"), "utf8");
   const chapters = [...summary.matchAll(/\]\(([^)]+\.md)\)/g)].map(match => match[1]);
-  assert.equal(chapters.length, 17);
+  assert.equal(chapters.length, 18);
+  assert.ok(chapters.includes("general/prices.md"), "prices have a dedicated navigation entry");
   assert.equal(new Set(chapters).size, chapters.length);
   for (const chapter of chapters) {
     const filename = chapter === "README.md" ? "index.html" : chapter.replace(/\.md$/, ".html");
@@ -27,7 +28,7 @@ test("HonKit builds all guidance pages and same-origin assets under /help/", asy
     assert.match(html, /gitbook/);
   }
   const files = await pages(output);
-  assert.equal(files.length, 17);
+  assert.equal(files.length, chapters.length);
   for (const file of files) {
     const html = await readFile(file, "utf8");
     // The gateway's global CSP forbids inline executable scripts.
@@ -45,6 +46,9 @@ test("HonKit builds all guidance pages and same-origin assets under /help/", asy
   assert.match(support, /https:\/\/t\.me\/droidje/);
   assert.match(support, /\/candidate\/#\/chats/);
   assert.match(support, /\/employer\/#\/chat/);
+  const prices = await readFile(path.join(output, "general/prices.html"), "utf8");
+  for (const amount of ["398", "196", "49", "147"]) assert.ok(prices.includes(amount));
+  assert.match(prices, /Только после ручного решения поддержки/);
   const search = JSON.parse(await readFile(path.join(output, "search_index.json"), "utf8"));
   assert.ok(Object.keys(search).length > 0, "native HonKit search index is generated");
 });

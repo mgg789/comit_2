@@ -10,6 +10,8 @@
 .settings-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 16rem; margin-bottom: 12rem; }
 .settings-card-heading h2 { margin: 0; }
 .settings-card-heading .action { padding: 12rem 18rem; font-size: 18rem; }
+.settings-company-form { display: grid; gap: 16rem; }
+.settings-company-form .action { justify-self: start; }
 .settings-toggle { display: flex; align-items: center; justify-content: space-between; gap: 24rem; margin-top: 24rem; cursor: pointer; }
 .settings-toggle strong, .settings-security-row strong { display: block; font-size: 20rem; font-weight: 500; }
 .settings-toggle small { display: block; color: var(--comit-text-muted); font-size: 16rem; margin-top: 6rem; }

@@ -440,12 +440,14 @@ export function ProcessCommand({
           </>
         )}
         {error && <p role="alert">{error}</p>}
+        <div className="form-actions">
         <Action type="button" disabled={busy} onClick={onClose}>
           Отмена
         </Action>
         <Action variant="primary" disabled={busy} type="submit">
           {busy ? "Сохраняем…" : "Подтвердить"}
         </Action>
+        </div>
       </form>
     </div>
   );
@@ -847,7 +849,7 @@ export function OrganizationAgent({ onClose }: { onClose: () => void }) {
               onError={reason => setError(errorText(reason))} />)}
           </div>
         )}
-        <div ref={end} />
+        <div ref={end} className="chat-tail-space" aria-hidden="true" />
         </div>
       </div>
       {!loading && !visible.length && (

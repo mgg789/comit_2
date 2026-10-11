@@ -25,8 +25,8 @@ const response = {
       categories: {type:"array",maxItems:4,items:{type:"object",additionalProperties:false,required:["category","amount_kopeks","events"],properties:{
         category:{type:"string",enum:["publication","invitation","ai","penalty"]},amount_kopeks:count,events:count}}},
       daily:{type:"array",maxItems:90,items:{type:"object",additionalProperties:false,required:["date","amount_kopeks"],properties:{date,amount_kopeks:count}}},
-      tariffs:{type:"object",additionalProperties:false,required:["publication_kopeks","invitation_kopeks","deadline_penalty_kopeks","ai_daily_allowance_kopeks","ai_usd_rub"],properties:{
-        publication_kopeks:count,invitation_kopeks:count,deadline_penalty_kopeks:count,ai_daily_allowance_kopeks:count,ai_usd_rub:count}}
+      tariffs:{type:"object",additionalProperties:false,required:["publication_kopeks","invitation_kopeks","invitation_send_kopeks","invitation_accept_kopeks","deadline_penalty_kopeks","ai_daily_allowance_kopeks","ai_usd_rub"],properties:{
+        publication_kopeks:count,invitation_kopeks:count,invitation_send_kopeks:count,invitation_accept_kopeks:count,deadline_penalty_kopeks:count,ai_daily_allowance_kopeks:count,ai_usd_rub:count}}
     }},
     current: counts, previous: counts, unique_candidates: count,
     daily: { type: "array", maxItems: 90, items: { type: "object", additionalProperties: false, required: ["date", "counts"], properties: { date, counts } } },
